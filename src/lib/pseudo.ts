@@ -38,6 +38,18 @@ export function actionTokens(a: Action): Token[] {
 			p.value.type === 'List' ? p.value.value.map((e) => fmtValue(e.value)).join(', ') : undefined;
 		return { text: fmtValue(p.value), cls: valueKind(p.value) || undefined, title };
 	};
+	// small lists render inline (`[a, b]`, each element coloured); large ones stay collapsed.
+	const LIST_INLINE_MAX = 12;
+	const valueTokens = (p: Param): Token[] => {
+		if (p.value.type !== 'List' || p.value.value.length > LIST_INLINE_MAX) return [valueToken(p)];
+		const out: Token[] = [{ text: '[' }];
+		p.value.value.forEach((e, i) => {
+			if (i > 0) out.push({ text: ', ' });
+			out.push(valueToken(e));
+		});
+		out.push({ text: ']' });
+		return out;
+	};
 
 	const store = storeParam(a);
 
@@ -87,7 +99,7 @@ export function actionTokens(a: Action): Token[] {
 	rest.forEach((p, j) => {
 		if (j > 0) toks.push({ text: ', ' });
 		if (p.name) toks.push({ text: `${p.name}=` });
-		toks.push(valueToken(p));
+		toks.push(...valueTokens(p));
 	});
 	toks.push({ text: ')' });
 	return toks;
