@@ -98,7 +98,9 @@
 		<section>
 			<h2>Variables</h2>
 			{#each m.variables as v (v.category + v.name)}
-				<div class="mono"><span class="dim">({v.category})</span> <span class="var">{v.name}</span></div>
+				<div class="mono">
+					<span class="dim">({v.category})</span> <span class="var">{v.name}</span>
+				</div>
 			{/each}
 		</section>
 	{/if}
