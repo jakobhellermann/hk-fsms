@@ -125,13 +125,16 @@
 		const groupOf = new Map<string, number>();
 		groups.forEach((grp, i) => grp.states.forEach((s) => groupOf.set(s, i)));
 
-		// transitions of a state that leave its group (visible ports); intra-chain transitions are hidden
+		// transitions of a state that leave its group (visible ports); intra-chain transitions are hidden.
+		// for chain groups we must look at ALL states, since the exit transition may come from the last
+		// state in the chain, not the first.
 		const transOf = (id: string) => {
-			const raw =
-				id === ANY
-					? model.global_transitions
-					: (model.states.find((s) => s.name === id)?.transitions ?? []);
-			return raw.filter((t) => groupOf.get(id) !== groupOf.get(t.to_state));
+			const grp = groupOf.get(id);
+			if (grp == null) return [];
+			const raw = model.states
+				.filter((s) => groupOf.get(s.name) === grp)
+				.flatMap((s) => s.transitions);
+			return raw.filter((t) => grp !== groupOf.get(t.to_state));
 		};
 
 		// ── dagre layout on groups (compact) — edges only drive ordering ──
@@ -511,6 +514,13 @@
 						{/if}
 						{#each n.rows as r (r.event + r.to)}
 							{@const lit = selected === n.id || selected === r.to}
+							<!-- faint wire linking the event row to its (target-ordered) bottom port -->
+							<path
+								class="wire"
+								class:hot={lit}
+								d="M {n.x + 6} {r.ty} C {n.x + 6} {(r.ty + r.py) / 2}, {r.px} {(r.ty + r.py) /
+									2}, {r.px} {r.py}"
+							/>
 							<text x={n.x + 10} y={r.ty + 3} class="erow" class:hot={lit}>{r.event}</text>
 							<circle cx={r.px} cy={r.py} r="2" class="port" class:hot={lit} />
 						{/each}
@@ -736,6 +746,18 @@
 	.nlabel.sel {
 		fill: var(--accent);
 	}
+	.elabel {
+		fill: var(--event);
+		font-family: ui-monospace, Menlo, monospace;
+		font-size: 11px;
+		paint-order: stroke;
+		stroke: var(--bg);
+		stroke-width: 3px;
+	}
+	.elabel.hot {
+		fill: var(--accent);
+		font-weight: 600;
+	}
 	.erow {
 		fill: var(--event);
 		font-family: ui-monospace, Menlo, monospace;
@@ -749,6 +771,14 @@
 	}
 	.port.hot {
 		fill: var(--accent);
+	}
+	.wire {
+		fill: none;
+		stroke: #4a4a4a;
+		stroke-width: 1;
+	}
+	.wire.hot {
+		stroke: var(--accent);
 	}
 	.chain-divider {
 		stroke: #444;
