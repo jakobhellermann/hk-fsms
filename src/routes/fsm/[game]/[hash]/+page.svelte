@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
+	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
@@ -17,8 +18,28 @@
 		{ id: 'pseudo', label: 'pseudocode' },
 		{ id: 'graph', label: 'graph' }
 	];
-	const mode = $derived<Mode>((page.url.searchParams.get('mode') as Mode) || 'raw');
+	const isMode = (s: string | null): s is Mode => s === 'raw' || s === 'pseudo' || s === 'graph';
+
+	// view mode is a global preference (localStorage) so it carries across FSMs; an explicit
+	// ?mode= in the URL overrides it (and becomes the new preference)
+	const STORAGE_KEY = 'fsm:view-mode';
+	let stored = $state<Mode>('raw');
+	if (browser && isMode(localStorage.getItem(STORAGE_KEY)))
+		stored = localStorage.getItem(STORAGE_KEY) as Mode;
+
+	const urlMode = $derived(page.url.searchParams.get('mode'));
+	const mode = $derived<Mode>(isMode(urlMode) ? urlMode : stored);
+
+	$effect(() => {
+		if (browser && isMode(urlMode) && urlMode !== stored) {
+			stored = urlMode;
+			localStorage.setItem(STORAGE_KEY, urlMode);
+		}
+	});
+
 	function setMode(m: Mode) {
+		stored = m;
+		if (browser) localStorage.setItem(STORAGE_KEY, m);
 		const p = new URLSearchParams(page.url.searchParams);
 		p.set('mode', m);
 		goto(`?${p}`, { replaceState: true, keepFocus: true, noScroll: true });
