@@ -222,12 +222,18 @@
 {:else if indexQuery.isError}
 	<p class="msg err">{String(indexQuery.error)}</p>
 {:else if scene === null}
-	<div class="count dim">{namedScenes.length} scenes</div>
-	{@render groupList(namedGroups, 'named')}
-	{#if otherScenes.length}
-		<div class="count dim section">{otherScenes.length} other files</div>
-		{@render groupList(otherGroups, 'other')}
-	{/if}
+	<div class="cols">
+		<section class="col">
+			<div class="count dim">{namedScenes.length} scenes</div>
+			{@render groupList(namedGroups, 'named')}
+		</section>
+		{#if otherScenes.length}
+			<section class="col">
+				<div class="count dim">{otherScenes.length} other files</div>
+				{@render groupList(otherGroups, 'other')}
+			</section>
+		{/if}
+	</div>
 {:else}
 	<div class="count dim">{sceneCount} FSMs</div>
 	<div class="treewrap">
@@ -306,10 +312,16 @@
 		padding: 0.6rem 1.25rem 0;
 		font-size: 0.85rem;
 	}
-	.count.section {
-		margin-top: 1rem;
-		border-top: 1px solid #2a2a2a;
-		padding-top: 0.8rem;
+	/* scenes + other files side by side, stacking when too narrow to fit */
+	.cols {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 1rem;
+		align-items: flex-start;
+	}
+	.col {
+		flex: 1 1 320px;
+		min-width: 0;
 	}
 	.grouplist {
 		list-style: none;
