@@ -68,23 +68,46 @@
 
 	const line = (pts: { x: number; y: number }[]) => pts.map((p) => `${p.x},${p.y}`).join(' ');
 
-	// scale: default fits the graph to the canvas width; +/- override, reset returns to fit
+	// pan/zoom: an SVG <g> transform driven by mouse drag (pan) and wheel (zoom-to-cursor).
+	// `view` null = follow the fit-to-canvas transform; any interaction pins it to concrete values.
 	let canvas = $state<HTMLDivElement>();
 	let cw = $state(0);
-	const fit = $derived(cw && layout.width ? Math.min(1, (cw - 40) / layout.width) : 1);
-	let userScale = $state<number | null>(null);
-	const scale = $derived(userScale ?? fit);
+	let ch = $state(0);
+	const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-	// drag anywhere on the canvas to pan
-	let drag = $state<{ x: number; y: number; l: number; t: number } | null>(null);
+	const fit = $derived.by(() => {
+		if (!cw || !ch || !layout.width || !layout.height) return { tx: 0, ty: 0, k: 1 };
+		const k = Math.min((cw - 40) / layout.width, (ch - 40) / layout.height, 1);
+		return { tx: (cw - layout.width * k) / 2, ty: (ch - layout.height * k) / 2, k };
+	});
+	let view = $state<{ tx: number; ty: number; k: number } | null>(null);
+	const cur = $derived(view ?? fit);
+
+	// re-fit whenever the layout (i.e. the model) changes
+	$effect(() => {
+		void layout;
+		view = null;
+	});
+
+	function zoomAround(mx: number, my: number, factor: number) {
+		const k = clamp(cur.k * factor, 0.1, 4);
+		const r = k / cur.k;
+		view = { tx: mx - (mx - cur.tx) * r, ty: my - (my - cur.ty) * r, k };
+	}
+	function wheel(e: WheelEvent) {
+		e.preventDefault();
+		const rect = canvas?.getBoundingClientRect();
+		if (!rect) return;
+		zoomAround(e.clientX - rect.left, e.clientY - rect.top, Math.exp(-e.deltaY * 0.0015));
+	}
+
+	let drag = $state<{ x: number; y: number; tx: number; ty: number } | null>(null);
 	function down(e: MouseEvent) {
-		if (!canvas) return;
-		drag = { x: e.clientX, y: e.clientY, l: canvas.scrollLeft, t: canvas.scrollTop };
+		drag = { x: e.clientX, y: e.clientY, tx: cur.tx, ty: cur.ty };
 	}
 	function move(e: MouseEvent) {
-		if (!drag || !canvas) return;
-		canvas.scrollLeft = drag.l - (e.clientX - drag.x);
-		canvas.scrollTop = drag.t - (e.clientY - drag.y);
+		if (!drag) return;
+		view = { tx: drag.tx + (e.clientX - drag.x), ty: drag.ty + (e.clientY - drag.y), k: cur.k };
 	}
 	const end = () => (drag = null);
 </script>
@@ -92,26 +115,26 @@
 <svelte:window onmousemove={move} onmouseup={end} />
 
 <div class="toolbar">
-	<button onclick={() => (userScale = Math.min(scale * 1.25, 3))}>+</button>
-	<button onclick={() => (userScale = Math.max(scale / 1.25, 0.1))}>−</button>
-	<button onclick={() => (userScale = null)}>fit</button>
-	<span class="dim">{model.states.length} states · {Math.round(scale * 100)}% · drag to pan</span>
+	<button onclick={() => zoomAround(cw / 2, ch / 2, 1.25)}>+</button>
+	<button onclick={() => zoomAround(cw / 2, ch / 2, 0.8)}>−</button>
+	<button onclick={() => (view = null)}>fit</button>
+	<span class="dim"
+		>{model.states.length} states · {Math.round(cur.k * 100)}% · drag to pan, scroll to zoom</span
+	>
 </div>
 
-<!-- drag-to-pan is a mouse-only enhancement; native scroll keeps it keyboard-accessible -->
+<!-- drag/wheel are mouse-only enhancements -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="canvas"
 	bind:this={canvas}
 	bind:clientWidth={cw}
+	bind:clientHeight={ch}
 	onmousedown={down}
+	onwheel={wheel}
 	class:grabbing={!!drag}
 >
-	<svg
-		width={layout.width * scale}
-		height={layout.height * scale}
-		viewBox="0 0 {layout.width} {layout.height}"
-	>
+	<svg class="stage">
 		<defs>
 			<marker
 				id="arrow"
@@ -137,35 +160,37 @@
 			</marker>
 		</defs>
 
-		{#each layout.edges as e, i (i)}
-			<polyline
-				points={line(e.points)}
-				fill="none"
-				stroke={e.global ? 'var(--var)' : '#888'}
-				stroke-width="1.3"
-				marker-end="url(#{e.global ? 'arrowg' : 'arrow'})"
-				opacity="0.8"
-			/>
-			<text x={e.lx} y={e.ly - 3} class="elabel" text-anchor="middle">{e.label}</text>
-		{/each}
-
-		{#each layout.nodes as n (n.id)}
-			<g>
-				<rect
-					x={n.x}
-					y={n.y}
-					width={n.w}
-					height={n.h}
-					rx="5"
-					class="node"
-					class:start={n.start}
-					class:any={n.any}
+		<g transform="translate({cur.tx} {cur.ty}) scale({cur.k})">
+			{#each layout.edges as e, i (i)}
+				<polyline
+					points={line(e.points)}
+					fill="none"
+					stroke={e.global ? 'var(--var)' : '#888'}
+					stroke-width="1.3"
+					marker-end="url(#{e.global ? 'arrowg' : 'arrow'})"
+					opacity="0.8"
 				/>
-				<text x={n.x + n.w / 2} y={n.y + n.h / 2 + 4} text-anchor="middle" class="nlabel"
-					>{n.label}</text
-				>
-			</g>
-		{/each}
+				<text x={e.lx} y={e.ly - 3} class="elabel" text-anchor="middle">{e.label}</text>
+			{/each}
+
+			{#each layout.nodes as n (n.id)}
+				<g>
+					<rect
+						x={n.x}
+						y={n.y}
+						width={n.w}
+						height={n.h}
+						rx="5"
+						class="node"
+						class:start={n.start}
+						class:any={n.any}
+					/>
+					<text x={n.x + n.w / 2} y={n.y + n.h / 2 + 4} text-anchor="middle" class="nlabel"
+						>{n.label}</text
+					>
+				</g>
+			{/each}
+		</g>
 	</svg>
 </div>
 
@@ -194,14 +219,19 @@
 		font-size: 0.85rem;
 	}
 	.canvas {
-		overflow: auto;
-		max-height: calc(100vh - 160px);
-		padding: 0 1.25rem 2rem;
+		overflow: hidden;
+		height: calc(100vh - 150px);
 		cursor: grab;
 		user-select: none;
+		touch-action: none;
 	}
 	.canvas.grabbing {
 		cursor: grabbing;
+	}
+	.stage {
+		display: block;
+		width: 100%;
+		height: 100%;
 	}
 	.node {
 		fill: var(--panel);
