@@ -4,22 +4,38 @@
 	import { isDeadAction } from '$lib/actions';
 
 	let { model }: { model: FsmModel } = $props();
+
+	let root = $state<HTMLElement>();
+
+	/** scroll to a state's `state X {` definition block (goto-definition) */
+	function goto(name: string) {
+		root
+			?.querySelector(`[data-state="${CSS.escape(name)}"]`)
+			?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}
 </script>
 
-<div class="code">
+{#snippet stateRef(name: string)}
+	<button type="button" class="state link" onclick={() => goto(name)}>{name}</button>
+{/snippet}
+
+<div class="code" bind:this={root}>
 	<div><span class="kw">fsm</span> <span class="name">{model.name}</span> {'{'}</div>
-	<div class="i1"><span class="kw">start</span> <span class="state">{model.start_state}</span></div>
+	<div class="i1"><span class="kw">start</span> {@render stateRef(model.start_state)}</div>
 	{#each model.global_transitions as t (t.event + t.to_state)}
 		<div class="i1">
 			<span class="kw">on</span> <span class="event">{t.event}</span>
 			<span class="arrow">→</span>
-			<span class="state">{t.to_state}</span> <span class="cmt">// from any state</span>
+			{@render stateRef(t.to_state)} <span class="cmt">// from any state</span>
 		</div>
 	{/each}
 
 	{#each model.states as s (s.name)}
 		<div class="blank"></div>
-		<div class="i1"><span class="kw">state</span> <span class="state">{s.name}</span> {'{'}</div>
+		<div class="i1" data-state={s.name}>
+			<span class="kw">state</span> <span class="state">{s.name}</span>
+			{'{'}
+		</div>
 		{#each s.actions as a, i (i)}
 			{@const dead = a.enabled && isDeadAction(a)}
 			<div class="i2" class:off={!a.enabled || dead}>
@@ -31,7 +47,7 @@
 			<div class="i2">
 				<span class="kw">on</span> <span class="event">{t.event}</span>
 				<span class="arrow">→</span>
-				<span class="state">{t.to_state}</span>
+				{@render stateRef(t.to_state)}
 			</div>
 		{/each}
 		<div class="i1">{'}'}</div>
@@ -84,6 +100,16 @@
 	.state {
 		color: var(--state);
 		font-weight: 600;
+	}
+	.link {
+		cursor: pointer;
+		background: none;
+		border: none;
+		padding: 0;
+		font: inherit;
+	}
+	.link:hover {
+		text-decoration: underline;
 	}
 	.arrow,
 	.cmt {
