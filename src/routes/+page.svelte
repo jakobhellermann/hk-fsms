@@ -4,6 +4,8 @@
 	import type { IndexEntry } from '$lib/model';
 
 	let game = $state<Game>('hk');
+	let scene = $state<string | null>(null);
+	let go = $state<string | null>(null);
 	let query = $state('');
 	let entries = $state<IndexEntry[]>([]);
 	let error = $state<string | null>(null);
@@ -12,6 +14,8 @@
 		const g = game;
 		entries = [];
 		error = null;
+		scene = null;
+		go = null;
 		loadIndex(g)
 			.then((e) => {
 				if (game === g) entries = e;
@@ -21,25 +25,53 @@
 			});
 	});
 
-	// one row per distinct content hash, with how many references point at it
-	type Row = { hash: string; name: string; refs: number };
-	const rows = $derived.by<Row[]>(() => {
-		const by = new Map<string, Row>();
-		for (const e of entries) {
-			const r = by.get(e.hash);
-			if (r) r.refs++;
-			else by.set(e.hash, { hash: e.hash, name: e.name, refs: 1 });
-		}
-		return [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
+	function pickGame(g: Game) {
+		game = g;
+	}
+	function pickScene(s: string | null) {
+		scene = s;
+		go = null;
+		query = '';
+	}
+	function pickGo(o: string | null) {
+		go = o;
+		query = '';
+	}
+
+	const match = (s: string) => s.toLowerCase().includes(query.trim().toLowerCase());
+
+	// level 1: scenes with FSM counts
+	const scenes = $derived.by(() => {
+		const by = new Map<string, number>();
+		for (const e of entries) by.set(e.file, (by.get(e.file) ?? 0) + 1);
+		return [...by.entries()]
+			.map(([file, count]) => ({ file, count }))
+			.filter((s) => match(s.file))
+			.sort((a, b) => a.file.localeCompare(b.file));
 	});
 
-	const LIMIT = 400;
-	const filtered = $derived.by(() => {
-		const q = query.trim().toLowerCase();
-		if (!q) return rows;
-		return rows.filter((r) => r.name.toLowerCase().includes(q));
+	// level 2: game objects within the chosen scene
+	const gameObjects = $derived.by(() => {
+		if (!scene) return [];
+		const by = new Map<string, number>();
+		for (const e of entries)
+			if (e.file === scene) by.set(e.game_object, (by.get(e.game_object) ?? 0) + 1);
+		return [...by.entries()]
+			.map(([path, count]) => ({ path, count }))
+			.filter((g) => match(g.path))
+			.sort((a, b) => a.path.localeCompare(b.path));
 	});
-	const shown = $derived(filtered.slice(0, LIMIT));
+
+	// level 3: FSMs on the chosen game object
+	const fsms = $derived.by(() => {
+		if (!scene || go === null) return [];
+		return entries
+			.filter((e) => e.file === scene && e.game_object === go)
+			.filter((e) => match(e.name))
+			.sort((a, b) => a.name.localeCompare(b.name));
+	});
+
+	const leaf = (p: string) => p.split('/').pop() || p;
 </script>
 
 <header>
@@ -47,29 +79,58 @@
 	<div class="controls">
 		<div class="games">
 			{#each GAMES as g (g.id)}
-				<button class:active={game === g.id} onclick={() => (game = g.id)}>{g.label}</button>
+				<button class:active={game === g.id} onclick={() => pickGame(g.id)}>{g.label}</button>
 			{/each}
 		</div>
-		<input placeholder="filter by name…" bind:value={query} />
+		<input placeholder="filter…" bind:value={query} />
 	</div>
-	<div class="dim status">
-		{#if error}
-			<span class="err">{error}</span>
-		{:else}
-			{filtered.length} of {rows.length} distinct FSMs{#if filtered.length > LIMIT}
-				— showing first {LIMIT}{/if}
+
+	<nav class="crumbs">
+		<button class="crumb" class:active={!scene} onclick={() => pickScene(null)}>scenes</button>
+		{#if scene}
+			<span class="sep">›</span>
+			<button class="crumb" class:active={!!scene && go === null} onclick={() => pickGo(null)}
+				>{scene}</button
+			>
 		{/if}
-	</div>
+		{#if scene && go !== null}
+			<span class="sep">›</span>
+			<span class="crumb active" title={go}>{go === '' ? '(scene root)' : leaf(go)}</span>
+		{/if}
+	</nav>
 </header>
 
-<ul class="list">
-	{#each shown as r (r.hash)}
-		<li>
-			<a href="{base}/fsm/{game}/{r.hash}">{r.name}</a>
-			{#if r.refs > 1}<span class="dim">×{r.refs}</span>{/if}
-		</li>
-	{/each}
-</ul>
+{#if error}
+	<p class="err">{error}</p>
+{:else if !scene}
+	<ul class="list">
+		{#each scenes as s (s.file)}
+			<li>
+				<button class="rowbtn" onclick={() => pickScene(s.file)}>{s.file}</button>
+				<span class="dim">×{s.count}</span>
+			</li>
+		{/each}
+	</ul>
+{:else if go === null}
+	<ul class="list">
+		{#each gameObjects as g (g.path)}
+			<li>
+				<button class="rowbtn" onclick={() => pickGo(g.path)} title={g.path}>
+					{g.path === '' ? '(scene root)' : leaf(g.path)}
+				</button>
+				<span class="dim">×{g.count}</span>
+			</li>
+		{/each}
+	</ul>
+{:else}
+	<ul class="list fsmlist">
+		{#each fsms as e (e.path_id)}
+			<li>
+				<a href="{base}/fsm/{game}/{e.hash}">{e.name}</a>
+			</li>
+		{/each}
+	</ul>
+{/if}
 
 <style>
 	header {
@@ -108,11 +169,27 @@
 		padding: 0.35rem 0.6rem;
 		border-radius: 4px;
 	}
-	.status {
-		margin-top: 0.5rem;
+	.crumbs {
+		margin-top: 0.6rem;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-family: ui-monospace, Menlo, monospace;
 	}
-	.err {
-		color: #e06c75;
+	.crumb {
+		background: none;
+		border: none;
+		color: var(--accent);
+		cursor: pointer;
+		padding: 0;
+		font: inherit;
+	}
+	.crumb.active {
+		color: var(--fg);
+		cursor: default;
+	}
+	.sep {
+		color: var(--dim);
 	}
 	.list {
 		list-style: none;
@@ -121,8 +198,27 @@
 		columns: 3;
 		column-gap: 2rem;
 	}
+	.fsmlist {
+		columns: 2;
+	}
 	.list li {
 		break-inside: avoid;
 		padding: 0.15rem 0;
+	}
+	.rowbtn {
+		background: none;
+		border: none;
+		color: var(--accent);
+		cursor: pointer;
+		padding: 0;
+		font: inherit;
+		text-align: left;
+	}
+	.rowbtn:hover {
+		text-decoration: underline;
+	}
+	.err {
+		color: #e06c75;
+		padding-left: 1.25rem;
 	}
 </style>

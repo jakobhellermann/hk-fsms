@@ -181,5 +181,6 @@ export interface IndexEntry {
 	file: string;
 	path_id: number;
 	name: string;
+	game_object: string;
 	hash: string;
 }
