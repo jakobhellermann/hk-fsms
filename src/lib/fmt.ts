@@ -9,7 +9,6 @@ import type {
 	Property,
 	StrValue,
 	TemplateControl,
-	Value,
 	VarValue
 } from './model';
 
@@ -54,27 +53,6 @@ function fmtEnum(e: EnumValue): string {
 
 function fmtArray(a: ArrayValue): string {
 	return a.kind === 'Var' ? `var ${q(a.value)}` : `array[${a.value.length} elems]`;
-}
-
-function fmtInner(v: Value): string {
-	switch (v.type) {
-		case 'Var':
-			return `var ${q(v.value)}`;
-		case 'Bool':
-		case 'Int':
-		case 'Float':
-			return String(v.value);
-		case 'Str':
-			return q(v.value);
-		case 'Vector':
-			return `(${v.value.join(', ')})`;
-		case 'Enum':
-			return `${short(v.value.enum_name)}(${v.value.value})`;
-		case 'Object':
-			return fmtObjectRef(v.value);
-		case 'Array':
-			return fmtArray(v.value);
-	}
 }
 
 function fmtVar(v: VarValue): string {
@@ -127,7 +105,9 @@ function fmtProperty(p: Property): string {
 
 function fmtTemplate(t: TemplateControl): string {
 	const vmap = (es: { variable: string; value: VarValue }[], arrow: string) =>
-		es.map((o) => (o.value.type === 'Var' ? `${o.variable}${arrow}var ${q(o.value.value)}` : o.variable));
+		es.map((o) =>
+			o.value.type === 'Var' ? `${o.variable}${arrow}var ${q(o.value.value)}` : o.variable
+		);
 	const parts = [`template=${t.template}`];
 	for (const [label, vars] of [
 		['in', vmap(t.inputs, '<-')],

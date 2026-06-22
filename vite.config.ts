@@ -13,7 +13,9 @@ export default defineConfig({
 			// any route that isn't prerendered. `base` lets the site live in a GH Pages subdir.
 			adapter: adapter({ fallback: '404.html' }),
 			paths: {
-				base: process.argv.includes('dev') ? '' : ((process.env.BASE_PATH ?? '') as '' | `/${string}`)
+				base: process.argv.includes('dev')
+					? ''
+					: ((process.env.BASE_PATH ?? '') as '' | `/${string}`)
 			}
 		})
 	]

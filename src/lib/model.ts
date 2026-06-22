@@ -91,9 +91,7 @@ export type EnumValue =
 	| { kind: 'Value'; value: number };
 
 // tag="kind", content="value"
-export type ArrayValue =
-	| { kind: 'Var'; value: string }
-	| { kind: 'Values'; value: Value[] };
+export type ArrayValue = { kind: 'Var'; value: string } | { kind: 'Values'; value: Value[] };
 
 // tag="type", content="value"
 export type Value =
