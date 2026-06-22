@@ -76,7 +76,7 @@
 	const namedGroups = $derived(groupNamedScenes(namedScenes));
 	const otherGroups = $derived(groupOtherFiles(otherScenes));
 
-	type FsmLeaf = { name: string; hash: string };
+	type FsmLeaf = { name: string; hash: string; pathId: number };
 	type TreeNode = { name: string; children: Map<string, TreeNode>; fsms: FsmLeaf[] };
 
 	const newNode = (name: string): TreeNode => ({ name, children: new Map(), fsms: [] });
@@ -95,7 +95,7 @@
 				if (!child) node.children.set(seg, (child = newNode(seg)));
 				node = child;
 			}
-			node.fsms.push({ name: e.name, hash: e.hash });
+			node.fsms.push({ name: e.name, hash: e.hash, pathId: e.path_id });
 		}
 		return root;
 	});
@@ -117,7 +117,7 @@
 {#snippet fsmLeaves(node: TreeNode)}
 	{#if node.fsms.length}
 		<ul class="fsms">
-			{#each sortedFsms(node) as f (f.hash + f.name)}
+			{#each sortedFsms(node) as f (f.pathId)}
 				<li><a href={fsmHref(f.hash)}>{f.name}</a></li>
 			{/each}
 		</ul>
