@@ -120,6 +120,31 @@ function varName(v: ParamValue): string | null {
 	}
 }
 
+/** Binary math operators rendered as expressions — class → [leftParam, rightParam]. */
+const OPERATORS: Record<string, [string, string]> = {
+	FloatOperator: ['float1', 'float2'],
+	IntOperator: ['integer1', 'integer2']
+};
+// PlayMaker's Operation enum order; the first four are infix, Min/Max render as min()/max().
+const OP_SYMBOLS = ['+', '-', '*', '/', 'min', 'max'];
+
+/**
+ * A binary math operator's operands and operator symbol, for rendering `a * b` / `min(a, b)`.
+ * `undefined` if the action isn't a known operator or its `operation` enum is out of range.
+ */
+export function binaryOp(
+	a: Action
+): { left: Param; right: Param; op: string; infix: boolean } | undefined {
+	const names = OPERATORS[short(a.class)];
+	if (!names) return undefined;
+	const left = a.params.find((p) => p.name === names[0]);
+	const right = a.params.find((p) => p.name === names[1]);
+	const operation = a.params.find((p) => p.name === 'operation')?.value;
+	if (!left || !right || operation?.type !== 'Int') return undefined;
+	const op = OP_SYMBOLS[operation.value];
+	return op === undefined ? undefined : { left, right, op, infix: operation.value < 4 };
+}
+
 /** Pure variable-assignment actions, rendered as `<target var> = <value>` — class → [target, value]. */
 const SETTERS: Record<string, [string, string]> = {
 	SetBoolValue: ['boolVariable', 'boolValue'],

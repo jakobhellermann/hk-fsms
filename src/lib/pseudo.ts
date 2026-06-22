@@ -1,6 +1,6 @@
 import type { Action, FsmModel, Param } from './model';
 import { fmtValue, short, valueKind } from './fmt';
-import { isHiddenParam, setter, storeParam } from './actions';
+import { binaryOp, isHiddenParam, setter, storeParam } from './actions';
 
 /** compact one-line arg list for an action: `name=value, …` (unnamed params show just the value) */
 export function args(params: Param[]): string {
@@ -27,12 +27,42 @@ export interface Token {
 }
 
 /**
- * Tokenised, colour-tagged form of an action line for the PseudoView. A single var-bound `store*`
- * output is lifted into an assignment prefix (`var "x" = Action(…)`); variables and events carry
- * their value colour. The plain-text `actionText` above stays the canonical (snapshot) form.
+ * Tokenised, colour-tagged form of an action line for the PseudoView. Several action shapes get a
+ * friendlier rendering — math operators as `a * b`, setters and single var-bound `store*` outputs as
+ * `var "x" = …` — otherwise it's `Action(args)`. The plain-text `actionText` stays the canonical form.
  */
 export function actionTokens(a: Action): Token[] {
-	const toks: Token[] = [];
+	const valueToken = (p: Param): Token => {
+		// a collapsed `[N elems]` list keeps its elements as hover text
+		const title =
+			p.value.type === 'List' ? p.value.value.map((e) => fmtValue(e.value)).join(', ') : undefined;
+		return { text: fmtValue(p.value), cls: valueKind(p.value) || undefined, title };
+	};
+
+	const store = storeParam(a);
+
+	// binary math operators: `target = a * b` (Min/Max as `min(a, b)`)
+	const op = binaryOp(a);
+	if (store && op) {
+		const used = [store, op.left, op.right];
+		const others = a.params.filter(
+			(p) => !used.includes(p) && p.name !== 'operation' && !isHiddenParam(a, p)
+		);
+		if (others.length === 0) {
+			const lhs: Token = { text: fmtValue(store.value), cls: 'var' };
+			return op.infix
+				? [lhs, { text: ' = ' }, valueToken(op.left), { text: ` ${op.op} ` }, valueToken(op.right)]
+				: [
+						lhs,
+						{ text: ' = ' },
+						{ text: `${op.op}(` },
+						valueToken(op.left),
+						{ text: ', ' },
+						valueToken(op.right),
+						{ text: ')' }
+					];
+		}
+	}
 
 	// pure setter actions collapse to `var "x" = value` — but only when nothing else is visible
 	// (e.g. an everyFrame=true would otherwise be dropped), else fall through to the normal form.
@@ -45,22 +75,19 @@ export function actionTokens(a: Action): Token[] {
 			return [
 				{ text: fmtValue(set.target.value), cls: 'var' },
 				{ text: ' = ' },
-				{ text: fmtValue(set.value.value), cls: valueKind(set.value.value) || undefined }
+				valueToken(set.value)
 			];
 		}
 	}
 
-	const store = storeParam(a);
+	const toks: Token[] = [];
 	const rest = a.params.filter((p) => p !== store && !isHiddenParam(a, p));
 	if (store) toks.push({ text: fmtValue(store.value), cls: 'var' }, { text: ' = ' });
 	toks.push({ text: short(a.class), cls: 'act' }, { text: '(' });
 	rest.forEach((p, j) => {
 		if (j > 0) toks.push({ text: ', ' });
 		if (p.name) toks.push({ text: `${p.name}=` });
-		// a collapsed `[N elems]` list keeps its elements as hover text
-		const title =
-			p.value.type === 'List' ? p.value.value.map((e) => fmtValue(e.value)).join(', ') : undefined;
-		toks.push({ text: fmtValue(p.value), cls: valueKind(p.value) || undefined, title });
+		toks.push(valueToken(p));
 	});
 	toks.push({ text: ')' });
 	return toks;
