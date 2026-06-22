@@ -57,6 +57,9 @@ export function isHiddenParam(a: Action, p: Param): boolean {
 		return true;
 	// `FsmOwnerDefault` set to UseOwner (`Self`) is the implicit target — only a specified object is news.
 	if (p.value.type === 'Owner' && p.value.value === 'SelfOwner') return true;
+	// An unbound variable slot (`<var>`): use-variable is set but no variable was chosen, so the param
+	// has no effect (e.g. SetPosition leaves that axis unchanged, a store writes nowhere).
+	if (p.value.type === 'PackedVar' && p.value.value === null) return true;
 	return false;
 }
 
