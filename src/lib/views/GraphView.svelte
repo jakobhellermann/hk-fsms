@@ -67,17 +67,46 @@
 	});
 
 	const line = (pts: { x: number; y: number }[]) => pts.map((p) => `${p.x},${p.y}`).join(' ');
-	let scale = $state(1);
+
+	// scale: default fits the graph to the canvas width; +/- override, reset returns to fit
+	let canvas = $state<HTMLDivElement>();
+	let cw = $state(0);
+	const fit = $derived(cw && layout.width ? Math.min(1, (cw - 40) / layout.width) : 1);
+	let userScale = $state<number | null>(null);
+	const scale = $derived(userScale ?? fit);
+
+	// drag anywhere on the canvas to pan
+	let drag = $state<{ x: number; y: number; l: number; t: number } | null>(null);
+	function down(e: MouseEvent) {
+		if (!canvas) return;
+		drag = { x: e.clientX, y: e.clientY, l: canvas.scrollLeft, t: canvas.scrollTop };
+	}
+	function move(e: MouseEvent) {
+		if (!drag || !canvas) return;
+		canvas.scrollLeft = drag.l - (e.clientX - drag.x);
+		canvas.scrollTop = drag.t - (e.clientY - drag.y);
+	}
+	const end = () => (drag = null);
 </script>
 
+<svelte:window onmousemove={move} onmouseup={end} />
+
 <div class="toolbar">
-	<button onclick={() => (scale = Math.min(scale * 1.25, 3))}>+</button>
-	<button onclick={() => (scale = Math.max(scale / 1.25, 0.3))}>−</button>
-	<button onclick={() => (scale = 1)}>reset</button>
-	<span class="dim">{model.states.length} states · drag to scroll</span>
+	<button onclick={() => (userScale = Math.min(scale * 1.25, 3))}>+</button>
+	<button onclick={() => (userScale = Math.max(scale / 1.25, 0.1))}>−</button>
+	<button onclick={() => (userScale = null)}>fit</button>
+	<span class="dim">{model.states.length} states · {Math.round(scale * 100)}% · drag to pan</span>
 </div>
 
-<div class="canvas">
+<!-- drag-to-pan is a mouse-only enhancement; native scroll keeps it keyboard-accessible -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="canvas"
+	bind:this={canvas}
+	bind:clientWidth={cw}
+	onmousedown={down}
+	class:grabbing={!!drag}
+>
 	<svg
 		width={layout.width * scale}
 		height={layout.height * scale}
@@ -168,6 +197,11 @@
 		overflow: auto;
 		max-height: calc(100vh - 160px);
 		padding: 0 1.25rem 2rem;
+		cursor: grab;
+		user-select: none;
+	}
+	.canvas.grabbing {
+		cursor: grabbing;
 	}
 	.node {
 		fill: var(--panel);
