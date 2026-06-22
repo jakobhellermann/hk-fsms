@@ -4,11 +4,25 @@
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { fetchModel, isGame, type Game } from '$lib/data';
-	import { short } from '$lib/fmt';
-	import ParamRow from '$lib/ParamRow.svelte';
+	import RawView from '$lib/views/RawView.svelte';
+	import PseudoView from '$lib/views/PseudoView.svelte';
+	import GraphView from '$lib/views/GraphView.svelte';
 
 	const game = $derived((page.params.game ?? 'hk') as Game);
 	const hash = $derived(page.params.hash ?? '');
+
+	type Mode = 'raw' | 'pseudo' | 'graph';
+	const MODES: { id: Mode; label: string }[] = [
+		{ id: 'raw', label: 'raw' },
+		{ id: 'pseudo', label: 'pseudocode' },
+		{ id: 'graph', label: 'graph' }
+	];
+	const mode = $derived<Mode>((page.url.searchParams.get('mode') as Mode) || 'raw');
+	function setMode(m: Mode) {
+		const p = new URLSearchParams(page.url.searchParams);
+		p.set('mode', m);
+		goto(`?${p}`, { replaceState: true, keepFocus: true, noScroll: true });
+	}
 
 	const modelQuery = createQuery(() => ({
 		queryKey: ['model', game, hash],
@@ -22,151 +36,100 @@
 	}
 </script>
 
-<nav>
-	<a
-		href="{base}/"
-		onclick={(e) => {
-			e.preventDefault();
-			back();
-		}}>← back</a
-	>
-	<span class="dim mono">{hash}</span>
-</nav>
+<header>
+	<nav>
+		<a
+			href="{base}/"
+			onclick={(e) => {
+				e.preventDefault();
+				back();
+			}}>← back</a
+		>
+		<span class="dim mono">{hash}</span>
+	</nav>
 
-{#if modelQuery.isError}
-	<p class="err">{String(modelQuery.error)}</p>
-{:else if !modelQuery.data}
-	<p class="dim">loading…</p>
-{:else}
-	{@const m = modelQuery.data}
-	<h1>{m.name}</h1>
-	<div class="dim">
-		start=<span class="state">{m.start_state}</span> · {m.states.length} states · {m.events.length}
-		events
-	</div>
-
-	{#if m.events.length}
-		<section>
-			<h2>Events</h2>
-			{#each m.events as e (e.name)}
-				<div class="mono">
-					<span class="event">{e.name}</span>
-					{#if e.is_global}<span class="dim">(global)</span>{/if}
-					{#if e.is_system}<span class="dim">(system)</span>{/if}
-				</div>
-			{/each}
-		</section>
-	{/if}
-
-	{#if m.global_transitions.length}
-		<section>
-			<h2>Global transitions</h2>
-			{#each m.global_transitions as t (t.event + t.to_state)}
-				<div class="mono">
-					on <span class="event">{t.event}</span> → <span class="state">{t.to_state}</span>
-				</div>
-			{/each}
-		</section>
-	{/if}
-
-	<section>
-		<h2>States</h2>
-		{#each m.states as s (s.name)}
-			<div class="state-block">
-				<div class="state-head">
-					{#if s.is_start}<span class="dim">*</span>{/if}
-					<span class="state">{s.name}</span>
-				</div>
-				{#each s.transitions as t (t.event + t.to_state)}
-					<div class="mono trans">
-						on <span class="event">{t.event}</span> → <span class="state">{t.to_state}</span>
-					</div>
-				{/each}
-				{#each s.actions as a, i (i)}
-					<div class="action">
-						<div class="action-head">
-							<span class="act">{short(a.class)}</span>
-							{#if a.custom_name && a.custom_name !== short(a.class)}<span class="dim"
-									>"{a.custom_name}"</span
-								>{/if}
-							{#if !a.enabled}<span class="dim">(disabled)</span>{/if}
-						</div>
-						{#each a.params as p, j (j)}
-							<ParamRow param={p} />
-						{/each}
-					</div>
+	{#if modelQuery.data}
+		{@const m = modelQuery.data}
+		<div class="title">
+			<h1>{m.name}</h1>
+			<div class="modes">
+				{#each MODES as mo (mo.id)}
+					<button class:active={mode === mo.id} onclick={() => setMode(mo.id)}>{mo.label}</button>
 				{/each}
 			</div>
-		{/each}
-	</section>
-
-	{#if m.variables.length}
-		<section>
-			<h2>Variables</h2>
-			{#each m.variables as v (v.category + v.name)}
-				<div class="mono">
-					<span class="dim">({v.category})</span> <span class="var">{v.name}</span>
-				</div>
-			{/each}
-		</section>
+		</div>
+		<div class="dim stats">
+			start=<span class="state">{m.start_state}</span> · {m.states.length} states · {m.events
+				.length} events · {m.variables.length} vars
+		</div>
 	{/if}
+</header>
+
+{#if modelQuery.isError}
+	<p class="msg err">{String(modelQuery.error)}</p>
+{:else if !modelQuery.data}
+	<p class="msg dim">loading…</p>
+{:else if mode === 'pseudo'}
+	<PseudoView model={modelQuery.data} />
+{:else if mode === 'graph'}
+	<GraphView model={modelQuery.data} />
+{:else}
+	<RawView model={modelQuery.data} />
 {/if}
 
 <style>
-	nav,
-	h1,
-	section,
-	.dim {
-		padding-left: 1.25rem;
-		padding-right: 1.25rem;
+	header {
+		padding: 1rem 1.25rem 0.75rem;
+		border-bottom: 1px solid #333;
+		position: sticky;
+		top: 0;
+		background: var(--bg);
+		z-index: 1;
 	}
 	nav {
-		padding-top: 1rem;
+		display: flex;
+		gap: 0.75rem;
+		align-items: baseline;
+	}
+	.title {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-top: 0.4rem;
 	}
 	h1 {
-		margin: 0.5rem 0 0;
+		margin: 0;
+		font-size: 1.25rem;
 	}
-	h2 {
-		font-size: 0.85rem;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--dim);
-		margin: 1.5rem 0 0.5rem;
+	.modes button {
+		background: var(--panel);
+		color: var(--fg);
+		border: 1px solid #333;
+		padding: 0.25rem 0.6rem;
+		cursor: pointer;
 	}
-	section {
-		padding-left: 1.25rem;
+	.modes button:first-child {
+		border-radius: 4px 0 0 4px;
 	}
-	.state-block {
-		margin: 0.75rem 0;
+	.modes button:last-child {
+		border-radius: 0 4px 4px 0;
 	}
-	.state-head {
-		font-weight: 600;
+	.modes button.active {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
-	.trans {
-		padding-left: 1.5rem;
-	}
-	.action {
-		margin: 0.4rem 0 0.4rem 1rem;
-		border-left: 2px solid #333;
-		padding-left: 0.75rem;
-	}
-	.action-head {
-		font-family: ui-monospace, Menlo, monospace;
-	}
-	.event {
-		color: var(--event);
+	.stats {
+		margin-top: 0.3rem;
+		font-size: 0.9rem;
 	}
 	.state {
 		color: var(--state);
 	}
-	.act {
-		color: var(--action);
-	}
-	.var {
-		color: var(--var);
+	.msg {
+		padding: 1rem 1.25rem;
 	}
 	.err {
 		color: #e06c75;
-		padding-left: 1.25rem;
 	}
 </style>
