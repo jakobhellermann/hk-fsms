@@ -5,29 +5,31 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { GAMES, fetchIndex, goLeaf, isGame, sceneLabel, type Game } from '$lib/data';
 
-	// navigation state lives in the URL so reloads restore the exact view
+	// navigation + filter state live in the URL so reloads/back restore the exact view
 	const params = $derived(page.url.searchParams);
 	const game = $derived<Game>(isGame(params.get('game')) ? (params.get('game') as Game) : 'hk');
 	const scene = $derived(params.get('scene')); // null = scenes view
-	const go = $derived(params.has('go') ? params.get('go')! : null); // null = game-objects view
+	const query = $derived(params.get('q') ?? '');
 
-	let query = $state('');
+	// numeric-aware ordering so `level2` sorts before `level10`
+	const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+	const byName = <T extends { name: string }>(a: T, b: T) => coll.compare(a.name, b.name);
 
-	function nav(next: { game?: Game; scene?: string | null; go?: string | null }) {
+	function setQuery(v: string) {
 		const p = new URLSearchParams(params);
-		if (next.game !== undefined) p.set('game', next.game);
-		if ('scene' in next) {
-			if (next.scene) p.set('scene', next.scene);
-			else p.delete('scene');
-			p.delete('go');
-		}
-		if ('go' in next) {
-			if (next.go !== null && next.go !== undefined) p.set('go', next.go);
-			else p.delete('go');
-		}
-		query = ''; // each drill-down level starts unfiltered
-		goto(`?${p}`, { keepFocus: true, noScroll: true });
+		if (v) p.set('q', v);
+		else p.delete('q');
+		// replaceState: typing shouldn't spam the history stack
+		goto(`${base}/?${p}`, { keepFocus: true, noScroll: true, replaceState: true });
 	}
+
+	function hrefFor(opts: { game?: Game; scene?: string }) {
+		const p = new URLSearchParams();
+		p.set('game', opts.game ?? game);
+		if (opts.scene) p.set('scene', opts.scene);
+		return `${base}/?${p}`;
+	}
+	const fsmHref = (hash: string) => `${base}/fsm/${game}/${hash}`;
 
 	const indexQuery = createQuery(() => ({
 		queryKey: ['index', game],
@@ -41,9 +43,9 @@
 		const by = new Map<string, number>();
 		for (const e of entries) by.set(e.file, (by.get(e.file) ?? 0) + 1);
 		return [...by.entries()]
-			.map(([file, count]) => ({ file, label: sceneLabel(file), count }))
-			.filter((s) => match(s.label))
-			.sort((a, b) => a.label.localeCompare(b.label));
+			.map(([file, count]) => ({ file, name: sceneLabel(file), count }))
+			.filter((s) => match(s.name))
+			.sort(byName);
 	});
 
 	// area = the scene-name prefix before the first underscore; only shown as quick-filter chips when
@@ -57,65 +59,103 @@
 			by.set(a, (by.get(a) ?? 0) + 1);
 		}
 		if (by.size < 2 || by.size > files.size * 0.7) return [];
-		return [...by.entries()]
-			.map(([area, count]) => ({ area, count }))
-			.sort((a, b) => a.area.localeCompare(b.area));
+		return [...by.entries()].map(([name, count]) => ({ name, count })).sort(byName);
 	});
 
-	const gameObjects = $derived.by(() => {
-		if (scene === null) return [];
-		const by = new Map<string, number>();
-		for (const e of entries)
-			if (e.file === scene) by.set(e.game_object, (by.get(e.game_object) ?? 0) + 1);
-		return [...by.entries()]
-			.map(([path, count]) => ({ path, label: goLeaf(path), count }))
-			.filter((g) => match(g.label) || match(g.path))
-			.sort((a, b) => a.label.localeCompare(b.label));
+	type FsmLeaf = { name: string; hash: string };
+	type TreeNode = { name: string; children: Map<string, TreeNode>; fsms: FsmLeaf[] };
+
+	const newNode = (name: string): TreeNode => ({ name, children: new Map(), fsms: [] });
+
+	// build the GameObject hierarchy for the selected scene; FSMs hang off their owning object
+	const tree = $derived.by(() => {
+		const root = newNode('');
+		if (scene === null) return root;
+		for (const e of entries) {
+			if (e.file !== scene) continue;
+			if (query && !(match(e.name) || match(e.game_object))) continue;
+			const segs = e.game_object === '' ? [] : e.game_object.split('/');
+			let node = root;
+			for (const seg of segs) {
+				let child = node.children.get(seg);
+				if (!child) node.children.set(seg, (child = newNode(seg)));
+				node = child;
+			}
+			node.fsms.push({ name: e.name, hash: e.hash });
+		}
+		return root;
 	});
 
-	const fsms = $derived.by(() => {
-		if (scene === null || go === null) return [];
-		return entries
-			.filter((e) => e.file === scene && e.game_object === go)
-			.filter((e) => match(e.name))
-			.sort((a, b) => a.name.localeCompare(b.name));
-	});
+	function countFsms(n: TreeNode): number {
+		let c = n.fsms.length;
+		for (const child of n.children.values()) c += countFsms(child);
+		return c;
+	}
+	const sortedChildren = (n: TreeNode) => [...n.children.values()].sort(byName);
+	const sortedFsms = (n: TreeNode) => [...n.fsms].sort(byName);
+	const sceneCount = $derived(scene === null ? 0 : countFsms(tree));
 
-	const placeholder = $derived(
-		scene === null ? 'filter scenes…' : go === null ? 'filter game objects…' : 'filter FSMs…'
-	);
+	const placeholder = $derived(scene === null ? 'filter scenes…' : 'filter objects & FSMs…');
 </script>
+
+{#snippet fsmLeaves(node: TreeNode)}
+	{#if node.fsms.length}
+		<ul class="fsms">
+			{#each sortedFsms(node) as f (f.hash + f.name)}
+				<li><a href={fsmHref(f.hash)}>{f.name}</a></li>
+			{/each}
+		</ul>
+	{/if}
+{/snippet}
+
+{#snippet treeNodes(node: TreeNode)}
+	<ul class="tree">
+		{#each sortedChildren(node) as child (child.name)}
+			<li>
+				{#if child.children.size}
+					<details open>
+						<summary>
+							<span class="obj">{child.name}</span>
+							<span class="dim badge">{countFsms(child)}</span>
+						</summary>
+						{@render fsmLeaves(child)}
+						{@render treeNodes(child)}
+					</details>
+				{:else}
+					<div class="objrow"><span class="obj">{child.name}</span></div>
+					{@render fsmLeaves(child)}
+				{/if}
+			</li>
+		{/each}
+	</ul>
+{/snippet}
 
 <header>
 	<div class="topline">
 		<h1>PlayMaker FSM browser</h1>
 		<div class="games">
 			{#each GAMES as g (g.id)}
-				<button class:active={game === g.id} onclick={() => nav({ game: g.id, scene: null })}>
-					{g.label}
-				</button>
+				<a class="gamebtn" class:active={game === g.id} href={hrefFor({ game: g.id })}>{g.label}</a>
 			{/each}
 		</div>
 	</div>
 
 	<nav class="crumbs">
-		<button class="crumb" class:active={scene === null} onclick={() => nav({ scene: null })}>
-			scenes
-		</button>
+		<a class="crumb" class:active={scene === null} href={hrefFor({})}>scenes</a>
 		{#if scene !== null}
 			<span class="sep">›</span>
-			<button class="crumb" class:active={go === null} onclick={() => nav({ scene, go: null })}>
-				{sceneLabel(scene)}
-			</button>
-		{/if}
-		{#if scene !== null && go !== null}
-			<span class="sep">›</span>
-			<span class="crumb active" title={go}>{goLeaf(go)}</span>
+			<span class="crumb active">{sceneLabel(scene)}</span>
 		{/if}
 	</nav>
 
 	<!-- svelte-ignore a11y_autofocus -->
-	<input class="filter" {placeholder} bind:value={query} autofocus />
+	<input
+		class="filter"
+		{placeholder}
+		value={query}
+		oninput={(e) => setQuery(e.currentTarget.value)}
+		autofocus
+	/>
 </header>
 
 {#if indexQuery.isPending}
@@ -125,13 +165,13 @@
 {:else if scene === null}
 	{#if areas.length}
 		<div class="chips">
-			{#each areas as a (a.area)}
+			{#each areas as a (a.name)}
 				<button
 					class="chip"
-					class:active={query === a.area}
-					onclick={() => (query = query === a.area ? '' : a.area)}
+					class:active={query === a.name}
+					onclick={() => setQuery(query === a.name ? '' : a.name)}
 				>
-					{a.area} <span class="dim">{a.count}</span>
+					{a.name} <span class="dim">{a.count}</span>
 				</button>
 			{/each}
 		</div>
@@ -140,28 +180,20 @@
 	<ul class="grid">
 		{#each scenes as s (s.file)}
 			<li>
-				<button class="rowbtn" onclick={() => nav({ scene: s.file })}>{s.label}</button>
+				<a class="rowlink" href={hrefFor({ scene: s.file })}>{s.name}</a>
 				<span class="dim badge">{s.count}</span>
 			</li>
 		{/each}
 	</ul>
-{:else if go === null}
-	<div class="count dim">{gameObjects.length} game objects</div>
-	<ul class="grid">
-		{#each gameObjects as g (g.path)}
-			<li>
-				<button class="rowbtn" onclick={() => nav({ go: g.path })} title={g.path}>{g.label}</button>
-				<span class="dim badge">{g.count}</span>
-			</li>
-		{/each}
-	</ul>
 {:else}
-	<div class="count dim">{fsms.length} FSMs</div>
-	<ul class="grid">
-		{#each fsms as e (e.path_id)}
-			<li><a href="{base}/fsm/{game}/{e.hash}">{e.name}</a></li>
-		{/each}
-	</ul>
+	<div class="count dim">{sceneCount} FSMs</div>
+	<div class="treewrap">
+		{#if tree.fsms.length}
+			<div class="objrow"><span class="obj dim">{goLeaf('')}</span></div>
+			{@render fsmLeaves(tree)}
+		{/if}
+		{@render treeNodes(tree)}
+	</div>
 {/if}
 
 <style>
@@ -183,15 +215,16 @@
 		font-size: 1.05rem;
 		margin: 0;
 	}
-	.games button {
+	.gamebtn {
 		background: var(--panel);
 		color: var(--fg);
 		border: 1px solid #333;
 		padding: 0.3rem 0.7rem;
 		cursor: pointer;
 		border-radius: 4px;
+		text-decoration: none;
 	}
-	.games button.active {
+	.gamebtn.active {
 		border-color: var(--accent);
 		color: var(--accent);
 	}
@@ -204,16 +237,16 @@
 		font-size: 0.9rem;
 	}
 	.crumb {
-		background: none;
-		border: none;
 		color: var(--accent);
-		cursor: pointer;
-		padding: 0;
-		font: inherit;
+		text-decoration: none;
+	}
+	.crumb:hover {
+		text-decoration: underline;
 	}
 	.crumb.active {
 		color: var(--fg);
 		cursor: default;
+		text-decoration: none;
 	}
 	.sep {
 		color: var(--dim);
@@ -264,24 +297,60 @@
 		padding: 0.15rem 0;
 		min-width: 0;
 	}
-	.rowbtn {
-		background: none;
-		border: none;
+	.rowlink {
 		color: var(--accent);
-		cursor: pointer;
-		padding: 0;
-		font: inherit;
-		text-align: left;
+		text-decoration: none;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.rowbtn:hover {
+	.rowlink:hover {
 		text-decoration: underline;
 	}
 	.badge {
 		font-size: 0.75rem;
 		flex-shrink: 0;
+	}
+
+	/* object tree */
+	.treewrap {
+		padding: 0.4rem 1.25rem 2rem;
+		font-size: 0.9rem;
+	}
+	.tree {
+		list-style: none;
+		margin: 0;
+		padding-left: 1.1rem;
+		border-left: 1px solid #2a2a2a;
+	}
+	.treewrap > .tree {
+		padding-left: 0;
+		border-left: none;
+	}
+	details > summary {
+		cursor: pointer;
+		padding: 0.1rem 0;
+	}
+	.obj {
+		color: var(--fg);
+	}
+	.objrow {
+		padding: 0.1rem 0;
+	}
+	.fsms {
+		list-style: none;
+		margin: 0;
+		padding-left: 1.1rem;
+	}
+	.fsms li {
+		padding: 0.05rem 0;
+	}
+	.fsms a {
+		color: var(--accent);
+		text-decoration: none;
+	}
+	.fsms a:hover {
+		text-decoration: underline;
 	}
 	.msg {
 		padding: 1rem 1.25rem;
