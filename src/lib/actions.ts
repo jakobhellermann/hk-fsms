@@ -42,6 +42,18 @@ export function isDeadAction(a: Action): boolean {
 /** `<short class>.<param>` pairs whose empty-string literal is just an unset default → hide it. */
 const HIDDEN_EMPTY_STRINGS = new Set(['Tk2dPlayAnimation.animLibName']);
 
+/**
+ * Actions whose `FsmEvent` params are pure result branches: an unset (`(none)`) branch is noise, so
+ * show only the wired ones. (Compare/test actions — their events are the whole point of the result.)
+ */
+const HIDE_EMPTY_EVENTS = new Set([
+	'FloatCompare',
+	'IntCompare',
+	'StringCompare',
+	'BoolTest',
+	'PlayerDataBoolTest'
+]);
+
 const isEmptyString = (v: ParamValue): boolean =>
 	v.type === 'FsmString' && v.value.kind === 'Literal' && v.value.value === '';
 
@@ -64,6 +76,9 @@ export function isHiddenParam(a: Action, p: Param): boolean {
 	// An unbound variable slot (`<var>`): use-variable is set but no variable was chosen, so the param
 	// has no effect (e.g. SetPosition leaves that axis unchanged, a store writes nowhere).
 	if (p.value.type === 'PackedVar' && p.value.value === null) return true;
+	// Unset result branches of compare/test actions (`equal=(none)` …) — keep only the wired events.
+	if (p.value.type === 'Event' && p.value.value === null && HIDE_EMPTY_EVENTS.has(short(a.class)))
+		return true;
 	return false;
 }
 
