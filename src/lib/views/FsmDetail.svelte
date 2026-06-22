@@ -52,21 +52,26 @@
 	<p class="msg dim">loading…</p>
 {:else}
 	{@const m = modelQuery.data}
-	<div class="bar">
-		<div class="modes">
-			{#each MODES as mo (mo.id)}
-				<button class:active={mode === mo.id} onclick={() => setMode(mo.id)}>{mo.label}</button>
-			{/each}
-		</div>
-	</div>
-	{#if mode === 'pseudo'}
-		<PseudoView model={m} />
-	{:else if mode === 'graph'}
-		<GraphView model={m} />
+	{#if mode === 'graph'}
+		<!-- the graph hosts the mode tabs in its own toolbar (same row as +/−/fit) -->
+		<GraphView model={m} {modeTabs} />
 	{:else}
-		<RawView model={m} />
+		<div class="bar">{@render modeTabs()}</div>
+		{#if mode === 'pseudo'}
+			<PseudoView model={m} />
+		{:else}
+			<RawView model={m} />
+		{/if}
 	{/if}
 {/if}
+
+{#snippet modeTabs()}
+	<div class="modes">
+		{#each MODES as mo (mo.id)}
+			<button class:active={mode === mo.id} onclick={() => setMode(mo.id)}>{mo.label}</button>
+		{/each}
+	</div>
+{/snippet}
 
 <style>
 	.bar {

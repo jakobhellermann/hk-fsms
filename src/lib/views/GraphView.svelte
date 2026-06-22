@@ -1,12 +1,13 @@
 <script module lang="ts">
 	import { browser } from '$app/environment';
 
-	// sidebar width is drag-resizable and persisted in localStorage
-	const SIDEBAR_KEY = 'fsm:graph-sidebar-w';
-	let sidebarWidth = $state((browser && Number(localStorage.getItem(SIDEBAR_KEY))) || 440);
+	// bottom pseudocode panel height is drag-resizable and persisted in localStorage
+	const SIDEBAR_KEY = 'fsm:graph-panel-h';
+	let panelHeight = $state((browser && Number(localStorage.getItem(SIDEBAR_KEY))) || 320);
 </script>
 
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import dagre from '@dagrejs/dagre';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -14,7 +15,8 @@
 	import { actionTokens } from '$lib/pseudo';
 	import { isDeadAction } from '$lib/actions';
 
-	let { model }: { model: FsmModel } = $props();
+	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as +/−/fit)
+	let { model, modeTabs }: { model: FsmModel; modeTabs?: Snippet } = $props();
 
 	// the selected state lives in the URL (?state=) so it survives reload and is shareable; its
 	// pseudocode shows in the sidebar
@@ -107,13 +109,28 @@
 		const k = Math.min((cw - 40) / layout.width, (ch - 40) / layout.height, 1);
 		return { tx: (cw - layout.width * k) / 2, ty: (ch - layout.height * k) / 2, k };
 	});
+	// default view: 100% zoom, centred horizontally, near the top
+	const home = $derived({ tx: (cw - layout.width) / 2, ty: 20, k: 1 });
 	let view = $state<{ tx: number; ty: number; k: number } | null>(null);
-	const cur = $derived(view ?? fit);
+	const cur = $derived(view ?? home);
 
 	// re-fit whenever the layout (i.e. the model) changes
 	$effect(() => {
 		void layout;
 		view = null;
+	});
+
+	// size the body to exactly fill the viewport below it — robust to the header height (vs a fixed
+	// magic offset, which left a sliver of page scroll)
+	let bodyEl = $state<HTMLElement>();
+	let bodyTop = $state(0);
+	$effect(() => {
+		const measure = () => {
+			if (bodyEl) bodyTop = bodyEl.getBoundingClientRect().top + window.scrollY;
+		};
+		measure();
+		window.addEventListener('resize', measure);
+		return () => window.removeEventListener('resize', measure);
 	});
 
 	function zoomAround(mx: number, my: number, factor: number) {
@@ -129,30 +146,35 @@
 	}
 
 	let drag = $state<{ x: number; y: number; tx: number; ty: number } | null>(null);
+	let moved = false; // whether the current canvas drag actually panned (vs a plain click)
 	function down(e: MouseEvent) {
+		moved = false;
 		drag = { x: e.clientX, y: e.clientY, tx: cur.tx, ty: cur.ty };
 	}
 
-	// drag the sidebar's left edge to resize it
-	let resizing = $state<{ x: number; w: number } | null>(null);
+	// drag the panel's top edge to resize its height
+	let resizing = $state<{ y: number; h: number } | null>(null);
 	function resizeDown(e: MouseEvent) {
 		e.preventDefault();
-		resizing = { x: e.clientX, w: sidebarWidth };
+		resizing = { y: e.clientY, h: panelHeight };
 	}
 
 	function move(e: MouseEvent) {
 		if (resizing) {
-			sidebarWidth = clamp(resizing.w + (resizing.x - e.clientX), 280, 760);
+			panelHeight = clamp(resizing.h + (resizing.y - e.clientY), 120, 640);
 			return;
 		}
 		if (!drag) return;
+		if (Math.abs(e.clientX - drag.x) > 3 || Math.abs(e.clientY - drag.y) > 3) moved = true;
 		view = { tx: drag.tx + (e.clientX - drag.x), ty: drag.ty + (e.clientY - drag.y), k: cur.k };
 	}
 	function end() {
+		// a click on empty canvas (mousedown+up without a pan) clears the selection
+		if (drag && !moved) select(null);
 		drag = null;
 		if (resizing) {
 			resizing = null;
-			if (browser) localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth));
+			if (browser) localStorage.setItem(SIDEBAR_KEY, String(panelHeight));
 		}
 	}
 </script>
@@ -162,13 +184,17 @@
 <div class="toolbar">
 	<button onclick={() => zoomAround(cw / 2, ch / 2, 1.25)}>+</button>
 	<button onclick={() => zoomAround(cw / 2, ch / 2, 0.8)}>−</button>
-	<button onclick={() => (view = null)}>fit</button>
+	<button onclick={() => (view = { ...fit })}>fit</button>
 	<span class="dim"
 		>{model.states.length} states · {Math.round(cur.k * 100)}% · drag to pan, scroll to zoom</span
 	>
+	{#if modeTabs}
+		<span class="grow"></span>
+		{@render modeTabs()}
+	{/if}
 </div>
 
-<div class="body">
+<div class="body" bind:this={bodyEl} style="height: calc(100dvh - {bodyTop}px)">
 	<!-- drag/wheel are mouse-only enhancements -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
@@ -178,6 +204,7 @@
 		bind:clientHeight={ch}
 		onmousedown={down}
 		onwheel={wheel}
+		oncontextmenu={(e) => e.preventDefault()}
 		class:grabbing={!!drag}
 	>
 		<svg class="stage">
@@ -242,11 +269,8 @@
 					<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 					<g
 						class:clickable={!n.any}
-						onmousedown={(e) => {
-							if (!n.any) e.stopPropagation();
-						}}
 						onclick={() => {
-							if (!n.any) select(n.id);
+							if (!n.any && !moved) select(n.id);
 						}}
 					>
 						<rect
@@ -269,10 +293,10 @@
 		</svg>
 	</div>
 
-	{#if selectedState}
-		<aside class="sidebar" style="width: {sidebarWidth}px">
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="resizer" onmousedown={resizeDown} class:active={!!resizing}></div>
+	<aside class="panel" style="height: {panelHeight}px">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="resizer" onmousedown={resizeDown} class:active={!!resizing}></div>
+		{#if selectedState}
 			<div class="sbhead">
 				<span class="state">{selectedState.name}</span>
 				<button class="close" onclick={() => select(null)} aria-label="close">×</button>
@@ -299,8 +323,10 @@
 					<div class="cmt">(no actions or transitions)</div>
 				{/if}
 			</div>
-		</aside>
-	{/if}
+		{:else}
+			<div class="empty dim">click a state to see its actions & transitions</div>
+		{/if}
+	</aside>
 </div>
 
 <style>
@@ -309,6 +335,9 @@
 		align-items: center;
 		gap: 0.4rem;
 		padding: 0.5rem 1.25rem;
+	}
+	.grow {
+		flex: 1;
 	}
 	.toolbar button {
 		background: var(--panel);
@@ -329,12 +358,12 @@
 	}
 	.body {
 		display: flex;
-		height: calc(100vh - 150px);
+		flex-direction: column;
+		/* height is set inline from the measured top offset (see component) */
 	}
 	.canvas {
 		flex: 1;
-		min-width: 0;
-		height: 100%;
+		min-height: 0;
 		overflow: hidden;
 		cursor: grab;
 		user-select: none;
@@ -350,21 +379,26 @@
 		stroke: var(--accent);
 		stroke-width: 2.5;
 	}
-	.sidebar {
+	.panel {
 		position: relative;
 		flex-shrink: 0;
-		height: 100%;
-		overflow: auto;
-		border-left: 1px solid #333;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		border-top: 1px solid #333;
 		background: var(--bg);
+	}
+	.empty {
+		padding: 1rem;
 	}
 	.resizer {
 		position: absolute;
 		left: 0;
+		right: 0;
 		top: 0;
-		bottom: 0;
-		width: 6px;
-		cursor: col-resize;
+		height: 6px;
+		cursor: row-resize;
 		z-index: 2;
 	}
 	.resizer:hover,
@@ -379,8 +413,6 @@
 		gap: 0.5rem;
 		padding: 0.6rem 1rem;
 		border-bottom: 1px solid #333;
-		position: sticky;
-		top: 0;
 		background: var(--bg);
 	}
 	.sbhead .state {
@@ -399,6 +431,9 @@
 		color: var(--fg);
 	}
 	.code {
+		flex: 1;
+		min-height: 0;
+		overflow: auto;
 		padding: 0.8rem 1rem 2rem;
 		font-family: ui-monospace, Menlo, monospace;
 		font-size: 13px;
