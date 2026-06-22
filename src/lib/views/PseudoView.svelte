@@ -1,18 +1,9 @@
 <script lang="ts">
-	import type { FsmModel, Param } from '$lib/model';
-	import { fmtValue, short } from '$lib/fmt';
+	import type { FsmModel } from '$lib/model';
+	import { short } from '$lib/fmt';
+	import { args } from '$lib/pseudo';
 
 	let { model }: { model: FsmModel } = $props();
-
-	// compact one-line arg list for an action: `name=value, …`
-	function args(params: Param[]): string {
-		return params
-			.map((p) => {
-				const v = fmtValue(p.value);
-				return p.name ? `${p.name}=${v}` : v;
-			})
-			.join(', ');
-	}
 </script>
 
 <div class="code">
