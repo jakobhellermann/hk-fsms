@@ -13,13 +13,40 @@
 			?.querySelector(`[data-state="${CSS.escape(name)}"]`)
 			?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
+
+	/** Ctrl+A inside the code block selects only the code, not the whole page */
+	function onSelectAll(e: KeyboardEvent) {
+		if (!(e.ctrlKey || e.metaKey) || e.key !== 'a') return;
+		e.preventDefault();
+		const sel = getSelection();
+		if (!sel || !root) return;
+		const range = document.createRange();
+		range.selectNodeContents(root);
+		sel.removeAllRanges();
+		sel.addRange(range);
+	}
 </script>
 
 {#snippet stateRef(name: string)}
-	<button type="button" class="state link" onclick={() => goto(name)}>{name}</button>
+	<span
+		class="state link"
+		role="button"
+		tabindex="0"
+		onclick={() => goto(name)}
+		onkeydown={(e) => e.key === 'Enter' && goto(name)}>{name}</span
+	>
 {/snippet}
 
-<div class="code" bind:this={root}>
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+	class="code"
+	bind:this={root}
+	tabindex="0"
+	role="region"
+	aria-label="pseudocode"
+	onkeydown={onSelectAll}
+>
 	<div><span class="kw">fsm</span> <span class="name">{model.name}</span> {'{'}</div>
 	<div class="i1"><span class="kw">start</span> {@render stateRef(model.start_state)}</div>
 	{#each model.global_transitions as t (t.event + t.to_state)}
@@ -103,10 +130,6 @@
 	}
 	.link {
 		cursor: pointer;
-		background: none;
-		border: none;
-		padding: 0;
-		font: inherit;
 	}
 	.link:hover {
 		text-decoration: underline;
