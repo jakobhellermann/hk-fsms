@@ -2,11 +2,21 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { fetchIndex, fsmSegments, goLeaf, isGame, resolveFsm, type Game } from '$lib/data';
+	import {
+		DEFAULT_GAME,
+		fetchIndex,
+		fsmSegments,
+		goLeaf,
+		isGame,
+		resolveFsm,
+		type Game
+	} from '$lib/data';
 	import type { IndexEntry } from '$lib/model';
 	import FsmDetail from '$lib/views/FsmDetail.svelte';
 
-	const game = $derived<Game>(isGame(page.params.game ?? null) ? (page.params.game as Game) : 'ss');
+	const game = $derived<Game>(
+		isGame(page.params.game ?? null) ? (page.params.game as Game) : DEFAULT_GAME
+	);
 	const scene = $derived(page.params.scene ?? '');
 	const rest = $derived(page.params.rest ? page.params.rest.split('/') : []);
 	const query = $derived(page.url.searchParams.get('q') ?? '');

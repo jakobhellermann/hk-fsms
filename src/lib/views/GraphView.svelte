@@ -89,7 +89,15 @@
 		const edges: Edge[] = g.edges().map((e) => {
 			const d = g.edge(e) as { points: { x: number; y: number }[]; label: string; global: boolean };
 			const mid = d.points[Math.floor(d.points.length / 2)] ?? { x: 0, y: 0 };
-			return { points: d.points, label: d.label, global: d.global, from: e.v, to: e.w, lx: mid.x, ly: mid.y };
+			return {
+				points: d.points,
+				label: d.label,
+				global: d.global,
+				from: e.v,
+				to: e.w,
+				lx: mid.x,
+				ly: mid.y
+			};
 		});
 		const gl = g.graph();
 		return { nodes, edges, width: gl.width ?? 100, height: gl.height ?? 100 };

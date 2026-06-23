@@ -2,11 +2,21 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { GAMES, fetchIndex, fetchSceneNames, isGame, sceneLabel, type Game } from '$lib/data';
+	import {
+		GAMES,
+		DEFAULT_GAME,
+		fetchIndex,
+		fetchSceneNames,
+		isGame,
+		sceneLabel,
+		type Game
+	} from '$lib/data';
 	import { groupNamedScenes, groupOtherFiles, type SceneGroup } from '$lib/scenes';
 	import { isGroupOpen, setGroupOpen } from '$lib/openGroups';
 
-	const game = $derived<Game>(isGame(page.params.game ?? null) ? (page.params.game as Game) : 'ss');
+	const game = $derived<Game>(
+		isGame(page.params.game ?? null) ? (page.params.game as Game) : DEFAULT_GAME
+	);
 	const query = $derived(page.url.searchParams.get('q') ?? '');
 
 	const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });

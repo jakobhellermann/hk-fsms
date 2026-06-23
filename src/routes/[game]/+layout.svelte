@@ -3,11 +3,13 @@
 	import { afterNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { GAMES, fetchSceneNames, isGame, sceneLabel, type Game } from '$lib/data';
+	import { GAMES, DEFAULT_GAME, fetchSceneNames, isGame, sceneLabel, type Game } from '$lib/data';
 
 	let { children } = $props();
 
-	const game = $derived<Game>(isGame(page.params.game ?? null) ? (page.params.game as Game) : 'ss');
+	const game = $derived<Game>(
+		isGame(page.params.game ?? null) ? (page.params.game as Game) : DEFAULT_GAME
+	);
 	const gameLabel = $derived(GAMES.find((g) => g.id === game)?.label ?? game);
 	const scene = $derived(page.params.scene ?? null);
 	// segments below the scene: [] = object tree, [...gameObject, fsm] = an FSM detail
