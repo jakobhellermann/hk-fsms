@@ -22,5 +22,9 @@ pack-data:
 unpack-data:
 	bash scripts/unzip-data.sh
 
+# dump all FSMs to pseudocode text files (requires unpacked data: just unpack-data)
+dump-pseudo *args:
+	cargo run --release --quiet --manifest-path indexer/Cargo.toml --bin dump-pseudo -- {{args}}
+
 clean:
 	rm -rf static/data

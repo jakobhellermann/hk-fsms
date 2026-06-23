@@ -130,7 +130,7 @@ export function fmtValue(v: ParamValue): string {
 		case 'Vector':
 			return `(${v.value.join(', ')})`;
 		case 'PackedVar':
-			return v.value === null ? '<var>' : `var ${q(v.value)}`;
+			return v.value === null ? '(unset)' : `var ${q(v.value)}`;
 		case 'Event':
 			return v.value === null ? '(none)' : `→${q(v.value)}`;
 		case 'Str':

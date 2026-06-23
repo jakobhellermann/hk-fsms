@@ -49,7 +49,7 @@ describe('fmtValue', () => {
 	});
 
 	it('packed vars and events distinguish null', () => {
-		expect(fmtValue({ type: 'PackedVar', value: null })).toBe('<var>');
+		expect(fmtValue({ type: 'PackedVar', value: null })).toBe('(unset)');
 		expect(fmtValue({ type: 'PackedVar', value: 'Gravity Scale' })).toBe('var "Gravity Scale"');
 		expect(fmtValue({ type: 'Event', value: null })).toBe('(none)');
 		expect(fmtValue({ type: 'Event', value: 'SLASH' })).toBe('→"SLASH"');
