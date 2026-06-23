@@ -85,13 +85,18 @@
 	</nav>
 
 	{#if !isDetail}
-		<input
-			class="filter"
-			{placeholder}
-			value={query}
-			oninput={(e) => setQuery(e.currentTarget.value)}
-			bind:this={filterEl}
-		/>
+		<div class="filter-wrap">
+			<input
+				class="filter"
+				{placeholder}
+				value={query}
+				oninput={(e) => setQuery(e.currentTarget.value)}
+				bind:this={filterEl}
+			/>
+			{#if query}
+				<button class="clear" onclick={() => setQuery('')} aria-label="clear filter">✕</button>
+			{/if}
+		</div>
 	{/if}
 </header>
 
@@ -157,6 +162,9 @@
 	.sep {
 		color: var(--dim);
 	}
+	.filter-wrap {
+		position: relative;
+	}
 	.filter {
 		width: 100%;
 		background: var(--panel);
@@ -164,5 +172,21 @@
 		border: 1px solid #333;
 		padding: 0.4rem 0.65rem;
 		border-radius: 4px;
+	}
+	.clear {
+		position: absolute;
+		right: 0.4rem;
+		top: 50%;
+		transform: translateY(-50%);
+		background: none;
+		border: none;
+		color: var(--dim);
+		cursor: pointer;
+		font-size: 0.8rem;
+		padding: 0.1rem 0.3rem;
+		line-height: 1;
+	}
+	.clear:hover {
+		color: var(--fg);
 	}
 </style>
