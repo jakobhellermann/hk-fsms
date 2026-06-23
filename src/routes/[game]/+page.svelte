@@ -163,13 +163,13 @@
 		min-width: 0;
 	}
 	.count {
-		padding: 0.6rem 1.25rem 0;
+		padding: 0.6rem var(--pad-x) 0;
 		font-size: 0.9rem;
 	}
 	.grouplist {
 		list-style: none;
 		margin: 0;
-		padding: 0.4rem 1.25rem 2rem;
+		padding: 0.4rem var(--pad-x) 2rem;
 	}
 	.grouplist > li {
 		padding: 0.08rem 0;
@@ -213,7 +213,7 @@
 		flex-shrink: 0;
 	}
 	.msg {
-		padding: 1rem 1.25rem;
+		padding: 1rem var(--pad-x);
 	}
 	.err {
 		color: #e06c75;

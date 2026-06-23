@@ -506,7 +506,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		padding: 0.5rem 1.25rem;
+		padding: 0.5rem var(--pad-x);
 	}
 	.grow {
 		flex: 1;

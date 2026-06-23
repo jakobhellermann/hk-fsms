@@ -109,7 +109,7 @@
 
 <style>
 	.code {
-		padding: 1rem 1.25rem 3rem;
+		padding: 1rem var(--pad-x) 3rem;
 		font-family: ui-monospace, Menlo, monospace;
 		font-size: 14px;
 		line-height: 1.65;

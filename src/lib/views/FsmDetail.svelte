@@ -77,7 +77,7 @@
 	.bar {
 		display: flex;
 		justify-content: flex-end;
-		padding: 0.5rem 1.25rem;
+		padding: 0.5rem var(--pad-x);
 	}
 	.modes button {
 		background: var(--panel);
@@ -97,7 +97,7 @@
 		color: var(--accent);
 	}
 	.msg {
-		padding: 1rem 1.25rem;
+		padding: 1rem var(--pad-x);
 	}
 	.err {
 		color: #e06c75;

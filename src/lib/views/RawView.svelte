@@ -82,7 +82,7 @@
 		margin: 1.5rem 0 0.5rem;
 	}
 	section {
-		padding: 0 1.25rem;
+		padding: 0 var(--pad-x);
 	}
 	.state-block {
 		margin: 0.75rem 0;

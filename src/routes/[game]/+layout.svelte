@@ -101,7 +101,7 @@
 
 <style>
 	header {
-		padding: 0.85rem 1.25rem;
+		padding: 0.85rem var(--pad-x);
 		position: sticky;
 		top: 0;
 		background: var(--bg);
