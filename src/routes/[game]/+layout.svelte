@@ -65,7 +65,11 @@
 		<a class="home" href="{base}/{game}"><h1>PlayMaker FSM browser</h1></a>
 		<div class="games">
 			{#each GAMES as g (g.id)}
-				<a class="gamebtn" class:active={game === g.id} href="{base}/{g.id}">{g.label}</a>
+				<a
+					class="gamebtn"
+					class:active={game === g.id}
+					href="{base}/{g.id}{query ? `?q=${encodeURIComponent(query)}` : ''}">{g.label}</a
+				>
 			{/each}
 		</div>
 	</div>
