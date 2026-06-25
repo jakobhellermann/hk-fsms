@@ -33,7 +33,12 @@
 	// rest is empty on the object tree, [...gameObject, fsm] on a detail
 	const detailEntry = $derived(rest.length ? resolveFsm(entries, scene, rest) : undefined);
 
-	const match = (s: string) => s.toLowerCase().includes(query.trim().toLowerCase());
+	const terms = $derived(query.trim().toLowerCase().split(/\s+/).filter(Boolean));
+	const match = (s: string) => {
+		if (!terms.length) return true;
+		const lower = s.toLowerCase();
+		return terms.every((t) => lower.includes(t));
+	};
 	const fsmHref = (e: IndexEntry) =>
 		`${base}/${game}/${fsmSegments(entries, e).map(encodeURIComponent).join('/')}`;
 
