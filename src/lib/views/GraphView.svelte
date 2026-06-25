@@ -35,7 +35,7 @@
 
 	const CHAR = 7.3;
 	const ROW_H = 20;
-	const PAD_Y = 8;
+	const PAD_Y = 0;
 
 	// a state inside a chain node: its name + the event that transitions to the next state (empty on last)
 	type ChainState = { name: string; event: string };
