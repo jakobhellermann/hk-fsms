@@ -429,11 +429,24 @@
 		const r = k / cur.k;
 		view = { tx: mx - (mx - cur.tx) * r, ty: my - (my - cur.ty) * r, k };
 	}
+	// coalesce wheel events to one zoom per animation frame: trackpads fire far faster than 60 Hz and
+	// each `view` write forces a synchronous repaint of the whole SVG. summed deltas compose exactly
+	// (exp is multiplicative), so batching is lossless.
+	let wheelAccum = 0;
+	let wheelPos = { x: 0, y: 0 };
+	let wheelRaf = 0;
 	function wheel(e: WheelEvent) {
 		e.preventDefault();
 		const rect = canvas?.getBoundingClientRect();
 		if (!rect) return;
-		zoomAround(e.clientX - rect.left, e.clientY - rect.top, Math.exp(-e.deltaY * 0.0015));
+		wheelPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+		wheelAccum += e.deltaY;
+		if (!wheelRaf)
+			wheelRaf = requestAnimationFrame(() => {
+				wheelRaf = 0;
+				zoomAround(wheelPos.x, wheelPos.y, Math.exp(-wheelAccum * 0.0015));
+				wheelAccum = 0;
+			});
 	}
 
 	let drag = $state<{ x: number; y: number; tx: number; ty: number } | null>(null);
