@@ -426,16 +426,13 @@
 										if (!moved) select(s.name);
 									}}
 								/>
-								<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 								<text
 									x={n.x + n.w / 2}
 									y={n.y + PAD_Y + j * ROW_H + 14}
 									text-anchor="middle"
 									class="nlabel"
 									class:sel={selected === s.name}
-									onclick={() => {
-										if (!moved) select(s.name);
-									}}>{s.name}</text
+									style="pointer-events: none">{s.name}</text
 								>
 								{#if s.event && s.event !== 'FINISHED' && j < n.chain.length - 1}
 									<text x={n.x + n.w + 4} y={n.y + PAD_Y + (j + 1) * ROW_H - 2} class="chain-arrow"
