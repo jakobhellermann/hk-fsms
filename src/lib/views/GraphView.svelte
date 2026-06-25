@@ -360,10 +360,14 @@
 				const portEdges = edges.filter((e) => srcRow.has(e));
 				for (const n of nodes) {
 					const repack = (items: { e: Edge; out: boolean }[], py: number) => {
+						// order by the other end's x; tie-break by the edge's own identity so a bidirectional
+						// pair (which ties — both ends are the same node) lands in the SAME lane at both nodes
+						// and runs parallel instead of crossing
+						const eid = (e: Edge) => e.from + ' ' + e.to;
 						items.sort((a, b) => {
 							const ka = a.out ? byId.get(a.e.to)! : byId.get(a.e.from)!;
 							const kb = b.out ? byId.get(b.e.to)! : byId.get(b.e.from)!;
-							return cx(ka) - cx(kb);
+							return cx(ka) - cx(kb) || eid(a.e).localeCompare(eid(b.e));
 						});
 						items.forEach((it, k) => {
 							const x = n.x + (n.w * (k + 1)) / (items.length + 1);
