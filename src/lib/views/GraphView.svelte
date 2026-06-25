@@ -446,17 +446,15 @@
 
 	// cubic curve from a port to the target: bottom/lone ports leave straight down, side ports leave
 	// horizontally toward their own side; the target is approached from above (top dock) or, for a
-	// back-edge, from below (bottom dock, `up`). vertical back-edges get a lateral lane so they bow
-	// clear of the forward edge running the other way in the same corridor.
-	const LANE = 30;
+	// back-edge, from below (bottom dock, `up`). distinct out/in slots (see re-pack pass) already keep
+	// opposing edges apart, so a vertically-aligned edge stays straight.
 	const edgePath = (e: Edge) => {
 		const vertical = layoutCfg.edgeStyle === 'bottom' || e.down;
 		const off = vertical ? 40 : 50;
-		const lane = vertical && e.up ? LANE : 0;
 		const c1 = vertical
-			? `${e.sx! + lane} ${e.sy! + (e.topPort ? -40 : 40)}`
+			? `${e.sx!} ${e.sy! + (e.topPort ? -40 : 40)}`
 			: `${e.sx! + (e.bow ?? (e.tx! < e.sx! ? -50 : 50))} ${e.sy!}`;
-		const c2 = e.up ? `${e.tx! + lane} ${e.ty! + off}` : `${e.tx!} ${e.ty! - off}`;
+		const c2 = e.up ? `${e.tx!} ${e.ty! + off}` : `${e.tx!} ${e.ty! - off}`;
 		return `M ${e.sx!} ${e.sy!} C ${c1}, ${c2}, ${e.tx!} ${e.ty!}`;
 	};
 
