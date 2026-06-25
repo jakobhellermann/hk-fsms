@@ -445,15 +445,24 @@
 							{/each}
 						{:else}
 							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+							<rect
+								x={n.x}
+								y={n.y}
+								width={n.w}
+								height={n.h}
+								rx="5"
+								class="node-slot"
+								onclick={() => {
+									if (!n.any && !moved) select(n.id);
+								}}
+							/>
 							<text
 								x={n.x + n.w / 2}
 								y={n.y + n.h / 2 + 4}
 								text-anchor="middle"
 								class="nlabel"
-								class:clickable={!n.any}
-								onclick={() => {
-									if (!n.any && !moved) select(n.id);
-								}}>{n.label}</text
+								class:sel={selected === n.id}
+								style="pointer-events: none">{n.label}</text
 							>
 						{/if}
 					</g>
@@ -544,9 +553,6 @@
 	}
 	.canvas.grabbing {
 		cursor: grabbing;
-	}
-	.clickable {
-		cursor: pointer;
 	}
 	.node.sel {
 		stroke: var(--accent);
@@ -708,6 +714,13 @@
 	.chain-divider {
 		stroke: #444;
 		stroke-width: 1;
+	}
+	.node-slot {
+		fill: transparent;
+		cursor: pointer;
+	}
+	.node-slot:hover {
+		fill: color-mix(in srgb, var(--fg) 8%, transparent);
 	}
 	.chain-slot {
 		fill: transparent;
