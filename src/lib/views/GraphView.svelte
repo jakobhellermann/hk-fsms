@@ -97,6 +97,7 @@
 		global: boolean;
 		// port-based state transitions (side/bottom):
 		down?: boolean;
+		up?: boolean; // target docked at its bottom edge (entered from below) rather than its top
 		bow?: number; // side mode: horizontal direction the curve leaves the port (matches the port side)
 		sx?: number;
 		sy?: number;
@@ -298,14 +299,18 @@
 					ordered.forEach((o, j) => {
 						o.r.px = n.x + (n.w * (j + 1)) / (ordered.length + 1);
 						o.r.py = n.y + n.h;
+						// a back-edge (target above the port) docks at the target's bottom and is entered from
+						// below, rather than looping over the top
+						const up = o.target.y + o.target.h <= o.r.py;
 						edges.push({
 							from: n.id,
 							to: o.target.id,
 							global: n.any,
+							up,
 							sx: o.r.px,
 							sy: o.r.py,
 							tx: cx(o.target),
-							ty: o.target.y
+							ty: up ? o.target.y + o.target.h : o.target.y
 						});
 					});
 				} else {
@@ -318,18 +323,20 @@
 							r.px = right ? n.x + n.w : n.x;
 							r.py = r.ty;
 						}
+						const up = target.y + target.h <= r.py;
 						edges.push({
 							from: n.id,
 							to: target.id,
 							global: n.any,
 							down: r.down,
+							up,
 							// leave the port toward its own side, so a right-edge port visibly exits rightward
 							// even when the target sits almost straight below (tx barely past the node centre)
 							bow: right ? 50 : -50,
 							sx: r.px,
 							sy: r.py,
 							tx: tgtCx,
-							ty: target.y
+							ty: up ? target.y + target.h : target.y
 						});
 					}
 				}
@@ -382,13 +389,17 @@
 
 	const line = (pts: { x: number; y: number }[]) => pts.map((p) => `${p.x},${p.y}`).join(' ');
 
-	// curve from a port to the target's top-centre: straight down for bottom ports (and lone side
-	// ports), else leaving the side (left/right) toward the target
+	// cubic curve from a port to the target: bottom/lone ports leave straight down, side ports leave
+	// horizontally toward their own side; the target is approached from above (top dock) or, for a
+	// back-edge, from below (bottom dock, `up`)
 	const edgePath = (e: Edge) => {
-		if (layoutCfg.edgeStyle === 'bottom' || e.down)
-			return `M ${e.sx!} ${e.sy!} C ${e.sx!} ${e.sy! + 40}, ${e.tx!} ${e.ty! - 40}, ${e.tx!} ${e.ty!}`;
-		const dx = e.bow ?? (e.tx! < e.sx! ? -50 : 50);
-		return `M ${e.sx!} ${e.sy!} C ${e.sx! + dx} ${e.sy!}, ${e.tx!} ${e.ty! - 50}, ${e.tx!} ${e.ty!}`;
+		const vertical = layoutCfg.edgeStyle === 'bottom' || e.down;
+		const off = vertical ? 40 : 50;
+		const c1 = vertical
+			? `${e.sx!} ${e.sy! + 40}`
+			: `${e.sx! + (e.bow ?? (e.tx! < e.sx! ? -50 : 50))} ${e.sy!}`;
+		const c2 = e.up ? `${e.tx!} ${e.ty! + off}` : `${e.tx!} ${e.ty! - off}`;
+		return `M ${e.sx!} ${e.sy!} C ${c1}, ${c2}, ${e.tx!} ${e.ty!}`;
 	};
 
 	// pan/zoom: an SVG <g> transform driven by mouse drag (pan) and wheel (zoom-to-cursor).
