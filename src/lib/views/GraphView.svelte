@@ -714,6 +714,7 @@
 	.chain-divider {
 		stroke: #444;
 		stroke-width: 1;
+		pointer-events: none;
 	}
 	.node-slot {
 		fill: transparent;
