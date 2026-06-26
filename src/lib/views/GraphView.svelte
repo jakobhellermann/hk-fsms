@@ -181,8 +181,9 @@
 		// ── dagre layout on groups (compact) ──
 		// routed mode keeps a multigraph and lets dagre route+label each edge; port modes use a plain
 		// graph where edges only drive node ordering (ports/curves are computed by hand below)
-		const sizeOf = (label: string, trans: { event: string }[], chainLen: number) => ({
-			width: Math.max(txt(label), ...trans.map((t) => txt(t.event) + 16), 40) + PAD * 2,
+		// width fits the widest state name in the group (a chain renders all of them, not just the head)
+		const sizeOf = (names: string[], trans: { event: string }[], chainLen: number) => ({
+			width: Math.max(...names.map(txt), ...trans.map((t) => txt(t.event) + 16), 40) + PAD * 2,
 			height:
 				chainLen > 1
 					? chainLen * ROW_H + PAD_Y * 2 + trans.length * ROW + (trans.length ? 6 : 0)
@@ -201,7 +202,7 @@
 		groups.forEach((grp, i) => {
 			const label = grp.states[0];
 			if (port) {
-				g.setNode(String(i), sizeOf(label, transOf(label), grp.states.length));
+				g.setNode(String(i), sizeOf(grp.states, transOf(label), grp.states.length));
 			} else {
 				const w = Math.max(54, ...grp.states.map((s) => s.length * CHAR_WIDE + 22));
 				const h = grp.states.length === 1 ? 30 : grp.states.length * ROW_H + PAD_Y * 2;
