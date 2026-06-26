@@ -183,7 +183,9 @@
 		// graph where edges only drive node ordering (ports/curves are computed by hand below)
 		// width fits the widest state name in the group (a chain renders all of them, not just the head)
 		const sizeOf = (names: string[], trans: { event: string }[], chainLen: number) => ({
-			width: Math.max(...names.map(txt), ...trans.map((t) => txt(t.event) + 16), 40) + PAD * 2,
+			width:
+				Math.max(...names.map((s) => txt(s) + 4), ...trans.map((t) => txt(t.event) + 16), 40) +
+				PAD * 2,
 			height:
 				chainLen > 1
 					? chainLen * ROW_H + PAD_Y * 2 + trans.length * ROW + (trans.length ? 6 : 0)
