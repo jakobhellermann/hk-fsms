@@ -788,7 +788,10 @@
 							>
 						{/if}
 						{#each n.rows as r (r.event + r.to)}
-							{@const lit = selected === n.id || selected === r.to}
+							<!-- a chain's exit transitions all leave from its LAST state, so highlight the ports
+							     when that state (not the chain head) is selected -->
+							{@const owner = n.chain ? n.chain[n.chain.length - 1].name : n.id}
+							{@const lit = selected === owner || selected === r.to}
 							{#if layoutCfg.edgeStyle === 'bottom' && n.rows.length > 1}
 								<!-- faint wire linking the event row to its (target-ordered) bottom port;
 								     a lone transition needs none — its port sits centred under the row -->
