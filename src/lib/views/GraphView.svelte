@@ -574,9 +574,6 @@
 		{/each}
 	</div>
 	<button class="cfg-btn" class:active={showCfg} onclick={() => (showCfg = !showCfg)}>⚙</button>
-	<span class="dim"
-		>{model.states.length} states · {Math.round(cur.k * 100)}% · drag to pan, scroll to zoom</span
-	>
 	{#if modeTabs}
 		<span class="grow"></span>
 		{@render modeTabs()}
@@ -939,10 +936,6 @@
 	}
 	.cfg-reset:hover {
 		border-color: var(--accent);
-	}
-	.toolbar .dim {
-		margin-left: 0.5rem;
-		font-size: 0.85rem;
 	}
 	.body {
 		display: flex;
