@@ -203,6 +203,11 @@ export function setter(a: Action): { target: Param; value: Param } | undefined {
  * store hit point/normal/distance at once), so those keep their plain `Action(args)` form.
  */
 export function storeParam(a: Action): Param | undefined {
-	const stores = a.params.filter((p) => /^store/i.test(p.name) && varName(p.value) !== null);
+	// `store<Noun>` (and bare `store`) is the write convention; `stored<Noun>` (past participle, lower
+	// `d`) is a value the action *reads* — e.g. TimeLimitCheck's StoredValue, GetNextPreSpawnedGameObject's
+	// storedArray. Exclude those so we don't render a read input as the `var "x" = …` output.
+	const stores = a.params.filter(
+		(p) => /^store/i.test(p.name) && !/^[Ss]tored[A-Z]/.test(p.name) && varName(p.value) !== null
+	);
 	return stores.length === 1 ? stores[0] : undefined;
 }

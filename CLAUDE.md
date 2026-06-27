@@ -43,8 +43,9 @@ Run `pnpm fmt` and keep `check`/`lint` clean before committing. Commit often wit
 - `src/lib/fmt.ts` — single-line value formatting, ported from `playmakerfsm`'s `prettify` example.
 - `src/lib/glossary.ts` — hover-text definitions **sourced from the PlayMaker decompile**, not
   guessed. Decomp lives at
-  `~/.steamapps/Hollow Knight/.../Data/Managed/decomp/playmaker`. Look things up there; never guess
-  PlayMaker semantics.
+  `~/.steamapps/Hollow Knight/.../Data/Managed/decomp/playmaker` (Hollow Knight) and
+  `/home/jakob/dev/hkss/game/decomp` (Silksong). Look things up there; never guess PlayMaker
+  semantics.
 - `src/lib/views/{RawView,PseudoView,GraphView}.svelte` — the three detail modes. Graph uses
   `@dagrejs/dagre` for layout + plain SVG (fit-to-screen, +/-, drag-to-pan).
 
