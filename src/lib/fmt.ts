@@ -114,8 +114,8 @@ function eventTargetTokens(t: EventTarget): Token[] {
 	return inner.length ? [{ text: `${kind}(` }, ...inner, { text: ')' }] : [{ text: kind }];
 }
 
-// the active parameter value of a FunctionCall (a `Value`, the variant decode.rs selects by type)
-function fmtCallValue(v: Value): string {
+// a single-line rendering of a bare `Value` (FunctionCall arg or a variable's authored default)
+export function fmtCallValue(v: Value): string {
 	switch (v.type) {
 		case 'Var':
 			return `var ${q(v.value)}`;
@@ -238,6 +238,17 @@ export function compositeTokens(v: ParamValue): Token[] | null {
 			return templateTokens(v.value);
 		default:
 			return null;
+	}
+}
+
+// the variable name behind a `var "X"` token (cls === 'var'), or null if the text isn't one.
+// every var reference is formatted as `var ` + JSON.stringify(name), so parse it back exactly.
+export function varRefName(text: string): string | null {
+	if (!text.startsWith('var "')) return null;
+	try {
+		return JSON.parse(text.slice(4));
+	} catch {
+		return null;
 	}
 }
 

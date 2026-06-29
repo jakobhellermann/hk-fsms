@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FsmModel, State } from '$lib/model';
-	import { actionTokens } from '$lib/pseudo';
+	import { actionTokens, type Token } from '$lib/pseudo';
+	import { fmtCallValue, varRefName } from '$lib/fmt';
 	import { isDeadAction } from '$lib/actions';
 
 	// renders one state's actions + transitions as pseudocode lines, shared by the full PseudoView and
@@ -27,6 +28,20 @@
 			model.global_transitions.find((t) => t.event === event)?.to_state
 		);
 	}
+
+	// variable name → formatted authored default, for the hover on `var "X"` references
+	const varDefaults = $derived(
+		new Map(model.variables.map((v) => [v.name, fmtCallValue(v.value)]))
+	);
+	// hover text for a token: a var reference shows its variable's default, else its own title
+	function tokenTitle(t: Token): string | undefined {
+		if (t.cls === 'var') {
+			const name = varRefName(t.text);
+			const def = name == null ? undefined : varDefaults.get(name);
+			if (def != null) return `= ${def}`;
+		}
+		return t.title;
+	}
 </script>
 
 {#each state.actions as a, i (i)}
@@ -42,9 +57,9 @@
 						onclick={() => onnavigate(target)}
 						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && onnavigate(target)}
 						>{t.text}</span
-					>{:else}<span class={t.cls} title={t.title}>{t.text}</span>{/if}{:else}<span
+					>{:else}<span class={t.cls} title={tokenTitle(t)}>{t.text}</span>{/if}{:else}<span
 					class={t.cls}
-					title={t.title}>{t.text}</span
+					title={tokenTitle(t)}>{t.text}</span
 				>{/if}{/each}{#if !a.enabled}<span class="cmt">{' // disabled'}</span>{/if}
 	</div>
 {/each}

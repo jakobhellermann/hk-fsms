@@ -178,6 +178,8 @@ export interface CurveKey {
 export interface Variable {
 	name: string;
 	category: string;
+	// the variable's authored initial value (its FSM-editor default)
+	value: Value;
 }
 
 // out/<game>/index.json entry

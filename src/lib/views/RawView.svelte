@@ -1,10 +1,15 @@
 <script lang="ts">
 	import type { FsmModel } from '$lib/model';
-	import { short } from '$lib/fmt';
+	import { fmtCallValue, short } from '$lib/fmt';
 	import { glossary } from '$lib/glossary';
 	import ParamRow from '$lib/ParamRow.svelte';
 
 	let { model }: { model: FsmModel } = $props();
+
+	// variable name → formatted authored default, for the hover on `var "X"` references in params
+	const varDefaults = $derived(
+		new Map(model.variables.map((v) => [v.name, fmtCallValue(v.value)]))
+	);
 </script>
 
 {#if model.events.length}
@@ -54,7 +59,7 @@
 						{#if !a.enabled}<span class="dim" title={glossary.disabled}>(disabled)</span>{/if}
 					</div>
 					{#each a.params as p, j (j)}
-						<ParamRow param={p} />
+						<ParamRow param={p} {varDefaults} />
 					{/each}
 				</div>
 			{/each}
@@ -68,6 +73,8 @@
 		{#each model.variables as v (v.category + v.name)}
 			<div class="mono">
 				<span class="dim">({v.category})</span> <span class="var">{v.name}</span>
+				<span class="dim">=</span>
+				{fmtCallValue(v.value)}
 			</div>
 		{/each}
 	</section>

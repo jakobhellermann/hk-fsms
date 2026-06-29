@@ -1,20 +1,31 @@
 <script lang="ts">
 	import type { Param } from './model';
-	import { fmtValue, valueKind } from './fmt';
+	import { fmtValue, valueKind, varRefName } from './fmt';
 	import Self from './ParamRow.svelte';
 
-	let { param, depth = 0 }: { param: Param; depth?: number } = $props();
+	let {
+		param,
+		depth = 0,
+		varDefaults
+	}: { param: Param; depth?: number; varDefaults?: Map<string, string> } = $props();
 	const isList = $derived(param.value.type === 'List');
+	const text = $derived(fmtValue(param.value));
+	// when the value is a `var "X"` reference, hover shows that variable's authored default
+	const title = $derived.by(() => {
+		const name = varRefName(text);
+		const def = name == null ? undefined : varDefaults?.get(name);
+		return def == null ? undefined : `= ${def}`;
+	});
 </script>
 
 <div class="row" style="padding-left: {depth * 1.25}rem">
 	<span class="name">{param.name || '·'}</span>
 	<span class="dim">: {param.type_name} =</span>
-	<span class="val {valueKind(param.value)}">{fmtValue(param.value)}</span>
+	<span class="val {valueKind(param.value)}" {title}>{text}</span>
 </div>
 {#if isList && param.value.type === 'List'}
 	{#each param.value.value as child, i (i)}
-		<Self param={child} depth={depth + 1} />
+		<Self param={child} depth={depth + 1} {varDefaults} />
 	{/each}
 {/if}
 
