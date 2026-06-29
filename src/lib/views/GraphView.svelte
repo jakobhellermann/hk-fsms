@@ -13,8 +13,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import type { FsmModel } from '$lib/model';
-	import { actionTokens } from '$lib/pseudo';
-	import { isDeadAction } from '$lib/actions';
+	import StateBody from './StateBody.svelte';
 
 	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as +/−/fit)
 	let { model, modeTabs }: { model: FsmModel; modeTabs?: Snippet } = $props();
@@ -59,15 +58,6 @@
 		if (name) p.set('state', name);
 		else p.delete('state');
 		goto(`?${p}`, { replaceState: true, keepFocus: true, noScroll: true });
-	}
-
-	// resolve an event referenced inside an action to its target state (own transitions, then global),
-	// so the sidebar can make it a clickable jump — same idea as PseudoView's event links
-	function eventTarget(event: string): string | undefined {
-		return (
-			selectedState?.transitions.find((t) => t.event === event)?.to_state ??
-			model.global_transitions.find((t) => t.event === event)?.to_state
-		);
 	}
 
 	const ANY = '★ any state';
@@ -879,38 +869,7 @@
 				<button class="close" onclick={() => select(null)} aria-label="close">×</button>
 			</div>
 			<div class="code">
-				{#each selectedState.actions as a, i (i)}
-					{@const dead = a.enabled && isDeadAction(a)}
-					<div class="line" class:off={!a.enabled || dead}>
-						{#each actionTokens(a) as t, k (k)}{#if t.event}{@const target = eventTarget(
-									t.event
-								)}{#if target}<button
-										class="event link"
-										onclick={() => select(target)}
-										title={t.title}>{t.text}</button
-									>{:else}<span class={t.cls} title={t.title}>{t.text}</span>{/if}{:else}<span
-									class={t.cls}
-									title={t.title}>{t.text}</span
-								>{/if}{/each}{#if !a.enabled}<span class="cmt"> // disabled</span>{/if}
-					</div>
-				{/each}
-				{#if selectedState.actions.length && selectedState.transitions.length}
-					<div class="blank"></div>
-				{/if}
-				{#each selectedState.transitions as t (t.event + t.to_state)}
-					<div class="line">
-						<span class="kw">on</span> <span class="event">{t.event}</span>
-						<span class="arrow">-></span>
-						{#if t.to_state}
-							<button class="state link" onclick={() => select(t.to_state)}>{t.to_state}</button>
-						{:else}
-							<span class="cmt">(none)</span>
-						{/if}
-					</div>
-				{/each}
-				{#if !selectedState.actions.length && !selectedState.transitions.length}
-					<div class="cmt">(no actions or transitions)</div>
-				{/if}
+				<StateBody state={selectedState} {model} onnavigate={select} emptyNote />
 			</div>
 		{:else}
 			<div class="empty dim">click a state to see its actions & transitions</div>
@@ -1085,50 +1044,6 @@
 		font-family: ui-monospace, Menlo, monospace;
 		font-size: 14px;
 		line-height: 1.65;
-	}
-	.code .line {
-		white-space: pre-wrap;
-		word-break: break-word;
-		text-indent: -2ch;
-		margin-left: 2ch;
-	}
-	.blank {
-		height: 0.6rem;
-	}
-	.link {
-		background: none;
-		border: none;
-		font: inherit;
-		padding: 0;
-		cursor: pointer;
-	}
-	.link:hover {
-		text-decoration: underline;
-	}
-	.kw {
-		color: #c678dd;
-	}
-	.act {
-		color: var(--action);
-	}
-	.var {
-		color: #9d8fb5;
-	}
-	.code .state {
-		color: var(--state);
-		font-weight: 600;
-	}
-	.code .event {
-		color: var(--event);
-	}
-	.code .arrow {
-		color: var(--dim);
-	}
-	.cmt {
-		color: var(--dim);
-	}
-	.off {
-		opacity: 0.55;
 	}
 	.stage {
 		display: block;

@@ -1,7 +1,6 @@
 <script lang="ts">
-	import type { FsmModel, State } from '$lib/model';
-	import { actionTokens, type Token } from '$lib/pseudo';
-	import { isDeadAction } from '$lib/actions';
+	import type { FsmModel } from '$lib/model';
+	import StateBody from './StateBody.svelte';
 
 	let { model }: { model: FsmModel } = $props();
 
@@ -30,14 +29,6 @@
 		range.selectNodeContents(root);
 		sel.removeAllRanges();
 		sel.addRange(range);
-	}
-
-	/** resolve an event name to its target state (state transitions first, then global) */
-	function eventTarget(state: State, event: string): string | undefined {
-		return (
-			state.transitions.find((t) => t.event === event)?.to_state ??
-			model.global_transitions.find((t) => t.event === event)?.to_state
-		);
 	}
 </script>
 
@@ -81,31 +72,7 @@
 			<span class="kw">state</span> <span class="state">{s.name}</span>
 			{'{'}
 		</div>
-		{#each s.actions as a, i (i)}
-			{@const dead = a.enabled && isDeadAction(a)}
-			<div class="i2" class:off={!a.enabled || dead}>
-				{#each actionTokens(a) as t, k (k)}{#if t.event}{@const target = eventTarget(
-							s,
-							t.event
-						)}{#if target}<span
-								class="event link"
-								role="button"
-								tabindex="0"
-								onclick={() => goto(target)}
-								onkeydown={(e) => e.key === 'Enter' && goto(target)}>{t.text}</span
-							>{:else}<span class={t.cls} title={t.title}>{t.text}</span>{/if}{:else}<span
-							class={t.cls}
-							title={t.title}>{t.text}</span
-						>{/if}{/each}{#if !a.enabled}<span class="cmt">{' // disabled'}</span>{/if}
-			</div>
-		{/each}
-		{#each s.transitions as t (t.event + t.to_state)}
-			<div class="i2">
-				<span class="kw">on</span> <span class="event">{t.event}</span>
-				<span class="arrow">-></span>
-				{@render stateRef(t.to_state)}
-			</div>
-		{/each}
+		<StateBody state={s} {model} onnavigate={goto} indent={4} />
 		<div class="i1">{'}'}</div>
 	{/each}
 	<div>{'}'}</div>
@@ -125,11 +92,6 @@
 	.i1 {
 		padding-left: 2ch;
 	}
-	.i2 {
-		padding-left: 4ch;
-		text-indent: -2ch;
-		margin-left: 2ch;
-	}
 	.blank {
 		height: 0.6rem;
 	}
@@ -139,16 +101,6 @@
 	.name {
 		color: var(--fg);
 		font-weight: 600;
-	}
-	.act {
-		color: var(--action);
-	}
-	.var {
-		/* toned-down purple so variables sit behind the eye-catching state names */
-		color: #9d8fb5;
-	}
-	.str {
-		color: #cd9178;
 	}
 	.event {
 		color: var(--event);
@@ -166,9 +118,6 @@
 	.arrow,
 	.cmt {
 		color: var(--dim);
-	}
-	.off {
-		opacity: 0.55;
 	}
 	@keyframes flash {
 		0% {
