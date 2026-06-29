@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionText, args, toPseudocode } from './pseudo';
+import { actionText, actionTokens, args, toPseudocode } from './pseudo';
 import type { FsmModel } from './model';
 
 describe('args', () => {
@@ -24,6 +24,40 @@ describe('actionText', () => {
 		expect(actionText({ class: 'X.Bar', custom_name: null, enabled: false, params: [] })).toBe(
 			'Bar()  // disabled'
 		);
+	});
+});
+
+describe('actionTokens', () => {
+	it('renders a layerMask array inline with names, index as hover text', () => {
+		const tokens = actionTokens({
+			class: 'X.RayCast',
+			custom_name: null,
+			enabled: true,
+			params: [
+				{
+					name: 'layerMask',
+					type_name: 'Array',
+					value: {
+						type: 'List',
+						value: [
+							{
+								name: '',
+								type_name: 'FsmInt',
+								value: { type: 'Layer', value: { index: 8, name: 'Terrain' } }
+							},
+							{
+								name: '',
+								type_name: 'FsmInt',
+								value: { type: 'Layer', value: { index: 25, name: 'Soft Terrain' } }
+							}
+						]
+					}
+				}
+			]
+		});
+		expect(tokens.map((t) => t.text).join('')).toBe('RayCast(layerMask=[Terrain, Soft Terrain])');
+		expect(tokens.find((t) => t.text === 'Terrain')?.title).toBe('layer 8');
+		expect(tokens.find((t) => t.text === 'Soft Terrain')?.title).toBe('layer 25');
 	});
 });
 

@@ -35,9 +35,13 @@ export interface Token {
  */
 export function actionTokens(a: Action): Token[] {
 	const valueToken = (p: Param): Token => {
-		// a collapsed `[N elems]` list keeps its elements as hover text
+		// a collapsed `[N elems]` list keeps its elements as hover text; a layer shows its index
 		const title =
-			p.value.type === 'List' ? p.value.value.map((e) => fmtValue(e.value)).join(', ') : undefined;
+			p.value.type === 'List'
+				? p.value.value.map((e) => fmtValue(e.value)).join(', ')
+				: p.value.type === 'Layer'
+					? `layer ${p.value.value.index}`
+					: undefined;
 		return {
 			text: fmtValue(p.value),
 			cls: valueKind(p.value) || undefined,

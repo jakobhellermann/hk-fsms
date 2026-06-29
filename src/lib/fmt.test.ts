@@ -70,6 +70,11 @@ describe('fmtValue', () => {
 		).toBe('array[1 elems]');
 	});
 
+	it('layers show the name, falling back to the index', () => {
+		expect(fmtValue({ type: 'Layer', value: { index: 8, name: 'Terrain' } })).toBe('Terrain');
+		expect(fmtValue({ type: 'Layer', value: { index: 8, name: null } })).toBe('layer 8');
+	});
+
 	it('list reports element count', () => {
 		expect(
 			fmtValue({

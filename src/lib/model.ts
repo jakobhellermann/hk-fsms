@@ -61,6 +61,7 @@ export type ParamValue =
 	| { type: 'Template'; value: TemplateControl }
 	| { type: 'Enum'; value: EnumValue }
 	| { type: 'EnumMember'; value: string }
+	| { type: 'Layer'; value: { index: number; name: string | null } }
 	| { type: 'Array'; value: ArrayValue }
 	| { type: 'Property'; value: Property }
 	| { type: 'AnimCurve'; value: Curve }

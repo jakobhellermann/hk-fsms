@@ -178,6 +178,8 @@ export function fmtValue(v: ParamValue): string {
 			return fmtEnum(v.value);
 		case 'EnumMember':
 			return v.value;
+		case 'Layer':
+			return v.value.name ?? `layer ${v.value.index}`;
 		case 'Array':
 			return fmtArray(v.value);
 		case 'Property':

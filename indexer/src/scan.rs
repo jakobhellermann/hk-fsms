@@ -24,6 +24,7 @@ use rayon::prelude::*;
 
 use crate::config::Entry;
 use crate::enum_map::{bake_enums, build_enum_map};
+use crate::layer_map::{bake_layers, build_layer_fields, read_layer_names};
 use crate::scene_lookup;
 
 /// Output of a single game scan: the index entries and the set of content hashes written.
@@ -47,6 +48,14 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
         "enum map: {} action fields, {} enum types",
         enum_map.by_field.len(),
         enum_map.by_name.len()
+    );
+
+    let layer_fields = build_layer_fields(&env.game_files.game_dir.join("Managed"));
+    let layer_names = read_layer_names(&env);
+    eprintln!(
+        "layers: {} fields, {} named slots",
+        layer_fields.len(),
+        layer_names.iter().filter(|n| !n.is_empty()).count()
     );
 
     let scene_names = scene_lookup::build_scene_lookup(&env)?;
@@ -100,6 +109,7 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
                 model.name = &pm.fsm.name;
             }
             bake_enums(&mut model, &enum_map);
+            bake_layers(&mut model, &layer_names, &layer_fields);
             let Ok(json) = serde_json::to_vec(&model) else {
                 continue;
             };
