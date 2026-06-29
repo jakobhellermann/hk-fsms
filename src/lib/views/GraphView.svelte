@@ -8,7 +8,7 @@
 </script>
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import dagre from '@dagrejs/dagre';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -483,9 +483,36 @@
 
 	// re-fit whenever the model (i.e. the FSM) changes — not on config tweaks,
 	// so adjusting ranker/seps doesn't lose pan/zoom state
+	let lastCentered: string | null = null;
 	$effect(() => {
 		void model;
 		view = null;
+		lastCentered = null;
+	});
+
+	// when the selected state changes (sidebar click or a ?state= deep link), pan it into view if it's
+	// off-screen — keep the current zoom, don't disturb the view if it's already visible
+	$effect(() => {
+		const sel = selected;
+		const w = cw,
+			h = ch,
+			nodes = layout.nodes;
+		if (!sel) {
+			lastCentered = null;
+			return;
+		}
+		if (!w || !h || sel === lastCentered) return;
+		const n = nodes.find((m) => m.id === sel || m.chain?.some((s) => s.name === sel));
+		if (!n) return;
+		lastCentered = sel;
+		untrack(() => {
+			const k = cur.k;
+			const m = 24;
+			const x0 = cur.tx + n.x * k;
+			const y0 = cur.ty + n.y * k;
+			if (x0 >= m && y0 >= m && x0 + n.w * k <= w - m && y0 + n.h * k <= h - m) return;
+			view = { tx: w / 2 - (n.x + n.w / 2) * k, ty: h / 2 - (n.y + n.h / 2) * k, k };
+		});
 	});
 
 	// size the body to exactly fill the viewport below it — robust to the header height (vs a fixed
