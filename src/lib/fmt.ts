@@ -10,11 +10,25 @@ import type {
 	StrValue,
 	TemplateControl,
 	Value,
+	VarOverride,
 	VarValue
 } from './model';
 
 export const short = (cls: string) => cls.split('.').pop() ?? cls;
 const q = (s: string) => JSON.stringify(s);
+
+/** A colorised fragment of a formatted value: `cls` is the css colour class (omitted = default). */
+export interface Token {
+	text: string;
+	cls?: string;
+	/** hover text — used to reveal the elements behind a collapsed `[N elems]` list */
+	title?: string;
+	/** event name — when this token is an event value (->"CANCEL"), for click-to-navigate */
+	event?: string;
+}
+
+const tokenText = (toks: Token[]) => toks.map((t) => t.text).join('');
+const varTok = (name: string): Token => ({ text: `var ${q(name)}`, cls: 'var' });
 
 export function fmtObjectRef(r: ObjectRef): string {
 	let loc: string;
@@ -31,10 +45,14 @@ export function fmtObjectRef(r: ObjectRef): string {
 	return r.file ? `${loc} (${r.file})` : loc;
 }
 
+export function goRefTokens(r: GoRef): Token[] {
+	if (r === 'SelfOwner') return [{ text: 'Self' }];
+	if ('Var' in r) return [varTok(r.Var)];
+	return [{ text: fmtObjectRef(r.Object) }];
+}
+
 export function fmtGoRef(r: GoRef): string {
-	if (r === 'SelfOwner') return 'Self';
-	if ('Var' in r) return `var ${q(r.Var)}`;
-	return fmtObjectRef(r.Object);
+	return tokenText(goRefTokens(r));
 }
 
 function fmtStr(s: StrValue): string {
@@ -82,15 +100,18 @@ function fmtVar(v: VarValue): string {
 	}
 }
 
-function fmtEventTarget(t: EventTarget): string {
+function eventTargetTokens(t: EventTarget): Token[] {
 	const kind =
 		['Self', 'GameObject', 'GameObjectFSM', 'FSMComponent', 'BroadcastAll', 'HostFSM', 'SubFSMs'][
 			t.kind
 		] ?? '?';
-	const bits: string[] = [];
-	if (t.kind === 1 || t.kind === 2) bits.push(fmtGoRef(t.game_object));
-	if (t.fsm_name) bits.push(`fsm=${q(t.fsm_name)}`);
-	return bits.length ? `${kind}(${bits.join(', ')})` : kind;
+	const inner: Token[] = [];
+	if (t.kind === 1 || t.kind === 2) inner.push(...goRefTokens(t.game_object));
+	if (t.fsm_name) {
+		if (inner.length) inner.push({ text: ', ' });
+		inner.push({ text: `fsm=${q(t.fsm_name)}` });
+	}
+	return inner.length ? [{ text: `${kind}(` }, ...inner, { text: ')' }] : [{ text: kind }];
 }
 
 // the active parameter value of a FunctionCall (a `Value`, the variant decode.rs selects by type)
@@ -115,12 +136,17 @@ function fmtCallValue(v: Value): string {
 	}
 }
 
-function fmtFunction(f: Call): string {
-	if (!f.parameter_type || f.parameter_type === 'None') return `${f.function}()`;
+function callValueTokens(v: Value): Token[] {
+	if (v.type === 'Var') return [varTok(v.value)];
+	if (v.type === 'Str') return [{ text: q(v.value), cls: 'str' }];
+	return [{ text: fmtCallValue(v) }];
+}
+
+function functionTokens(f: Call): Token[] {
+	if (!f.parameter_type || f.parameter_type === 'None') return [{ text: `${f.function}()` }];
 	// fall back to the bare type when the value couldn't be decoded
-	return f.value
-		? `${f.function}(${fmtCallValue(f.value)})`
-		: `${f.function}(<${f.parameter_type}>)`;
+	if (!f.value) return [{ text: `${f.function}(<${f.parameter_type}>)` }];
+	return [{ text: `${f.function}(` }, ...callValueTokens(f.value), { text: ')' }];
 }
 
 function fmtProperty(p: Property): string {
@@ -128,21 +154,26 @@ function fmtProperty(p: Property): string {
 	return p.property ? `${ty}.${p.property}` : ty;
 }
 
-function fmtTemplate(t: TemplateControl): string {
-	const vmap = (es: { variable: string; value: VarValue }[], arrow: string) =>
-		es.map((o) =>
-			o.value.type === 'Var' ? `${o.variable}${arrow}var ${q(o.value.value)}` : o.variable
-		);
-	const parts = [`template=${t.template}`];
-	for (const [label, vars] of [
-		['in', vmap(t.inputs, '<-')],
-		['out', vmap(t.outputs, '->')],
-		['vars', vmap(t.overrides, '=')]
-	] as const) {
-		if (vars.length) parts.push(`${label}[${vars.join(', ')}]`);
+function templateTokens(t: TemplateControl): Token[] {
+	const out: Token[] = [{ text: `template=${t.template}` }];
+	const section = (label: string, es: VarOverride[], arrow: string) => {
+		if (!es.length) return;
+		out.push({ text: ` ${label}[` });
+		es.forEach((o, i) => {
+			if (i) out.push({ text: ', ' });
+			if (o.value.type === 'Var')
+				out.push({ text: `${o.variable}${arrow}` }, varTok(o.value.value));
+			else out.push({ text: o.variable });
+		});
+		out.push({ text: ']' });
+	};
+	section('in', t.inputs, '<-');
+	section('out', t.outputs, '->');
+	section('vars', t.overrides, '=');
+	if (t.events.length) {
+		out.push({ text: ` events[${t.events.map(([f, to]) => `${f}->${to}`).join(', ')}]` });
 	}
-	if (t.events.length) parts.push(`events[${t.events.map(([f, to]) => `${f}->${to}`).join(', ')}]`);
-	return parts.join(' ');
+	return out;
 }
 
 // single-line rendering of a parameter value (List is rendered structurally by the component)
@@ -169,11 +200,11 @@ export function fmtValue(v: ParamValue): string {
 		case 'Var':
 			return fmtVar(v.value);
 		case 'EventTarget':
-			return fmtEventTarget(v.value);
+			return tokenText(eventTargetTokens(v.value));
 		case 'Function':
-			return fmtFunction(v.value);
+			return tokenText(functionTokens(v.value));
 		case 'Template':
-			return fmtTemplate(v.value);
+			return tokenText(templateTokens(v.value));
 		case 'Enum':
 			return fmtEnum(v.value);
 		case 'EnumMember':
@@ -192,6 +223,21 @@ export function fmtValue(v: ParamValue): string {
 			return fmtObjectRef(v.value);
 		case 'Raw':
 			return `(${v.value.length}B)`;
+	}
+}
+
+// composite values embed `var "x"` / strings the single-class `valueKind` can't reach; render them
+// structurally into tokens instead. Returns null for scalar values (caller uses `valueKind`).
+export function compositeTokens(v: ParamValue): Token[] | null {
+	switch (v.type) {
+		case 'EventTarget':
+			return eventTargetTokens(v.value);
+		case 'Function':
+			return functionTokens(v.value);
+		case 'Template':
+			return templateTokens(v.value);
+		default:
+			return null;
 	}
 }
 

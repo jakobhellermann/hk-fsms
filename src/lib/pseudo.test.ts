@@ -59,6 +59,35 @@ describe('actionTokens', () => {
 		expect(tokens.find((t) => t.text === 'Terrain')?.title).toBe('layer 8');
 		expect(tokens.find((t) => t.text === 'Soft Terrain')?.title).toBe('layer 25');
 	});
+
+	it('highlights a var embedded in an eventTarget', () => {
+		const tokens = actionTokens({
+			class: 'X.SendEventByName',
+			custom_name: null,
+			enabled: true,
+			params: [
+				{
+					name: 'eventTarget',
+					type_name: 'FsmEventTarget',
+					value: {
+						type: 'EventTarget',
+						value: {
+							kind: 1,
+							game_object: { Var: 'HUD Canvas' },
+							fsm_name: null,
+							fsm: { file: null, target: { kind: 'Null' } },
+							exclude_self: false,
+							send_to_children: false
+						}
+					}
+				}
+			]
+		});
+		expect(tokens.map((t) => t.text).join('')).toBe(
+			'SendEventByName(eventTarget=GameObject(var "HUD Canvas"))'
+		);
+		expect(tokens.find((t) => t.cls === 'var')?.text).toBe('var "HUD Canvas"');
+	});
 });
 
 describe('toPseudocode', () => {

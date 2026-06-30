@@ -1,6 +1,9 @@
 import type { Action, FsmModel, Param } from './model';
-import { fmtValue, short, valueKind } from './fmt';
+import { compositeTokens, fmtValue, short, valueKind } from './fmt';
+import type { Token } from './fmt';
 import { binaryOp, compoundOp, isHiddenParam, setter, storeParam } from './actions';
+
+export type { Token };
 
 /** compact one-line arg list for an action: `name=value, …` (unnamed params show just the value) */
 export function args(params: Param[]): string {
@@ -16,16 +19,6 @@ export function args(params: Param[]): string {
 export function actionText(a: FsmModel['states'][number]['actions'][number]): string {
 	const line = `${short(a.class)}(${args(a.params)})`;
 	return a.enabled ? line : `${line}  // disabled`;
-}
-
-/** A colorised fragment of an action line: `cls` is the css colour class (omitted = default text). */
-export interface Token {
-	text: string;
-	cls?: string;
-	/** hover text — used to reveal the elements behind a collapsed `[N elems]` list */
-	title?: string;
-	/** event name — when this token is an event value (->"CANCEL"), for click-to-navigate */
-	event?: string;
 }
 
 /**
@@ -52,7 +45,11 @@ export function actionTokens(a: Action): Token[] {
 	// small lists render inline (`[a, b]`, each element coloured); large ones stay collapsed.
 	const LIST_INLINE_MAX = 12;
 	const valueTokens = (p: Param): Token[] => {
-		if (p.value.type !== 'List' || p.value.value.length > LIST_INLINE_MAX) return [valueToken(p)];
+		const composite = compositeTokens(p.value);
+		if (composite) return composite;
+		if (p.value.type !== 'List' || p.value.value.length > LIST_INLINE_MAX) {
+			return [valueToken(p)];
+		}
 		const out: Token[] = [{ text: '[' }];
 		p.value.value.forEach((e, i) => {
 			if (i > 0) out.push({ text: ', ' });
