@@ -25,6 +25,8 @@ export interface Transition {
 export interface State {
 	name: string;
 	is_start: boolean;
+	/** author-assigned PlayMaker colour group (0 = default/grey; palette index) */
+	color_index: number;
 	/** the state's node rect in the PlayMaker editor graph (raw authored layout) */
 	position: { x: number; y: number; w: number; h: number };
 	transitions: Transition[];

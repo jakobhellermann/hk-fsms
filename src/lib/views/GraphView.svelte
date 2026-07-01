@@ -54,6 +54,35 @@
 
 	const ANY = '★ any state';
 
+	// PlayMaker state colour groups: the author picks a colorIndex (0 = default/grey) per state. The
+	// palette RGBs are PlayMaker's editor palette as replicated by FSMExpress (STATE_COLORS in
+	// FsmPlaymaker.cs) — PlayMaker only stores the index. Index 0 keeps the neutral panel look;
+	// unknown indices fall back to default too (FSMExpress clamps to the last colour, a known TODO).
+	const STATE_COLORS = [
+		'#808080',
+		'#748fc9',
+		'#3ab6a6',
+		'#5da435',
+		'#e1fe32',
+		'#eb832e',
+		'#bb4b4b',
+		'#7535a4'
+	];
+	// lighter tint used for a transition, keyed by its SOURCE state's group (FSMExpress TRANSITION_COLORS)
+	const TRANSITION_COLORS = [
+		'#dedede',
+		'#c5d5f8',
+		'#9fe1d8',
+		'#b7e19f',
+		'#e1fe66',
+		'#ffc698',
+		'#e19fa0',
+		'#c59fe1'
+	];
+	const stateColor = (i: number) => (i > 0 && i < STATE_COLORS.length ? STATE_COLORS[i] : null);
+	const transColor = (i: number) =>
+		i > 0 && i < TRANSITION_COLORS.length ? TRANSITION_COLORS[i] : null;
+
 	const CHAR = 6.6; // port-mode event/label text metric
 	const CHAR_WIDE = 7.3; // routed-mode node width metric
 	const HEADER = 24; // state-name header height (top space above the first port row)
@@ -88,6 +117,8 @@
 		h: number;
 		start: boolean;
 		any: boolean;
+		/** PlayMaker colour-group index of the head state (0 = default/grey) */
+		colorIndex: number;
 		rows: Row[];
 		/** present when this node is a collapsed linear chain */
 		chain?: ChainState[];
@@ -105,6 +136,8 @@
 		sy?: number;
 		tx?: number;
 		ty?: number;
+		/** transition tint from the source state's colour group (null = default grey); unset for globals */
+		color?: string | null;
 		// routed transitions + global arrows (polyline + midpoint label):
 		points?: { x: number; y: number }[];
 		label?: string;
@@ -225,6 +258,7 @@
 			const { x: left, y: top, w, h } = posList[i];
 			const label = grp.states[0];
 			const chain = grp.states.length > 1;
+			const colorIndex = model.states.find((s) => s.name === label)?.color_index ?? 0;
 			let rows: Row[] = [];
 			if (port) {
 				const trans = transOf(label);
@@ -263,6 +297,7 @@
 				h,
 				start: grp.states[0] === model.start_state,
 				any: false,
+				colorIndex,
 				rows,
 				chain: chain
 					? grp.states.map((s, j) => ({
@@ -303,6 +338,7 @@
 						points: [p0, p1],
 						label: t.event,
 						global: false,
+						color: transColor(from.colorIndex),
 						from: from.id,
 						to: to.id,
 						lx: (p0.x + p1.x) / 2,
@@ -330,6 +366,7 @@
 								from: n.id,
 								to: o.target.id,
 								global: n.any,
+								color: transColor(n.colorIndex),
 								up,
 								topPort: up,
 								sx: o.r.px,
@@ -362,6 +399,7 @@
 							from: n.id,
 							to: target.id,
 							global: n.any,
+							color: transColor(n.colorIndex),
 							down: r.down,
 							up,
 							// leave the port toward its own side, so a right-edge port visibly exits rightward
@@ -733,11 +771,11 @@
 						selected != null &&
 						(layout.edgeGroups[i][0].has(selected) || layout.edgeGroups[i][1].has(selected))}
 					{#if e.points}
-						<!-- dagre-routed transition or global arrow: polyline with midpoint label -->
+						<!-- routed transition or global arrow: polyline with midpoint label -->
 						<polyline
 							points={line(e.points)}
 							fill="none"
-							stroke={hot ? 'var(--accent)' : e.global ? 'var(--var)' : '#888'}
+							stroke={hot ? 'var(--accent)' : e.global ? 'var(--var)' : (e.color ?? '#888')}
 							stroke-width={hot ? 2.2 : 1.3}
 							marker-end="url(#{hot ? 'arrowsel' : e.global ? 'arrowg' : 'arrow'})"
 							opacity={selected == null ? 0.8 : hot ? 1 : 0.18}
@@ -756,7 +794,7 @@
 						<path
 							d={edgePath(e)}
 							fill="none"
-							stroke={hot ? 'var(--accent)' : '#888'}
+							stroke={hot ? 'var(--accent)' : (e.color ?? '#888')}
 							stroke-width={hot ? 2 : 1.2}
 							marker-end="url(#{hot ? 'arrowsel' : 'arrow'})"
 							opacity={selected == null ? 0.55 : hot ? 1 : 0.1}
@@ -766,6 +804,7 @@
 				{/each}
 
 				{#each layout.nodes as n (n.id)}
+					{@const nodeFill = stateColor(n.colorIndex)}
 					<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 					<g>
 						<rect
@@ -779,6 +818,7 @@
 							class:any={n.any}
 							class:sel={n.chain ? n.chain.some((s) => s.name === selected) : selected === n.id}
 							class:clickable={!n.any}
+							style={nodeFill ? `fill: color-mix(in srgb, ${nodeFill} 22%, var(--panel))` : ''}
 							onclick={() => {
 								if (!n.any && !moved) select(n.id);
 							}}

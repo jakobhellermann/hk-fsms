@@ -118,6 +118,7 @@ describe('toPseudocode', () => {
 				{
 					name: 'A',
 					is_start: true,
+					color_index: 0,
 					position: { x: 0, y: 0, w: 0, h: 0 },
 					transitions: [{ event: 'NEXT', to_state: 'B' }],
 					actions: [
@@ -132,6 +133,7 @@ describe('toPseudocode', () => {
 				{
 					name: 'B',
 					is_start: false,
+					color_index: 0,
 					position: { x: 0, y: 0, w: 0, h: 0 },
 					transitions: [],
 					actions: [{ class: 'X.Bar', custom_name: null, enabled: false, params: [] }]
