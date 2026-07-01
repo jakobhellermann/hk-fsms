@@ -31,6 +31,17 @@
 		scene === null ? 'filter scenes & files…' : 'filter objects & FSMs…'
 	);
 
+	// make the filter the first Tab target without stealing focus on load (autofocus pops the
+	// on-screen keyboard on tablets). intercept only the initial Tab, when nothing is focused yet.
+	let filterEl = $state<HTMLInputElement>();
+	function onKeydown(e: KeyboardEvent) {
+		if (e.key !== 'Tab' || e.shiftKey || isDetail || !filterEl) return;
+		const active = document.activeElement;
+		if (active && active !== document.body) return;
+		e.preventDefault();
+		filterEl.focus();
+	}
+
 	function setQuery(v: string) {
 		const p = new URLSearchParams(page.url.searchParams);
 		if (v) p.set('q', v);
@@ -53,6 +64,8 @@
 				: `FSMs — ${gameLabel}`}
 	</title>
 </svelte:head>
+
+<svelte:window onkeydown={onKeydown} />
 
 <header>
 	<div class="topline">
@@ -86,6 +99,7 @@
 		<div class="filter-wrap">
 			<input
 				class="filter"
+				bind:this={filterEl}
 				{placeholder}
 				value={query}
 				oninput={(e) => setQuery(e.currentTarget.value)}
