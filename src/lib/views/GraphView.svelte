@@ -9,7 +9,6 @@
 
 <script lang="ts">
 	import { untrack, type Snippet } from 'svelte';
-	import dagre from '@dagrejs/dagre';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import type { FsmModel } from '$lib/model';
@@ -18,31 +17,17 @@
 	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as +/−/fit)
 	let { model, modeTabs }: { model: FsmModel; modeTabs?: Snippet } = $props();
 
-	type RankDir = 'TB' | 'LR';
-	type Ranker = 'network-simplex' | 'tight-tree' | 'longest-path';
-	// two orthogonal axes:
-	//  layout — where nodes sit: `computed` (dagre auto-layout, collapses linear chains) or `editor`
-	//           (raw PlayMaker editor rects, one node per state)
-	//  edgeStyle — how edges/labels look: `routed` (label at the line midpoint) or `side`/`bottom`
-	//           (out-transitions as labelled ports leaving the side resp. the bottom edge)
-	type LayoutMode = 'computed' | 'editor';
+	// nodes always sit at their raw PlayMaker editor rects (one node per state, linear chains
+	// optionally collapsed). `edgeStyle` controls how edges/labels look: `routed` (straight line,
+	// label at the midpoint) or `side`/`bottom` (out-transitions as labelled ports leaving the side
+	// resp. the bottom edge).
 	type EdgeStyle = 'routed' | 'side' | 'bottom';
 	type LayoutCfg = {
-		layout: LayoutMode;
-		rankdir: RankDir;
-		ranker: Ranker;
-		nodesep: number;
-		ranksep: number;
 		edgeStyle: EdgeStyle;
 		collapseChains: boolean;
 	};
 	const defaultCfg: LayoutCfg = {
-		layout: 'editor',
 		collapseChains: true,
-		rankdir: 'TB',
-		ranker: 'network-simplex',
-		nodesep: 28,
-		ranksep: 46,
 		edgeStyle: 'side'
 	};
 	let layoutCfg = $state<LayoutCfg>(
@@ -50,7 +35,6 @@
 			? { ...defaultCfg, ...JSON.parse(localStorage.getItem(CFG_KEY)!) }
 			: { ...defaultCfg }
 	);
-	let showCfg = $state(false);
 	$effect(() => {
 		if (browser) localStorage.setItem(CFG_KEY, JSON.stringify(layoutCfg));
 	});
@@ -111,7 +95,7 @@
 		sy?: number;
 		tx?: number;
 		ty?: number;
-		// dagre-routed transitions + global arrows (polyline + midpoint label):
+		// routed transitions + global arrows (polyline + midpoint label):
 		points?: { x: number; y: number }[];
 		label?: string;
 		lx?: number;
@@ -120,7 +104,6 @@
 
 	const layout = $derived.by(() => {
 		const style = layoutCfg.edgeStyle;
-		const editor = layoutCfg.layout === 'editor';
 		const routed = style === 'routed';
 		const port = !routed;
 
@@ -190,9 +173,6 @@
 			return raw.filter((t) => grp !== groupOf.get(t.to_state));
 		};
 
-		// ── dagre layout on groups (compact) ──
-		// routed mode keeps a multigraph and lets dagre route+label each edge; port modes use a plain
-		// graph where edges only drive node ordering (ports/curves are computed by hand below)
 		// width fits the widest state name in the group (a chain renders all of them, not just the head)
 		const sizeOf = (names: string[], trans: { event: string }[], chainLen: number) => ({
 			width:
@@ -203,100 +183,28 @@
 					? chainLen * ROW_H + PAD_Y * 2 + trans.length * ROW + (trans.length ? 6 : 0)
 					: HEADER + trans.length * ROW + (trans.length ? 6 : 0)
 		});
-		// node geometry: raw editor rects (normalised so the top-left sits near the origin) or a dagre
-		// layout. the dagre path also produces the routed-edge polylines (collected into `routedEdges`).
-		let posList: { x: number; y: number; w: number; h: number }[];
-		let width = 100;
-		let height = 100;
-		const routedEdges: Edge[] = [];
-		if (editor) {
-			// a collapsed chain is placed at its head state's editor position
-			const raw = groups.map((grp) => model.states.find((s) => s.name === grp.states[0])!.position);
-			const minX = Math.min(...raw.map((p) => p.x));
-			const minY = Math.min(...raw.map((p) => p.y));
-			posList = raw.map((p, i) => {
-				const grp = groups[i];
-				const x = p.x - minX + 20;
-				const y = p.y - minY + 20;
-				// keep the faithful raw rect only for a lone state in `edge` mode; otherwise size to fit
-				// the stacked chain states + any ports (same sizing as the computed layout)
-				if (grp.states.length === 1 && routed) return { x, y, w: p.w, h: p.h };
-				if (port) {
-					const sz = sizeOf(grp.states, transOf(grp.states[0]), grp.states.length);
-					return { x, y, w: sz.width, h: sz.height };
-				}
-				const w = Math.max(54, ...grp.states.map((s) => s.length * CHAR_WIDE + 22));
-				const h = grp.states.length === 1 ? 30 : grp.states.length * ROW_H + PAD_Y * 2;
-				return { x, y, w, h };
-			});
-			width = Math.max(...posList.map((p) => p.x + p.w), 80) + 20;
-			height = Math.max(...posList.map((p) => p.y + p.h), 80) + 20;
-		} else {
-			const g = new dagre.graphlib.Graph(routed ? { multigraph: true } : undefined);
-			g.setGraph({
-				rankdir: layoutCfg.rankdir,
-				ranker: layoutCfg.ranker,
-				nodesep: layoutCfg.nodesep,
-				ranksep: layoutCfg.ranksep,
-				marginx: 16,
-				marginy: 16
-			});
-			g.setDefaultEdgeLabel(() => ({}));
-			groups.forEach((grp, i) => {
-				const label = grp.states[0];
-				if (port) {
-					g.setNode(String(i), sizeOf(grp.states, transOf(label), grp.states.length));
-				} else {
-					const w = Math.max(54, ...grp.states.map((s) => s.length * CHAR_WIDE + 22));
-					const h = grp.states.length === 1 ? 30 : grp.states.length * ROW_H + PAD_Y * 2;
-					g.setNode(String(i), { width: w, height: h });
-				}
-			});
-			if (routed) {
-				const addEdge = (from: string, event: string, to: string, global: boolean) => {
-					const fg = groupOf.get(from);
-					const tg = groupOf.get(to);
-					if (fg == null || tg == null || fg === tg) return;
-					g.setEdge(String(fg), String(tg), { label: event, global }, `${from}|${event}|${to}`);
-				};
-				for (const s of model.states)
-					for (const t of s.transitions) addEdge(s.name, t.event, t.to_state, false);
-			} else {
-				const link = (from: string, to: string) => {
-					const fg = groupOf.get(from);
-					const tg = groupOf.get(to);
-					if (fg != null && tg != null && fg !== tg) g.setEdge(String(fg), String(tg));
-				};
-				for (const s of model.states) for (const t of s.transitions) link(s.name, t.to_state);
+		// node geometry: raw PlayMaker editor rects, normalised so the top-left sits near the origin.
+		// a collapsed chain is placed at its head state's editor position.
+		const raw = groups.map((grp) => model.states.find((s) => s.name === grp.states[0])!.position);
+		const minX = Math.min(...raw.map((p) => p.x));
+		const minY = Math.min(...raw.map((p) => p.y));
+		const posList = raw.map((p, i) => {
+			const grp = groups[i];
+			const x = p.x - minX + 20;
+			const y = p.y - minY + 20;
+			// keep the faithful raw rect only for a lone state in `routed` mode; otherwise size to fit
+			// the stacked chain states + any ports
+			if (grp.states.length === 1 && routed) return { x, y, w: p.w, h: p.h };
+			if (port) {
+				const sz = sizeOf(grp.states, transOf(grp.states[0]), grp.states.length);
+				return { x, y, w: sz.width, h: sz.height };
 			}
-			dagre.layout(g);
-			posList = groups.map((_, i) => {
-				const n = g.node(String(i));
-				return { x: n.x - n.width / 2, y: n.y - n.height / 2, w: n.width, h: n.height };
-			});
-			if (routed) {
-				for (const e of g.edges()) {
-					const d = g.edge(e) as {
-						points: { x: number; y: number }[];
-						label: string;
-						global: boolean;
-					};
-					const mid = d.points[Math.floor(d.points.length / 2)] ?? { x: 0, y: 0 };
-					routedEdges.push({
-						points: d.points,
-						label: d.label,
-						global: d.global,
-						from: groups[Number(e.v)].states[0],
-						to: groups[Number(e.w)].states[0],
-						lx: mid.x,
-						ly: mid.y
-					});
-				}
-			}
-			const gl = g.graph();
-			width = gl.width ?? 100;
-			height = gl.height ?? 100;
-		}
+			const w = Math.max(54, ...grp.states.map((s) => s.length * CHAR_WIDE + 22));
+			const h = grp.states.length === 1 ? 30 : grp.states.length * ROW_H + PAD_Y * 2;
+			return { x, y, w, h };
+		});
+		const width = Math.max(...posList.map((p) => p.x + p.w), 80) + 20;
+		const height = Math.max(...posList.map((p) => p.y + p.h), 80) + 20;
 
 		const nodes: Node[] = groups.map((grp, i) => {
 			const { x: left, y: top, w, h } = posList[i];
@@ -337,9 +245,9 @@
 			};
 		});
 
-		const edges: Edge[] = [...routedEdges];
-		if (routed && editor) {
-			// editor layout has no dagre routing: straight labelled lines between nodes (groups), with
+		const edges: Edge[] = [];
+		if (routed) {
+			// routed mode: straight labelled lines between nodes (groups), with
 			// endpoints trimmed to each box border along the centre-to-centre line
 			const cx = (n: Node) => n.x + n.w / 2;
 			const cy = (n: Node) => n.y + n.h / 2;
@@ -721,15 +629,6 @@
 <svelte:window onpointermove={move} onpointerup={end} onpointercancel={end} />
 
 <div class="toolbar">
-	<span class="tb-label">layout</span>
-	<div class="seg">
-		{#each ['computed', 'editor'] as l}
-			<button
-				class:active={layoutCfg.layout === l}
-				onclick={() => (layoutCfg.layout = l as LayoutMode)}>{l}</button
-			>
-		{/each}
-	</div>
 	<span class="tb-label">edges</span>
 	<div class="seg">
 		{#each ['routed', 'side', 'bottom'] as s}
@@ -743,54 +642,12 @@
 		<input type="checkbox" bind:checked={layoutCfg.collapseChains} />
 		collapse chains
 	</label>
-	<button class="cfg-btn" class:active={showCfg} onclick={() => (showCfg = !showCfg)}>⚙</button>
 	<button onclick={() => (view = { ...fit })}>fit</button>
 	{#if modeTabs}
 		<span class="grow"></span>
 		{@render modeTabs()}
 	{/if}
 </div>
-
-{#if showCfg}
-	<div class="cfg-panel">
-		<label>
-			<span>direction</span>
-			<div class="seg">
-				{#each ['TB', 'LR'] as d}
-					<button
-						class:active={layoutCfg.rankdir === d}
-						onclick={() => (layoutCfg.rankdir = d as RankDir)}>{d}</button
-					>
-				{/each}
-			</div>
-		</label>
-		<label>
-			<span>ranker</span>
-			<div class="seg">
-				{#each ['network-simplex', 'tight-tree', 'longest-path'] as r}
-					<button
-						class:active={layoutCfg.ranker === r}
-						onclick={() => (layoutCfg.ranker = r as Ranker)}
-						>{r === 'network-simplex'
-							? 'simplex'
-							: r === 'tight-tree'
-								? 'tight'
-								: 'longest'}</button
-					>
-				{/each}
-			</div>
-		</label>
-		<label>
-			<span>node sep ({layoutCfg.nodesep})</span>
-			<input type="range" min="8" max="80" bind:value={layoutCfg.nodesep} />
-		</label>
-		<label>
-			<span>rank sep ({layoutCfg.ranksep})</span>
-			<input type="range" min="16" max="120" bind:value={layoutCfg.ranksep} />
-		</label>
-		<button class="cfg-reset" onclick={() => (layoutCfg = { ...defaultCfg })}>reset</button>
-	</div>
-{/if}
 
 <div class="body" bind:this={bodyEl} style="height: calc(100dvh - {bodyTop}px)">
 	<!-- drag/wheel are mouse-only enhancements -->
@@ -1034,30 +891,6 @@
 		color: var(--dim);
 		cursor: pointer;
 	}
-	.cfg-btn {
-		font-size: 1.1rem;
-		line-height: 1;
-	}
-	.cfg-btn.active {
-		background: var(--accent);
-		color: var(--bg);
-		border-color: var(--accent);
-	}
-	.cfg-panel {
-		display: flex;
-		gap: 1.2rem;
-		padding: 0.5rem var(--pad-x);
-		border-bottom: 1px solid #333;
-		background: var(--panel);
-		flex-wrap: wrap;
-	}
-	.cfg-panel label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		font-size: 0.8rem;
-		color: var(--dim);
-	}
 	.seg {
 		display: flex;
 		gap: 2px;
@@ -1076,25 +909,6 @@
 	.seg button.active {
 		background: var(--accent);
 		color: var(--bg);
-		border-color: var(--accent);
-	}
-	.cfg-panel input[type='range'] {
-		width: 100px;
-		accent-color: var(--accent);
-	}
-	.cfg-reset {
-		align-self: flex-end;
-		background: var(--bg);
-		color: var(--fg);
-		border: 1px solid #333;
-		border-radius: 3px;
-		padding: 2px 8px;
-		font-size: 0.75rem;
-		cursor: pointer;
-		width: auto;
-		height: auto;
-	}
-	.cfg-reset:hover {
 		border-color: var(--accent);
 	}
 	.body {
