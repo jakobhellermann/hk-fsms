@@ -140,7 +140,7 @@
 		ty?: number;
 		/** transition tint from the source state's colour group (null = default grey); unset for globals */
 		color?: string | null;
-		/** "back" edge: target is closer to the start state (lower BFS layer) than the source — dotted */
+		/** "back" edge: a DFS back edge (loops to an ancestor of the source in the start-rooted DFS) — dotted */
 		back?: boolean;
 		/** side mode: dock on the target's left/right edge (horizontal arrival) — a level side-neighbour */
 		hdock?: boolean;
@@ -323,36 +323,55 @@
 			};
 		});
 
-		// BFS distance from the start state over transitions (`outs` from the chain pass). A cyclic FSM
-		// has no true direction, so this init-rooted layering is just a heuristic: an edge whose target
-		// sits in a lower (closer-to-start) layer than its source is a "back" edge, drawn dotted. Node
-		// distance = the shallowest of its group's states (a collapsed chain uses its earliest member).
-		const dist = new Map<string, number>();
-		if (model.start_state) {
-			const q = [model.start_state];
-			dist.set(model.start_state, 0);
-			for (let h = 0; h < q.length; h++) {
-				const d = dist.get(q[h])!;
-				for (const t of outs.get(q[h]) ?? [])
-					if (!dist.has(t.to)) {
-						dist.set(t.to, d + 1);
-						q.push(t.to);
-					}
+		// classify "back" edges (drawn dotted) as DFS back edges on the group graph rooted at the start
+		// state: an edge to a group still on the recursion stack, i.e. an ancestor the flow is looping
+		// back to. This beats a BFS-layer compare, which mislabels the longer of two paths to a shared
+		// node as "back" even though it flows forward. DFS runs over groups so it matches the rendered
+		// node granularity (a collapsed chain is one vertex).
+		const groupAdj: number[][] = groups.map(() => []);
+		{
+			const seen = groups.map(() => new Set<number>());
+			for (const s of model.states) {
+				const fg = groupOf.get(s.name);
+				if (fg == null) continue;
+				for (const t of s.transitions) {
+					const tg = groupOf.get(t.to_state);
+					if (tg == null || tg === fg || seen[fg].has(tg)) continue;
+					seen[fg].add(tg);
+					groupAdj[fg].push(tg);
+				}
 			}
 		}
-		const nodeDist = new Map<string, number>();
-		groups.forEach((grp, i) => {
-			let m = Infinity;
-			for (const s of grp.states) {
-				const d = dist.get(s);
-				if (d != null && d < m) m = d;
+		const backPair = new Set<string>(); // "fromGroup toGroup" indices that are DFS back edges
+		{
+			const color = groups.map(() => 0); // 0 = unvisited, 1 = on stack, 2 = done
+			const startG = model.start_state != null ? groupOf.get(model.start_state) : undefined;
+			const roots = startG != null ? [startG, ...groups.map((_, i) => i)] : groups.map((_, i) => i);
+			for (const root of roots) {
+				if (color[root] !== 0) continue;
+				color[root] = 1;
+				const stack = [{ u: root, i: 0 }];
+				while (stack.length) {
+					const top = stack[stack.length - 1];
+					if (top.i < groupAdj[top.u].length) {
+						const v = groupAdj[top.u][top.i++];
+						if (color[v] === 1)
+							backPair.add(top.u + ' ' + v); // v is an ancestor on the stack
+						else if (color[v] === 0) {
+							color[v] = 1;
+							stack.push({ u: v, i: 0 });
+						}
+					} else {
+						color[top.u] = 2;
+						stack.pop();
+					}
+				}
 			}
-			nodeDist.set(nodes[i].id, m);
-		});
+		}
 		const isBack = (fromId: string, toId: string) => {
-			const a = nodeDist.get(fromId);
-			const b = nodeDist.get(toId);
-			return a != null && b != null && isFinite(a) && isFinite(b) && b < a;
+			const a = groupOf.get(fromId);
+			const b = groupOf.get(toId);
+			return a != null && b != null && backPair.has(a + ' ' + b);
 		};
 
 		const edges: Edge[] = [];
