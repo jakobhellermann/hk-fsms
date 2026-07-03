@@ -215,9 +215,15 @@
 				.flatMap((s) => s.transitions);
 			return raw.filter((t) => grp !== groupOf.get(t.to_state));
 		};
-		// FINISHED is PlayMaker's implicit "done" event — it gets no labelled port; it just leaves as
-		// an unlabelled default edge from the bottom. so it drives neither box sizing nor the port rows.
-		const portsOf = (id: string) => transOf(id).filter((t) => t.event !== 'FINISHED');
+		// FINISHED is PlayMaker's implicit "done" event. On its own it stays an unlabelled bottom edge
+		// (no port row); but a state that also has named transitions gets a labelled FINISHED port
+		// alongside them — a bare edge there is confusing. FINISHED sorts last, as the default exit.
+		const labeledPorts = (id: string) => {
+			const t = transOf(id);
+			const named = t.filter((x) => x.event !== 'FINISHED');
+			const finished = t.filter((x) => x.event === 'FINISHED');
+			return named.length > 0 ? [...named, ...finished] : named;
+		};
 
 		// width fits the widest state name in the group (a chain renders all of them, not just the head)
 		const sizeOf = (names: string[], trans: { event: string }[], chainLen: number) => ({
@@ -244,7 +250,7 @@
 			// the stacked chain states + any ports
 			if (grp.states.length === 1 && routed) return { x, y, w: p.w, h: p.h };
 			if (port) {
-				const sz = sizeOf(grp.states, portsOf(grp.states[0]), grp.states.length);
+				const sz = sizeOf(grp.states, labeledPorts(grp.states[0]), grp.states.length);
 				return { x, y, w: sz.width, h: sz.height };
 			}
 			const w = Math.max(54, ...grp.states.map((s) => s.length * CHAR_WIDE + 22));
@@ -262,8 +268,10 @@
 			let rows: Row[] = [];
 			if (port) {
 				const trans = transOf(label);
-				const ports = trans.filter((t) => t.event !== 'FINISHED');
+				const named = trans.filter((t) => t.event !== 'FINISHED');
 				const finished = trans.filter((t) => t.event === 'FINISHED');
+				// mixed: FINISHED shares the box with named transitions → give it a labelled port too
+				const ports = named.length > 0 ? [...named, ...finished] : named;
 				const single = ports.length === 1;
 				rows = ports.map((t, idx) => ({
 					event: t.event,
@@ -274,19 +282,20 @@
 					px: left + w / 2, // placeholder; the port slot is assigned below
 					py: top + h,
 					// in side mode a lone labelled out-edge drops straight down from the bottom centre
-					down: style === 'side' && single && finished.length === 0
+					down: style === 'side' && single
 				}));
-				// FINISHED transitions render as unlabelled edges leaving the bottom centre (no port row)
-				for (const t of finished)
-					rows.push({
-						event: t.event,
-						to: t.to_state,
-						ty: top + h,
-						px: left + w / 2,
-						py: top + h,
-						down: true,
-						bare: true
-					});
+				// FINISHED standing alone: no port row, just an unlabelled default edge from the bottom
+				if (named.length === 0)
+					for (const t of finished)
+						rows.push({
+							event: t.event,
+							to: t.to_state,
+							ty: top + h,
+							px: left + w / 2,
+							py: top + h,
+							down: true,
+							bare: true
+						});
 			}
 			return {
 				id: label,
