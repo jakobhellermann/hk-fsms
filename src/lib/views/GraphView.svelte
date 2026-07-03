@@ -140,6 +140,8 @@
 		ty?: number;
 		/** transition tint from the source state's colour group (null = default grey); unset for globals */
 		color?: string | null;
+		/** "back" edge: target is closer to the start state (lower BFS layer) than the source — dotted */
+		back?: boolean;
 		// routed transitions + global arrows (polyline + midpoint label):
 		points?: { x: number; y: number }[];
 		label?: string;
@@ -319,6 +321,38 @@
 			};
 		});
 
+		// BFS distance from the start state over transitions (`outs` from the chain pass). A cyclic FSM
+		// has no true direction, so this init-rooted layering is just a heuristic: an edge whose target
+		// sits in a lower (closer-to-start) layer than its source is a "back" edge, drawn dotted. Node
+		// distance = the shallowest of its group's states (a collapsed chain uses its earliest member).
+		const dist = new Map<string, number>();
+		if (model.start_state) {
+			const q = [model.start_state];
+			dist.set(model.start_state, 0);
+			for (let h = 0; h < q.length; h++) {
+				const d = dist.get(q[h])!;
+				for (const t of outs.get(q[h]) ?? [])
+					if (!dist.has(t.to)) {
+						dist.set(t.to, d + 1);
+						q.push(t.to);
+					}
+			}
+		}
+		const nodeDist = new Map<string, number>();
+		groups.forEach((grp, i) => {
+			let m = Infinity;
+			for (const s of grp.states) {
+				const d = dist.get(s);
+				if (d != null && d < m) m = d;
+			}
+			nodeDist.set(nodes[i].id, m);
+		});
+		const isBack = (fromId: string, toId: string) => {
+			const a = nodeDist.get(fromId);
+			const b = nodeDist.get(toId);
+			return a != null && b != null && isFinite(a) && isFinite(b) && b < a;
+		};
+
 		const edges: Edge[] = [];
 		if (routed) {
 			// routed mode: straight labelled lines between nodes (groups), with
@@ -350,6 +384,7 @@
 						label: t.event,
 						global: false,
 						color: transColor(from.colorIndex),
+						back: isBack(from.id, to.id),
 						from: from.id,
 						to: to.id,
 						lx: (p0.x + p1.x) / 2,
@@ -379,6 +414,7 @@
 								to: o.target.id,
 								global: n.any,
 								color: transColor(n.colorIndex),
+								back: isBack(n.id, o.target.id),
 								up,
 								topPort: up,
 								sx: o.r.px,
@@ -428,6 +464,7 @@
 							to: target.id,
 							global: n.any,
 							color: transColor(n.colorIndex),
+							back: isBack(n.id, target.id),
 							down: r.down,
 							up,
 							bow,
@@ -826,6 +863,7 @@
 							fill="none"
 							stroke={hot ? 'var(--accent)' : e.global ? 'var(--var)' : (e.color ?? '#888')}
 							stroke-width={hot ? 2.2 : 1.3}
+							stroke-dasharray={e.back ? '2 3' : undefined}
 							marker-end="url(#arrow)"
 							opacity={selected == null ? 0.8 : hot ? 1 : 0.18}
 							pointer-events="none"
@@ -845,6 +883,7 @@
 							fill="none"
 							stroke={hot ? 'var(--accent)' : (e.color ?? '#888')}
 							stroke-width={hot ? 2 : 1.2}
+							stroke-dasharray={e.back ? '2 3' : undefined}
 							marker-end="url(#arrow)"
 							opacity={selected == null ? 0.55 : hot ? 1 : 0.1}
 							pointer-events="none"
