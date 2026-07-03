@@ -361,6 +361,7 @@
 			const cx = (m: Node) => m.x + m.w / 2;
 			const byId = new Map(nodes.map((n) => [n.id, n]));
 			const srcRow = new Map<Edge, Row>(); // bottom mode: edge → its source row (to re-place the port)
+			const sideDock = new Map<Edge, boolean>(); // side mode: edge → source port on the right side (to recompute the bow after re-docking)
 			for (const n of nodes) {
 				const valid = n.rows
 					.map((r) => ({ r, target: nodes[groupOf.get(r.to)!] }))
@@ -411,15 +412,18 @@
 						// a natural diagonal curve, while one straight below docks under the port.
 						const lo = target.x + DOCK_INSET;
 						const hi = target.x + target.w - DOCK_INSET;
+						// the swing-limit bound (don't dock past the port on its exit side) must never cross the
+						// target's dock band — otherwise the range inverts and the edge lands beside the node
+						// instead of on it. staying on the target wins over the anti-swing bias.
 						const dockX = r.down
 							? tgtCx
 							: right
-								? clamp(tgtCx, Math.max(lo, r.px), hi)
-								: clamp(tgtCx, lo, Math.min(hi, r.px));
+								? clamp(tgtCx, Math.min(hi, Math.max(lo, r.px)), hi)
+								: clamp(tgtCx, lo, Math.max(lo, Math.min(hi, r.px)));
 						// horizontal control offset scaled to the actual gap (plus a small side lean), so a
 						// target straight below gets a gentle curve instead of a fixed 50px loop at the port
 						const bow = (dockX - r.px) * 0.5 + (right ? SIDE_LEAN : -SIDE_LEAN);
-						edges.push({
+						const e: Edge = {
 							from: n.id,
 							to: target.id,
 							global: n.any,
@@ -431,7 +435,9 @@
 							sy: r.py,
 							tx: dockX,
 							ty: up ? target.y + target.h : target.y
-						});
+						};
+						edges.push(e);
+						sideDock.set(e, right);
 					}
 				}
 			}
@@ -481,6 +487,36 @@
 						],
 						n.y
 					);
+				}
+			}
+
+			// side mode: spread a target's incoming docks across its edge instead of letting them all
+			// gravitate to the centre (mirrors the bottom-mode re-pack). outgoing side ports are tied to
+			// their label rows and stay put; only the free dock points move. a lone incoming edge keeps
+			// its centre/under-port dock. bow is recomputed so the curve still meets the new dock cleanly.
+			if (style === 'side') {
+				const sideEdges = edges.filter((e) => sideDock.has(e));
+				const dock = (target: Node, inc: Edge[]) => {
+					if (inc.length < 2) return;
+					inc.sort(
+						(a, b) => cx(byId.get(a.from)!) - cx(byId.get(b.from)!) || a.from.localeCompare(b.from)
+					);
+					inc.forEach((e, k) => {
+						const x = target.x + (target.w * (k + 1)) / (inc.length + 1);
+						e.tx = x;
+						e.bow = (x - e.sx!) * 0.5 + (sideDock.get(e)! ? SIDE_LEAN : -SIDE_LEAN);
+					});
+				};
+				for (const n of nodes) {
+					const incoming = sideEdges.filter((e) => e.to === n.id);
+					dock(
+						n,
+						incoming.filter((e) => !e.up)
+					); // docking at the top edge
+					dock(
+						n,
+						incoming.filter((e) => e.up)
+					); // docking at the bottom edge (back-edges)
 				}
 			}
 		}
