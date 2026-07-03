@@ -92,6 +92,8 @@
 	const txt = (s: string) => s.length * CHAR;
 	const ROW_H = 20; // chain state row height
 	const PAD_Y = 0; // chain box vertical padding
+	const DOCK_INSET = 12; // side edge: dock at least this far from a target's corners
+	const SIDE_LEAN = 12; // side edge: min horizontal lean so a target straight below still curves gently
 
 	// a state inside a chain node: its name + the event that transitions to the next state (empty on last)
 	type ChainState = { name: string; event: string };
@@ -404,6 +406,19 @@
 							r.py = r.ty;
 						}
 						const up = target.y + target.h <= r.py;
+						// dock toward the target's centre, but never past the port on its exit side — that
+						// would swing the curve back across the node. so a target off to the port's side gets
+						// a natural diagonal curve, while one straight below docks under the port.
+						const lo = target.x + DOCK_INSET;
+						const hi = target.x + target.w - DOCK_INSET;
+						const dockX = r.down
+							? tgtCx
+							: right
+								? clamp(tgtCx, Math.max(lo, r.px), hi)
+								: clamp(tgtCx, lo, Math.min(hi, r.px));
+						// horizontal control offset scaled to the actual gap (plus a small side lean), so a
+						// target straight below gets a gentle curve instead of a fixed 50px loop at the port
+						const bow = (dockX - r.px) * 0.5 + (right ? SIDE_LEAN : -SIDE_LEAN);
 						edges.push({
 							from: n.id,
 							to: target.id,
@@ -411,12 +426,10 @@
 							color: transColor(n.colorIndex),
 							down: r.down,
 							up,
-							// leave the port toward its own side, so a right-edge port visibly exits rightward
-							// even when the target sits almost straight below (tx barely past the node centre)
-							bow: right ? 50 : -50,
+							bow,
 							sx: r.px,
 							sy: r.py,
-							tx: tgtCx,
+							tx: dockX,
 							ty: up ? target.y + target.h : target.y
 						});
 					}
@@ -523,10 +536,15 @@
 	// opposing edges apart, so a vertically-aligned edge stays straight.
 	const edgePath = (e: Edge) => {
 		const vertical = layoutCfg.edgeStyle === 'bottom' || e.down;
-		const off = vertical ? 40 : 50;
+		// side edges: cap the vertical approach arm to the actual drop so a close target can't produce
+		// a control point above the start (which loops the curve)
+		const off = vertical ? 40 : clamp(Math.abs(e.ty! - e.sy!) * 0.4, 12, 50);
+		// side ports leave horizontally toward their own side; the bow is scaled to the horizontal gap
+		// upstream (see the layout pass), so a target straight below gets a gentle lean rather than a hook
+		const sideBow = e.bow ?? (e.tx! < e.sx! ? -50 : 50);
 		const c1 = vertical
 			? `${e.sx!} ${e.sy! + (e.topPort ? -40 : 40)}`
-			: `${e.sx! + (e.bow ?? (e.tx! < e.sx! ? -50 : 50))} ${e.sy!}`;
+			: `${e.sx! + sideBow} ${e.sy!}`;
 		const c2 = e.up ? `${e.tx!} ${e.ty! + off}` : `${e.tx!} ${e.ty! - off}`;
 		return `M ${e.sx!} ${e.sy!} C ${c1}, ${c2}, ${e.tx!} ${e.ty!}`;
 	};
