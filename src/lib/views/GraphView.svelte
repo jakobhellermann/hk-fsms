@@ -142,6 +142,8 @@
 		color?: string | null;
 		/** "back" edge: target is closer to the start state (lower BFS layer) than the source — dotted */
 		back?: boolean;
+		/** side mode: dock on the target's left/right edge (horizontal arrival) — a level side-neighbour */
+		hdock?: boolean;
 		// routed transitions + global arrows (polyline + midpoint label):
 		points?: { x: number; y: number }[];
 		label?: string;
@@ -442,20 +444,34 @@
 							r.px = right ? n.x + n.w : n.x;
 							r.py = r.ty;
 						}
-						const up = target.y + target.h <= r.py;
-						// dock toward the target's centre, but never past the port on its exit side — that
-						// would swing the curve back across the node. so a target off to the port's side gets
-						// a natural diagonal curve, while one straight below docks under the port.
 						const lo = target.x + DOCK_INSET;
 						const hi = target.x + target.w - DOCK_INSET;
-						// the swing-limit bound (don't dock past the port on its exit side) must never cross the
-						// target's dock band — otherwise the range inverts and the edge lands beside the node
-						// instead of on it. staying on the target wins over the anti-swing bias.
-						const dockX = r.down
-							? tgtCx
-							: right
-								? clamp(tgtCx, Math.min(hi, Math.max(lo, r.px)), hi)
-								: clamp(tgtCx, lo, Math.max(lo, Math.min(hi, r.px)));
+						const vlo = target.y + DOCK_INSET;
+						const vhi = target.y + target.h - DOCK_INSET;
+						// which target edge to dock on, by where the port sits vertically: above the target → its
+						// top, below it → its bottom, level with it → the facing SIDE (horizontal arrival). the
+						// side case keeps a level neighbour from grazing over the top edge to reach a top dock.
+						const up = r.py >= target.y + target.h;
+						const side = !r.down && !up && r.py > target.y;
+						let dockX: number;
+						let dockY: number;
+						if (side) {
+							// dock on the edge facing the source, at the port's height (clamped to the box)
+							dockX = r.px >= tgtCx ? target.x + target.w : target.x;
+							dockY = clamp(r.py, vlo, vhi);
+						} else {
+							// dock toward the target's centre, but never past the port on its exit side — that
+							// would swing the curve back across the node. so a target off to the port's side gets
+							// a natural diagonal curve, while one straight below docks under the port. the
+							// swing-limit bound must never cross the target's dock band, else the range inverts
+							// and the edge lands beside the node; staying on the target wins over the anti-swing.
+							dockX = r.down
+								? tgtCx
+								: right
+									? clamp(tgtCx, Math.min(hi, Math.max(lo, r.px)), hi)
+									: clamp(tgtCx, lo, Math.max(lo, Math.min(hi, r.px)));
+							dockY = up ? target.y + target.h : target.y;
+						}
 						// horizontal control offset scaled to the actual gap (plus a small side lean), so a
 						// target straight below gets a gentle curve instead of a fixed 50px loop at the port
 						const bow = (dockX - r.px) * 0.5 + (right ? SIDE_LEAN : -SIDE_LEAN);
@@ -467,11 +483,12 @@
 							back: isBack(n.id, target.id),
 							down: r.down,
 							up,
+							hdock: side,
 							bow,
 							sx: r.px,
 							sy: r.py,
 							tx: dockX,
-							ty: up ? target.y + target.h : target.y
+							ty: dockY
 						};
 						edges.push(e);
 						sideDock.set(e, right);
@@ -532,7 +549,8 @@
 			// their label rows and stay put; only the free dock points move. a lone incoming edge keeps
 			// its centre/under-port dock. bow is recomputed so the curve still meets the new dock cleanly.
 			if (style === 'side') {
-				const sideEdges = edges.filter((e) => sideDock.has(e));
+				// only top/bottom docks fan across the target's width; side (horizontal) docks keep their y
+				const sideEdges = edges.filter((e) => sideDock.has(e) && !e.hdock);
 				const dock = (target: Node, inc: Edge[]) => {
 					if (inc.length < 2) return;
 					inc.sort(
@@ -618,11 +636,19 @@
 		const c1 = vertical
 			? `${e.sx!} ${e.sy! + (e.topPort ? -off : off)}`
 			: `${e.sx! + sideBow} ${e.sy!}`;
-		// lean the end control point toward the source so the tip's tangent (c2 → dock) follows the
-		// curve's actual diagonal instead of always pointing straight into the edge. capped at `off`
-		// (≤45° from vertical) so a steeply-offset dock still tucks in cleanly rather than skewing flat.
-		const lean = clamp((e.tx! - e.sx!) * 0.4, -off, off);
-		const c2 = e.up ? `${e.tx! - lean} ${e.ty! + off}` : `${e.tx! - lean} ${e.ty! - off}`;
+		let c2: string;
+		if (e.hdock) {
+			// side dock: approach the target's edge horizontally from the source's side, so the tip enters
+			// the near face level instead of dropping onto the top
+			const hoff = Math.min(Math.abs(e.tx! - e.sx!) * 0.45, 50) * (e.sx! >= e.tx! ? 1 : -1);
+			c2 = `${e.tx! + hoff} ${e.ty!}`;
+		} else {
+			// lean the end control point toward the source so the tip's tangent (c2 → dock) follows the
+			// curve's actual diagonal instead of always pointing straight into the edge. capped at `off`
+			// (≤45° from vertical) so a steeply-offset dock still tucks in cleanly rather than skewing flat.
+			const lean = clamp((e.tx! - e.sx!) * 0.4, -off, off);
+			c2 = e.up ? `${e.tx! - lean} ${e.ty! + off}` : `${e.tx! - lean} ${e.ty! - off}`;
+		}
 		return `M ${e.sx!} ${e.sy!} C ${c1}, ${c2}, ${e.tx!} ${e.ty!}`;
 	};
 
