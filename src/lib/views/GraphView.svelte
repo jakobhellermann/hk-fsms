@@ -581,7 +581,11 @@
 		const c1 = vertical
 			? `${e.sx!} ${e.sy! + (e.topPort ? -off : off)}`
 			: `${e.sx! + sideBow} ${e.sy!}`;
-		const c2 = e.up ? `${e.tx!} ${e.ty! + off}` : `${e.tx!} ${e.ty! - off}`;
+		// lean the end control point toward the source so the tip's tangent (c2 → dock) follows the
+		// curve's actual diagonal instead of always pointing straight into the edge. capped at `off`
+		// (≤45° from vertical) so a steeply-offset dock still tucks in cleanly rather than skewing flat.
+		const lean = clamp((e.tx! - e.sx!) * 0.4, -off, off);
+		const c2 = e.up ? `${e.tx! - lean} ${e.ty! + off}` : `${e.tx! - lean} ${e.ty! - off}`;
 		return `M ${e.sx!} ${e.sy!} C ${c1}, ${c2}, ${e.tx!} ${e.ty!}`;
 	};
 
@@ -793,38 +797,20 @@
 	>
 		<svg class="stage">
 			<defs>
+				<!-- single arrowhead for every edge: `markerUnits=userSpaceOnUse` keeps its size constant
+				     regardless of the (thicker) stroke a hot edge uses, and `fill=context-stroke` makes the
+				     tip inherit the edge's own colour (transition tint, global var, selection accent, …) -->
 				<marker
 					id="arrow"
 					viewBox="0 0 10 10"
 					refX="9"
 					refY="5"
-					markerWidth="6"
-					markerHeight="6"
+					markerWidth="8"
+					markerHeight="8"
+					markerUnits="userSpaceOnUse"
 					orient="auto-start-reverse"
 				>
-					<path d="M0,0 L10,5 L0,10 z" fill="#888" />
-				</marker>
-				<marker
-					id="arrowg"
-					viewBox="0 0 10 10"
-					refX="9"
-					refY="5"
-					markerWidth="6"
-					markerHeight="6"
-					orient="auto-start-reverse"
-				>
-					<path d="M0,0 L10,5 L0,10 z" fill="var(--var)" />
-				</marker>
-				<marker
-					id="arrowsel"
-					viewBox="0 0 10 10"
-					refX="9"
-					refY="5"
-					markerWidth="6"
-					markerHeight="6"
-					orient="auto-start-reverse"
-				>
-					<path d="M0,0 L10,5 L0,10 z" fill="var(--accent)" />
+					<path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
 				</marker>
 			</defs>
 
@@ -840,7 +826,7 @@
 							fill="none"
 							stroke={hot ? 'var(--accent)' : e.global ? 'var(--var)' : (e.color ?? '#888')}
 							stroke-width={hot ? 2.2 : 1.3}
-							marker-end="url(#{hot ? 'arrowsel' : e.global ? 'arrowg' : 'arrow'})"
+							marker-end="url(#arrow)"
 							opacity={selected == null ? 0.8 : hot ? 1 : 0.18}
 							pointer-events="none"
 						/>
@@ -859,7 +845,7 @@
 							fill="none"
 							stroke={hot ? 'var(--accent)' : (e.color ?? '#888')}
 							stroke-width={hot ? 2 : 1.2}
-							marker-end="url(#{hot ? 'arrowsel' : 'arrow'})"
+							marker-end="url(#arrow)"
 							opacity={selected == null ? 0.55 : hot ? 1 : 0.1}
 							pointer-events="none"
 						/>
