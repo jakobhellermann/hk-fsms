@@ -536,14 +536,14 @@
 	// opposing edges apart, so a vertically-aligned edge stays straight.
 	const edgePath = (e: Edge) => {
 		const vertical = layoutCfg.edgeStyle === 'bottom' || e.down;
-		// side edges: cap the vertical approach arm to the actual drop so a close target can't produce
-		// a control point above the start (which loops the curve)
-		const off = vertical ? 40 : clamp(Math.abs(e.ty! - e.sy!) * 0.4, 12, 50);
+		// cap both control arms to a fraction of the drop so a short edge can't place c1 below c2 — that
+		// crossing makes the curve dip down, back up, then down again between two close states
+		const off = Math.min(Math.abs(e.ty! - e.sy!) * 0.45, vertical ? 40 : 50);
 		// side ports leave horizontally toward their own side; the bow is scaled to the horizontal gap
 		// upstream (see the layout pass), so a target straight below gets a gentle lean rather than a hook
 		const sideBow = e.bow ?? (e.tx! < e.sx! ? -50 : 50);
 		const c1 = vertical
-			? `${e.sx!} ${e.sy! + (e.topPort ? -40 : 40)}`
+			? `${e.sx!} ${e.sy! + (e.topPort ? -off : off)}`
 			: `${e.sx! + sideBow} ${e.sy!}`;
 		const c2 = e.up ? `${e.tx!} ${e.ty! + off}` : `${e.tx!} ${e.ty! - off}`;
 		return `M ${e.sx!} ${e.sy!} C ${c1}, ${c2}, ${e.tx!} ${e.ty!}`;
