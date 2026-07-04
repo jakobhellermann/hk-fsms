@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fmtValue } from './fmt';
 import { toPseudocode } from './pseudo';
-import type { FsmModel, IndexEntry, Param } from './model';
+import { expandIndex, type FsmModel, type IndexEntry, type Param } from './model';
 
 // Runs against the real content store (the gitignored static/data symlink → ../playmakerfsm/out).
 // Skips cleanly in environments without the data (e.g. fresh CI).
@@ -14,7 +14,9 @@ const readModel = (hash: string): FsmModel =>
 	JSON.parse(readFileSync(resolve(dir, 'content', `${hash}.json`), 'utf8'));
 
 describe.skipIf(!hasData)('real store (hk)', () => {
-	const index: IndexEntry[] = JSON.parse(readFileSync(resolve(dir, 'index.json'), 'utf8'));
+	const index: IndexEntry[] = expandIndex(
+		JSON.parse(readFileSync(resolve(dir, 'index.json'), 'utf8'))
+	);
 
 	// deterministic pick: distinct content hashes, ordered by (name, hash)
 	const seen = new Set<string>();

@@ -23,7 +23,7 @@ fn main() -> Result<()> {
         let result = scan::scan_game(&game.path, &out_dir)?;
 
         let index_path = out_dir.join("index.json");
-        std::fs::write(&index_path, serde_json::to_vec_pretty(&result.entries)?)?;
+        std::fs::write(&index_path, config::to_compact_json(&result.entries))?;
 
         let scenes_path = out_dir.join("scenes.json");
         std::fs::write(

@@ -184,11 +184,30 @@ export interface Variable {
 	value: Value;
 }
 
-// out/<game>/index.json entry
+// one FSM in the index. `id` is a stable per-load key (its position in the expanded list); the URL is
+// built from file/game_object/name, never from an internal id.
 export interface IndexEntry {
+	id: number;
 	file: string;
-	path_id: number;
 	name: string;
 	game_object: string;
 	hash: string;
+}
+
+// out/<game>/index.json is a compact columnar format: a shared file table plus one tuple per FSM,
+// `[fileIndex, name, game_object, hash]` — far smaller than one object-with-keys per entry.
+export interface CompactIndex {
+	f: string[];
+	e: [number, string, string, string][];
+}
+
+/** expand the compact index.json into `IndexEntry[]` (assigning each a stable `id`). */
+export function expandIndex(raw: CompactIndex): IndexEntry[] {
+	return raw.e.map(([fi, name, game_object, hash], id) => ({
+		id,
+		file: raw.f[fi],
+		name,
+		game_object,
+		hash
+	}));
 }

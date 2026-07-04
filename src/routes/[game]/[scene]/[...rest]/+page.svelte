@@ -75,7 +75,7 @@
 {#snippet fsmLeaves(node: TreeNode)}
 	{#if node.fsms.length}
 		<ul class="fsms">
-			{#each sortedFsms(node) as f (f.path_id)}
+			{#each sortedFsms(node) as f (f.id)}
 				<li>
 					<a href={fsmHref(f)}>{f.name}</a>{#if f.name === 'Control'}<span
 							class="star"

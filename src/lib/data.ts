@@ -1,5 +1,5 @@
 import { base } from '$app/paths';
-import type { FsmModel, IndexEntry } from './model';
+import { expandIndex, type CompactIndex, type FsmModel, type IndexEntry } from './model';
 export { type Game, type Favorite, GAMES, DEFAULT_GAME, isGame, favoritesFor } from './config';
 import { type Game } from './config';
 
@@ -14,7 +14,7 @@ export function goLeaf(path: string): string {
 export async function fetchIndex(game: Game): Promise<IndexEntry[]> {
 	const r = await fetch(`${base}/data/${game}/index.json`);
 	if (!r.ok) throw new Error(`index ${game}: ${r.status}`);
-	return r.json();
+	return expandIndex((await r.json()) as CompactIndex);
 }
 
 // scene name per file (levelN → "Cliffs_03", bundle → "Dust_01"). Files without a scene

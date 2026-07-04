@@ -534,10 +534,26 @@ fn write_readme(out_dir: &Path, games: &[(String, usize)]) -> Result<()> {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
-    let index: Vec<Entry> = serde_json::from_str(
+    // index.json is the compact columnar format: a shared file table + one tuple per FSM.
+    #[derive(Deserialize)]
+    struct Compact {
+        f: Vec<String>,
+        e: Vec<(usize, String, String, String)>,
+    }
+    let compact: Compact = serde_json::from_str(
         &std::fs::read_to_string(data_dir.join("index.json"))
             .with_context(|| format!("index.json for {slug}"))?,
     )?;
+    let index: Vec<Entry> = compact
+        .e
+        .into_iter()
+        .map(|(fi, name, game_object, hash)| Entry {
+            file: compact.f[fi].clone(),
+            name,
+            game_object,
+            hash,
+        })
+        .collect();
 
     // scene names (file → scene_name)
     let scenes: HashMap<String, String> = serde_json::from_str(
