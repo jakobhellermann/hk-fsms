@@ -7,6 +7,8 @@
 		DEFAULT_GAME,
 		fetchIndex,
 		fetchSceneNames,
+		favoritesFor,
+		fsmSegments,
 		isGame,
 		sceneLabel,
 		type Game
@@ -96,6 +98,29 @@
 	];
 	const namedGroups = $derived(singlesFirst(groupNamedScenes(namedScenes)));
 	const otherGroups = $derived(singlesFirst(groupOtherFiles(otherScenes)));
+
+	// curated quick-links (e.g. named bosses) resolved against the index to real FSM URLs; filtered by
+	// the same search terms as the scenes, and dropped silently if the target FSM no longer exists
+	const favorites = $derived(
+		favoritesFor(game)
+			.filter((f) => match(f.name))
+			.map((f) => {
+				let path: string;
+				if (f.fsm) {
+					const e = entries.find(
+						(x) => x.file === f.file && x.game_object === (f.game_object ?? '') && x.name === f.fsm
+					);
+					if (!e) return null;
+					path = fsmSegments(entries, e).map(encodeURIComponent).join('/');
+				} else {
+					// scene favorite: link to the bundle's object tree (only if it has any FSMs)
+					if (!entries.some((x) => x.file === f.file)) return null;
+					path = encodeURIComponent(f.file);
+				}
+				return { name: f.name, href: `${base}/${game}/${path}${f.mode ? `?mode=${f.mode}` : ''}` };
+			})
+			.filter((f) => f !== null)
+	);
 </script>
 
 {#snippet groupList(groups: SceneGroup<SceneRow>[], ns: string)}
@@ -137,6 +162,15 @@
 {:else if indexQuery.isError}
 	<p class="msg err">{String(indexQuery.error)}</p>
 {:else}
+	{#if favorites.length}
+		<section class="favorites">
+			<ul class="favlist">
+				{#each favorites as f (f.href)}
+					<li><a class="favlink" href={f.href}>{f.name}</a></li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
 	<div class="cols">
 		<section class="col">
 			<div class="count dim">{namedScenes.length} scenes</div>
@@ -152,6 +186,32 @@
 {/if}
 
 <style>
+	.favorites {
+		padding: 0.2rem var(--pad-x) 0.6rem;
+		border-bottom: 1px solid #2a2a2a;
+		margin-bottom: 0.4rem;
+	}
+	.favlist {
+		list-style: none;
+		margin: 0.3rem 0 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+	.favlink {
+		display: inline-block;
+		padding: 0.15rem 0.6rem;
+		border: 1px solid #333;
+		border-radius: 999px;
+		background: var(--panel);
+		color: var(--accent);
+		text-decoration: none;
+		font-size: 0.9rem;
+	}
+	.favlink:hover {
+		border-color: var(--accent);
+	}
 	.cols {
 		display: flex;
 		flex-wrap: wrap;

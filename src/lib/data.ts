@@ -1,6 +1,6 @@
 import { base } from '$app/paths';
 import type { FsmModel, IndexEntry } from './model';
-export { type Game, GAMES, DEFAULT_GAME, isGame } from './config';
+export { type Game, type Favorite, GAMES, DEFAULT_GAME, isGame, favoritesFor } from './config';
 import { type Game } from './config';
 
 // scene-name display/grouping helpers live in `scenes.ts` (kept free of `$app` so they're unit-testable)
