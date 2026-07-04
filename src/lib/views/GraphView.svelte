@@ -683,8 +683,16 @@
 		const k = Math.min((cw - 40) / layout.width, (ch - 40) / layout.height, 1);
 		return { tx: (cw - layout.width * k) / 2, ty: (ch - layout.height * k) / 2, k };
 	});
-	// default view: 100% zoom, centred horizontally, near the top
-	const home = $derived({ tx: (cw - layout.width) / 2, ty: 20, k: 1 });
+	// default view: 100% zoom with the start state top-centre (horizontally centred, near the top) so the
+	// graph opens at the beginning of the flow. Nodes sit at raw PlayMaker editor rects, so the start can
+	// be anywhere — without this the view centred the whole (often wide) graph and the start ended up
+	// off-screen. Falls back to whole-graph-centred when there's no start node.
+	const startNode = $derived(layout.nodes.find((n) => n.start));
+	const home = $derived.by(() => {
+		const n = startNode;
+		if (!cw || !ch || !n) return { tx: (cw - layout.width) / 2, ty: 20, k: 1 };
+		return { tx: cw / 2 - (n.x + n.w / 2), ty: 56 - n.y, k: 1 };
+	});
 	let view = $state<{ tx: number; ty: number; k: number } | null>(null);
 	const cur = $derived(view ?? home);
 
