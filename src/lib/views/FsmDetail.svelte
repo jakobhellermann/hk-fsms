@@ -12,8 +12,8 @@
 
 	type Mode = 'raw' | 'pseudo' | 'graph';
 	const MODES: { id: Mode; label: string }[] = [
-		{ id: 'pseudo', label: 'pseudocode' },
 		{ id: 'graph', label: 'graph' },
+		{ id: 'pseudo', label: 'pseudocode' },
 		{ id: 'raw', label: 'raw' }
 	];
 	const isMode = (s: string | null): s is Mode => s === 'raw' || s === 'pseudo' || s === 'graph';
