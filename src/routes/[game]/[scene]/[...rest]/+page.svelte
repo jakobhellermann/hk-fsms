@@ -9,6 +9,7 @@
 		goLeaf,
 		isGame,
 		resolveFsm,
+		resolveScenePath,
 		type Game
 	} from '$lib/data';
 	import type { IndexEntry } from '$lib/model';
@@ -17,8 +18,6 @@
 	const game = $derived<Game>(
 		isGame(page.params.game ?? null) ? (page.params.game as Game) : DEFAULT_GAME
 	);
-	const scene = $derived(page.params.scene ?? '');
-	const rest = $derived(page.params.rest ? page.params.rest.split('/') : []);
 	const query = $derived(page.url.searchParams.get('q') ?? '');
 
 	const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -29,6 +28,12 @@
 		queryFn: () => fetchIndex(game)
 	}));
 	const entries = $derived(indexQuery.data ?? []);
+
+	// recover [scene, ...rest] from the params — a scene file may contain '/' (see resolveScenePath),
+	// so it can arrive split across the scene param and the head of rest
+	const path = $derived(resolveScenePath(entries, page.params.scene ?? '', page.params.rest ?? ''));
+	const scene = $derived(path.scene);
+	const rest = $derived(path.rest);
 
 	// rest is empty on the object tree, [...gameObject, fsm] on a detail
 	const detailEntry = $derived(rest.length ? resolveFsm(entries, scene, rest) : undefined);

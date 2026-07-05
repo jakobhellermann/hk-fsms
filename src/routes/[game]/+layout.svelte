@@ -3,7 +3,16 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { GAMES, DEFAULT_GAME, fetchSceneNames, isGame, sceneLabel, type Game } from '$lib/data';
+	import {
+		GAMES,
+		DEFAULT_GAME,
+		fetchIndex,
+		fetchSceneNames,
+		isGame,
+		resolveScenePath,
+		sceneLabel,
+		type Game
+	} from '$lib/data';
 
 	let { children } = $props();
 
@@ -11,9 +20,23 @@
 		isGame(page.params.game ?? null) ? (page.params.game as Game) : DEFAULT_GAME
 	);
 	const gameLabel = $derived(GAMES.find((g) => g.id === game)?.label ?? game);
-	const scene = $derived(page.params.scene ?? null);
+
+	const indexQuery = createQuery(() => ({
+		queryKey: ['index', game],
+		queryFn: () => fetchIndex(game)
+	}));
+	const entries = $derived(indexQuery.data ?? []);
+
+	// recover [scene, ...rest]; a scene file may contain '/' and arrive split across the params
+	// (see resolveScenePath). Empty scene param → the game index page (no scene selected).
+	const resolved = $derived(
+		page.params.scene
+			? resolveScenePath(entries, page.params.scene, page.params.rest ?? '')
+			: { scene: null as string | null, rest: [] as string[] }
+	);
+	const scene = $derived(resolved.scene);
 	// segments below the scene: [] = object tree, [...gameObject, fsm] = an FSM detail
-	const rest = $derived(page.params.rest ? page.params.rest.split('/') : []);
+	const rest = $derived(resolved.rest);
 	const isDetail = $derived(scene !== null && rest.length > 0);
 	const query = $derived(page.url.searchParams.get('q') ?? '');
 

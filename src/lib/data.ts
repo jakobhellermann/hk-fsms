@@ -60,6 +60,30 @@ export function resolveFsm(
 	return group[Number(m[2])];
 }
 
+/**
+ * Recover the true `[scene, ...rest]` from raw route params. A scene/bundle file may itself contain
+ * `/` (e.g. Silksong `scenes_scenes_scenes/foo.bundle`). The app links to such a file as a single URL
+ * segment via `%2F`, but GitHub Pages decodes `%2F` back to `/` (and 301-redirects), so a
+ * shared/redirected link arrives with the file split across `scene` and the head of `rest`. Recover
+ * it by taking the shortest leading run of segments that names a real file in the index. Falls back
+ * to the raw single-segment scene (e.g. while the index is still loading, or for a genuine miss).
+ */
+export function resolveScenePath(
+	entries: IndexEntry[],
+	sceneParam: string,
+	restParam: string
+): { scene: string; rest: string[] } {
+	const restSegs = restParam ? restParam.split('/') : [];
+	if (!sceneParam) return { scene: sceneParam, rest: restSegs };
+	const segs = [sceneParam, ...restSegs];
+	const files = new Set(entries.map((e) => e.file));
+	for (let i = 1; i <= segs.length; i++) {
+		const candidate = segs.slice(0, i).join('/');
+		if (files.has(candidate)) return { scene: candidate, rest: segs.slice(i) };
+	}
+	return { scene: sceneParam, rest: restSegs };
+}
+
 export async function fetchModel(game: Game, hash: string): Promise<FsmModel> {
 	const r = await fetch(`${base}/data/${game}/content/${hash}.json`);
 	if (!r.ok) throw new Error(`model ${hash}: ${r.status}`);
