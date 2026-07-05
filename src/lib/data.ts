@@ -73,7 +73,9 @@ export function resolveScenePath(
 	sceneParam: string,
 	restParam: string
 ): { scene: string; rest: string[] } {
-	const restSegs = restParam ? restParam.split('/') : [];
+	// filter empties: a trailing slash (GitHub Pages redirects `…/Control` → `…/Control/` for the
+	// stub directory) would otherwise add an empty final segment, making resolveFsm look for name ""
+	const restSegs = restParam ? restParam.split('/').filter(Boolean) : [];
 	if (!sceneParam) return { scene: sceneParam, rest: restSegs };
 	const segs = [sceneParam, ...restSegs];
 	const files = new Set(entries.map((e) => e.file));
