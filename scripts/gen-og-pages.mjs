@@ -47,11 +47,15 @@ const esc = (s) =>
 	s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // replace a meta tag's content in the shell (matches the generic tags app.html already emits), or
-// append it before </head> if absent.
+// append it before </head> if absent. `\s+` tolerates app.html's multi-line/pretty-printed tags.
 function setMeta(html, attr, key, value) {
-	const re = new RegExp(`(<meta ${attr}="${key}" content=")[^"]*(")`);
+	const re = new RegExp(`(<meta\\s+${attr}="${key}"\\s+content=")[^"]*(")`);
 	if (re.test(html)) return html.replace(re, `$1${esc(value)}$2`);
 	return html.replace('</head>', `\t\t<meta ${attr}="${key}" content="${esc(value)}" />\n\t</head>`);
+}
+// drop a meta tag entirely (single- or multi-line form)
+function removeMeta(html, attr, key) {
+	return html.replace(new RegExp(`\\s*<meta\\s+${attr}="${key}"[\\s\\S]*?/>`), '');
 }
 function setTitle(html, value) {
 	if (/<title>[^<]*<\/title>/.test(html)) return html.replace(/<title>[^<]*<\/title>/, `<title>${esc(value)}</title>`);
@@ -76,9 +80,8 @@ for (const g of GAMES) {
 		continue;
 	}
 	const entries = expandIndex(JSON.parse(await readFile(indexPath, 'utf8')));
-	const scenes = JSON.parse(await readFile(path.join(DATA, g.id, 'scenes.json'), 'utf8'));
-	const sceneName = (f) => scenes[f] ?? f;
-
+	// (scene display names not needed — favorite cards show just the name)
+	
 	for (const f of favorites) {
 		let segments;
 		let fsmHash = null;
@@ -102,19 +105,16 @@ for (const g of GAMES) {
 
 		const route = [g.id, ...segments]; // decoded segments = on-disk dir names GH Pages resolves to
 		const urlPath = route.map(encodeURIComponent).join('/');
-		const scene = sceneName(f.file);
-		const title = `${f.name} — PlayMaker FSM browser`;
-		const description = f.fsm
-			? `${f.name}: PlayMaker FSM "${f.fsm}" in ${scene} — ${g.label}.`
-			: `${f.name}: PlayMaker FSMs in ${scene} — ${g.label}.`;
 		const url = `${SITE}/${urlPath}${f.mode ? `?mode=${f.mode}` : ''}`;
 
+		// the card is just the boss/FSM name — the surrounding site name + graph image carry the rest;
+		// a description only duplicates it (esp. when the link is posted in a themed Discord), so drop it
 		let html = shell;
-		html = setTitle(html, title);
-		html = setMeta(html, 'name', 'description', description);
-		html = setMeta(html, 'property', 'og:title', title);
-		html = setMeta(html, 'property', 'og:description', description);
+		html = setTitle(html, f.name);
+		html = setMeta(html, 'property', 'og:title', f.name);
 		html = setMeta(html, 'property', 'og:url', url);
+		html = removeMeta(html, 'name', 'description');
+		html = removeMeta(html, 'property', 'og:description');
 		// a favorite that resolves to a single FSM points its og:image at the pre-rendered state graph
 		// (1200×630, from gen-og-graphs.mjs); scene-only favorites keep the square summary icon
 		const graphPng = fsmHash ? path.join('static', 'og', `graph-${fsmHash}.png`) : null;
