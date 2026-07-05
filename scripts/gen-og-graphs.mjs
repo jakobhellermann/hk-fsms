@@ -160,11 +160,10 @@ async function main() {
 				props: { layout, edgeStyle: 'side', selected: null }
 			});
 
-			// fit the layout into the 1200×630 frame with padding; never upscale a small graph past 1.0
+			// fit the layout into the 1200×630 frame edge-to-edge; never upscale a small graph past 1.0
 			const W = 1200;
 			const H = 630;
-			const P = 48;
-			const scale = Math.min((W - 2 * P) / layout.width, (H - 2 * P) / layout.height, 1);
+			const scale = Math.min(W / layout.width, H / layout.height, 1);
 			const tx = (W - layout.width * scale) / 2;
 			const ty = (H - layout.height * scale) / 2;
 
