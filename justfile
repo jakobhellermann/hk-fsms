@@ -22,6 +22,11 @@ pack-data:
 unpack-data:
 	bash scripts/unzip-data.sh
 
+# render the OpenGraph social card: assets/og-image.svg → static/og-image.png (needs rsvg-convert)
+og-image:
+	rsvg-convert assets/og-image.svg -o static/og-image.png
+	@echo "wrote static/og-image.png ($(du -h static/og-image.png | cut -f1))"
+
 # dump all FSMs to pseudocode text files (requires unpacked data: just unpack-data)
 dump-pseudo *args:
 	cargo run --release --quiet --manifest-path indexer/Cargo.toml --bin dump-pseudo -- {{args}}
