@@ -1,4 +1,4 @@
-# playmakerfsm-ui
+# hk-fsms
 
 Static SvelteKit site for browsing the PlayMaker FSMs of Hollow Knight and Silksong. It renders the
 content-addressed JSON store produced by the indexer in `indexer/` (run `just index`).
