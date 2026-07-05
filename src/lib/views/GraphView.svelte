@@ -525,7 +525,7 @@
 						// order by the other end's x; tie-break by the edge's own identity so a bidirectional
 						// pair (which ties — both ends are the same node) lands in the SAME lane at both nodes
 						// and runs parallel instead of crossing
-						const eid = (e: Edge) => e.from + ' ' + e.to;
+						const eid = (e: Edge) => e.from + '\0' + e.to;
 						items.sort((a, b) => {
 							const ka = a.out ? byId.get(a.e.to)! : byId.get(a.e.from)!;
 							const kb = b.out ? byId.get(b.e.to)! : byId.get(b.e.from)!;
@@ -852,12 +852,13 @@
 <svelte:window onpointermove={move} onpointerup={end} onpointercancel={end} />
 
 <div class="toolbar">
-	<span class="tb-label">edges</span>
+	<span class="tb-label">transitions</span>
 	<div class="seg">
 		{#each ['routed', 'side', 'bottom'] as s}
 			<button
 				class:active={layoutCfg.edgeStyle === s}
-				onclick={() => (layoutCfg.edgeStyle = s as EdgeStyle)}>{s === 'routed' ? 'edge' : s}</button
+				onclick={() => (layoutCfg.edgeStyle = s as EdgeStyle)}
+				>{s === 'routed' ? 'edge' : s === 'bottom' ? 'vertical' : s}</button
 			>
 		{/each}
 	</div>
