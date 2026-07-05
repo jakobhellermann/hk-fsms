@@ -15,7 +15,11 @@ export default defineConfig({
 			paths: {
 				base: process.argv.includes('dev')
 					? ''
-					: ((process.env.BASE_PATH ?? '') as '' | `/${string}`)
+					: ((process.env.BASE_PATH ?? '') as '' | `/${string}`),
+				// absolute (base-prefixed) asset URLs, not relative — the SPA fallback and the
+				// generated favorite OG stubs (scripts/gen-og-pages.mjs) live at varying depths and
+				// must load /_app from the site root regardless of their path depth.
+				relative: false
 			}
 		})
 	]

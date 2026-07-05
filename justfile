@@ -22,10 +22,10 @@ pack-data:
 unpack-data:
 	bash scripts/unzip-data.sh
 
-# render the OpenGraph social card: assets/og-image.svg → static/og-image.png (needs rsvg-convert)
-og-image:
-	rsvg-convert assets/og-image.svg -o static/og-image.png
-	@echo "wrote static/og-image.png ($(du -h static/og-image.png | cut -f1))"
+# render the OpenGraph icon (summary card): assets/og-icon.svg → static/og-icon.png (needs rsvg-convert)
+og-icon:
+	rsvg-convert assets/og-icon.svg -o static/og-icon.png
+	@echo "wrote static/og-icon.png ($(du -h static/og-icon.png | cut -f1))"
 
 # dump all FSMs to pseudocode text files (requires unpacked data: just unpack-data)
 dump-pseudo *args:
