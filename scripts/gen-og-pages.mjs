@@ -45,6 +45,9 @@ const expandIndex = (raw) =>
 
 const esc = (s) =>
 	s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// encode a path but keep '/' as a real separator (mirror of data.ts encodePath) — literal slashes,
+// no %2F, so og:url matches the app's links and the on-disk stub path
+const encodePath = (p) => p.split('/').map(encodeURIComponent).join('/');
 
 // replace a meta tag's content in the shell (matches the generic tags app.html already emits), or
 // append it before </head> if absent. `\s+` tolerates app.html's multi-line/pretty-printed tags.
@@ -104,7 +107,7 @@ for (const g of GAMES) {
 		}
 
 		const route = [g.id, ...segments]; // decoded segments = on-disk dir names GH Pages resolves to
-		const urlPath = route.map(encodeURIComponent).join('/');
+		const urlPath = route.map(encodePath).join('/');
 		const url = `${SITE}/${urlPath}${f.mode ? `?mode=${f.mode}` : ''}`;
 
 		// the card is just the boss/FSM name — the surrounding site name + graph image carry the rest;

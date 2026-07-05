@@ -8,6 +8,7 @@
 		DEFAULT_GAME,
 		fetchIndex,
 		fetchSceneNames,
+		encodePath,
 		isGame,
 		resolveScenePath,
 		sceneLabel,
@@ -46,7 +47,7 @@
 	}));
 	const sceneTitle = (file: string) => sceneNamesQuery.data?.get(file) ?? sceneLabel(file);
 
-	const sceneHref = $derived(scene ? `${base}/${game}/${encodeURIComponent(scene)}` : '');
+	const sceneHref = $derived(scene ? `${base}/${game}/${encodePath(scene)}` : '');
 	// the FSM name shown in the breadcrumb (drop the disambiguating ":n" suffix)
 	const fsmCrumb = $derived(isDetail ? rest[rest.length - 1].replace(/:\d+$/, '') : '');
 

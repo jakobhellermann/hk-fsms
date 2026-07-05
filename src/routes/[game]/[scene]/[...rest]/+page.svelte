@@ -6,6 +6,7 @@
 		DEFAULT_GAME,
 		fetchIndex,
 		fsmSegments,
+		encodePath,
 		goLeaf,
 		isGame,
 		resolveFsm,
@@ -45,7 +46,7 @@
 		return terms.every((t) => lower.includes(t));
 	};
 	const fsmHref = (e: IndexEntry) =>
-		`${base}/${game}/${fsmSegments(entries, e).map(encodeURIComponent).join('/')}`;
+		`${base}/${game}/${fsmSegments(entries, e).map(encodePath).join('/')}`;
 
 	type TreeNode = { name: string; children: Map<string, TreeNode>; fsms: IndexEntry[] };
 	const newNode = (name: string): TreeNode => ({ name, children: new Map(), fsms: [] });

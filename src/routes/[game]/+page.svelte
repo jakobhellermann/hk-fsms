@@ -9,6 +9,7 @@
 		fetchSceneNames,
 		favoritesFor,
 		fsmSegments,
+		encodePath,
 		isGame,
 		sceneLabel,
 		type Game
@@ -54,7 +55,7 @@
 	};
 	const byFile = (a: { file: string }, b: { file: string }) => coll.compare(a.file, b.file);
 	const sceneHref = (s: SceneRow) =>
-		`${base}/${game}/${encodeURIComponent(s.file)}${s.contentMatch ? `?q=${encodeURIComponent(debouncedQuery.trim())}` : ''}`;
+		`${base}/${game}/${encodePath(s.file)}${s.contentMatch ? `?q=${encodeURIComponent(debouncedQuery.trim())}` : ''}`;
 
 	type SceneRow = {
 		file: string;
@@ -111,11 +112,11 @@
 						(x) => x.file === f.file && x.game_object === (f.game_object ?? '') && x.name === f.fsm
 					);
 					if (!e) return null;
-					path = fsmSegments(entries, e).map(encodeURIComponent).join('/');
+					path = fsmSegments(entries, e).map(encodePath).join('/');
 				} else {
 					// scene favorite: link to the bundle's object tree (only if it has any FSMs)
 					if (!entries.some((x) => x.file === f.file)) return null;
-					path = encodeURIComponent(f.file);
+					path = encodePath(f.file);
 				}
 				return { name: f.name, href: `${base}/${game}/${path}${f.mode ? `?mode=${f.mode}` : ''}` };
 			})

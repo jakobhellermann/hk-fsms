@@ -11,6 +11,17 @@ export function goLeaf(path: string): string {
 	return path === '' ? '(scene root)' : (path.split('/').pop() ?? path);
 }
 
+/**
+ * Encode a value for a URL while keeping `/` as a real path separator. A scene/bundle file may
+ * itself contain `/` (e.g. `scenes_scenes_scenes/foo.bundle`); we deliberately DON'T escape it to
+ * `%2F` — GitHub Pages decodes `%2F` back to `/` anyway, and `resolveScenePath` reconstructs the
+ * file from the segments — so linking with literal slashes keeps link, stub path and reload URL all
+ * identical (no `%2F`, no decode/redirect surprises).
+ */
+export function encodePath(p: string): string {
+	return p.split('/').map(encodeURIComponent).join('/');
+}
+
 export async function fetchIndex(game: Game): Promise<IndexEntry[]> {
 	const r = await fetch(`${base}/data/${game}/index.json`);
 	if (!r.ok) throw new Error(`index ${game}: ${r.status}`);
