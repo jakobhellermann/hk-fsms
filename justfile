@@ -27,6 +27,10 @@ og-icon:
 	rsvg-convert assets/og-icon.svg -o static/og-icon.png
 	@echo "wrote static/og-icon.png ($(du -h static/og-icon.png | cut -f1))"
 
+# render per-favorite FSM state-graph OG images → static/og/graph-<hash>.png (needs unpacked data + rsvg-convert)
+og-graphs:
+	node scripts/gen-og-graphs.mjs
+
 # dump all FSMs to pseudocode text files (requires unpacked data: just unpack-data)
 dump-pseudo *args:
 	cargo run --release --quiet --manifest-path indexer/Cargo.toml --bin dump-pseudo -- {{args}}

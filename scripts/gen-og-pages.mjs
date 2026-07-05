@@ -81,6 +81,7 @@ for (const g of GAMES) {
 
 	for (const f of favorites) {
 		let segments;
+		let fsmHash = null;
 		if (f.fsm) {
 			const e = entries.find(
 				(x) => x.file === f.file && x.game_object === (f.game_object ?? '') && x.name === f.fsm
@@ -90,6 +91,7 @@ for (const g of GAMES) {
 				continue;
 			}
 			segments = fsmSegments(entries, e);
+				fsmHash = e.hash;
 		} else {
 			if (!entries.some((x) => x.file === f.file)) {
 				skipped.push(`${g.id}/${f.name} (scene empty)`);
@@ -113,6 +115,15 @@ for (const g of GAMES) {
 		html = setMeta(html, 'property', 'og:title', title);
 		html = setMeta(html, 'property', 'og:description', description);
 		html = setMeta(html, 'property', 'og:url', url);
+		// a favorite that resolves to a single FSM points its og:image at the pre-rendered state graph
+		// (1200×630, from gen-og-graphs.mjs); scene-only favorites keep the square summary icon
+		const graphPng = fsmHash ? path.join('static', 'og', `graph-${fsmHash}.png`) : null;
+		if (graphPng && existsSync(graphPng)) {
+			html = setMeta(html, 'property', 'og:image', `${SITE}/og/graph-${fsmHash}.png`);
+			html = setMeta(html, 'property', 'og:image:width', '1200');
+			html = setMeta(html, 'property', 'og:image:height', '630');
+			html = setMeta(html, 'name', 'twitter:card', 'summary_large_image');
+		}
 
 		const dir = path.join(BUILD, ...route);
 		await mkdir(dir, { recursive: true });
