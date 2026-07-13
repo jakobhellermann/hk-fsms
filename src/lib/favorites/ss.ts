@@ -135,6 +135,12 @@ export const ssFavorites: Favorite[] = [
 		fsm: 'Control'
 	},
 	{
+		name: 'Moss Mother',
+		file: 'scenes_scenes_scenes/tut_03.bundle',
+		game_object: 'Black Thread States/Normal World/Battle Scene/Wave 1/Mossbone Mother',
+		fsm: 'Control'
+	},
+	{
 		name: 'Nyleth',
 		file: 'scenes_scenes_scenes/shellwood_11b_memory.bundle',
 		game_object: 'Boss Scene/Flower Queen Boss',
@@ -251,7 +257,7 @@ export const ssFavorites: Favorite[] = [
 ];
 
 // TODO: fandom Bosses (Silksong) still unmapped — no clear arena FSM found in the index yet:
-//   - Craggler, Moss Mother, Sharpe, Skarrgard: no matching game object found
+//   - Craggler, Sharpe, Skarrgard: no matching game object found
 //   - Great Conchflies / Raging Conchfly: two candidates, assignment unclear —
 //       coral_27 | Battle Scene/Wave 1/Coral Conch Driller Giant Solo | Control
 //       coral_11 | …/Boss Scene/Coral Conch Driller Giant Mourn | Control
