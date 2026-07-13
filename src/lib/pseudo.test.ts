@@ -77,6 +77,28 @@ describe('actionTokens', () => {
 		expect(tokens.map((t) => t.text).join('')).toBe('var "Flaps" -= 1');
 	});
 
+	it('attaches action + param tooltips as token titles', () => {
+		const a = {
+			class: 'HutongGames.PlayMaker.Actions.FloatCompare',
+			custom_name: null,
+			enabled: true,
+			params: [
+				{ name: 'float1', type_name: 'FsmFloat', value: { type: 'Float', value: 1 } as const },
+				{ name: 'everyFrame', type_name: 'FsmBool', value: { type: 'Bool', value: true } as const }
+			]
+		};
+		const tip = {
+			tip: 'Sends Events based on the comparison of 2 Floats.',
+			params: { float1: 'The first float variable.', everyFrame: 'Repeat every frame.' }
+		};
+		const tokens = actionTokens(a, tip);
+		expect(tokens.find((t) => t.cls === 'act')?.title).toBe(tip.tip);
+		expect(tokens.find((t) => t.text === 'float1=')?.title).toBe(tip.params.float1);
+		expect(tokens.find((t) => t.text === 'everyFrame=')?.title).toBe(tip.params.everyFrame);
+		// without a tip the tokens carry no titles (the callers pass no tooltips → no hover text)
+		expect(actionTokens(a).find((t) => t.cls === 'act')?.title).toBeUndefined();
+	});
+
 	it('highlights a var embedded in an eventTarget', () => {
 		const tokens = actionTokens({
 			class: 'X.SendEventByName',

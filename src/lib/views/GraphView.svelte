@@ -12,12 +12,17 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import type { FsmModel } from '$lib/model';
+	import type { Tooltips } from '$lib/tooltips';
 	import { computeLayout, type EdgeStyle, type LayoutCfg } from '$lib/graph/layout';
 	import GraphSvg from '$lib/graph/GraphSvg.svelte';
 	import StateBody from './StateBody.svelte';
 
 	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as +/−/fit)
-	let { model, modeTabs }: { model: FsmModel; modeTabs?: Snippet } = $props();
+	let {
+		model,
+		modeTabs,
+		tooltips = {}
+	}: { model: FsmModel; modeTabs?: Snippet; tooltips?: Tooltips } = $props();
 
 	// nodes always sit at their raw PlayMaker editor rects (one node per state, linear chains
 	// optionally collapsed). `edgeStyle` controls how edges/labels look: `routed` (straight line,
@@ -289,7 +294,7 @@
 				<button class="close" onclick={() => select(null)} aria-label="close">×</button>
 			</div>
 			<div class="code">
-				<StateBody state={selectedState} {model} onnavigate={select} emptyNote />
+				<StateBody state={selectedState} {model} {tooltips} onnavigate={select} emptyNote />
 			</div>
 		{:else}
 			<div class="empty dim">click a state to see its actions & transitions</div>

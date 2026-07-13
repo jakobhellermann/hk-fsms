@@ -2,6 +2,8 @@ import { base } from '$app/paths';
 import { expandIndex, type CompactIndex, type FsmModel, type IndexEntry } from './model';
 export { type Game, type Favorite, GAMES, DEFAULT_GAME, isGame, favoritesFor } from './config';
 import { type Game } from './config';
+import type { Tooltips } from './tooltips';
+export type { Tooltips, ActionTip } from './tooltips';
 
 // scene-name display/grouping helpers live in `scenes.ts` (kept free of `$app` so they're unit-testable)
 export { sceneLabel } from './scenes';
@@ -35,6 +37,14 @@ export async function fetchSceneNames(game: Game): Promise<Map<string, string>> 
 	if (!r.ok) throw new Error(`scene names ${game}: ${r.status}`);
 	const j = (await r.json()) as Record<string, string>;
 	return new Map(Object.entries(j));
+}
+
+// per-action `[Tooltip]` help text (class description + per-param). A game without an extracted
+// tooltips.json (e.g. an IL2CPP build) simply yields an empty map, so the UI shows no tooltips.
+export async function fetchTooltips(game: Game): Promise<Tooltips> {
+	const r = await fetch(`${base}/data/${game}/tooltips.json`);
+	if (!r.ok) return {};
+	return (await r.json()) as Tooltips;
 }
 
 // FSMs are addressed by their tree path — `[scene, ...gameObject, name]` — and resolved to a content

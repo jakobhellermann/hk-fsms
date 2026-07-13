@@ -60,7 +60,12 @@ fn enum_members(res: &Resolution, ty: &MemberType) -> Option<HashMap<i32, String
 }
 
 /// The full type name in PlayMaker's `enumName` form: `Namespace.Outer+Nested` (`+` per nesting level).
-fn full_type_name(res: &Resolution, td: &dotnetdll::resolved::types::TypeDefinition) -> String {
+/// This matches the `action.class` form the FSM model carries, so it's the right key for per-class
+/// lookups (enums here, tooltips in `tooltip_map`).
+pub(crate) fn full_type_name(
+    res: &Resolution,
+    td: &dotnetdll::resolved::types::TypeDefinition,
+) -> String {
     match td.encloser {
         Some(enc) => format!("{}+{}", full_type_name(res, &res[enc]), td.name),
         None => match &td.namespace {

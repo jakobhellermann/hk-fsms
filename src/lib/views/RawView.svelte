@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { FsmModel } from '$lib/model';
+	import type { Tooltips } from '$lib/tooltips';
 	import { fmtCallValue, short } from '$lib/fmt';
 	import { glossary } from '$lib/glossary';
 	import ParamRow from '$lib/ParamRow.svelte';
 
-	let { model }: { model: FsmModel } = $props();
+	let { model, tooltips = {} }: { model: FsmModel; tooltips?: Tooltips } = $props();
 
 	// variable name → formatted authored default, for the hover on `var "X"` references in params
 	const varDefaults = $derived(
@@ -50,16 +51,17 @@
 				</div>
 			{/each}
 			{#each s.actions as a, i (i)}
+				{@const tip = tooltips[a.class]}
 				<div class="action" class:disabled={!a.enabled}>
 					<div class="action-head">
-						<span class="act">{short(a.class)}</span>
+						<span class="act" class:help={tip?.tip} title={tip?.tip}>{short(a.class)}</span>
 						{#if a.custom_name && a.custom_name !== short(a.class)}
 							<span class="dim">"{a.custom_name}"</span>
 						{/if}
 						{#if !a.enabled}<span class="dim" title={glossary.disabled}>(disabled)</span>{/if}
 					</div>
 					{#each a.params as p, j (j)}
-						<ParamRow param={p} {varDefaults} />
+						<ParamRow param={p} {varDefaults} help={tip?.params?.[p.name]} />
 					{/each}
 				</div>
 			{/each}
@@ -124,6 +126,10 @@
 	}
 	.act {
 		color: var(--action);
+	}
+	.act.help {
+		cursor: help;
+		border-bottom: 1px dotted color-mix(in srgb, var(--action) 55%, transparent);
 	}
 	.var {
 		color: var(--var);

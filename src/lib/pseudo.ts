@@ -2,6 +2,7 @@ import type { Action, FsmModel, Param } from './model';
 import { compositeTokens, fmtValue, short, valueKind } from './fmt';
 import type { Token } from './fmt';
 import { binaryOp, compoundOp, isHiddenParam, setter, storeParam } from './actions';
+import type { ActionTip } from './tooltips';
 
 export type { Token };
 
@@ -25,8 +26,12 @@ export function actionText(a: FsmModel['states'][number]['actions'][number]): st
  * Tokenised, colour-tagged form of an action line for the PseudoView. Several action shapes get a
  * friendlier rendering — math operators as `a * b`, setters and single var-bound `store*` outputs as
  * `var "x" = …` — otherwise it's `Action(args)`. The plain-text `actionText` stays the canonical form.
+ *
+ * `tip` (the action class's `[Tooltip]` help) attaches as hover text to the action-name token and to
+ * each param-name token; it's only surfaced on the `Action(args)` form, since the collapsed shapes
+ * (assignments, math) carry no class/param name to hang it on.
  */
-export function actionTokens(a: Action): Token[] {
+export function actionTokens(a: Action, tip?: ActionTip): Token[] {
 	const valueToken = (p: Param): Token => {
 		// a collapsed `[N elems]` list keeps its elements as hover text; a layer shows its index
 		const title =
@@ -125,10 +130,10 @@ export function actionTokens(a: Action): Token[] {
 	const toks: Token[] = [];
 	const rest = a.params.filter((p) => p !== store && !isHiddenParam(a, p));
 	if (store) toks.push({ text: fmtValue(store.value), cls: 'var' }, { text: ' = ' });
-	toks.push({ text: short(a.class), cls: 'act' }, { text: '(' });
+	toks.push({ text: short(a.class), cls: 'act', title: tip?.tip }, { text: '(' });
 	rest.forEach((p, j) => {
 		if (j > 0) toks.push({ text: ', ' });
-		if (p.name) toks.push({ text: `${p.name}=` });
+		if (p.name) toks.push({ text: `${p.name}=`, title: tip?.params?.[p.name] });
 		toks.push(...valueTokens(p));
 	});
 	toks.push({ text: ')' });

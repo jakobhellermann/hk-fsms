@@ -3,6 +3,7 @@ mod enum_map;
 mod layer_map;
 mod scan;
 mod scene_lookup;
+mod tooltip_map;
 
 use std::path::Path;
 
@@ -30,6 +31,9 @@ fn main() -> Result<()> {
             &scenes_path,
             serde_json::to_vec_pretty(&result.scene_names)?,
         )?;
+
+        let tooltips_path = out_dir.join("tooltips.json");
+        std::fs::write(&tooltips_path, serde_json::to_vec(&result.tooltips)?)?;
 
         eprintln!(
             "{} fsms → {} distinct models, index in {} ({:.1}s)",

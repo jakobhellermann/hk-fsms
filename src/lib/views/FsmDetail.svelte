@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { fetchModel, isGame, type Game } from '$lib/data';
+	import { fetchModel, fetchTooltips, isGame, type Game } from '$lib/data';
 	import RawView from '$lib/views/RawView.svelte';
 	import PseudoView from '$lib/views/PseudoView.svelte';
 	import GraphView from '$lib/views/GraphView.svelte';
@@ -44,6 +44,15 @@
 		queryFn: () => fetchModel(game, hash),
 		enabled: isGame(game) && hash !== ''
 	}));
+
+	// per-game action tooltips — immutable per game, so cache forever (like the model content)
+	const tooltipsQuery = createQuery(() => ({
+		queryKey: ['tooltips', game],
+		queryFn: () => fetchTooltips(game),
+		enabled: isGame(game),
+		staleTime: Infinity
+	}));
+	const tooltips = $derived(tooltipsQuery.data ?? {});
 </script>
 
 {#if modelQuery.isError}
@@ -54,13 +63,13 @@
 	{@const m = modelQuery.data}
 	{#if mode === 'graph'}
 		<!-- the graph hosts the mode tabs in its own toolbar (same row as +/−/fit) -->
-		<GraphView model={m} {modeTabs} />
+		<GraphView model={m} {tooltips} {modeTabs} />
 	{:else}
 		<div class="bar">{@render modeTabs()}</div>
 		{#if mode === 'pseudo'}
-			<PseudoView model={m} />
+			<PseudoView model={m} {tooltips} />
 		{:else}
-			<RawView model={m} />
+			<RawView model={m} {tooltips} />
 		{/if}
 	{/if}
 {/if}

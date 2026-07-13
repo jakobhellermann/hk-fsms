@@ -26,12 +26,14 @@ use crate::config::Entry;
 use crate::enum_map::{bake_enums, build_enum_map};
 use crate::layer_map::{bake_layers, build_layer_fields, read_layer_names};
 use crate::scene_lookup;
+use crate::tooltip_map::{Tooltips, build_tooltips};
 
 /// Output of a single game scan: the index entries and the set of content hashes written.
 pub struct ScanResult {
     pub entries: Vec<Entry>,
     pub written: BTreeSet<String>,
     pub scene_names: BTreeMap<String, String>,
+    pub tooltips: Tooltips,
 }
 
 /// Scan one game: find all PlayMakerFSM components, decode them, write content-addressed
@@ -57,6 +59,9 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
         layer_fields.len(),
         layer_names.iter().filter(|n| !n.is_empty()).count()
     );
+
+    let tooltips = build_tooltips(&env.game_files.game_dir.join("Managed"));
+    eprintln!("tooltips: {} action classes", tooltips.len());
 
     let scene_names = scene_lookup::build_scene_lookup(&env)?;
     eprintln!("scenes: {} names", scene_names.len());
@@ -216,5 +221,6 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
         entries,
         written,
         scene_names,
+        tooltips,
     })
 }

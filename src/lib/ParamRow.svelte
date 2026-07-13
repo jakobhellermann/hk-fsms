@@ -6,8 +6,9 @@
 	let {
 		param,
 		depth = 0,
-		varDefaults
-	}: { param: Param; depth?: number; varDefaults?: Map<string, string> } = $props();
+		varDefaults,
+		help
+	}: { param: Param; depth?: number; varDefaults?: Map<string, string>; help?: string } = $props();
 	const isList = $derived(param.value.type === 'List');
 	const text = $derived(fmtValue(param.value));
 	// when the value is a `var "X"` reference, hover shows that variable's authored default
@@ -19,7 +20,7 @@
 </script>
 
 <div class="row" style="padding-left: {depth * 1.25}rem">
-	<span class="name">{param.name || '·'}</span>
+	<span class="name" class:help title={help}>{param.name || '·'}</span>
 	<span class="dim">: {param.type_name} =</span>
 	<span class="val {valueKind(param.value)}" {title}>{text}</span>
 </div>
@@ -37,6 +38,10 @@
 	}
 	.name {
 		color: var(--fg);
+	}
+	.name.help {
+		cursor: help;
+		border-bottom: 1px dotted var(--dim);
 	}
 	.val.var {
 		color: var(--var);

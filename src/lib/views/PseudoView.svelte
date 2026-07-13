@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { FsmModel } from '$lib/model';
+	import type { Tooltips } from '$lib/tooltips';
 	import StateBody from './StateBody.svelte';
 
-	let { model }: { model: FsmModel } = $props();
+	let { model, tooltips = {} }: { model: FsmModel; tooltips?: Tooltips } = $props();
 
 	let root = $state<HTMLElement>();
 	let flash = $state<string | null>(null);
@@ -72,7 +73,7 @@
 			<span class="kw">state</span> <span class="state">{s.name}</span>
 			{'{'}
 		</div>
-		<StateBody state={s} {model} onnavigate={goto} indent={4} />
+		<StateBody state={s} {model} {tooltips} onnavigate={goto} indent={4} />
 		<div class="i1">{'}'}</div>
 	{/each}
 	<div>{'}'}</div>

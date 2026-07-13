@@ -3,6 +3,7 @@
 	import { actionTokens, type Token } from '$lib/pseudo';
 	import { fmtCallValue, varRefName } from '$lib/fmt';
 	import { isDeadAction } from '$lib/actions';
+	import type { Tooltips } from '$lib/tooltips';
 
 	// renders one state's actions + transitions as pseudocode lines, shared by the full PseudoView and
 	// the graph's state-preview sidebar. `onnavigate` is how each host follows a state reference
@@ -11,12 +12,14 @@
 		state,
 		model,
 		onnavigate,
+		tooltips = {},
 		indent = 0,
 		emptyNote = false
 	}: {
 		state: State;
 		model: FsmModel;
 		onnavigate: (name: string) => void;
+		tooltips?: Tooltips;
 		indent?: number;
 		emptyNote?: boolean;
 	} = $props();
@@ -47,7 +50,7 @@
 {#each state.actions as a, i (i)}
 	{@const dead = a.enabled && isDeadAction(a)}
 	<div class="line" class:off={!a.enabled || dead} style="padding-left: {indent}ch">
-		{#each actionTokens(a) as t, k (k)}{#if t.event}{@const target = eventTarget(
+		{#each actionTokens(a, tooltips[a.class]) as t, k (k)}{#if t.event}{@const target = eventTarget(
 					t.event
 				)}{#if target}<span
 						class="event link"
