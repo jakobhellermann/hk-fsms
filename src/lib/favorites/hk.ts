@@ -47,6 +47,8 @@ export const hkFavorites: Favorite[] = [
 		fsm: 'FalseyControl'
 	},
 	{ name: 'God Tamer', file: 'level441', game_object: 'Entry Object', fsm: 'Control' },
+	// Gorb's internal codename is "Slug" (arena scene Cliffs_02_boss).
+	{ name: 'Gorb', file: 'level232', game_object: 'Warrior/Ghost Warrior Slug', fsm: 'Attacking' },
 	{
 		name: 'Great Nailsage Sly',
 		file: 'level460',
@@ -162,7 +164,6 @@ export const hkFavorites: Favorite[] = [
 ];
 
 // TODO: fandom Bosses (Hollow Knight) still unmapped — no arena fight FSM in the index:
-//   - Gorb: absent (only the Godhome statue exists; no "Ghost Warrior Gorb")
 //   - Oblobbles: only a Corpse / colosseum-wave / statue FSM, no clean boss controller
 //   - Flukemarm: only the Godhome statue (the boss's own FSM isn't in the index)
 // (Hunter is an NPC, not a fight; "Sister Splinter" is a Silksong boss miscategorised on the wiki.)
