@@ -46,6 +46,13 @@ export const hkFavorites: Favorite[] = [
 		game_object: 'Battle Scene/False Knight New',
 		fsm: 'FalseyControl'
 	},
+	{ name: 'Flukemarm', file: 'level361', game_object: 'Fluke Mother', fsm: 'Fluke Mother' },
+	{
+		name: 'Galien',
+		file: 'level298',
+		game_object: 'Warrior/Ghost Warrior Galien',
+		fsm: 'Movement'
+	},
 	{ name: 'God Tamer', file: 'level441', game_object: 'Entry Object', fsm: 'Control' },
 	// Gorb's internal codename is "Slug" (arena scene Cliffs_02_boss).
 	{ name: 'Gorb', file: 'level232', game_object: 'Warrior/Ghost Warrior Slug', fsm: 'Attacking' },
@@ -110,6 +117,12 @@ export const hkFavorites: Favorite[] = [
 	},
 	{ name: 'Nosk', file: 'level290', game_object: 'Mimic Spider', fsm: 'Mimic Spider' },
 	{
+		name: 'Oblobbles',
+		file: 'level33',
+		game_object: 'Colosseum Manager/Waves/Wave 30 Obble/Mega Fat Bee',
+		fsm: 'Fatty Fly Attack'
+	},
+	{
 		name: 'Paintmaster Sheo',
 		file: 'level457',
 		game_object: 'Battle Scene/Sheo Boss',
@@ -163,7 +176,4 @@ export const hkFavorites: Favorite[] = [
 	}
 ];
 
-// TODO: fandom Bosses (Hollow Knight) still unmapped — no arena fight FSM in the index:
-//   - Oblobbles: only a Corpse / colosseum-wave / statue FSM, no clean boss controller
-//   - Flukemarm: only the Godhome statue (the boss's own FSM isn't in the index)
 // (Hunter is an NPC, not a fight; "Sister Splinter" is a Silksong boss miscategorised on the wiki.)
