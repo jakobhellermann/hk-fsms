@@ -59,11 +59,24 @@
 	// on-screen keyboard on tablets). intercept only the initial Tab, when nothing is focused yet.
 	let filterEl = $state<HTMLInputElement>();
 	function onKeydown(e: KeyboardEvent) {
-		if (e.key !== 'Tab' || e.shiftKey || isDetail || !filterEl) return;
+		if (isDetail || !filterEl) return;
 		const active = document.activeElement;
-		if (active && active !== document.body) return;
-		e.preventDefault();
-		filterEl.focus();
+		const typing =
+			active instanceof HTMLElement &&
+			(active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+
+		if (e.key === 'Tab' && !e.shiftKey && !typing) {
+			if (active && active !== document.body) return;
+			e.preventDefault();
+			filterEl.focus();
+			return;
+		}
+
+		// `s` or `/` jumps to the filter (unless already typing in a field or a shortcut modifier is held)
+		if ((e.key === 's' || e.key === 'S' || e.key === '/') && !typing && !e.ctrlKey && !e.metaKey) {
+			e.preventDefault();
+			filterEl.focus();
+		}
 	}
 
 	function setQuery(v: string) {
