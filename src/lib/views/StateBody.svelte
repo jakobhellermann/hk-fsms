@@ -119,6 +119,9 @@
 	.str {
 		color: #cd9178;
 	}
+	.layer {
+		color: #e5c07b;
+	}
 	.event {
 		color: var(--event);
 	}

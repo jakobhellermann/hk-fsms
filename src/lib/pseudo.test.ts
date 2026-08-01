@@ -28,7 +28,7 @@ describe('actionText', () => {
 });
 
 describe('actionTokens', () => {
-	it('renders a layerMask array inline with names, index as hover text', () => {
+	it('renders a layerMask array inline with names and indices', () => {
 		const tokens = actionTokens({
 			class: 'X.RayCast',
 			custom_name: null,
@@ -55,9 +55,10 @@ describe('actionTokens', () => {
 				}
 			]
 		});
-		expect(tokens.map((t) => t.text).join('')).toBe('RayCast(layerMask=[Terrain, Soft Terrain])');
-		expect(tokens.find((t) => t.text === 'Terrain')?.title).toBe('layer 8');
-		expect(tokens.find((t) => t.text === 'Soft Terrain')?.title).toBe('layer 25');
+		expect(tokens.map((t) => t.text).join('')).toBe(
+			'RayCast(layerMask=[Terrain (8), Soft Terrain (25)])'
+		);
+		expect(tokens.find((t) => t.text === 'Terrain (8)')?.title).toBe('Unity layer');
 	});
 
 	it('folds a negated compound operand into the operator (+= -1 → -= 1)', () => {

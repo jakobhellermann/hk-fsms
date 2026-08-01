@@ -210,7 +210,7 @@ export function fmtValue(v: ParamValue): string {
 		case 'EnumMember':
 			return v.value;
 		case 'Layer':
-			return v.value.name ?? `layer ${v.value.index}`;
+			return v.value.name != null ? `${v.value.name} (${v.value.index})` : `layer ${v.value.index}`;
 		case 'Array':
 			return fmtArray(v.value);
 		case 'Property':
@@ -255,6 +255,7 @@ export function varRefName(text: string): string | null {
 // css class for coloring a value
 export function valueKind(v: ParamValue): string {
 	if (v.type === 'Event') return 'event';
+	if (v.type === 'Layer') return 'layer';
 	const s = fmtValue(v);
 	if (s.startsWith('var ')) return 'var';
 	if (v.type === 'Str' || (v.type === 'FsmString' && v.value.kind === 'Literal')) return 'str';

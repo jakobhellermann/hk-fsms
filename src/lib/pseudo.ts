@@ -33,12 +33,12 @@ export function actionText(a: FsmModel['states'][number]['actions'][number]): st
  */
 export function actionTokens(a: Action, tip?: ActionTip): Token[] {
 	const valueToken = (p: Param): Token => {
-		// a collapsed `[N elems]` list keeps its elements as hover text; a layer shows its index
+		// a collapsed `[N elems]` list keeps its elements as hover text; a layer names its kind
 		const title =
 			p.value.type === 'List'
 				? p.value.value.map((e) => fmtValue(e.value)).join(', ')
 				: p.value.type === 'Layer'
-					? `layer ${p.value.value.index}`
+					? 'Unity layer'
 					: undefined;
 		return {
 			text: fmtValue(p.value),
