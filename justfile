@@ -13,14 +13,19 @@ pack-data:
 	for slug in hk ss; do
 		if [ -d "static/data/$slug" ]; then
 			start=$(date +%s)
-			(cd static/data && tar -cf - "$slug" | zstd --ultra -22 -q -o "$slug.tar.zst" -f)
+			# Deterministic mtime
+			find "static/data/$slug" -exec touch -t 200001010000 {} +
+			(cd static/data \
+				&& find "$slug" -print0 | sort -z \
+				| tar --numeric-owner --no-recursion -cf - --null -T - \
+				| zstd --ultra -22 -q -o "$slug.tar.zst" -f)
 			echo "packed $slug → $(du -h static/data/$slug.tar.zst | cut -f1) in $(($(date +%s) - start))s"
 		fi
 	done
 
 # unpack committed data archives (for CI or fresh checkout)
 unpack-data:
-	bash scripts/unzip-data.sh
+	bash scripts/unpack-data.sh
 
 # render the OpenGraph icon (summary card): assets/og-icon.svg → static/og-icon.png (needs rsvg-convert)
 og-icon:
