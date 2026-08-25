@@ -15,10 +15,14 @@ pack-data:
 			start=$(date +%s)
 			# Deterministic mtime
 			find "static/data/$slug" -exec touch -t 200001010000 {} +
+			# Compressing takes a minute; write beside the target and move it
+			# into place so the committed archive is never half-written.
+			tmp="static/data/.$slug.tar.zst.tmp"
 			(cd static/data \
 				&& find "$slug" -print0 | sort -z \
 				| tar --numeric-owner --no-recursion -cf - --null -T - \
-				| zstd --ultra -22 -q -o "$slug.tar.zst" -f)
+				| zstd --ultra -22 -q -o ".$slug.tar.zst.tmp" -f)
+			mv "$tmp" "static/data/$slug.tar.zst"
 			echo "packed $slug → $(du -h static/data/$slug.tar.zst | cut -f1) in $(($(date +%s) - start))s"
 		fi
 	done
