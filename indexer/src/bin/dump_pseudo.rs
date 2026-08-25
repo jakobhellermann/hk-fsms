@@ -16,8 +16,6 @@ use playmakerfsm::model::FsmModel;
 use playmakerfsm::pseudo;
 use serde::Deserialize;
 
-// ── types for reading the index ──────────────────────────────────────────────
-
 #[derive(Deserialize)]
 struct Config {
     games: Vec<GameConfig>,
@@ -37,8 +35,6 @@ struct Entry {
     game_object: String,
     hash: String,
 }
-
-// ── file naming: name → name + go components → name + go + scene ──────────────
 
 fn sanitize(s: &str) -> String {
     s.chars()
@@ -121,8 +117,6 @@ fn build_filenames(hashes: &[(String, String, String)]) -> Vec<String> {
         .collect()
 }
 
-// ── readme ─────────────────────────────────────────────────────────────────
-
 fn write_readme(out_dir: &Path, games: &[(String, usize)]) -> Result<()> {
     let mut lines = vec![
         "# Pseudocode dump".into(),
@@ -173,8 +167,6 @@ fn write_readme(out_dir: &Path, games: &[(String, usize)]) -> Result<()> {
     std::fs::write(out_dir.join("README.md"), lines.join("\n"))?;
     Ok(())
 }
-
-// ── main ──────────────────────────────────────────────────────────────────────
 
 fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
     // index.json is the compact columnar format: a shared file table + one tuple per FSM.
