@@ -6,7 +6,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use rabex_env::Environment;
-use rabex_env::addressables::binary_catalog::resource_providers;
+use rabex_env::addressables::catalog::resource_providers;
 use rabex_env::resolver::EnvResolver;
 
 const SCENE_INSTANCE_CLASS: &str = "UnityEngine.ResourceManagement.ResourceProviders.SceneInstance";
