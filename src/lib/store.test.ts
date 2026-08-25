@@ -18,11 +18,18 @@ describe.skipIf(!hasData)('real store (hk)', () => {
 		JSON.parse(readFileSync(resolve(dir, 'index.json'), 'utf8'))
 	);
 
-	// deterministic pick: distinct content hashes, ordered by (name, hash)
+	// Deterministic pick: one FSM per name, ordered by where it sits. Ordering or
+	// de-duplicating by content hash would reshuffle the selection whenever the
+	// model gains a field, so the snapshots below would fail for no reason.
 	const seen = new Set<string>();
 	const distinct = [...index]
-		.sort((a, b) => a.name.localeCompare(b.name) || a.hash.localeCompare(b.hash))
-		.filter((e) => (seen.has(e.hash) ? false : (seen.add(e.hash), true)));
+		.sort(
+			(a, b) =>
+				a.name.localeCompare(b.name) ||
+				a.file.localeCompare(b.file) ||
+				a.game_object.localeCompare(b.game_object)
+		)
+		.filter((e) => (seen.has(e.name) ? false : (seen.add(e.name), true)));
 
 	for (const e of distinct.slice(0, 3)) {
 		it(`pseudocode snapshot: ${e.name}`, () => {
