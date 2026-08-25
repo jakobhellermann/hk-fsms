@@ -14,7 +14,7 @@ use dotnetdll::resolved::attribute::{Attribute, FixedArg};
 use dotnetdll::resolved::types::{Resolver, TypeDefinition};
 use serde::Serialize;
 
-use crate::enum_map::full_type_name;
+use playmakerfsm::context::full_type_name;
 
 /// Tooltips for one action class: the class-level description and per-field (param) help text.
 #[derive(Serialize, Default)]

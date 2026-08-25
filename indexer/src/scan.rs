@@ -21,9 +21,9 @@ use rabex_env::unity::types::MonoBehaviour;
 use rabex_env::{Environment, resolver::GameFiles};
 use rayon::prelude::*;
 
+use playmakerfsm::context::{self, GameContext};
+
 use crate::config::Entry;
-use crate::enum_map::{bake_enums, build_enum_map};
-use crate::layer_map::{bake_layers, build_layer_fields, read_layer_names};
 use crate::scene_lookup;
 use crate::tooltip_map::{Tooltips, build_tooltips};
 
@@ -44,20 +44,13 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
     let tpk = TypeTreeCache::new(TpkTypeTreeBlob::embedded());
     let env = Environment::new(game_files, tpk);
 
-    let enum_map = build_enum_map(&env.game_files.game_dir.join("Managed"));
-    eprintln!(
-        "enum map: {} action fields, {} enum types",
-        enum_map.by_field.len(),
-        enum_map.by_name.len()
-    );
-
-    let layer_fields = build_layer_fields(&env.game_files.game_dir.join("Managed"));
-    let layer_names = read_layer_names(&env);
-    eprintln!(
-        "layers: {} fields, {} named slots",
-        layer_fields.len(),
-        layer_names.iter().filter(|n| !n.is_empty()).count()
-    );
+    let managed = env.game_files.game_dir.join("Managed");
+    let read = |name: &str| std::fs::read(managed.join(name)).with_context(|| name.to_string());
+    let game = GameContext::new(
+        &read("PlayMaker.dll")?,
+        &read("Assembly-CSharp.dll")?,
+        context::layer_names(&env)?,
+    )?;
 
     let tooltips = build_tooltips(&env.game_files.game_dir.join("Managed"));
     eprintln!("tooltips: {} action classes", tooltips.len());
@@ -104,8 +97,7 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
             let Ok(mut model) = component.decode(handle) else {
                 continue;
             };
-            bake_enums(&mut model, &enum_map);
-            bake_layers(&mut model, &layer_names, &layer_fields);
+            game.apply(&mut model);
             let Ok(json) = serde_json::to_vec(&model) else {
                 continue;
             };

@@ -1,6 +1,4 @@
 mod config;
-mod enum_map;
-mod layer_map;
 mod scan;
 mod scene_lookup;
 mod tooltip_map;
