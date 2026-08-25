@@ -4,6 +4,9 @@
 
 export interface FsmModel {
 	name: string;
+	// m_Enabled of the component: a disabled one never gets Start() or Update(),
+	// so its FSM stands still until something enables it
+	enabled: boolean;
 	start_state: string;
 	events: Event[];
 	global_transitions: Transition[];
@@ -29,6 +32,9 @@ export interface Transition {
 export interface State {
 	name: string;
 	is_start: boolean;
+	// actions run one after another, each blocking until it finishes, instead of
+	// all starting together on entry
+	is_sequence: boolean;
 	/** author-assigned PlayMaker colour group (0 = default/grey; palette index) */
 	color_index: number;
 	/** the state's node rect in the PlayMaker editor graph (raw authored layout) */

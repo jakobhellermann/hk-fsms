@@ -134,6 +134,7 @@ describe('toPseudocode', () => {
 	it('renders states, transitions and global transitions', () => {
 		const m: FsmModel = {
 			name: 'Demo',
+			enabled: false,
 			template_name: null,
 			start_state: 'A',
 			events: [],
@@ -142,6 +143,7 @@ describe('toPseudocode', () => {
 				{
 					name: 'A',
 					is_start: true,
+					is_sequence: false,
 					color_index: 0,
 					position: { x: 0, y: 0, w: 0, h: 0 },
 					transitions: [{ event: 'NEXT', to_state: 'B' }],
@@ -157,6 +159,7 @@ describe('toPseudocode', () => {
 				{
 					name: 'B',
 					is_start: false,
+					is_sequence: true,
 					color_index: 0,
 					position: { x: 0, y: 0, w: 0, h: 0 },
 					transitions: [],
@@ -166,7 +169,8 @@ describe('toPseudocode', () => {
 			variables: []
 		};
 		expect(toPseudocode(m)).toBe(
-			`fsm Demo {
+			`// component disabled: this FSM does not run until something enables it
+fsm Demo {
   start A
   on GO -> B  // from any state
 
@@ -175,7 +179,7 @@ describe('toPseudocode', () => {
     on NEXT -> B
   }
 
-  state B {
+  sequence state B {
     Bar()  // disabled
   }
 }`

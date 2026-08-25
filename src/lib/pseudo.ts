@@ -156,12 +156,16 @@ export function actionTokens(a: Action, tip?: ActionTip): Token[] {
  * of the same structure; this text form is what the snapshot tests pin.
  */
 export function toPseudocode(model: FsmModel): string {
-	const out: string[] = [`fsm ${model.name} {`, `  start ${model.start_state}`];
+	const out: string[] = [];
+	if (!model.enabled) {
+		out.push('// component disabled: this FSM does not run until something enables it');
+	}
+	out.push(`fsm ${model.name} {`, `  start ${model.start_state}`);
 	for (const t of model.global_transitions) {
 		out.push(`  on ${t.event} -> ${t.to_state || '(none)'}  // from any state`);
 	}
 	for (const s of model.states) {
-		out.push('', `  state ${s.name} {`);
+		out.push('', `  ${s.is_sequence ? 'sequence state' : 'state'} ${s.name} {`);
 		for (const a of s.actions) out.push(`    ${actionText(a)}`);
 		for (const t of s.transitions) out.push(`    on ${t.event} -> ${t.to_state || '(none)'}`);
 		out.push('  }');

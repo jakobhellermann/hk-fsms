@@ -58,6 +58,9 @@
 	aria-label="pseudocode"
 	onkeydown={onSelectAll}
 >
+	{#if !model.enabled}
+		<div class="cmt">// component disabled: this FSM does not run until something enables it</div>
+	{/if}
 	{#if model.template_name}
 		<div class="cmt">// uses template: {model.template_name}</div>
 	{/if}
@@ -75,7 +78,8 @@
 	{#each model.states as s (s.name)}
 		<div class="blank"></div>
 		<div class="i1" data-state={s.name} class:flash={flash === s.name}>
-			<span class="kw">state</span> <span class="state">{s.name}</span>
+			<span class="kw">{s.is_sequence ? 'sequence state' : 'state'}</span>
+			<span class="state">{s.name}</span>
 			{'{'}
 		</div>
 		<StateBody state={s} {model} {tooltips} onnavigate={goto} indent={4} />
