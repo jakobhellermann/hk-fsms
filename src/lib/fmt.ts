@@ -1,6 +1,8 @@
 import type {
 	ArrayValue,
 	Call,
+	Curve,
+	CurveKey,
 	EnumValue,
 	EventTarget,
 	GoRef,
@@ -71,7 +73,7 @@ function fmtEnum(e: EnumValue): string {
 }
 
 function fmtArray(a: ArrayValue): string {
-	return a.kind === 'Var' ? `var ${q(a.value)}` : `array[${a.value.length} elems]`;
+	return a.kind === 'Var' ? `var ${q(a.value)}` : `[${a.value.map(fmtCallValue).join(', ')}]`;
 }
 
 function fmtVar(v: VarValue): string {
@@ -92,7 +94,7 @@ function fmtVar(v: VarValue): string {
 		case 'Object':
 			return fmtObjectRef(v.value);
 		case 'Vector':
-			return `(${v.value.join(',')})`;
+			return `(${v.value.join(', ')})`;
 		case 'Enum':
 			return `enum(${v.value})`;
 		case 'Array':
@@ -149,9 +151,26 @@ function functionTokens(f: Call): Token[] {
 	return [{ text: `${f.function}(` }, ...callValueTokens(f.value), { text: ')' }];
 }
 
-function fmtProperty(p: Property): string {
+function propertyMember(p: Property): string {
 	const ty = short(p.type_name);
 	return p.property ? `${ty}.${p.property}` : ty;
+}
+
+function fmtProperty(p: Property): string {
+	return `${propertyMember(p)} on ${fmtGoRef(p.target)}`;
+}
+
+function propertyTokens(p: Property): Token[] {
+	return [{ text: `${propertyMember(p)} on ` }, ...goRefTokens(p.target)];
+}
+
+// Keyframes under Unity's own field names. The slopes are the shape: eight of
+// Silksong's fifteen curves share their time/value pairs and differ only there.
+// Weights and the infinity modes are left out — read the object itself for those.
+function fmtCurve(c: Curve): string {
+	const key = (k: CurveKey) =>
+		`(time=${k.time}, value=${k.value}, inSlope=${k.in_slope}, outSlope=${k.out_slope})`;
+	return `curve[${c.keys.map(key).join(', ')}]`;
 }
 
 function templateTokens(t: TemplateControl): Token[] {
@@ -161,9 +180,10 @@ function templateTokens(t: TemplateControl): Token[] {
 		out.push({ text: ` ${label}[` });
 		es.forEach((o, i) => {
 			if (i) out.push({ text: ', ' });
-			if (o.value.type === 'Var')
-				out.push({ text: `${o.variable}${arrow}` }, varTok(o.value.value));
-			else out.push({ text: o.variable });
+			out.push({ text: `${o.variable}${arrow}` });
+			if (o.value.type === 'Var') out.push(varTok(o.value.value));
+			else if (o.value.type === 'Str') out.push({ text: q(o.value.value), cls: 'str' });
+			else out.push({ text: fmtVar(o.value) });
 		});
 		out.push({ text: ']' });
 	};
@@ -216,7 +236,7 @@ export function fmtValue(v: ParamValue): string {
 		case 'Property':
 			return fmtProperty(v.value);
 		case 'AnimCurve':
-			return `curve[${v.value.keys.length} keys]`;
+			return fmtCurve(v.value);
 		case 'List':
 			return `[${v.value.length} elems]`;
 		case 'Pptr':
@@ -236,6 +256,8 @@ export function compositeTokens(v: ParamValue): Token[] | null {
 			return functionTokens(v.value);
 		case 'Template':
 			return templateTokens(v.value);
+		case 'Property':
+			return propertyTokens(v.value);
 		default:
 			return null;
 	}

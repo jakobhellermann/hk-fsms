@@ -66,8 +66,77 @@ describe('fmtValue', () => {
 		).toBe('Mode(1)');
 		expect(fmtValue({ type: 'Array', value: { kind: 'Var', value: 'xs' } })).toBe('var "xs"');
 		expect(
-			fmtValue({ type: 'Array', value: { kind: 'Values', value: [{ type: 'Int', value: 1 }] } })
-		).toBe('array[1 elems]');
+			fmtValue({
+				type: 'Array',
+				value: {
+					kind: 'Values',
+					value: [
+						{ type: 'Int', value: 1 },
+						{ type: 'Str', value: 'a' }
+					]
+				}
+			})
+		).toBe('[1, "a"]');
+	});
+
+	it('spells out a curve and names a property target', () => {
+		const key = (time: number, value: number) => ({
+			time,
+			value,
+			in_slope: 0,
+			out_slope: 0,
+			in_weight: 0,
+			out_weight: 0,
+			weighted_mode: 0
+		});
+		expect(
+			fmtValue({
+				type: 'AnimCurve',
+				value: {
+					keys: [key(0, 0), key(1, 0.5)],
+					pre_infinity: 0,
+					post_infinity: 0,
+					rotation_order: 0
+				}
+			})
+		).toBe(
+			'curve[(time=0, value=0, inSlope=0, outSlope=0), (time=1, value=0.5, inSlope=0, outSlope=0)]'
+		);
+		// a stepped curve: JSON cannot hold the infinite tangent, so it arrives as a string
+		expect(
+			fmtValue({
+				type: 'AnimCurve',
+				value: {
+					keys: [{ ...key(0, 0), in_slope: 'Infinity' }],
+					pre_infinity: 0,
+					post_infinity: 0,
+					rotation_order: 0
+				}
+			})
+		).toBe('curve[(time=0, value=0, inSlope=Infinity, outSlope=0)]');
+		expect(
+			fmtValue({
+				type: 'Property',
+				value: {
+					target: 'SelfOwner',
+					type_name: 'UnityEngine.Transform',
+					property: 'position',
+					set: true
+				}
+			})
+		).toBe('Transform.position on Self');
+		// a target that never resolves: the action returns early and does nothing
+		expect(
+			fmtValue({
+				type: 'Property',
+				value: {
+					target: { Object: { file: null, target: { kind: 'Null' } } },
+					type_name: 'X.ObjectBounce',
+					property: '',
+					set: false
+				}
+			})
+		).toBe('ObjectBounce on <null>');
 	});
 
 	it('layers show the name with its index, falling back to the index', () => {

@@ -171,13 +171,17 @@ export interface Curve {
 	rotation_order: number;
 }
 
+// JSON has no NaN or ±Infinity, so the model spells them out as these strings
+// (see playmakerfsm's model::float). Any float field can arrive in that form.
+export type Float = number | 'NaN' | 'Infinity' | '-Infinity';
+
 export interface CurveKey {
-	time: number;
-	value: number;
-	in_slope: number;
-	out_slope: number;
-	in_weight: number;
-	out_weight: number;
+	time: Float;
+	value: Float;
+	in_slope: Float;
+	out_slope: Float;
+	in_weight: Float;
+	out_weight: Float;
 	weighted_mode: number;
 }
 
