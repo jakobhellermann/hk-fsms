@@ -74,6 +74,8 @@ export type ParamValue =
 	| { type: 'Property'; value: Property }
 	| { type: 'AnimCurve'; value: Curve }
 	| { type: 'List'; value: Param[] }
+	// ParamDataType.CustomClass: no bytes of its own, just a field count and the fields
+	| { type: 'Class'; value: { class: string; fields: Param[] } }
 	| { type: 'Pptr'; value: ObjectRef }
 	| { type: 'Raw'; value: number[] };
 

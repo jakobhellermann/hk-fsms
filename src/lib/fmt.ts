@@ -7,6 +7,7 @@ import type {
 	EventTarget,
 	GoRef,
 	ObjectRef,
+	Param,
 	ParamValue,
 	Property,
 	StrValue,
@@ -114,6 +115,13 @@ function eventTargetTokens(t: EventTarget): Token[] {
 		inner.push({ text: `fsm=${q(t.fsm_name)}` });
 	}
 	return inner.length ? [{ text: `${kind}(` }, ...inner, { text: ')' }] : [{ text: kind }];
+}
+
+// `name=value, …` for a nested class's fields
+function fmtFields(fields: Param[]): string {
+	return fields
+		.map((f) => (f.name ? `${f.name}=${fmtValue(f.value)}` : fmtValue(f.value)))
+		.join(', ');
 }
 
 // a single-line rendering of a bare `Value` (FunctionCall arg or a variable's authored default)
@@ -239,6 +247,8 @@ export function fmtValue(v: ParamValue): string {
 			return fmtCurve(v.value);
 		case 'List':
 			return `[${v.value.length} elems]`;
+		case 'Class':
+			return `{${fmtFields(v.value.fields)}}`;
 		case 'Pptr':
 			return fmtObjectRef(v.value);
 		case 'Raw':

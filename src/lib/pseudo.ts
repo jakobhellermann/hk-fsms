@@ -52,6 +52,17 @@ export function actionTokens(a: Action, tip?: ActionTip): Token[] {
 	const valueTokens = (p: Param): Token[] => {
 		const composite = compositeTokens(p.value);
 		if (composite) return composite;
+		// a class has no value but its fields, so it never shortens to a count
+		if (p.value.type === 'Class') {
+			const out: Token[] = [{ text: '{' }];
+			p.value.value.fields.forEach((f, i) => {
+				if (i > 0) out.push({ text: ', ' });
+				if (f.name) out.push({ text: `${f.name}=` });
+				out.push(valueToken(f));
+			});
+			out.push({ text: '}' });
+			return out;
+		}
 		if (p.value.type !== 'List' || p.value.value.length > LIST_INLINE_MAX) {
 			return [valueToken(p)];
 		}
