@@ -1,9 +1,10 @@
 //! Dump every FSM of a game to pseudocode text files (one per unique FSM).
 //!
 //! Reads the content-addressed store produced by the indexer (`just index` +
-//! `just unpack-data`) from `static/data/<slug>/`. Identical FSMs (same content hash)
-//! collapse to one file. Filenames start with the FSM name; if that collides,
-//! game-object path components are appended until unique, then the scene name.
+//! `just unpack-data`) from `static/data/<slug>/` and renders each model with
+//! [`playmakerfsm::pseudo`]. Identical FSMs (same content hash) collapse to one
+//! file. Filenames start with the FSM name; if that collides, game-object path
+//! components are appended until unique, then the scene name.
 //!
 //! Usage: `cargo run --release --bin dump-pseudo -- [slug]...` (default: all games in config)
 
@@ -11,8 +12,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
+use playmakerfsm::model::FsmModel;
+use playmakerfsm::pseudo;
 use serde::Deserialize;
-use serde_json::Value;
 
 // ── types for reading the index ──────────────────────────────────────────────
 
@@ -34,365 +36,6 @@ struct Entry {
     name: String,
     game_object: String,
     hash: String,
-}
-
-// ── value formatting (ported from src/lib/fmt.ts) ────────────────────────────
-
-fn short(cls: &str) -> &str {
-    cls.rsplit('.').next().unwrap_or(cls)
-}
-
-/// JSON-quoted string: `"hello"` (matches the TS `q()` / `JSON.stringify`).
-fn q(s: &str) -> String {
-    serde_json::to_string(s).unwrap_or_else(|_| format!("{s:?}"))
-}
-
-fn fmt_value(v: &Value) -> String {
-    let ty = v["type"].as_str().unwrap_or("");
-    let val = &v["value"];
-    match ty {
-        "Bool" => val.as_bool().unwrap_or(false).to_string(),
-        "Int" => val.as_i64().unwrap_or(0).to_string(),
-        "Float" => {
-            let f = val.as_f64().unwrap_or(0.0);
-            format!("{f}")
-        }
-        "Vector" => {
-            let comps = val.as_array().map(|a| {
-                a.iter()
-                    .map(|c| format!("{}", c.as_f64().unwrap_or(0.0)))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            });
-            format!("({})", comps.unwrap_or_default())
-        }
-        "PackedVar" => match val {
-            Value::Null => "(unset)".into(),
-            _ => format!("var {}", q(val.as_str().unwrap_or(""))),
-        },
-        "Event" => match val {
-            Value::Null => "(none)".into(),
-            _ => format!("→{}", q(val.as_str().unwrap_or(""))),
-        },
-        "Str" => q(val.as_str().unwrap_or("")),
-        "FsmString" => fmt_str(val),
-        "Owner" | "GameObject" | "Object" => fmt_go_ref(val),
-        "Var" => fmt_var(val),
-        "EventTarget" => fmt_event_target(val),
-        "Function" => fmt_function(val),
-        "Template" => fmt_template(val),
-        "Enum" => fmt_enum(val),
-        "EnumMember" => val.as_str().unwrap_or("").to_string(),
-        "Array" => fmt_array(val),
-        "Property" => fmt_property(val),
-        "AnimCurve" => {
-            let n = val["keys"].as_array().map(|a| a.len()).unwrap_or(0);
-            format!("curve[{n} keys]")
-        }
-        "List" => {
-            let n = val.as_array().map(|a| a.len()).unwrap_or(0);
-            format!("[{n} elems]")
-        }
-        "Pptr" => fmt_object_ref(val),
-        "Raw" => {
-            let n = val.as_array().map(|a| a.len()).unwrap_or(0);
-            format!("({n}B)")
-        }
-        _ => format!("{val}"),
-    }
-}
-
-fn fmt_str(s: &Value) -> String {
-    match s["kind"].as_str() {
-        Some("Var") => format!("var {}", q(s["value"].as_str().unwrap_or(""))),
-        _ => q(s["value"].as_str().unwrap_or("")),
-    }
-}
-
-fn fmt_enum(e: &Value) -> String {
-    match e["kind"].as_str() {
-        Some("Var") => format!("var {}", q(e["value"].as_str().unwrap_or(""))),
-        Some("Named") => {
-            let name = e["value"]["enum_name"].as_str().unwrap_or("");
-            let val = e["value"]["value"].as_i64().unwrap_or(0);
-            format!("{}({val})", short(name))
-        }
-        _ => e["value"].as_i64().unwrap_or(0).to_string(),
-    }
-}
-
-fn fmt_array(a: &Value) -> String {
-    match a["kind"].as_str() {
-        Some("Var") => format!("var {}", q(a["value"].as_str().unwrap_or(""))),
-        _ => {
-            let n = a["value"].as_array().map(|a| a.len()).unwrap_or(0);
-            format!("array[{n} elems]")
-        }
-    }
-}
-
-fn fmt_var(v: &Value) -> String {
-    match v["type"].as_str() {
-        Some("Var") => format!("var {}", q(v["value"].as_str().unwrap_or(""))),
-        Some("Unset") => "(unset var)".into(),
-        Some("Unused") => "(unused)".into(),
-        Some("Float") => format!("{}", v["value"].as_f64().unwrap_or(0.0)),
-        Some("Int") => v["value"].as_i64().unwrap_or(0).to_string(),
-        Some("Bool") => v["value"].as_bool().unwrap_or(false).to_string(),
-        Some("Str") => q(v["value"].as_str().unwrap_or("")),
-        Some("Object") => fmt_object_ref(&v["value"]),
-        Some("Vector") => {
-            let comps = v["value"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .map(|c| format!("{}", c.as_f64().unwrap_or(0.0)))
-                        .collect::<Vec<_>>()
-                        .join(",")
-                })
-                .unwrap_or_default();
-            format!("({comps})")
-        }
-        Some("Enum") => format!("enum({})", v["value"].as_i64().unwrap_or(0)),
-        Some("Array") => fmt_array(&v["value"]),
-        _ => format!("{v}"),
-    }
-}
-
-fn fmt_go_ref(r: &Value) -> String {
-    if r.is_string() {
-        return match r.as_str() {
-            Some("SelfOwner") => "Self".into(),
-            _ => r.as_str().unwrap_or("").into(),
-        };
-    }
-    if let Some(name) = r.get("Var").and_then(|v| v.as_str()) {
-        return format!("var {}", q(name));
-    }
-    if let Some(obj) = r.get("Object") {
-        return fmt_object_ref(obj);
-    }
-    format!("{r}")
-}
-
-fn fmt_object_ref(r: &Value) -> String {
-    let target = &r["target"];
-    let kind = target["kind"].as_str().unwrap_or("");
-    let loc = match kind {
-        "Null" => return "<null>".into(),
-        "Path" => target["target"].as_str().unwrap_or("").to_string(),
-        "Loose" => {
-            let name = target["target"]["name"].as_str();
-            match name {
-                Some(n) => n.to_string(),
-                None => format!("loose:{}", target["target"]["id"].as_i64().unwrap_or(0)),
-            }
-        }
-        _ => format!("{target}"),
-    };
-    match r["file"].as_str() {
-        Some(file) if !file.is_empty() => format!("{loc} ({file})"),
-        _ => loc,
-    }
-}
-
-fn fmt_event_target(t: &Value) -> String {
-    let kind = t["kind"].as_i64().unwrap_or(-1);
-    let kind_str = match kind {
-        0 => "Self",
-        1 => "GameObject",
-        2 => "GameObjectFSM",
-        3 => "FSMComponent",
-        4 => "BroadcastAll",
-        5 => "HostFSM",
-        6 => "SubFSMs",
-        _ => "?",
-    };
-    let mut bits = Vec::new();
-    if kind == 1 || kind == 2 {
-        bits.push(fmt_go_ref(&t["game_object"]));
-    }
-    if let Some(name) = t["fsm_name"].as_str() {
-        bits.push(format!("fsm={}", q(name)));
-    }
-    if bits.is_empty() {
-        kind_str.into()
-    } else {
-        format!("{}({})", kind_str, bits.join(", "))
-    }
-}
-
-fn fmt_function(f: &Value) -> String {
-    let function = f["function"].as_str().unwrap_or("");
-    let pt = f["parameter_type"].as_str().unwrap_or("");
-    if pt.is_empty() || pt == "None" {
-        return format!("{function}()");
-    }
-    match f.get("value") {
-        Some(v) if !v.is_null() => format!("{function}({})", fmt_call_value(v)),
-        // fall back to the bare type when the value couldn't be decoded
-        _ => format!("{function}(<{pt}>)"),
-    }
-}
-
-// the active parameter value of a FunctionCall (a `Value`, the variant decode.rs selects by type)
-fn fmt_call_value(v: &Value) -> String {
-    match v["type"].as_str() {
-        Some("Var") => format!("var {}", q(v["value"].as_str().unwrap_or(""))),
-        Some("Bool") => v["value"].as_bool().unwrap_or(false).to_string(),
-        Some("Int") => v["value"].as_i64().unwrap_or(0).to_string(),
-        Some("Float") => format!("{}", v["value"].as_f64().unwrap_or(0.0)),
-        Some("Str") => q(v["value"].as_str().unwrap_or("")),
-        Some("Vector") => {
-            let comps = v["value"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .map(|c| format!("{}", c.as_f64().unwrap_or(0.0)))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                })
-                .unwrap_or_default();
-            format!("({comps})")
-        }
-        Some("Enum") => {
-            let name = v["value"]["enum_name"].as_str().unwrap_or("");
-            let val = v["value"]["value"].as_i64().unwrap_or(0);
-            format!("{}({val})", short(name))
-        }
-        Some("Object") => fmt_object_ref(&v["value"]),
-        Some("Array") => fmt_array(&v["value"]),
-        _ => format!("{v}"),
-    }
-}
-
-fn fmt_template(t: &Value) -> String {
-    let vmap = |entries: &Value, arrow: &str| -> Vec<String> {
-        entries
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|o| {
-                let var = o["variable"].as_str().unwrap_or("");
-                if o["value"]["type"].as_str() == Some("Var") {
-                    format!(
-                        "{var}{arrow}var {}",
-                        q(o["value"]["value"].as_str().unwrap_or(""))
-                    )
-                } else {
-                    var.to_string()
-                }
-            })
-            .collect()
-    };
-    let mut parts = vec![format!("template={}", t["template"])];
-    for (label, vars) in [
-        ("in", vmap(&t["inputs"], "<-")),
-        ("out", vmap(&t["outputs"], "->")),
-        ("vars", vmap(&t["overrides"], "=")),
-    ] {
-        if !vars.is_empty() {
-            parts.push(format!("{label}[{}]", vars.join(", ")));
-        }
-    }
-    if let Some(events) = t["events"].as_array().filter(|e| !e.is_empty()) {
-        let evs: Vec<_> = events
-            .iter()
-            .map(|e| {
-                format!(
-                    "{}->{}",
-                    e[0].as_str().unwrap_or(""),
-                    e[1].as_str().unwrap_or("")
-                )
-            })
-            .collect();
-        parts.push(format!("events[{}]", evs.join(", ")));
-    }
-    parts.join(" ")
-}
-
-fn fmt_property(p: &Value) -> String {
-    let ty = short(p["type_name"].as_str().unwrap_or(""));
-    let prop = p["property"].as_str().unwrap_or("");
-    if prop.is_empty() {
-        ty.to_string()
-    } else {
-        format!("{ty}.{prop}")
-    }
-}
-
-// ── pseudocode (ported from src/lib/pseudo.ts) ───────────────────────────────
-
-fn args(params: &Value) -> String {
-    params
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|p| {
-            let name = p["name"].as_str().unwrap_or("");
-            let v = fmt_value(&p["value"]);
-            if name.is_empty() {
-                v
-            } else {
-                format!("{name}={v}")
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn action_text(a: &Value) -> String {
-    let cls = short(a["class"].as_str().unwrap_or(""));
-    let line = format!("{}({})", cls, args(&a["params"]));
-    if a["enabled"].as_bool().unwrap_or(true) {
-        line
-    } else {
-        format!("{line}  // disabled")
-    }
-}
-
-fn to_pseudocode(m: &Value) -> String {
-    let mut out = Vec::new();
-    out.push(format!("fsm {} {{", m["name"].as_str().unwrap_or("")));
-    out.push(format!(
-        "  start {}",
-        m["start_state"].as_str().unwrap_or("")
-    ));
-
-    if let Some(globals) = m["global_transitions"].as_array() {
-        for t in globals {
-            out.push(format!(
-                "  on {} → {}  // from any state",
-                t["event"].as_str().unwrap_or(""),
-                t["to_state"].as_str().unwrap_or("")
-            ));
-        }
-    }
-
-    if let Some(states) = m["states"].as_array() {
-        for s in states {
-            out.push(String::new());
-            out.push(format!("  state {} {{", s["name"].as_str().unwrap_or("")));
-            if let Some(actions) = s["actions"].as_array() {
-                for a in actions {
-                    out.push(format!("    {}", action_text(a)));
-                }
-            }
-            if let Some(transitions) = s["transitions"].as_array() {
-                for t in transitions {
-                    out.push(format!(
-                        "    on {} → {}",
-                        t["event"].as_str().unwrap_or(""),
-                        t["to_state"].as_str().unwrap_or("")
-                    ));
-                }
-            }
-            out.push("  }".into());
-        }
-    }
-
-    out.push("}".into());
-    out.join("\n")
 }
 
 // ── file naming: name → name + go components → name + go + scene ──────────────
@@ -594,10 +237,10 @@ fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
     let mut written = 0usize;
 
     for (i, (name, _go, _scene, hash)) in hashes.iter().enumerate() {
-        let model: Value = serde_json::from_slice(
-            &std::fs::read(content_dir.join(format!("{hash}.json")))
-                .with_context(|| format!("content/{hash}.json"))?,
-        )?;
+        let json = std::fs::read(content_dir.join(format!("{hash}.json")))
+            .with_context(|| format!("content/{hash}.json"))?;
+        let model: FsmModel = serde_json::from_slice(&json)
+            .with_context(|| format!("content/{hash}.json is not an FsmModel"))?;
 
         let entries = &by_hash[hash];
 
@@ -612,7 +255,7 @@ fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
         }
         header.push(String::new());
 
-        let text = format!("{}\n{}\n", header.join("\n"), to_pseudocode(&model));
+        let text = format!("{}\n{}", header.join("\n"), pseudo::render(&model));
         let path = out_game_dir.join(format!("{}.txt", filenames[i]));
         std::fs::write(&path, text)?;
         written += 1;
