@@ -72,9 +72,13 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
     let written: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
     let entries: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
 
-    let scan = |file_label: String, handle: &rabex_env::handle::SerializedFileHandle| {
+    let scan = |file_label: String,
+                handle: &rabex_env::handle::SerializedFileHandle|
+     -> Result<()> {
+        // `scripts` reports "not in this file" as an error, and most files hold
+        // no FSM at all.
         let Ok(scripts) = handle.scripts::<MonoBehaviour>("PlayMakerFSM") else {
-            return;
+            return Ok(());
         };
         let mut qualifier = Qualifier::new(handle);
         let mut local: Vec<Entry> = Vec::new();
@@ -83,24 +87,18 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
             let path_id = mb.path_id();
             let label = qualifier
                 .qualify_local(path_id)
-                .map(|p| p.to_string())
-                .unwrap_or_default();
+                .with_context(|| format!("no component path for {file_label} obj:{path_id}"))?
+                .to_string();
             let game_object = label
                 .rsplit_once('@')
                 .map(|(go, _)| go)
                 .unwrap_or(&label)
                 .to_string();
 
-            let Ok(component) = ComponentFsm::read(handle, path_id) else {
-                continue;
-            };
-            let Ok(mut model) = component.decode(handle) else {
-                continue;
-            };
+            let component = ComponentFsm::read(handle, path_id)?;
+            let mut model = component.decode(handle)?;
             game.apply(&mut model);
-            let Ok(json) = serde_json::to_vec(&model) else {
-                continue;
-            };
+            let json = serde_json::to_vec(&model)?;
 
             let mut hasher = DefaultHasher::new();
             json.hash(&mut hasher);
@@ -108,12 +106,12 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
 
             let is_new = written.lock().unwrap().insert(hash.clone());
             if is_new {
-                let _ = std::fs::write(content_dir.join(format!("{hash}.json")), &json);
+                std::fs::write(content_dir.join(format!("{hash}.json")), &json)?;
             }
             local.push(Entry {
                 file: file_label.clone(),
                 path_id,
-                name: component.name().to_string(),
+                name: model.name.to_string(),
                 game_object,
                 hash,
             });
@@ -123,42 +121,37 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
             eprintln!("  {file_label}: {} fsms", local.len());
         }
         entries.lock().unwrap().extend(local);
+        Ok(())
     };
 
     // Plain serialized files (levelN, *.assets, globalgamemanagers)
-    plain.par_iter().for_each(|file| {
-        let Ok(handle) = env.load_serialized(file) else {
-            return;
-        };
-        scan(file.to_string_lossy().to_string(), &handle);
-    });
+    plain.par_iter().try_for_each(|file| -> Result<()> {
+        let handle = env.load_serialized(file)?;
+        scan(file.to_string_lossy().to_string(), &handle)
+    })?;
 
     // Addressables bundles — each contains multiple serialized files (main CAB + .sharedAssets).
     // The file label is the bundle path (e.g. `scenes_scenes_scenes/bone_east_10.bundle`), not the
     // internal archive path — that's what the scene lookup uses and what the UI displays.
-    bundles.par_iter().for_each(|bundle_path| {
+    bundles.par_iter().try_for_each(|bundle_path| -> Result<()> {
         let file_label = bundle_path.to_string_lossy().to_string();
-        let Ok(bundle) = env.load_addressables_bundle(bundle_path) else {
-            return;
-        };
-        let Some(bundle_id) = bundle.main_serializedfile().map(|f| f.path.clone()) else {
-            return;
-        };
+        let bundle = env.load_addressables_bundle(bundle_path)?;
+        let bundle_id = bundle
+            .main_serializedfile()
+            .map(|f| f.path.clone())
+            .with_context(|| format!("{file_label} has no main serialized file"))?;
         for entry in bundle.serialized_files() {
             let archive_path = ArchivePath::new(&bundle_id, &entry.path);
-            let Ok(data) = bundle.read_at_entry(entry) else {
-                continue;
-            };
-            let Ok(mut serialized) = SerializedFile::from_reader(&mut Cursor::new(&data)) else {
-                continue;
-            };
-            if let Ok(version) = env.unity_version() {
-                serialized.m_UnityVersion.get_or_insert(version.clone());
-            }
+            let data = bundle.read_at_entry(entry)?;
+            let mut serialized = SerializedFile::from_reader(&mut Cursor::new(&data))?;
+            serialized
+                .m_UnityVersion
+                .get_or_insert(env.unity_version()?.clone());
             let handle = env.insert_cache(archive_path.to_string().into(), serialized, data.into());
-            scan(file_label.clone(), &handle);
+            scan(file_label.clone(), &handle)?;
         }
-    });
+        Ok(())
+    })?;
 
     let mut entries = entries.into_inner().unwrap();
     let written = written.into_inner().unwrap();
