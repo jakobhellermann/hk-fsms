@@ -134,6 +134,7 @@ describe('toPseudocode', () => {
 	it('renders states, transitions and global transitions', () => {
 		const m: FsmModel = {
 			name: 'Demo',
+			template_name: null,
 			start_state: 'A',
 			events: [],
 			global_transitions: [{ event: 'GO', to_state: 'B' }],

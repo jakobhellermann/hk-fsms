@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fmtCallValue } from '$lib/fmt';
 	import type { FsmModel } from '$lib/model';
 	import type { Tooltips } from '$lib/tooltips';
 	import StateBody from './StateBody.svelte';
@@ -57,8 +58,12 @@
 	aria-label="pseudocode"
 	onkeydown={onSelectAll}
 >
+	{#if model.template_name}
+		<div class="cmt">// uses template: {model.template_name}</div>
+	{/if}
 	<div><span class="kw">fsm</span> <span class="name">{model.name}</span> {'{'}</div>
 	<div class="i1"><span class="kw">start</span> {@render stateRef(model.start_state)}</div>
+
 	{#each model.global_transitions as t (t.event + t.to_state)}
 		<div class="i1">
 			<span class="kw">on</span> <span class="event">{t.event}</span>
@@ -75,6 +80,23 @@
 		</div>
 		<StateBody state={s} {model} {tooltips} onnavigate={goto} indent={4} />
 		<div class="i1">{'}'}</div>
+	{/each}
+
+	<!-- inspector-exposed first, in their own paragraph: those are the ones an
+	     instance of a template can set, so they are where two instances differ -->
+	{#each [true, false] as exposed (exposed)}
+		{@const group = model.variables.filter((v) => v.show_in_inspector === exposed)}
+		{#if group.length}
+			<div class="blank"></div>
+			{#each group as v (v.category + v.name)}
+				<div class="i1">
+					<span class="kw">var</span> <span class="var">{v.name}</span><span class="cmt"
+						>: {v.category} =</span
+					>
+					{fmtCallValue(v.value)}
+				</div>
+			{/each}
+		{/if}
 	{/each}
 	<div>{'}'}</div>
 </div>
@@ -98,6 +120,9 @@
 	}
 	.kw {
 		color: #c678dd;
+	}
+	.var {
+		color: #9d8fb5;
 	}
 	.name {
 		color: var(--fg);

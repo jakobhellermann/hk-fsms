@@ -9,6 +9,10 @@ export interface FsmModel {
 	global_transitions: Transition[];
 	states: State[];
 	variables: Variable[];
+	// m_Name of the FsmTemplate this FSM was built from, if any: the states and
+	// actions are then the template's, and only the name and the
+	// inspector-exposed variables come from the component running it
+	template_name: string | null;
 }
 
 export interface Event {
@@ -180,6 +184,9 @@ export interface CurveKey {
 export interface Variable {
 	name: string;
 	category: string;
+	// exposed in the PlayMaker inspector, which is what makes it settable per
+	// instance when an FSM runs a template
+	show_in_inspector: boolean;
 	// the variable's authored initial value (its FSM-editor default)
 	value: Value;
 }
