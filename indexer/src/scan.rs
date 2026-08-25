@@ -10,8 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use anyhow::{Context as _, Result};
-use playmakerfsm::model::{Context as FsmContext, decode_fsm};
-use playmakerfsm::raw::*;
+use playmakerfsm::component::ComponentFsm;
 use rabex::files::SerializedFile;
 use rabex_env::addressables::ArchivePath;
 use rabex_env::qualify::Qualifier;
@@ -85,7 +84,6 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
             return;
         };
         let mut qualifier = Qualifier::new(handle);
-        let mut ctx = FsmContext::new(handle);
         let mut local: Vec<Entry> = Vec::new();
 
         for mb in scripts {
@@ -100,28 +98,12 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
                 .unwrap_or(&label)
                 .to_string();
 
-            let Ok(pm) = mb.cast::<PlayMakerFSM>().read() else {
+            let Ok(component) = ComponentFsm::read(handle, path_id) else {
                 continue;
             };
-            // If the component references a template, the template's FSM *is* the runtime FSM —
-            // PlayMakerFSM.InitTemplate() replaces the component FSM entirely, keeping only the
-            // component's variables and name. The template lives in its OWN serialized file, so its
-            // action PPtrs index THAT file's external table — resolve them against the template's
-            // file, not the instance's, otherwise cross-bundle refs land in the wrong bundle.
-            let tpl = (pm.fsmTemplate.m_PathID != 0)
-                .then(|| handle.deref(pm.fsmTemplate).ok())
-                .flatten();
-            let tpl_value = tpl.as_ref().and_then(|h| h.read().ok());
-            let mut tpl_ctx = tpl.as_ref().map(|h| FsmContext::new(&h.file));
-
-            let fsm = tpl_value.as_ref().map_or(&pm.fsm, |t| &t.fsm);
-            let mut model = match tpl_ctx.as_mut() {
-                Some(c) => decode_fsm(fsm, c),
-                None => decode_fsm(fsm, &mut ctx),
+            let Ok(mut model) = component.decode(handle) else {
+                continue;
             };
-            if tpl_value.is_some() {
-                model.name = &pm.fsm.name;
-            }
             bake_enums(&mut model, &enum_map);
             bake_layers(&mut model, &layer_names, &layer_fields);
             let Ok(json) = serde_json::to_vec(&model) else {
@@ -139,7 +121,7 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
             local.push(Entry {
                 file: file_label.clone(),
                 path_id,
-                name: pm.fsm.name.to_string(),
+                name: component.name().to_string(),
                 game_object,
                 hash,
             });
