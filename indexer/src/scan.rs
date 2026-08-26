@@ -5,18 +5,15 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 
 use anyhow::{Context as _, Result};
 use playmakerfsm::component::ComponentFsm;
-use rabex::files::SerializedFile;
-use rabex_env::addressables::ArchivePath;
+use playmakerfsm::files;
 use rabex_env::qualify::Qualifier;
 use rabex_env::rabex::tpk::TpkTypeTreeBlob;
 use rabex_env::rabex::typetree::typetree_cache::sync::TypeTreeCache;
-use rabex_env::resolver::EnvResolver;
 use rabex_env::unity::types::MonoBehaviour;
 use rabex_env::{Environment, resolver::GameFiles};
 use rayon::prelude::*;
@@ -46,9 +43,10 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
 
     let managed = env.game_files.game_dir.join("Managed");
     let read = |name: &str| std::fs::read(managed.join(name)).with_context(|| name.to_string());
+    let assembly_csharp = read("Assembly-CSharp.dll")?;
     let game = GameContext::new(
         &read("PlayMaker.dll")?,
-        &read("Assembly-CSharp.dll")?,
+        &[("Assembly-CSharp.dll", &assembly_csharp)],
         context::layer_names(&env)?,
     )?;
 
@@ -58,13 +56,8 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
     let scene_names = scene_lookup::build_scene_lookup(&env)?;
     eprintln!("scenes: {} names", scene_names.len());
 
-    let plain: Vec<PathBuf> = env.game_files.serialized_files()?;
-    let bundles: Vec<PathBuf> = env.addressables_bundles()?;
-    eprintln!(
-        "scanning {} plain files + {} bundles...",
-        plain.len(),
-        bundles.len()
-    );
+    let sources = files::sources(&env)?;
+    eprintln!("scanning {} files and bundles...", sources.len());
 
     let content_dir = out_dir.join("content");
     std::fs::create_dir_all(&content_dir)?;
@@ -124,33 +117,9 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
         Ok(())
     };
 
-    // Plain serialized files (levelN, *.assets, globalgamemanagers)
-    plain.par_iter().try_for_each(|file| -> Result<()> {
-        let handle = env.load_serialized(file)?;
-        scan(file.to_string_lossy().to_string(), &handle)
-    })?;
-
-    // Addressables bundles — each contains multiple serialized files (main CAB + .sharedAssets).
-    // The file label is the bundle path (e.g. `scenes_scenes_scenes/bone_east_10.bundle`), not the
-    // internal archive path — that's what the scene lookup uses and what the UI displays.
-    bundles.par_iter().try_for_each(|bundle_path| -> Result<()> {
-        let file_label = bundle_path.to_string_lossy().to_string();
-        let bundle = env.load_addressables_bundle(bundle_path)?;
-        let bundle_id = bundle
-            .main_serializedfile()
-            .map(|f| f.path.clone())
-            .with_context(|| format!("{file_label} has no main serialized file"))?;
-        for entry in bundle.serialized_files() {
-            let archive_path = ArchivePath::new(&bundle_id, &entry.path);
-            let data = bundle.read_at_entry(entry)?;
-            let mut serialized = SerializedFile::from_reader(&mut Cursor::new(&data))?;
-            serialized
-                .m_UnityVersion
-                .get_or_insert(env.unity_version()?.clone());
-            let handle = env.insert_cache(archive_path.to_string().into(), serialized, data.into());
-            scan(file_label.clone(), &handle)?;
-        }
-        Ok(())
+    sources.par_iter().try_for_each(|source| -> Result<()> {
+        let label = source.label();
+        source.for_each_file(&env, |handle| scan(label.clone(), handle))
     })?;
 
     let mut entries = entries.into_inner().unwrap();
