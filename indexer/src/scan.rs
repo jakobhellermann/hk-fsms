@@ -43,10 +43,32 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
 
     let managed = env.game_files.game_dir.join("Managed");
     let read = |name: &str| std::fs::read(managed.join(name)).with_context(|| name.to_string());
-    let assembly_csharp = read("Assembly-CSharp.dll")?;
+    // Action classes live in TeamCherry.*.dll too; the rest of Managed/ is the
+    // engine and the BCL.
+    let mut names = vec!["Assembly-CSharp.dll".to_string()];
+    let mut found: Vec<String> = std::fs::read_dir(&managed)?
+        .flatten()
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| {
+            name == "Assembly-CSharp-firstpass.dll"
+                || (name.starts_with("TeamCherry.") && name.ends_with(".dll"))
+        })
+        .collect();
+    found.sort();
+    names.extend(found);
+    eprintln!("assemblies: PlayMaker.dll + {}", names.join(", "));
+    let assemblies = names
+        .into_iter()
+        .map(|name| read(&name).map(|bytes| (name, bytes)))
+        .collect::<Result<Vec<_>>>()?;
+    let assemblies: Vec<(&str, &[u8])> = assemblies
+        .iter()
+        .map(|(name, bytes)| (name.as_str(), bytes.as_slice()))
+        .collect();
+
     let game = GameContext::new(
         &read("PlayMaker.dll")?,
-        &[("Assembly-CSharp.dll", &assembly_csharp)],
+        &assemblies,
         context::layer_names(&env)?,
     )?;
 
