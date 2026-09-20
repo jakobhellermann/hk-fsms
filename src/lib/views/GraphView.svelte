@@ -14,6 +14,7 @@
 	import type { FsmModel } from '$lib/model';
 	import type { Tooltips } from '$lib/tooltips';
 	import { computeLayout, type EdgeStyle, type LayoutCfg } from '$lib/graph/layout';
+	import { anchorFragment, anchorUrl, copyText, resolveAnchor } from '$lib/anchor';
 	import GraphSvg from '$lib/graph/GraphSvg.svelte';
 	import StateBody from './StateBody.svelte';
 
@@ -47,12 +48,50 @@
 	const selectedState = $derived(
 		selected ? (model.states.find((s) => s.name === selected) ?? null) : null
 	);
-	function select(name: string | null) {
+	function select(name: string | null, keepHash = false) {
 		const p = new URLSearchParams(page.url.searchParams);
 		if (name) p.set('state', name);
 		else p.delete('state');
-		goto(`?${p}`, { replaceState: true, keepFocus: true, noScroll: true });
+		// a user click drops a deep-link hash (`goto` with a query-only URL) — they've moved on;
+		// applying an anchor keeps it, so the URL keeps pointing at the anchored action
+		goto(`?${p}${keepHash ? location.hash : ''}`, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
 	}
+
+	// `#State/N` permalinks (see anchor.ts): a deep link selects the state (reusing the `?state=`
+	// mechanism + its pan-into-view effect) and flashes the anchored action in the sidebar
+	let flashAction = $state<number | null>(null);
+	$effect(() => {
+		if (flashAction == null) return;
+		const t = setTimeout(() => (flashAction = null), 1600);
+		return () => clearTimeout(t);
+	});
+	function applyAnchor() {
+		const a = resolveAnchor(
+			model.states.map((s) => s.name),
+			location.hash
+		);
+		if (!a) return;
+		flashAction = a.action;
+		// `selected` (page.url-derived) must not become a dependency of the caller's effect — the
+		// goto in select() would re-trigger it and re-flash the line on every selection
+		untrack(() => {
+			if (selected !== a.state) select(a.state, true);
+		});
+	}
+	function linkAnchor(state: string, action: number | null) {
+		const url = anchorUrl('graph', anchorFragment(state, action));
+		history.replaceState(history.state, '', url);
+		void copyText(url);
+		flashAction = action;
+	}
+	$effect(() => {
+		void model;
+		applyAnchor();
+	});
 
 	const layout = $derived(computeLayout(model, layoutCfg));
 
@@ -234,7 +273,12 @@
 	}
 </script>
 
-<svelte:window onpointermove={move} onpointerup={end} onpointercancel={end} />
+<svelte:window
+	onhashchange={applyAnchor}
+	onpointermove={move}
+	onpointerup={end}
+	onpointercancel={end}
+/>
 
 <div class="toolbar">
 	<span class="tb-label">transitions</span>
@@ -291,10 +335,24 @@
 		{#if selectedState}
 			<div class="sbhead">
 				<span class="state">{selectedState.name}</span>
+				<button
+					class="copy"
+					title="copy link to this state"
+					aria-label="copy link to state {selectedState.name}"
+					onclick={() => linkAnchor(selectedState.name, null)}>#</button
+				>
 				<button class="close" onclick={() => select(null)} aria-label="close">×</button>
 			</div>
 			<div class="code">
-				<StateBody state={selectedState} {model} {tooltips} onnavigate={select} emptyNote />
+				<StateBody
+					state={selectedState}
+					{model}
+					{tooltips}
+					onnavigate={select}
+					onanchor={linkAnchor}
+					flash={flashAction}
+					emptyNote
+				/>
 			</div>
 		{:else}
 			<div class="empty dim">click a state to see its actions & transitions</div>
@@ -402,7 +460,6 @@
 	.sbhead {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
 		gap: 0.5rem;
 		padding: 0.6rem 1rem;
 		border-bottom: 1px solid #333;
@@ -410,6 +467,19 @@
 	}
 	.sbhead .state {
 		font-weight: 600;
+	}
+	.copy {
+		background: none;
+		border: none;
+		color: var(--dim);
+		cursor: pointer;
+		font-size: 0.9rem;
+		line-height: 1;
+		padding: 0 0.2rem;
+		margin-left: auto;
+	}
+	.copy:hover {
+		color: var(--accent);
 	}
 	.close {
 		background: none;

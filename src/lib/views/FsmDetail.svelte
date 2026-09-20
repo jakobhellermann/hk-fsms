@@ -36,7 +36,13 @@
 		if (browser) localStorage.setItem(STORAGE_KEY, m);
 		const p = new URLSearchParams(page.url.searchParams);
 		p.set('mode', m);
-		goto(`${page.url.pathname}?${p}`, { replaceState: true, keepFocus: true, noScroll: true });
+		// keep a deep-link hash (`#State/N`) across the switch so the anchor re-applies in the
+		// new view — `goto` with a hash-less URL would drop it
+		goto(`${page.url.pathname}?${p}${browser ? location.hash : ''}`, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
 	}
 
 	const modelQuery = createQuery(() => ({
