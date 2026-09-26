@@ -1,0 +1,220 @@
+# UI Control
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Inventory/Map
+#   Menu_Title / _GameCameras/HudCamera/In-game/Inventory/Map
+
+fsm UI Control {
+  start Init
+  on PANE RESET → Pane Reset  // from any state
+  on WIDE MAP → Wide Map  // from any state
+  on MAP ZOOM → Disable Confirm  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    ActivateAllChildren(gameObject=var "World Map", activate=true)
+    ActivateAllChildren(gameObject=var "Pan Arrows", activate=false)
+    FadeNestedFadeGroup(Target=var "Wide Map", ToAlpha=1, FadeTime=0)
+    SetPosition2D(GameObject=var "World Map Fader", Vector=(0, 0), X=0, Y=0, Space=1, EveryFrame=false)
+    on FINISHED → Pane Reset
+  }
+
+  state Wide Map {
+  }
+
+  state Pane Reset {
+    ActivateGameObject(gameObject=var "Confirm Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Marker Cancel Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Marker Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Key Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Inactive
+  }
+
+  state Inactive {
+    SetBoolValue(boolVariable=var "Disable Zoom", boolValue=false, everyFrame=false)
+    TransformVector2(Transform=Self, Transformation=0, Vector=var "Keep Map Pos Local", StoreResult=var "Keep Map Pos World", EveryFrame=true)
+    SetPosition2D(GameObject=var "World Map Fader", Vector=var "Keep Map Pos World", X=0, Y=0, Space=1, EveryFrame=true)
+    on SETUP → Locked Zoom Reset
+  }
+
+  state Activate {
+    ActivateGameObject(gameObject=var "Confirm Action", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Marker Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetLanguageString(sheetName="UI", convName="CTRL_ZOOM_IN", storeValue=var "Confirm Text Str")
+    SetTextMeshProText(gameObject=var "Confirm Text", textString=var "Confirm Text Str")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="UI ACTIVE", delay=0, everyFrame=false)
+    ActivateInventoryPaneInput(Target=Self, Activate=true)
+    on FINISHED → Wide Map
+  }
+
+  state Map Zoom {
+    TransformVector2(Transform=Self, Transformation=0, Vector=var "Keep Map Pos Local", StoreResult=var "Keep Map Pos World", EveryFrame=true)
+    SetPosition2D(GameObject=var "World Map Fader", Vector=var "Keep Map Pos World", X=0, Y=0, Space=1, EveryFrame=true)
+    FadeGroupDown(target=Self, fast=false)
+    SetFsmBool(gameObject=var "Game Map", fsmName="Map FSM State", variableName="Display Next Area", setValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Locked Zoom", isTrue=→"QUICK", isFalse=(none), everyFrame=false)
+    SetFsmBool(gameObject=var "Inventory", fsmName="Inventory Control", variableName="Do Not Close", setValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Zoom Shortcut", isTrue=→"QUICK", isFalse=(none), everyFrame=false)
+    PlayAudioEvent(audioClip=ui_map_mode_zoom_in (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on ZOOMED IN → Zoomed In
+    on QUICK → Wait for Activate
+  }
+
+  state Zoomed In {
+    MapStartPan(target=var "Game Map")
+    BoolTest(boolVariable=var "Locked Zoom", isTrue=→"LOCKED ZOOM", isFalse=(none), everyFrame=false)
+    GetLanguageString(sheetName="UI", convName="CTRL_MARKERS", storeValue=var "Marker Text Str")
+    SetTextMeshProText(gameObject=var "Marker Text", textString=var "Marker Text Str")
+    SetMenuButtonIconAction(target=var "Confirm Action", menuAction=Cancel)
+    ActivateGameObject(gameObject=var "Confirm Action", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Marker Action", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetLanguageString(sheetName="UI", convName="CTRL_ZOOM_OUT", storeValue=var "Confirm Text Str")
+    SetTextMeshProText(gameObject=var "Confirm Text", textString=var "Confirm Text Str")
+    ListenForInventory(eventTarget=Self, wasPressed=→"UI CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"UI CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on UI CONFIRM → Have Markers?
+    on UI CANCEL → Zoom Out
+    on LOCKED ZOOM → Locked
+  }
+
+  state Zoom Out {
+    ActivateGameObject(gameObject=var "Confirm Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Marker Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateAllChildren(gameObject=var "Pan Arrows", activate=false)
+    MapStopPan(target=var "Game Map")
+    CallMethodProper(gameObject=Self, behaviour="InventoryMapManager", methodName="ZoomOut", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=ui_map_mode_zoom_out (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on ZOOMED OUT → Map Off
+  }
+
+  state Reset {
+    SetFsmGameObject(gameObject=Self, fsmName="Update Cursor", variableName="Item", setValue=var "Self", everyFrame=false)
+    ActivateGameObject(gameObject=var "Confirm Action", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetLanguageString(sheetName="UI", convName="CTRL_ZOOM_IN", storeValue=var "Confirm Text Str")
+    SetTextMeshProText(gameObject=var "Confirm Text", textString=var "Confirm Text Str")
+    SetMenuButtonIconAction(target=var "Confirm Action", menuAction=Submit)
+    SetFsmBool(gameObject=var "Inventory", fsmName="Inventory Control", variableName="Do Not Close", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="UPDATE CURSOR", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "Cursor", vector=(unset), x=-5.71, y=-7.05, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Wide Map
+  }
+
+  state Map Off {
+    CallMethodProper(gameObject=var "Game Map", behaviour="GameMap", methodName="CloseQuickMap", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Reset
+  }
+
+  state Have Markers? {
+    PlayerDataBoolTest(boolName="hasMarker", isTrue=(none), isFalse=→"CANCEL")
+    CallStaticMethod(className="CollectableItemManager", methodName="IsInHiddenMode", parameters=[], storeResult=var "Is Hidden", everyFrame=false)
+    BoolTest(boolVariable=var "Is Hidden", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Marker Select Menu
+    on CANCEL → Zoomed In
+  }
+
+  state Marker Select Menu {
+    OpenMarkerMenu(target=var "Map Marker Top")
+    MapStopPan(target=var "Game Map")
+    ActivateGameObject(gameObject=var "Confirm Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ListenForInventory(eventTarget=Self, wasPressed=→"UI CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    GetLanguageString(sheetName="UI", convName="CTRL_MARKER_PLACE", storeValue=var "Marker Text Str")
+    SetTextMeshProText(gameObject=var "Marker Text", textString=var "Marker Text Str")
+    ListenForMenuCancel(eventTarget=Self, wasPressed=→"UI CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on UI CANCEL → Marker Cancel
+  }
+
+  state Marker Cancel {
+    CloseMarkerMenu(target=var "Map Marker Top")
+    Wait(time=0.05, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Hide Cancel Button
+  }
+
+  state Do Zoom {
+    CallMethodProper(gameObject=Self, behaviour="InventoryMapManager", methodName="AutoZoomIn", parameters=[], storeResult=(unset var), EveryFrame=false)
+    GetLanguageString(sheetName="UI", convName="CTRL_MARKERS", storeValue=var "Marker Text Str")
+    SetTextMeshProText(gameObject=var "Marker Text", textString=var "Marker Text Str")
+    SetMenuButtonIconAction(target=var "Confirm Action", menuAction=Cancel)
+    ActivateGameObject(gameObject=var "Confirm Action", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Marker Action", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetLanguageString(sheetName="UI", convName="CTRL_ZOOM_OUT", storeValue=var "Confirm Text Str")
+    SetTextMeshProText(gameObject=var "Confirm Text", textString=var "Confirm Text Str")
+    FadeNestedFadeGroup(Target=var "World Map Fader", ToAlpha=1, FadeTime=0)
+    BoolTest(boolVariable=var "Zoom Shortcut", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    on FINISHED → Map Zoom
+  }
+
+  state Setup {
+    SetBoolValue(boolVariable=var "Locked Zoom", boolValue=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Wide Map", ToAlpha=1, FadeTime=0)
+    CallStaticMethod(className="CollectableItemManager", methodName="IsInHiddenMode", parameters=[], storeResult=var "Is Hidden", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Is Hidden", isTrue=→"LOCKED ZOOM", isFalse=(none), everyFrame=false)  // disabled
+    CallMethodProper(gameObject=var "Game Map", behaviour="GameMap", methodName="IsLostInAbyssPostMap", parameters=[], storeResult=var "Is Hidden", EveryFrame=false)  // disabled
+    BoolTest(boolVariable=var "Is Hidden", isTrue=→"LOCKED ZOOM", isFalse=(none), everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Zoom Shortcut", isTrue=→"AUTO ZOOM", isFalse=(none), everyFrame=false)
+    on AUTO ZOOM → Do Zoom
+    on ACTIVATE → Activate
+    on LOCKED ZOOM → Locked Zoom
+  }
+
+  state Wait for Activate {
+    SetBoolValue(boolVariable=var "Zoom Shortcut", boolValue=false, everyFrame=false)
+    TransformVector2(Transform=Self, Transformation=0, Vector=var "Keep Map Pos Local", StoreResult=var "Keep Map Pos World", EveryFrame=true)
+    SetPosition2D(GameObject=var "World Map Fader", Vector=var "Keep Map Pos World", X=0, Y=0, Space=1, EveryFrame=true)
+    on ACTIVATE → Activate 2
+  }
+
+  state Activate 2 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="UI ACTIVE", delay=0, everyFrame=false)
+    ActivateInventoryPaneInput(Target=Self, Activate=true)
+    on FINISHED → Zoomed In
+  }
+
+  state Locked Zoom {
+    SetBoolValue(boolVariable=var "Locked Zoom", boolValue=true, everyFrame=false)
+    on FINISHED → Do Zoom
+  }
+
+  state Locked {
+    FadeNestedFadeGroup(Target=var "World Map Fader", ToAlpha=1, FadeTime=0)
+    TransformVector2(Transform=Self, Transformation=0, Vector=var "Keep Map Pos Local", StoreResult=var "Keep Map Pos World", EveryFrame=true)
+    SetPosition2D(GameObject=var "World Map Fader", Vector=var "Keep Map Pos World", X=0, Y=0, Space=1, EveryFrame=true)
+  }
+
+  state Locked Zoom Reset {
+    BoolTest(boolVariable=var "Locked Zoom", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="InventoryMapManager", methodName="LockedZoomUndo", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Setup
+  }
+
+  state Disable Confirm {
+    ActivateGameObject(gameObject=var "Confirm Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Map Zoom
+  }
+
+  state Hide Cancel Button {
+    ActivateGameObject(gameObject=var "Marker Cancel Action", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Zoomed In
+  }
+
+  var Disable Zoom: bool = false
+  var Zoom Shortcut: bool = false
+  var Is Hidden: bool = false
+  var Locked Zoom: bool = false
+  var Confirm Text Str: string = ""
+  var Marker Text Str: string = ""
+  var Keep Map Pos Local: vector2 = (4.05, -7.37)
+  var Keep Map Pos World: vector2 = (0, 0)
+  var Confirm Action: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map/Confirm Action
+  var Confirm Text: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map/Confirm Action/Text
+  var Cursor: gameObject = <null>
+  var Inventory: gameObject = _GameCameras/HudCamera/In-game/Inventory
+  var Map Marker Top: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map/Map Markers
+  var Marker Action: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map/Map Marker Action
+  var Marker Text: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map/Map Marker Action/Text
+  var Pan Arrows: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map/Pan Arrows
+  var Self: gameObject = <null>
+  var Wide Map: gameObject = <null>
+  var World Map: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map
+  var Marker Cancel Action: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map/Marker Cancel Action
+  var World Map Fader: gameObject = <null>
+  var Key Action: gameObject = _GameCameras/HudCamera/In-game/Inventory/Map/World Map/Key Action
+}

@@ -1,0 +1,305 @@
+# Behaviour
+# 1 location(s):
+#   Under_17 / Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC
+
+fsm Behaviour {
+  start Init
+
+  state Init {
+    ActivateGameObject(gameObject=var "Shop Camlock Left", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Shop Camlock Right", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Start Pos
+  }
+
+  state Met? {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    PlayerDataVariableTest(VariableName="MetArchitect", ExpectedValue=false, IsExpectedEvent=→"FALSE", IsNotExpectedEvent=→"TRUE")
+    on FALSE → Is Act 3?
+    on TRUE → Melody Quest?
+  }
+
+  state Top Idle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Top Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AnimatorPlay(gameObject=var "Chair", stateName="Top Idle", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    on FINISHED → Wait For Approach
+  }
+
+  state Bottom Idle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Bottom Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AnimatorPlay(gameObject=var "Chair", stateName="Bottom Idle", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    SetProperty(targetProperty=Tk2dTalkAnimNPC.IdleAnim on Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC@Tk2dTalkAnimNPC, everyFrame=false)
+    ActivateTalkAnimNPC(Activate=true, StopInstantly=false, Target=Self)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Met Idle
+  }
+
+  state Start Pos {
+    PlayerDataVariableTest(VariableName="MetArchitect", ExpectedValue=false, IsExpectedEvent=→"BOTTOM", IsNotExpectedEvent=(none))
+    SetProperty(targetProperty=PlayMakerNPC.InteractLabel on Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC@PlayMakerNPC, everyFrame=false)
+    SendRandomEvent(events=[→"TOP", →"BOTTOM"], weights=[0.5, 0.5], delay=0)
+    on TOP → Top Idle
+    on BOTTOM → Start Bottom
+  }
+
+  state Met Idle {
+    CallMethodProper(gameObject=var "Working Effects", behaviour="PlayParticleEffects", methodName="PlayParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodOnExit(gameObject=var "Working Effects", behaviour="PlayParticleEffects", methodName="StopParticleSystems", parameters=[], storeResult=(unset var))
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=2, MinReactDelay=1.4, MaxReactDelay=1.8, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=Architect_work_loop (sfxdynamic_assets_areaunderstore.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=1)
+    on INTERACT → Met?
+    on SING → Sing
+    on STARTLE → Startle
+  }
+
+  state Meet Dlg {
+    SetPlayerDataVariable(VariableName="MetArchitect", SetValue=true)
+    SetProperty(targetProperty=PlayMakerNPC.InteractLabel on Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC@PlayMakerNPC, everyFrame=false)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Drop Down {
+    ActivateTalkAnimNPC(Activate=false, StopInstantly=true, Target=Self)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Travel Antic", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AnimatorPlay(gameObject=var "Chair", stateName="Retract", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    SetIntValue(intVariable=var "Retract Trigger Count", intValue=0, everyFrame=false)
+    ListenForAnimationEvent(Target=var "Chair", Response=→"IMPACT")
+    on IMPACT → Chair Impact
+  }
+
+  state Wait For Approach {
+    TriggerEnterEventSubscribe(trigger=Architect Scene/Retract Trigger@TriggerEnterEvent, triggerEnteredEvent=→"ENTER", triggerExitedEvent=(none), triggerStayedEvent=(none))
+    on ENTER → Wait
+  }
+
+  state Chair Impact {
+    IntOperator(integer1=var "Retract Trigger Count", integer2=1, operation=Add, storeResult=var "Retract Trigger Count", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Travel Impact", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CallMethodProper(gameObject=Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat, behaviour="JitterSelfForTime", methodName="StartTimedJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    IntCompare(integer1=var "Retract Trigger Count", integer2=2, equal=→"END", lessThan=(none), greaterThan=→"END", everyFrame=false)
+    ListenForAnimationEvent(Target=var "Chair", Response=→"IMPACT")
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on IMPACT → Chair Impact
+    on END → Wait for impact
+    on DROP → Replay Drop Down
+    on FINISHED → Replay Drop Down
+  }
+
+  state Shop Repeat Dlg {
+    RunDialogue(Sheet="Under", Key="ARCHITECT_SHOP_TALK_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Dlg End 2 {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Shop Up
+  }
+
+  state Dlg End 3 {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Met Idle
+  }
+
+  state Shop Up {
+    GetShopObject(StoreObject=var "Shop Object", Target=Self)
+    SendEventByName(eventTarget=GameObject(var "Shop Object"), sendEvent="SHOP UP", delay=0, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Hero Is Right", leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    BoolTestToGameObject(Test=var "Hero Is Right", ExpectedValue=true, TrueGameObject=var "Shop Camlock Right", FalseGameObject=var "Shop Camlock Left", StoreResult=var "Current Camlock", EveryFrame=false)
+    ActivateGameObject(gameObject=var "Current Camlock", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on SHOP CLOSED → Will Leave?
+  }
+
+  state Start Bottom {
+    ActivateGameObject(gameObject=Architect Scene/Chair/Retract Dust, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Bottom Idle
+  }
+
+  state Do Toolmaster Convo? {
+    GetIsCrestUnlocked(Crest=Toolmaster (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=(none), falseEvent=→"FALSE", storeValue=(unset))
+    PlayerDataVariableTest(VariableName="ArchitectTalkedCrest", ExpectedValue=false, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on TRUE → Toolmaster Dlg
+    on FALSE → Act 3 Repeat?
+  }
+
+  state Toolmaster Dlg {
+    SetPlayerDataVariable(VariableName="ArchitectTalkedCrest", SetValue=true)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_AFTER_SHRINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Webshot Dlg {
+    SetPlayerDataVariable(VariableName="ArchitectMentionedWebShot", SetValue=true)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_WEAVER_SHOOT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Wait {
+    WaitRandom(timeMin=1, timeMax=1.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Drop Down
+  }
+
+  state Melody Dlg {
+    SetPlayerDataVariable(VariableName="ArchitectMentionedMelody", SetValue=true)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_MELODY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Webshot? {
+    PlayerDataVariableTest(VariableName="ArchitectMentionedWebShot", ExpectedValue=true, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=(none))
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=1, IsCollected=→"TRUE", NotCollected=(none), ItemName="", Sprite=var "", Item=Broken SilkShot (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    on TRUE → Webshot Dlg
+    on FINISHED → Cogwork Heart?
+  }
+
+  state Melody Quest? {
+    PlayerDataBoolTest(boolName="HasMelodyArchitect", isTrue=→"FINISHED", isFalse=(none))
+    PlayerDataBoolTest(boolName="ArchitectMelodyReturnSeen", isTrue=→"FINISHED", isFalse=(none))
+    PlayerDataBoolTest(boolName="ArchitectMelodyReturnQueued", isTrue=→"RETURN", isFalse=(none))
+    PlayerDataBoolTest(boolName="ArchitectMentionedMelody", isTrue=→"FINISHED", isFalse=(none))
+    CheckQuestState(NotTrackedEvent=→"FINISHED", TrackedEvent=→"TRUE", CompletedEvent=→"FINISHED", Quest=Citadel Ascent Melodies (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle))
+    on TRUE → Melody Dlg
+    on FINISHED → Webshot?
+    on RETURN → Melody Return Dlg
+  }
+
+  state Act 3 Met? {
+    PlayerDataVariableTest(VariableName="blackThreadWorld", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FALSE")
+    PlayerDataVariableTest(VariableName="MetArchitectAct3", ExpectedValue=false, IsExpectedEvent=→"FALSE", IsNotExpectedEvent=→"TRUE")
+    on FALSE → Melody Quest?
+    on TRUE → Act 3 Meet Dlg
+  }
+
+  state Act 3 Meet Dlg {
+    SetPlayerDataVariable(VariableName="MetArchitect", SetValue=true)
+    SetPlayerDataVariable(VariableName="MetArchitectAct3", SetValue=true)
+    SetProperty(targetProperty=PlayMakerNPC.InteractLabel on Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC@PlayMakerNPC, everyFrame=false)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_MEET_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Will Leave? {
+    PlayerDataBoolTest(boolName="ArchitectWillLeave", isTrue=→"FINISHED", isFalse=(none))
+    CheckIfToolUnlocked(Tool=Cogwork Saw (dataassets_assets_assets/dataassets/tools/toolitems.bundle), trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    CheckIfToolUnlocked(Tool=Brolly Spike (dataassets_assets_assets/dataassets/tools/toolitems.bundle), trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    CheckIfToolUnlocked(Tool=Scuttlebrace (dataassets_assets_assets/dataassets/tools/toolitems.bundle), trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    PlayerDataBoolTest(boolName="PurchasedArchitectToolKit", isTrue=(none), isFalse=→"FINISHED")
+    GetIsCrestUnlocked(Crest=Toolmaster (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=1, IsCollected=(none), NotCollected=→"FINISHED", ItemName="", Sprite=var "", Item=Architect Key (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))  // disabled
+    PlayerDataBoolTest(boolName="HasMelodyArchitect", isTrue=(none), isFalse=→"FINISHED")
+    SendEvent(eventTarget=Self, sendEvent=→"TRUE", delay=0, everyFrame=false)
+    on TRUE → Will Leave Dlg
+    on FINISHED → Dlg End 3
+  }
+
+  state Will Leave Dlg {
+    SetPlayerDataVariable(VariableName="ArchitectWillLeave", SetValue=true)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_WILL_LEAVE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 3
+  }
+
+  state Cogwork Heart Dlg {
+    SetPlayerDataVariable(VariableName="ArchitectMentionedCogHeart", SetValue=true)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_COG_HEART", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Cogwork Heart? {
+    PlayerDataVariableTest(VariableName="ArchitectMentionedCogHeart", ExpectedValue=true, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=(none))
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=2, IsCollected=→"TRUE", NotCollected=(none), ItemName="", Sprite=var "", Item=Cog Heart Pieces (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    on TRUE → Cogwork Heart Dlg
+    on FINISHED → Do Toolmaster Convo?
+  }
+
+  state Is Act 3? {
+    PlayerDataVariableTest(VariableName="blackThreadWorld", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    PlayerDataVariableTest(VariableName="MetArchitectAct3", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"ACT 3 MEET")
+    on FINISHED → Meet Dlg
+    on ACT 3 MEET → Act 3 Meet Dlg
+  }
+
+  state Replay Drop Down {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Travel Antic", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ListenForAnimationEvent(Target=var "Chair", Response=→"IMPACT")
+    on IMPACT → Chair Impact
+  }
+
+  state Wait for impact {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Bottom Idle
+  }
+
+  state Act 3 Repeat? {
+    PlayerDataVariableTest(VariableName="blackThreadWorld", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Melody Gained Convo?
+    on TRUE → Shop Repeat Dlg Act 3
+  }
+
+  state Shop Repeat Dlg Act 3 {
+    RunDialogue(Sheet="Under", Key="ARCHITECT_SHOP_TALK_REPEAT_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Sing {
+    ActivateTalkAnimNPC(Activate=false, StopInstantly=false, Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Architect_sing (sfxdynamic_assets_areaunderstore.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=2, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Sing End
+  }
+
+  state Sing Return {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Bottom Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateTalkAnimNPC(Activate=true, StopInstantly=false, Target=Self)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Met Idle
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWaitV2(Target=Self, ClipName="Sing End", AnimationCompleteEvent=(none))
+    on FINISHED → Sing Return
+  }
+
+  state Startle {
+    ActivateTalkAnimNPC(Activate=false, StopInstantly=false, Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    Wait(time=0.3, finishEvent=→"CANCEL", realTime=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Architect_startle (sfxdynamic_assets_areaunderstore.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on CANCEL → Sing End
+  }
+
+  state Melody Return Dlg {
+    SetPlayerDataVariable(VariableName="ArchitectMelodyReturnSeen", SetValue=true)
+    SetPlayerDataVariable(VariableName="ArchitectMelodyReturnQueued", SetValue=false)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_MELODY_RETURN", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  state Melody Gained Convo? {
+    PlayerDataBoolMultiTest(boolTests=[{boolName="HasMelodyArchitect", inputBool=(unset), expectedValue=true, storeValue=(unset)}, {boolName="ArchitectMelodyGainSeen", inputBool=(unset), expectedValue=false, storeValue=(unset)}], storeValue=(unset), passedEvent=→"TRUE", failedEvent=(none))
+    on FINISHED → Shop Repeat Dlg
+    on TRUE → Melody Gained Dlg
+  }
+
+  state Melody Gained Dlg {
+    SetPlayerDataVariable(VariableName="ArchitectMelodyGainSeen", SetValue=true)
+    RunDialogue(Sheet="Under", Key="ARCHITECT_MELODY_GAINED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End 2
+  }
+
+  var Retract Trigger Count: int = 0
+  var Hero Is Right: bool = false
+  var Did Melody Dlg: bool = false
+  var Already Mentioned Melody: bool = false
+  var Dlg: string = ""
+  var Chair: gameObject = Architect Scene/Chair
+  var Shop Object: gameObject = <null>
+  var Shop Camlock Right: gameObject = Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC/Shop Camlock Right
+  var Shop Camlock Left: gameObject = Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC/Shop Camlock Left
+  var Current Camlock: gameObject = <null>
+  var Working Effects: gameObject = Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC/Working Effects
+  var Audio Loop Voice: gameObject = Architect Scene/Chair/pillar E/pillar D/pillar C/pillar B/pillar A/seat/Architect NPC/Audio Loop Voice
+}

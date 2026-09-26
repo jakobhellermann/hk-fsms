@@ -1,0 +1,349 @@
+# Control
+# 1 location(s):
+#   herodynamic_assets_all.bundle / Tool Dust Bomb New
+
+// uses template: bomb_tool_control
+fsm Control {
+  start Init
+  on TINK DOWN L → Tink Down L  // from any state
+  on TINK DOWN R → Tink Down R  // from any state
+  on TINK LEFT → Tink Left  // from any state
+  on TINK RIGHT → Tink Right  // from any state
+  on TINK UP → Tink Up  // from any state
+  on DISABLE → Reset  // from any state
+  on TORNADO → Tornado Blow Away  // from any state
+  on SWALLOW → Recycle  // from any state
+
+  state Init {
+    ActivateGameObject(gameObject=var "Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetOwner(storeGameObject=var "Self")
+    FindNamedChild(gameObject=Self, storeResult=var "Sprite")
+    FindNamedChild(gameObject=Self, storeResult=var "Interactor")
+    FindNamedChild(gameObject=Self, storeResult=var "Lit Fuse Loop")
+    FindNamedChild(gameObject=Self, storeResult=var "Vignette Cutout")
+    FindNamedChild(gameObject=var "Sprite", storeResult=var "Sprite Art")
+    Tk2dSpriteGetColor(gameObject=var "Sprite Art", color=var "Initial Color", everyframe=false)
+    FindNamedChild(gameObject=var "Sprite", storeResult=var "Pt Fuse")
+    FindNamedChild(gameObject=var "Sprite", storeResult=var "Pt Fuse Poison")
+    SetGameObject(variable=var "Pt Fuse Current", gameObject=var "Pt Fuse", everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetIntValue(intVariable=var "Bounces", intValue=2, everyFrame=false)
+    SetIntValue(intVariable=var "Slashes", intValue=3, everyFrame=false)
+    ActivateGameObject(gameObject=var "Interactor", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Vignette Cutout", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetGravity2dScale(gameObject=Self, storeGravity=var "Initial Gravity", everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Lit", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "In Water", boolValue=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Record Init Velocity
+  }
+
+  state Air {
+    ActivateGameObject(gameObject=var "Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ProjectileSquashV2(gameObject=Self, stretchFactor=0.75, stretchMinY=0.9, stretchMaxX=1.3, scaleModifier=1.1, otherGameObject=var "Sprite", everyFrame=true)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=var "Sprite", everyFrame=true)
+    ClampSpeed(gameObject=Self, speedMin=(unset), speedMax=50, everyFrame=false)
+    GetVelocity2dNotZeroV2(gameObject=Self, vector=var "Velocity", x=(unset), y=(unset), space=0, everyFrame=true)
+    CheckCollisionSideEnterV2(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL R", bottomHitEvent=→"GROUND", leftHitEvent=→"WALL L", otherLayer=false, otherLayerNumber=0, ignoreTriggers=true, velocity2D=var "Velocity")
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL R", bottomHitEvent=→"GROUND", leftHitEvent=→"WALL L", otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Water Surface", collideLayer=Soft Terrain(25), sendEvent=→"WATER", storeCollider=var "Surface Water")
+    ReceivedDamage(Target=Self, collideTag="", sendEvent=(none), sendEventHeavy=(none), sendEventSpikes=→"INSTA EXPLODE", sendEventLava=→"INSTA EXPLODE", sendEventLightning=(none), storeGameObject=var "", ignoreAcid=false, ignoreLava=false, ignoreWater=false, ignoreHunterWeapon=false, ignoreTraps=false, ignoreNail=false, ignoreSpikes=false, storeDamageDealt=(unset), storeDirection=(unset), storeMagnitudeMultiplier=(unset), firstHitOnly=false)
+    on GROUND → Bounce Ground
+    on WALL L → Bounce Wall L
+    on WALL R → Bounce Wall R
+    on ENEMY → Explode Antic
+    on INSTA EXPLODE → Explode
+    on WATER → In Water
+  }
+
+  state Bounce Ground {
+    SetRotation(gameObject=var "Sprite", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=90, space=0, everyFrame=false, lateUpdate=false)
+    GetVector2XY(vector2Variable=var "Velocity", storeX=var "X Velocity", storeY=var "Y Velocity", everyFrame=false)
+    FloatMultiplyV2(floatVariable=var "X Velocity", multiplyBy=0.9, everyFrame=false, fixedUpdate=false)
+    FloatMultiplyV2(floatVariable=var "Y Velocity", multiplyBy=-0.75, everyFrame=false, fixedUpdate=false)
+    FloatClamp(floatVariable=var "Y Velocity", minValue=0.1, maxValue=99999, everyFrame=false)
+    on FINISHED → Bounce Impact
+  }
+
+  state Bounce Wall L {
+    SetRotation(gameObject=var "Sprite", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    GetVector2XY(vector2Variable=var "Velocity", storeX=var "X Velocity", storeY=var "Y Velocity", everyFrame=false)
+    FloatMultiplyV2(floatVariable=var "X Velocity", multiplyBy=-0.75, everyFrame=false, fixedUpdate=false)
+    FloatAdd(floatVariable=var "Y Velocity", add=4, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "X Velocity", minValue=0.1, maxValue=99999, everyFrame=false)
+    on FINISHED → Bounce Impact
+  }
+
+  state Bounce Wall R {
+    SetRotation(gameObject=var "Sprite", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=180, space=0, everyFrame=false, lateUpdate=false)
+    GetVector2XY(vector2Variable=var "Velocity", storeX=var "X Velocity", storeY=var "Y Velocity", everyFrame=false)
+    FloatMultiplyV2(floatVariable=var "X Velocity", multiplyBy=-0.75, everyFrame=false, fixedUpdate=false)
+    FloatAdd(floatVariable=var "Y Velocity", add=4, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "X Velocity", minValue=-999999, maxValue=-0.1, everyFrame=false)
+    on FINISHED → Bounce Impact
+  }
+
+  state Bounce Impact {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.06, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Bounce")
+    SetScale(gameObject=var "Sprite", vector=(unset), x=1, y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    IntAdd(intVariable=var "Bounces", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Bounces", integer2=0, equal=→"EXPLODE", lessThan=→"EXPLODE", greaterThan=(none), everyFrame=false)
+    on FINISHED → Bounce Launch
+    on EXPLODE → Explode Antic
+    on ENEMY → Explode Antic
+    on INSTA EXPLODE → Explode
+  }
+
+  state Bounce Launch {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=var "Y Velocity", everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    BoolTest(boolVariable=var "Is Lit", isTrue=(none), isFalse=→"LIGHT FUSE", everyFrame=false)  // disabled
+    on FINISHED → Light Fuse
+    on LIGHT FUSE → Light Fuse
+  }
+
+  state Explode {
+    AudioStop(gameObject=var "Lit Fuse Loop", fadeTime=0)
+    ActivateGameObject(gameObject=var "Vignette Cutout", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SpawnObjectFromGlobalPool(gameObject=var "Current Explosion Prefab", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Explosion")
+    SetPosition(gameObject=var "Explosion", vector=(unset), x=(unset), y=(unset), z=0, space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Interactor", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "In Sand", isTrue=→"SAND", isFalse=(none), everyFrame=false)
+    on SAND → Sand Explode
+    on FINISHED → Recycle
+  }
+
+  state Explode Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    Tk2dPlayFrame(gameObject=var "Sprite Art", frame=0)
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Lit")
+    SetScale(gameObject=var "Sprite", vector=(unset), x=1, y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    Wait(time=0.07, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Interactor", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Water Dust Explode
+  }
+
+  state Idle Anim {
+    PlayParticleEmitter(gameObject=var "Pt Fuse Current", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=bone_hunter_fly_throw_spear (sfxstatic_assets_areaant.bundle), pitchMin=1.25, pitchMax=1.25, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlaySimple(gameObject=var "Lit Fuse Loop", volume=(unset), oneShotClip=<null>)
+    SetGameObject(variable=var "Current Explosion Prefab", gameObject=var "Explosion Prefab", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Idle")
+    on FINISHED → Air
+  }
+
+  state Tink Up {
+    BoolTest(boolVariable=var "Slashed", isTrue=→"INSTA EXPLODE", isFalse=(none), everyFrame=false)  // disabled
+    IntAdd(intVariable=var "Slashes", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Slashes", integer2=0, equal=→"INSTA EXPLODE", lessThan=→"INSTA EXPLODE", greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Slashed", boolValue=true, everyFrame=false)
+    RandomFloat(min=85, max=95, storeResult=var "Angle")
+    RandomFloat(min=35, max=40, storeResult=var "Speed")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    SetIntValue(intVariable=var "Bounces", intValue=0, everyFrame=false)  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Lit")  // disabled
+    on FINISHED → Light Fuse
+    on INSTA EXPLODE → Explode Antic
+  }
+
+  state Tink Right {
+    BoolTest(boolVariable=var "Slashed", isTrue=→"INSTA EXPLODE", isFalse=(none), everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Slashed", boolValue=true, everyFrame=false)  // disabled
+    RandomFloat(min=35, max=40, storeResult=var "Speed")  // disabled
+    IntAdd(intVariable=var "Slashes", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Slashes", integer2=0, equal=→"INSTA EXPLODE", lessThan=→"INSTA EXPLODE", greaterThan=(none), everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=30, speed=35, everyFrame=false)
+    SetIntValue(intVariable=var "Bounces", intValue=0, everyFrame=false)  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Lit")  // disabled
+    on FINISHED → Light Fuse
+    on INSTA EXPLODE → Explode
+  }
+
+  state Tink Left {
+    BoolTest(boolVariable=var "Slashed", isTrue=→"INSTA EXPLODE", isFalse=(none), everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Slashed", boolValue=true, everyFrame=false)  // disabled
+    RandomFloat(min=35, max=40, storeResult=var "Speed")  // disabled
+    IntAdd(intVariable=var "Slashes", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Slashes", integer2=0, equal=→"INSTA EXPLODE", lessThan=→"INSTA EXPLODE", greaterThan=(none), everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=150, speed=35, everyFrame=false)
+    SetIntValue(intVariable=var "Bounces", intValue=0, everyFrame=false)  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Lit")  // disabled
+    on FINISHED → Light Fuse
+    on INSTA EXPLODE → Explode
+  }
+
+  state Tink Down R {
+    BoolTest(boolVariable=var "Slashed", isTrue=→"INSTA EXPLODE", isFalse=(none), everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Slashed", boolValue=true, everyFrame=false)  // disabled
+    RandomFloat(min=35, max=40, storeResult=var "Speed")  // disabled
+    IntAdd(intVariable=var "Slashes", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Slashes", integer2=0, equal=→"INSTA EXPLODE", lessThan=→"INSTA EXPLODE", greaterThan=(none), everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=305, speed=50, everyFrame=false)
+    SetIntValue(intVariable=var "Bounces", intValue=0, everyFrame=false)  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Lit")  // disabled
+    on FINISHED → Light Fuse
+    on INSTA EXPLODE → Explode
+  }
+
+  state Tink Down L {
+    BoolTest(boolVariable=var "Slashed", isTrue=→"INSTA EXPLODE", isFalse=(none), everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Slashed", boolValue=true, everyFrame=false)  // disabled
+    RandomFloat(min=35, max=40, storeResult=var "Speed")  // disabled
+    IntAdd(intVariable=var "Slashes", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Slashes", integer2=0, equal=→"INSTA EXPLODE", lessThan=→"INSTA EXPLODE", greaterThan=(none), everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=235, speed=50, everyFrame=false)
+    SetIntValue(intVariable=var "Bounces", intValue=0, everyFrame=false)  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Lit")  // disabled
+    on FINISHED → Light Fuse
+    on INSTA EXPLODE → Explode
+  }
+
+  state Type {
+    BoolTest(boolVariable=var "Dust", isTrue=→"DUST", isFalse=→"EXPLODE", everyFrame=false)
+    on EXPLODE → Set Explode
+    on DUST → Set Dust
+  }
+
+  state Set Explode {
+    SetStringValue(stringVariable=var "Clip Idle", stringValue="Bomb Idle", everyFrame=false)
+    SetStringValue(stringVariable=var "Clip Bounce", stringValue="Bomb Bounce", everyFrame=false)
+    SetStringValue(stringVariable=var "Clip Lit", stringValue="Bomb Lit", everyFrame=false)
+    SetGameObject(variable=var "Explosion Prefab", gameObject=Tool_pinpilo_explosion, everyFrame=false)
+    SetGameObject(variable=var "Explosion Prefab Poison", gameObject=Tool_pinpilo_explosion_poison, everyFrame=false)
+    SetGameObject(variable=var "Water Explosion Prefab", gameObject=Tool_pinpilo_explosion_water, everyFrame=false)
+    on FINISHED → Poison?
+  }
+
+  state Set Dust {
+    SetStringValue(stringVariable=var "Clip Idle", stringValue="Dust Bomb Idle", everyFrame=false)
+    SetStringValue(stringVariable=var "Clip Bounce", stringValue="Dust Bomb Bounce", everyFrame=false)
+    SetStringValue(stringVariable=var "Clip Lit", stringValue="Dust Bomb Lit", everyFrame=false)
+    SetGameObject(variable=var "Explosion Prefab", gameObject=Tool_dustpilo_explosion, everyFrame=false)
+    SetGameObject(variable=var "Explosion Prefab Poison", gameObject=Tool_dustpilo_explosion_poison, everyFrame=false)
+    SetGameObject(variable=var "Water Explosion Prefab", gameObject=Tool_dustpilo_explosion_water, everyFrame=false)
+    on FINISHED → Poison?
+  }
+
+  state In Water {
+    SetGameObject(variable=var "Current Explosion Prefab", gameObject=var "Water Explosion Prefab", everyFrame=false)
+    ActivateGameObject(gameObject=var "Vignette Cutout", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Interactor", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "In Water", boolValue=true, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    StopParticleEmitter(gameObject=var "Pt Fuse Current")
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Bounce")
+    Tk2dSpriteSetColor(gameObject=var "Sprite Art", color=(0.6600346, 0.7663554, 0.8014706, 1), everyframe=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioStop(gameObject=var "Lit Fuse Loop", fadeTime=0)
+    PlayAudioEvent(audioClip=automaton_trapdoor_spawner_steam (sfxstatic_assets_shared.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Explode Antic
+  }
+
+  state Reset {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Initial Gravity")
+    SetBoolValue(boolVariable=var "In Sand", boolValue=false, everyFrame=false)
+    Tk2dSpriteSetColor(gameObject=var "Sprite Art", color=var "Initial Color", everyframe=false)
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Sand Explode {
+    SpawnObjectFromGlobalPool(gameObject=Sand_explosion_effects, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    on FINISHED → Recycle
+  }
+
+  state Light Fuse {
+    PlayAudioEvent(audioClip=hot_coal_damage (sfxstatic_assets_shared.bundle), pitchMin=1.25, pitchMax=1.25, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=var "Sprite Art", animLibName="", clipName=var "Clip Lit")
+    SetBoolValue(boolVariable=var "Is Lit", boolValue=true, everyFrame=false)
+    on FINISHED → Air
+  }
+
+  state Tornado Blow Away {
+    FlingObject(flungObject=Self, speedMin=25, speedMax=30, angleMin=50, angleMax=130)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    IntAdd(intVariable=var "Bounces", add=-2, everyFrame=false)
+    on FINISHED → Air
+  }
+
+  state Water Dust Explode {
+    BoolTest(boolVariable=var "Dust", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BoolTest(boolVariable=var "In Water", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=var "Explosion Prefab", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Explosion")
+    SetPosition(gameObject=var "Explosion", vector=(unset), x=(unset), y=(unset), z=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Water Maggot Explode?
+  }
+
+  state Water Maggot Explode? {
+    BoolTest(boolVariable=var "In Water", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    GetParent(gameObject=var "Surface Water", storeResult=var "Surface Water")
+    GetPosition2D(gameObject=Self, vector=var "Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Surface Water", behaviour="MaggotRegion", methodName="ReportExplosion", parameters=[var "Pos"], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Explode
+  }
+
+  state Poison? {
+    CheckIfToolEquipped(Tool=Poison Pouch (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    SetGameObject(variable=var "Pt Fuse Current", gameObject=var "Pt Fuse", everyFrame=false)
+    SetGameObject(variable=var "Explosion Prefab", gameObject=var "Explosion Prefab", everyFrame=false)
+    SetGameObject(variable=var "Pt Fuse Current", gameObject=var "Pt Fuse Poison", everyFrame=false)
+    SetGameObject(variable=var "Explosion Prefab", gameObject=var "Explosion Prefab Poison", everyFrame=false)
+    on FINISHED → Idle Anim
+  }
+
+  state Record Init Velocity {
+    SetVector2Value(vector2Variable=var "Velocity", vector2Value=(-14, 20), everyFrame=false)
+    SendEventByScale(gameObject=var "Hero", eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    SetVector2Value(vector2Variable=var "Velocity", vector2Value=(14, 20), everyFrame=false)
+    on FINISHED → Type
+  }
+
+  var Dust: bool = true
+  var Damager: gameObject = Tool Dust Bomb New/Enemy Detector
+
+  var X Velocity: float = 0
+  var Y Velocity: float = 0
+  var Angle: float = 0
+  var Speed: float = 0
+  var Initial Gravity: float = 0
+  var Bounces: int = 2
+  var Slashes: int = 0
+  var Slashed: bool = false
+  var In Sand: bool = false
+  var Is Lit: bool = false
+  var In Water: bool = false
+  var Clip Idle: string = "Bomb Idle"
+  var Clip Bounce: string = "Bomb Bounce"
+  var Clip Lit: string = "Bomb Lit"
+  var Velocity: vector2 = (0, 0)
+  var Pos: vector2 = (0, 0)
+  var Initial Color: color = (0, 0, 0, 1)
+  var Current Explosion Prefab: gameObject = <null>
+  var Explosion: gameObject = <null>
+  var Explosion Prefab: gameObject = Tool_pinpilo_explosion
+  var Interactor: gameObject = <null>
+  var Lit Fuse Loop: gameObject = <null>
+  var Pt Fuse Current: gameObject = <null>
+  var Self: gameObject = Tool Bomb
+  var Sprite: gameObject = <null>
+  var Sprite Art: gameObject = <null>
+  var Surface Water: gameObject = <null>
+  var Water Explosion Prefab: gameObject = <null>
+  var Pt Fuse: gameObject = <null>
+  var Pt Fuse Poison: gameObject = <null>
+  var Explosion Prefab Poison: gameObject = <null>
+  var Vignette Cutout: gameObject = <null>
+}

@@ -1,0 +1,275 @@
+# Lift Control
+# 1 location(s):
+#   Ruins1_03 / _Scenery/Ruins Lift 1
+
+fsm Lift Control {
+  start Pause
+  on CALL → Get Call  // from any state
+
+  state Init {
+    SetFloatValue(floatVariable=var "Move Speed Neg", floatValue=var "Move Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Move Speed Neg", multiplyBy=-1, everyFrame=false)
+    SetParent(gameObject=var "BG Chain L", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "BG Chain R", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Get Init Pos
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Called", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="Deactivate", parameters=[], storeResult=(unset var))
+    on CONTROL DOWN → Get Pos Down
+    on CONTROL UP → Get Pos Up
+  }
+
+  state Get Pos Down {
+    SetIntValue(intVariable=var "Next Position", intValue=var "Current Position", everyFrame=false)
+    IntAdd(intVariable=var "Next Position", add=1, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="KeepInBounds", parameters=[var "Next Position"], storeResult=var "Next Position")
+    SetIntValue(intVariable=var "Value", intValue=var "Next Position", everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="GetPositionY", parameters=[var "Next Position"], storeResult=var "Destination Y")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetSpriteRenderer(gameObject=var "Down Light", active=true)
+    SetSpriteRenderer(gameObject=var "Up Light", active=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=lift_activate (sharedassets7.assets), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Move Down Start
+    on CONTROL UP → Swerve Up
+  }
+
+  state Move Down {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Destination Y", tolerance=0, equal=→"ARRIVED", lessThan=→"ARRIVED", greaterThan=(none), everyFrame=true)
+    TranslateV2(gameObject=Self, vector=(unset), x=(unset), y=var "Move Speed Neg", z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false, alwaysOnStart=false, yMin=var "Destination Y", yMax=(unset))
+    BoolTest(boolVariable=var "Hero Bonk", isTrue=→"BONK", isFalse=(none), everyFrame=true)
+    SendEventByName(eventTarget=GameObject(var "Control Lever"), sendEvent="CAN HIT", delay=0, everyFrame=false)
+    on ARRIVED → Arrive
+    on CONTROL UP → Swerve Up
+    on BONK → Bonk
+  }
+
+  state Arrive {
+    AudioStop(gameObject=Self)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=lift_arrive (sharedassets7.assets), pitchMin=0.7, pitchMax=0.7, volume=1, delay=0, storePlayer=<null>)
+    SetIntValue(intVariable=var "Current Position", intValue=var "Next Position", everyFrame=false)
+    StopLiftChain(target=var "BG Chain L", everyFrame=false)
+    StopLiftChain(target=var "BG Chain R", everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Destination Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    SendEventToRegister(eventName="LIFT STOP")
+    SendEventByName(eventTarget=FSMComponent, sendEvent="LIFT STOP", delay=0, everyFrame=false)  // disabled
+    SetSpriteRenderer(gameObject=var "Down Light", active=false)
+    SetSpriteRenderer(gameObject=var "Up Light", active=false)
+    SetCollider(gameObject=var "Enemy Crusher", active=false)
+    on FINISHED → At Terminus?
+  }
+
+  state At Terminus? {
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="IsCurrentPositionTerminus", parameters=[var "Current Position"], storeResult=var "At Terminus")
+    BoolTest(boolVariable=var "At Terminus", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    GetFsmBool(gameObject=var "Control Lever", fsmName="Control Lever", variableName="Going Down", storeValue=var "Going Down", everyFrame=false)
+    BoolFlip(boolVariable=var "Going Down")
+    SetFsmBool(gameObject=var "Control Lever", fsmName="Control Lever", variableName="Going Down", setValue=var "Going Down", everyFrame=false)
+    on FINISHED → Arrive Shake
+  }
+
+  state Get Pos Up {
+    SetIntValue(intVariable=var "Next Position", intValue=var "Current Position", everyFrame=false)
+    IntAdd(intVariable=var "Next Position", add=-1, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="KeepInBounds", parameters=[var "Next Position"], storeResult=var "Next Position")
+    SetIntValue(intVariable=var "Value", intValue=var "Next Position", everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="GetPositionY", parameters=[var "Next Position"], storeResult=var "Destination Y")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetSpriteRenderer(gameObject=var "Down Light", active=false)
+    SetSpriteRenderer(gameObject=var "Up Light", active=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=lift_activate (sharedassets7.assets), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Move Up Start
+    on CONTROL DOWN → Swerve Down
+  }
+
+  state Move Up {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Destination Y", tolerance=0, equal=→"ARRIVED", lessThan=(none), greaterThan=→"ARRIVED", everyFrame=true)
+    TranslateV2(gameObject=Self, vector=(unset), x=(unset), y=var "Move Speed", z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false, alwaysOnStart=false, yMin=(unset), yMax=var "Destination Y")
+    SendEventByName(eventTarget=GameObject(var "Control Lever"), sendEvent="CAN HIT", delay=0, everyFrame=false)
+    on ARRIVED → Arrive
+    on CONTROL DOWN → Swerve Down
+  }
+
+  state Swerve Up {
+    AudioStop(gameObject=Self)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=lift_arrive (sharedassets7.assets), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=lift_activate (sharedassets7.assets), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    iTweenShakePosition(gameObject=Self, id="", vector=(0.08, 0, 0), time=0.5, delay=0, loopType=none, space=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=false, loopDontFinish=false)
+    StopLiftChain(target=var "BG Chain L", everyFrame=false)
+    StopLiftChain(target=var "BG Chain R", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    IntAdd(intVariable=var "Next Position", add=-1, everyFrame=false)
+    SetIntValue(intVariable=var "Value", intValue=var "Next Position", everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="GetPositionY", parameters=[var "Next Position"], storeResult=var "Destination Y")
+    SetSpriteRenderer(gameObject=var "Down Light", active=false)
+    SetSpriteRenderer(gameObject=var "Up Light", active=true)
+    SetCollider(gameObject=var "Enemy Crusher", active=false)
+    on FINISHED → Move Up Start
+  }
+
+  state Swerve Down {
+    AudioStop(gameObject=Self)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=lift_arrive (sharedassets7.assets), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=lift_activate (sharedassets7.assets), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    iTweenShakePosition(gameObject=Self, id="", vector=(0.08, 0, 0), time=0.5, delay=0, loopType=none, space=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=false, loopDontFinish=false)
+    StopLiftChain(target=var "BG Chain L", everyFrame=false)
+    StopLiftChain(target=var "BG Chain R", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    IntAdd(intVariable=var "Next Position", add=1, everyFrame=false)
+    SetIntValue(intVariable=var "Value", intValue=var "Next Position", everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="GetPositionY", parameters=[var "Next Position"], storeResult=var "Destination Y")
+    SetSpriteRenderer(gameObject=var "Down Light", active=true)
+    SetSpriteRenderer(gameObject=var "Up Light", active=false)
+    SetCollider(gameObject=var "Enemy Crusher", active=false)
+    on FINISHED → Move Down Start
+  }
+
+  state Get Call {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="LIFT STOP", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="LIFT STOP")
+    SetIntValue(intVariable=var "Next Position", intValue=var "Call Stop", everyFrame=false)
+    SetIntValue(intVariable=var "Value", intValue=var "Next Position", everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="GetPositionY", parameters=[var "Next Position"], storeResult=var "Destination Y")
+    SetCollider(gameObject=var "Enemy Crusher", active=false)
+    StopLiftChain(target=var "BG Chain L", everyFrame=false)
+    StopLiftChain(target=var "BG Chain R", everyFrame=false)
+    SetSpriteRenderer(gameObject=var "Down Light", active=false)
+    SetSpriteRenderer(gameObject=var "Up Light", active=false)
+    SetBoolValue(boolVariable=var "Called", boolValue=true, everyFrame=false)
+    on FINISHED → Check Call Dir
+    on CONTROL UP → Get Pos Up
+    on CONTROL DOWN → Get Pos Down
+  }
+
+  state Check Call Dir {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Self Y", float2=var "Destination Y", tolerance=0.1, equal=→"CALL CANCEL", lessThan=→"CALL UP", greaterThan=→"CALL DOWN", everyFrame=false)
+    on CALL UP → Call Up
+    on CALL DOWN → Call Down
+    on CALL CANCEL → Idle
+  }
+
+  state Call Up {
+    SetSpriteRenderer(gameObject=var "Down Light", active=false)
+    SetSpriteRenderer(gameObject=var "Up Light", active=true)
+    SendEventByName(eventTarget=GameObject(var "Control Lever"), sendEvent="MOVE UP", delay=0, everyFrame=false)
+    on FINISHED → Move Up Start
+  }
+
+  state Call Down {
+    SetSpriteRenderer(gameObject=var "Down Light", active=true)
+    SetSpriteRenderer(gameObject=var "Up Light", active=false)
+    SendEventByName(eventTarget=GameObject(var "Control Lever"), sendEvent="MOVE DOWN", delay=0, everyFrame=false)
+    on FINISHED → Move Down Start
+  }
+
+  state Bonk {
+    SetSpriteRenderer(gameObject=var "Down Light", active=false)
+    SetSpriteRenderer(gameObject=var "Up Light", active=true)
+    SendEventByName(eventTarget=GameObject(var "Control Lever"), sendEvent="MOVE UP", delay=0, everyFrame=false)
+    on FINISHED → Swerve Up
+  }
+
+  state Pause {
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="Deactivate", parameters=[], storeResult=(unset var))
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Get Init Pos {
+    SetIntValue(intVariable=var "Current Position", intValue=var "Value", everyFrame=false)
+    IntCompare(integer1=var "Current Position", integer2=0, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SetIntValue(intVariable=var "Current Position", intValue=var "Initial Position", everyFrame=false)
+    on FINISHED → Move to Init Pos
+  }
+
+  state Move to Init Pos {
+    CallMethodProper(gameObject=Self, behaviour="RuinsLift", methodName="GetPositionY", parameters=[var "Current Position"], storeResult=var "Destination Y")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Destination Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    IntCompare(integer1=var "Current Position", integer2=1, equal=→"TOP", lessThan=→"TOP", greaterThan=→"NOT TOP", everyFrame=false)
+    on TOP → At Top
+    on NOT TOP → Not At Top
+  }
+
+  state At Top {
+    SetFsmBool(gameObject=var "Control Lever", fsmName="Control Lever", variableName="Going Down", setValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Not At Top {
+    SetFsmBool(gameObject=var "Control Lever", fsmName="Control Lever", variableName="Going Down", setValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Arrive Shake {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    iTweenShakePosition(gameObject=Self, id="", vector=(0.08, 0, 0), time=0.5, delay=0, loopType=none, space=0, axis=none, startEvent=→"FINISHED", finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=false)
+    on FINISHED → Idle
+  }
+
+  state Move Up Start {
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="Activate", parameters=[], storeResult=(unset var))
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    MoveLiftChain(goUp=true, target=var "BG Chain R", everyFrame=false)
+    MoveLiftChain(goUp=false, target=var "BG Chain L", everyFrame=false)
+    SetSpriteRenderer(gameObject=var "Down Light", active=false)
+    SetSpriteRenderer(gameObject=var "Up Light", active=true)
+    SetCollider(gameObject=var "Enemy Crusher", active=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Destination Y", tolerance=0, equal=→"ARRIVED", lessThan=(none), greaterThan=→"ARRIVED", everyFrame=true)
+    TranslateV2(gameObject=Self, vector=(unset), x=(unset), y=var "Move Speed", z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false, alwaysOnStart=false, yMin=(unset), yMax=var "Destination Y")
+    on FINISHED → Move Up
+    on ARRIVED → Arrive
+  }
+
+  state Move Down Start {
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="Activate", parameters=[], storeResult=(unset var))
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    MoveLiftChain(goUp=false, target=var "BG Chain R", everyFrame=false)
+    MoveLiftChain(goUp=true, target=var "BG Chain L", everyFrame=false)
+    SetCollider(gameObject=var "Enemy Crusher", active=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Destination Y", tolerance=0, equal=→"ARRIVED", lessThan=→"ARRIVED", greaterThan=(none), everyFrame=true)
+    TranslateV2(gameObject=Self, vector=(unset), x=(unset), y=var "Move Speed Neg", z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false, alwaysOnStart=false, yMin=var "Destination Y", yMax=(unset))
+    BoolTest(boolVariable=var "Hero Bonk", isTrue=→"BONK", isFalse=(none), everyFrame=true)
+    on FINISHED → Move Down
+    on ARRIVED → Arrive
+    on BONK → Bonk
+  }
+
+  var Move Speed: float = 10
+  var Initial Position: int = 1
+
+  var Destination Y: float = 0
+  var Move Speed Neg: float = 0
+  var Self Y: float = 0
+  var Start X: float = 0
+  var Call Stop: int = 0
+  var Current Position: int = 1
+  var Next Position: int = 0
+  var Value: int = 0
+  var At Terminus: bool = false
+  var Called: bool = false
+  var Going Down: bool = false
+  var Hero Bonk: bool = false
+  var BG Chain L: gameObject = _Scenery/Ruins Lift 1/BG Chain L
+  var BG Chain R: gameObject = _Scenery/Ruins Lift 1/BG Chain R
+  var Control Lever: gameObject = _Scenery/Ruins Lift 1/Control Lever
+  var Down Light: gameObject = _Scenery/Ruins Lift 1/Down Light
+  var Enemy Crusher: gameObject = _Scenery/Ruins Lift 1/Enemy Crusher
+  var Self: gameObject = <null>
+  var Up Light: gameObject = _Scenery/Ruins Lift 1/Up Light
+}

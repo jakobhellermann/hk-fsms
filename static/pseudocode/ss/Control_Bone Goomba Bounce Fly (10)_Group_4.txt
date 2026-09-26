@@ -1,0 +1,109 @@
+# Control
+# 1 location(s):
+#   Abyss_09 / Group:4/Bone Goomba Bounce Fly (10)
+
+fsm Control {
+  start Pause
+  on ZERO HP → Die  // from any state
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Idle")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on SING → Sing
+    on HAZARD RELOAD → Refill HP
+    on TOOK DAMAGE → Return Pause
+  }
+
+  state Pause {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Pos")
+    SetVector3XYZ(vector3Variable=var "Start Pos", vector3Value=(unset), x=(unset), y=(unset), z=var "Z Pos", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    CreateEmptyObject(gameObject=<null>, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Home Point")
+    on FINISHED → Idle
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Sing")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=bone_flyer_singing (sfxdynamic_assets_areabone.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Die {
+    SendMessage(gameObject=var "Sprite", delivery=SendMessage, options=1, functionCall=StopSway())
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=var "Sprite", active=false)
+    CheckSceneName(sceneName="Abyss_09", equalEvent=→"CANCEL", notEqualEvent=(none))
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on HAZARD RELOAD → Respawn
+    on FINISHED → Fly In
+    on CANCEL → Wait For Hazard
+  }
+
+  state Respawn {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RefillHP())
+    SendMessage(gameObject=var "Sprite", delivery=SendMessage, options=1, functionCall=ResumeSway())
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetMeshRenderer(gameObject=var "Sprite", active=true)
+    on FINISHED → Idle
+  }
+
+  state Refill HP {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RefillHP())
+    on FINISHED → Idle
+  }
+
+  state Fly In {
+    SetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=30, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    TranslateRandom(gameObject=Self, translateMin=(-10, 5, 0), translateMax=(10, 10, 0), space=0)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Idle")
+    AnimatePositionTo(gameObject=Self, toValue=var "Start Pos", localSpace=false, time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=var "Sprite", active=true)
+    Tk2dSpriteSetColor(gameObject=var "Sprite", color=(0, 0, 0, 0), everyframe=false)
+    Tk2dSpriteTweenColor(gameObject=var "Sprite", color=(0.4433962, 0.4433962, 0.4433962, 1), duration=0.5)
+    on FINISHED → Land
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=var "Sprite", color=(1, 1, 1, 1), everyframe=false)
+    on FINISHED → Respawn
+  }
+
+  state Wait For Hazard {
+    on HAZARD RELOAD → Respawn
+  }
+
+  state Return Pause {
+    Wait(time=0.1, finishEvent=(none), realTime=false)
+    on FINISHED → Return Home
+  }
+
+  state Return Home {
+    FireAtTarget(gameObject=Self, target=var "Home Point", speed=5, position=(0, 0, 0), spread=0, everyFrame=true)
+    GetDistance(gameObject=Self, target=var "Home Point", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=0.1, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Idle
+  }
+
+  var Z Pos: float = 0
+  var Distance: float = 0
+  var Start Pos: vector3 = (0, 0, 0)
+  var Audio Loop Voice: gameObject = Group:4/Bone Goomba Bounce Fly (10)/Audio Loop Voice
+  var Self: gameObject = Group:4/Bone Goomba Bounce Fly (10)
+  var Home Point: gameObject = <null>
+  var Sprite: gameObject = Group:4/Bone Goomba Bounce Fly (10)/Sprite
+}

@@ -1,0 +1,215 @@
+# Dialogue
+# 1 location(s):
+#   Shadow_24 / Mapper Scene/Mapper Master NPC
+
+fsm Dialogue {
+  start Init
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Master Melody Region")
+    ActivateGameObject(gameObject=var "Cam Lock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckQuestState(NotTrackedEvent=→"CANCEL", TrackedEvent=(none), CompletedEvent=→"COMPLETED", Quest=var "Quest")
+    on CANCEL → Not Here
+    on FINISHED → Idle
+    on COMPLETED → Quest Completed
+  }
+
+  state Idle {
+    PlayParticleEmitter(gameObject=var "Pt RainIdle", emit=0, resetIfPlaying=false)
+    on INTERACT → Meet Dlg
+  }
+
+  state Meet Dlg {
+    StopParticleEmitter(gameObject=var "Pt RainIdle")
+    PlayParticleEmitter(gameObject=var "Pt RainCrouch", emit=0, resetIfPlaying=false)
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_MASTER_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dlg
+  }
+
+  sequence state End Dlg {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    ActivateGameObject(gameObject=var "Cam Lock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt RainCrouch")
+    PlayParticleEmitter(gameObject=var "Pt RainIdle", emit=0, resetIfPlaying=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWait(Target=Self, ClipName="TalkToIdle", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle Right", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Sing
+  }
+
+  state Needolin Ready {
+    SendEventToRegister(eventName="REMINDER NEEDOLIN")
+    ListenForDreamNail(eventTarget=Self, wasPressed=→"NEEDOLIN", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset))
+    on NEEDOLIN → Start Needolin
+  }
+
+  state Start Needolin {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    PlayAudioEvent(audioClip=hornet_pull_out_needolin (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Needolin Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegister(eventName="REMINDER NEEDOLIN END")
+    on FINISHED → Playing Needolin
+  }
+
+  state Playing Needolin {
+    AudioPlaySimple(gameObject=var "Audio Loop Needolin", volume=0, oneShotClip=<null>)
+    FadeAudioV2(Target=var "Audio Loop Needolin", StartVolume=0, EndVolume=1, Time=0.25, SetOnExit=false)
+    GetProperty(targetProperty=AudioSource.time on Mapper Scene/Mapper Master NPC/Audio Loop Voice@AudioSource, everyFrame=false)
+    SetProperty(targetProperty=AudioSource.time on Mapper Scene/Mapper Master NPC/Audio Loop Needolin@AudioSource, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Needolin Play")
+    ListenForDreamNail(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"END", activeBool=(unset))
+    Wait(time=4, finishEvent=→"FINISHED", realTime=false)
+    on END → End Needolin
+    on FINISHED → Wait For Loop End
+  }
+
+  state End Needolin {
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Needolin End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioStopV2(gameObject=var "Audio Loop Needolin", fadeTime=0.15, cancelOnEarlyExit=false)
+    on FINISHED → End Needolin 2
+  }
+
+  state Reset Hero {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    on FINISHED → Needolin Ready
+  }
+
+  state End Needolin 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Walk To Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Reset Hero
+  }
+
+  sequence state Sing {
+    Wait(time=2, finishEvent=(none), realTime=false)
+    StopParticleEmitter(gameObject=var "Pt RainIdle")
+    PlayParticleEmitter(gameObject=var "Pt RainSing", emit=0, resetIfPlaying=false)
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=Shakra_sing_rite_first_loop (sfxstatic_assets_mapper.bundle), autoPlay=true, stopOnExit=false)
+    SetAudioClip(gameObject=var "Audio Loop Needolin", audioClip=shakra_sing_rite_accompaniment_loop (sfxstatic_assets_mapper.bundle), autoPlay=false, stopOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle to Sing Right", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Needolin Ready
+  }
+
+  sequence state Sing End {
+    Wait(time=1, finishEvent=(none), realTime=false)
+    PlayRandomAudioClipTableV3(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    StopParticleEmitter(gameObject=var "Pt RainSing")
+    PlayParticleEmitter(gameObject=var "Pt RainIdle", emit=0, resetIfPlaying=false)
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing Right to Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Sing End Idle
+  }
+
+  state Sing End Idle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle Right", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Complete Quest
+  }
+
+  state Item Dlg {
+    StopParticleEmitter(gameObject=var "Pt RainIdle")
+    PlayParticleEmitter(gameObject=var "Pt RainCrouch", emit=0, resetIfPlaying=false)
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_MASTER_ITEM", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Reward
+  }
+
+  sequence state Reward {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SetPlayerDataVariable(VariableName="shakraAidForumBattle", SetValue=true)
+    SavedItemGet(Item=var "Reward")
+    QueueSaveGame()
+    Wait(time=1, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=false)
+    on FINISHED → Disappear
+  }
+
+  sequence state Disappear {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateGameObject(gameObject=var "Master Melody Region", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=2, finishEvent=(none), realTime=false)
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    StopParticleEmitter(gameObject=var "Pt RainCrouch")
+    PlayAudioEvent(audioClip=Shakra_leap_01 (sfxstatic_assets_mapper.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_leap (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)  // disabled
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Tele Antic", AnimationCompleteEvent=(none))
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=-55, space=1, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=shakra_zip_1 (sfxstatic_assets_mapper.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Tele Out", AnimationCompleteEvent=(none))
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cam Lock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Not Here {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Wait For Loop End {
+    SetAudioLoop(gameObject=var "Audio Loop Voice", loop=true)
+    GetProperty(targetProperty=AudioSource.time on Mapper Scene/Mapper Master NPC/Audio Loop Voice@AudioSource, everyFrame=true)
+    FloatCompare(float1=var "Clip Time", float2=10.2, tolerance=0, equal=→"NEXT", lessThan=(none), greaterThan=→"NEXT", everyFrame=true)
+    on NEXT → Song End
+  }
+
+  state Song End {
+    GetProperty(targetProperty=AudioSource.time on Mapper Scene/Mapper Master NPC/Audio Loop Voice@AudioSource, everyFrame=false)
+    GetProperty(targetProperty=AudioSource.time on Mapper Scene/Mapper Master NPC/Audio Loop Needolin@AudioSource, everyFrame=false)
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[Shakra_sing_rite_ending (sfxstatic_assets_mapper.bundle)], weights=[1], pitchMin=1, pitchMax=1, stopPreviousSound=true)
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Needolin", audioClips=[shakra_sing_rite_accompaniment_ending (sfxstatic_assets_mapper.bundle)], weights=[1], pitchMin=1, pitchMax=1, stopPreviousSound=true)
+    Wait(time=12, finishEvent=(none), realTime=false)
+    on FINISHED → Sing End
+  }
+
+  sequence state Complete Quest {
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=true)
+    GetQuestReward(StoreReward=var "Reward", Quest=var "Quest")
+    EndQuest(ConsumeCurrency=true, Quest=var "Quest")
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SetPlayerDataVariable(VariableName="shakraAidForumBattle", SetValue=true)
+    on FINISHED → Item Dlg
+  }
+
+  sequence state Startle {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Can Startle Range", storeResult=false, sendEvent="", outOfRangeEvent="CANCEL", everyFrame=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_startle (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Startle Right", AnimationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Right")
+    on FINISHED → Idle
+    on CANCEL → Idle
+  }
+
+  state Quest Completed {
+    ActivateGameObject(gameObject=var "Master Melody Region", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  var Cam Lock: gameObject = Mapper Scene/CameraLockArea Shakra Scene
+
+  var Clip Time: float = 0
+  var Clip Time Needolin: float = 0
+  var Pt RainCrouch: gameObject = Mapper Scene/Mapper Master NPC/Pt RainCrouch
+  var Pt RainIdle: gameObject = Mapper Scene/Mapper Master NPC/Pt RainIdle
+  var Pt RainSing: gameObject = Mapper Scene/Mapper Master NPC/Pt RainSing
+  var Audio Loop Voice: gameObject = Mapper Scene/Mapper Master NPC/Audio Loop Voice
+  var Audio Loop Needolin: gameObject = Mapper Scene/Mapper Master NPC/Audio Loop Needolin
+  var Parent: gameObject = <null>
+  var Master Melody Region: gameObject = <null>
+  var Reward: object = <null>
+  var Quest: object = Shakra Final Quest (dataassets_assets_assets/dataassets/questsystem/quests.bundle)
+}

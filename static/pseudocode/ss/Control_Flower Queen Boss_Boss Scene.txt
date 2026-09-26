@@ -1,0 +1,604 @@
+# Control
+# 1 location(s):
+#   Shellwood_11b_Memory / Boss Scene/Flower Queen Boss
+
+fsm Control {
+  start Init
+  on STUN → Stun Start  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Boss Scene")
+    FindChild(gameObject=var "Boss Scene", childName="Spike Balls P1", storeResult=var "Spike Balls")
+    FindChild(gameObject=var "Boss Scene", childName="Wall Spike L", storeResult=var "Wall Spikes L")
+    FindChild(gameObject=var "Boss Scene", childName="Wall Spike R", storeResult=var "Wall Spikes R")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Pt FloorAntic 2")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Pt FloorBreak2")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Terrain Phase 1")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Terrain Phase 2")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "CamLock P1")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "CamLock P2")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Respawn Plat")
+    GetHP(target=Self, storeValue=var "P2 HP")
+    MultiplyIntByFloat(integer=var "P2 HP", multiplyFloat=0.7, storeResult=var "P2 HP", everyFrame=false, forceRoundUp=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Dormant
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateGameObject(gameObject=var "Body Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Legs Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Phase Check
+    on TOOK DAMAGE → Phase Check
+  }
+
+  state Choice P2 {
+    BoolTest(boolVariable=var "Hornet Dead", isTrue=→"HORNET DEAD", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Do Spikes", isTrue=→"SPIKE SUMMON", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatTestToBool(float1=var "Distance", float2=12, tolerance=0, equalBool=(unset), lessThanBool=var "In Pollen Blast Range", greaterThanBool=(unset), everyFrame=false)
+    SendRandomEventV4(events=[→"WALK", →"SPIKE SUMMON", →"SHOOT", →"LEAP", →"POLLEN BLAST"], weights=[1, 1, 1, 1, 1], eventMax=[1, 1, 1, 1, 1], missedMax=[2, 4, 4, 3, 2], activeBool=var "In Pollen Blast Range")
+    SendRandomEventV4(events=[→"WALK", →"SPIKE SUMMON", →"SHOOT", →"LEAP"], weights=[1, 1, 1, 1], eventMax=[1, 1, 1, 1], missedMax=[2, 4, 4, 3], activeBool=(unset))
+    on WALK → Walk Dir
+    on SHOOT → Set Angles
+    on LEAP → Brambles Down
+    on SPIKE SUMMON → Spike Antic
+    on HORNET DEAD → Hornet Dead
+    on POLLEN BLAST → Pollen Blast
+  }
+
+  state Walk Dir {
+    ActivateGameObject(gameObject=var "Legs Walk", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlaySimple(gameObject=var "Walk Loop", volume=1, oneShotClip=<null>)
+    CheckYPosition(gameObject=Self, compareTo=var "Y Min", compareToOffset=3, tolerance=0, equal=(none), lessThan=→"UP", greaterThan=(none), everyFrame=false, space=0, activeBool=(unset))
+    CheckYPosition(gameObject=Self, compareTo=var "Y Max", compareToOffset=-3, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"DOWN", everyFrame=false, space=0, activeBool=(unset))
+    SendRandomEventV4(events=[→"DOWN", →"UP"], weights=[1, 1], eventMax=[1, 1], missedMax=[1, 1], activeBool=(unset))
+    on UP → Walk Up
+    on DOWN → Walk Down
+  }
+
+  state Walk Up {
+    SetFloatValue(floatVariable=var "Target Speed", floatValue=5, everyFrame=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.5, targetSpeed=var "Target Speed")
+    WaitRandom(timeMin=0.8, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    CheckYPosition(gameObject=Self, compareTo=var "Y Max", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=true, space=0, activeBool=(unset))
+    on FINISHED → Walk Decel
+  }
+
+  state Walk Down {
+    SetFloatValue(floatVariable=var "Target Speed", floatValue=-5, everyFrame=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.5, targetSpeed=var "Target Speed")
+    WaitRandom(timeMin=0.8, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    CheckYPosition(gameObject=Self, compareTo=var "Y Min", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    on FINISHED → Walk Decel
+  }
+
+  state Walk Decel {
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.85, brakeOnExit=true)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    FadeAudio(gameObject=var "Walk Loop", startVolume=1, endVolume=0, time=0.2)
+    on FINISHED → Walk End
+  }
+
+  state Walk End {
+    AudioStop(gameObject=var "Walk Loop", fadeTime=0)
+    ActivateGameObject(gameObject=var "Legs Walk", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Shoot Antic {
+    PlayRandomAudioClipTable(Table=movement_heavy_flowerqueen (sfxdynamic_assets_areashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Shoot", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetIntValue(intVariable=var "Shots", intValue=4, everyFrame=false)
+    SetBoolValue(boolVariable=var "Shoot Pattern Alt", boolValue=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_yellow_shoot_antic (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.25, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_mask_crack (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=0.85, delay=0.25, storePlayer=<null>)
+    on FINISHED → Shoot Loop Start
+  }
+
+  state Shoot {
+    IntCompare(integer1=var "Shots", integer2=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=broodmother_spit (sfxstatic_assets_areaslab.bundle), pitchMin=0.85, pitchMax=1.15, volume=0.8, delay=0, storePlayer=<null>)
+    SetParticleEmissionTemp(gameObject=var "Pt Spit", emission=true, time=0.1)
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Spit Effect 2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    IntAdd(intVariable=var "Shots", add=-1, everyFrame=false)
+    ActivateGameObject(gameObject=var "Shoot Head Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Pollen Shot FQ (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Shoot Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    GetAngleToTarget2D(gameObject=var "Shoot Point", target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    ClampAngle(angleVariable=var "Angle", minValue=var "Angle Min", maxValue=var "Angle Max", everyFrame=false)
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=10, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Pollen Shot FQ (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Shoot Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatAdd(floatVariable=var "Angle", add=50, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=10, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Pollen Shot FQ (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Shoot Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatAdd(floatVariable=var "Angle", add=-100, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=10, everyFrame=false)
+    BoolFlip(boolVariable=var "Shoot Pattern Alt")
+    Wait(time=0.6, finishEvent=→"REPEAT", realTime=false)
+    on REPEAT → Shoot Type
+    on END → Shoot End
+  }
+
+  state Shoot End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Shoot Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioStop(gameObject=var "Shoot Loop", fadeTime=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_yellow_shoot_antic (sfxstatic_assets_areashellwood.bundle), pitchMin=1.15, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Idle
+  }
+
+  state Set Angles {
+    SetBoolValue(boolVariable=var "Did First Attack", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=flower_short (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="SLASH", outOfRangeEvent="", everyFrame=false)
+    SetBoolValue(boolVariable=var "Last Attack Was Spike", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=-45, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=45, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=135, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=225, everyFrame=false)
+    on FINISHED → Shoot Antic
+    on SLASH → Slash Antic
+  }
+
+  state Leap Antic {
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[flower_short_ish (sfxstatic_assets_areashellwood.bundle)], weights=[1], pitchMin=1, pitchMax=1, stopPreviousSound=true)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did First Attack", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Next Bramble"), sendEvent="DOWN", delay=0.08, everyFrame=false)
+    PlayRandomAudioClipTable(Table=movement_heavy_flowerqueen (sfxdynamic_assets_areashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    ActivateGameObject(gameObject=var "Idle Hurtbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Last Attack Was Spike", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap Antic")
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt Leap Antic", emit=0, resetIfPlaying=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0.08, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_side_dash_antic_foley (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Leap
+  }
+
+  state Leap {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_side_dash (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetSpecialDeath(target=Self, hasSpecialDeath=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    SetVelocityByScale(gameObject=Self, speed=40, ySpeed=(unset), everyFrame=false)
+    CheckXPosition(gameObject=Self, compareTo=var "X Max", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"LAND", greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    CheckXPosition(gameObject=Self, compareTo=var "X Min", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"LAND", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    ActivateGameObject(gameObject=var "Leap Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Leap Trail")
+    on LAND → Set Killable
+  }
+
+  state Land {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_hit_wall_after_dash (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    GetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "X Pos", minValue=var "X Min", maxValue=var "X Max", everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leap Land", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayParticleEmitterChildren(gameObject=var "Pt Leap Land", resetTimeIfPlaying=false, stopOnStateExit=false)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Brambles Up
+  }
+
+  state Land 2 {
+    ActivateGameObject(gameObject=var "Body Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Next Bramble"), sendEvent="UP", delay=0, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Spike Antic {
+    SetBoolValue(boolVariable=var "Do Spikes", boolValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Last Attack Was Spike", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Did First Attack", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Last Attack Was Spike", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_summon_vine_balls_foley (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=vine_spikes_wall_appear (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayRandomAudioClipTable(Table=movement_heavy_flowerqueen (sfxdynamic_assets_areashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Spike Roar
+    on CANCEL → Phase Check
+  }
+
+  state Spike Roar {
+    ActivateGameObject(gameObject=var "Sing Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=flower_short (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    SendEventByName(eventTarget=GameObject(var "Spike Balls"), sendEvent="SPIKE ATTACK", delay=0, everyFrame=false)
+    on FINISHED → Spike Roar End
+  }
+
+  state Spike Roar End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Stun Start {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=flower_stun (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioStop(gameObject=var "Audio Player", fadeTime=0)
+    AudioStop(gameObject=var "Shoot Loop", fadeTime=0)
+    AudioStop(gameObject=var "Walk Loop", fadeTime=0)
+    ActivateGameObject(gameObject=var "pollen_flare_attack_boss", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Idle Hurtbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Stun Timer", floatValue=2, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Leap Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Shoot Head Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Petal Stun", emit=0, resetIfPlaying=false)
+    on FINISHED → Stunned Colliders
+  }
+
+  state Stunned {
+    FloatAdd(floatVariable=var "Stun Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    on END → Stun Recover
+    on TOOK DAMAGE → Stun Damage
+  }
+
+  state Stun Recover {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Do Pose", boolValue=false, everyFrame=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    ActivateGameObject(gameObject=var "Stun Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Idle
+  }
+
+  state Stun Damage {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Hit")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=flower_stun (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FloatAdd(floatVariable=var "Stun Timer", add=-0.25, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Stunned
+    on END → Damage Recover
+  }
+
+  state Damage Recover {
+    SendEventByName(eventTarget=Self, sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    on FINISHED → Stun Recover
+  }
+
+  state Choice P1 {
+    SendEvent(eventTarget=Self, sendEvent=→"POLLEN BLAST", delay=0, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Hornet Dead", isTrue=→"HORNET DEAD", isFalse=(none), everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "P2 HP", equal=→"P2 SHIFT", lessThan=→"P2 SHIFT", greaterThan=(none), everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatTestToBool(float1=var "Distance", float2=12, tolerance=0, equalBool=(unset), lessThanBool=var "In Pollen Blast Range", greaterThanBool=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "In Pollen Blast Range", var "Did First Attack"], sendEvent=(none), storeResult=var "Can Pollen Blast", everyFrame=false)
+    SendRandomEventV4(events=[→"LEAP", →"SPIKE SUMMON", →"SHOOT", →"POLLEN BLAST"], weights=[1, 1, 1, 1], eventMax=[1, 1, 1, 1], missedMax=[2, 3, 3, 2], activeBool=var "Can Pollen Blast")
+    SendRandomEventV4(events=[→"LEAP", →"SPIKE SUMMON", →"SHOOT"], weights=[1, 1, 1], eventMax=[1, 1, 1], missedMax=[2, 3, 3], activeBool=(unset))
+    on SHOOT → Set Angles
+    on LEAP → Brambles Down
+    on SPIKE SUMMON → Spike Antic
+    on P2 SHIFT → Shift Antic
+    on HORNET DEAD → Hornet Dead
+    on SLASH → Slash Antic
+    on POLLEN BLAST → Pollen Blast
+  }
+
+  state Phase Check {
+    IntSwitch(intVariable=var "Phase", compareTo=[1, 2], sendEvent=[→"P1", →"P2"], everyFrame=false)
+    on P1 → Choice P1
+    on P2 → Choice P2
+  }
+
+  state Start {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Phase1 Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    AudioStop(gameObject=var "Walk Loop", fadeTime=0)
+    on FINISHED → Idle
+  }
+
+  state Crawl Down {
+    SetPosition2d(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Target Speed", floatValue=-10, everyFrame=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.35, targetSpeed=var "Target Speed")
+    CheckYPosition(gameObject=Self, compareTo=var "Phase1 Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"END", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Legs Idle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Legs Walk", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlaySimple(gameObject=var "Walk Loop", volume=1, oneShotClip=<null>)
+    ActivateGameObject(gameObject=var "Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on END → Start
+  }
+
+  state Slash Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayRandomAudioClipTable(Table=movement_heavy_flowerqueen (sfxdynamic_assets_areashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Mask Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.6, finishEvent=→"END", realTime=false)
+    PlayAudioEvent(audioClip=carmelita_cyclone_antic_truncated (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on END → Slash Begin
+  }
+
+  state Slash 1 {
+    ActivateGameObject(gameObject=var "Slash 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=bone_circler_vicious_fly_attack (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 2
+  }
+
+  state Slash 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 3
+  }
+
+  state Slash 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 4
+  }
+
+  state Slash Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Brambles Down {
+    GetFsmBool(gameObject=var "Respawn Plat", fsmName="Control", variableName="Is Active", storeValue=var "Respawn Plat Is Active", everyFrame=false)
+    BoolTest(boolVariable=var "Respawn Plat Is Active", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetGameObject(variable=var "Next Bramble", gameObject=var "Wall Spikes L", everyFrame=false)
+    CheckXPosition(gameObject=Self, compareTo=18.7, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"FINISHED", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    SetGameObject(variable=var "Next Bramble", gameObject=var "Wall Spikes R", everyFrame=false)
+    on FINISHED → Leap Antic
+    on CANCEL → Phase Check
+  }
+
+  state Brambles Up {
+    SetGameObject(variable=var "Next Bramble", gameObject=var "Wall Spikes R", everyFrame=false)
+    CheckXPosition(gameObject=Self, compareTo=18.7, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"FINISHED", greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    SetGameObject(variable=var "Next Bramble", gameObject=var "Wall Spikes L", everyFrame=false)
+    on FINISHED → Land 2
+  }
+
+  state Shift Antic {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Spikes", boolValue=true, everyFrame=false)
+    FindChild(gameObject=var "Boss Scene", childName="Spike Balls", storeResult=var "Spike Balls")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    on FINISHED → Shift Sing
+  }
+
+  state Shift Sing {
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[flower_scream_long (sfxstatic_assets_areashellwood.bundle)], weights=[1], pitchMin=1, pitchMax=1, stopPreviousSound=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Antic")
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt FloorAntic 2", resetTimeIfPlaying=false, stopOnStateExit=true)
+    Wait(time=2.25, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=false, Delay=0)
+    SendEventToRegister(eventName="BREAK ANTIC")
+    PlayAudioEvent(audioClip=misc_rumble_loop (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    PlayAudioEvent(audioClip=vine_ball_antic_for_emerge (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=vine_spikes_wall_disappear (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Shift Break
+  }
+
+  state Shift Break {
+    AudioStopV2(gameObject=var "Audio Player", fadeTime=0, cancelOnEarlyExit=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt FloorBreak2", resetTimeIfPlaying=false, stopOnStateExit=false)
+    ActivateGameObject(gameObject=var "CamLock P1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Phase 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Respawn Plat", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "CamLock P2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Big Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", audioClip=vine_floor_break_away (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Shift Recover
+  }
+
+  state Shift Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetIntValue(intVariable=var "Phase", intValue=2, everyFrame=false)
+    SetSpecialDeath(target=Self, hasSpecialDeath=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.5, cancelOnEarlyExit=false)
+    on FINISHED → Idle
+  }
+
+  state Set Killable {
+    IntCompare(integer1=var "Phase", integer2=2, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetSpecialDeath(target=Self, hasSpecialDeath=false)
+    on FINISHED → Land
+  }
+
+  state Shoot Loop Start {
+    AudioPlaySimple(gameObject=var "Shoot Loop", volume=1, oneShotClip=<null>)
+    on FINISHED → Shoot Type
+  }
+
+  state Hornet Dead {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="AnticToSing")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+  }
+
+  state Dormant {
+    GetPosition2d(gameObject=Self, vector_2d=var "Start Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=-100, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)
+    ActivateGameObject(gameObject=var "Idle Hurtbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on START → Crawl Down
+  }
+
+  state Shoot Type {
+    BoolTest(boolVariable=var "Shoot Pattern Alt", isTrue=→"ALT", isFalse=(none), everyFrame=false)
+    on FINISHED → Shoot
+    on ALT → Shoot Alt
+  }
+
+  state Shoot Alt {
+    IntCompare(integer1=var "Shots", integer2=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=broodmother_spit (sfxstatic_assets_areaslab.bundle), pitchMin=0.85, pitchMax=1.15, volume=0.8, delay=0, storePlayer=<null>)
+    SetParticleEmissionTemp(gameObject=var "Pt Spit", emission=true, time=0.1)
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Spit Effect 2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    IntAdd(intVariable=var "Shots", add=-1, everyFrame=false)
+    ActivateGameObject(gameObject=var "Shoot Head Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Pollen Shot FQ (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Shoot Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    GetAngleToTarget2D(gameObject=var "Shoot Point", target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    ClampAngle(angleVariable=var "Angle", minValue=var "Angle Min", maxValue=var "Angle Max", everyFrame=false)
+    FloatAdd(floatVariable=var "Angle", add=25, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=10, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Pollen Shot FQ (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Shoot Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatAdd(floatVariable=var "Angle", add=50, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=10, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Pollen Shot FQ (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Shoot Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatAdd(floatVariable=var "Angle", add=-100, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=10, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Pollen Shot FQ (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Shoot Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatAdd(floatVariable=var "Angle", add=-50, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=10, everyFrame=false)
+    BoolFlip(boolVariable=var "Shoot Pattern Alt")
+    Wait(time=0.6, finishEvent=→"REPEAT", realTime=false)
+    on REPEAT → Shoot Type
+    on END → Shoot End
+  }
+
+  state Slash 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 5
+  }
+
+  state Slash 5 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 5", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 6
+  }
+
+  state Slash 6 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 6", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 7
+  }
+
+  state Slash 7 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 7", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 8
+  }
+
+  state Slash 8 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 8", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash Recover
+  }
+
+  state Slash Begin {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=scrollkeeper_slash_attack_2 (sfxstatic_assets_arealibrary.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 1
+  }
+
+  state Pollen Blast {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pollen Blast")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=flower_medium (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Wait(time=2.1, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "pollen_flare_attack_boss", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "pollen_flare_attack_boss", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_mask_crack (sfxstatic_assets_areashellwood.bundle), pitchMin=0.85, pitchMax=0.85, volume=0.25, delay=0.08, storePlayer=<null>)
+    AudioPlayInState(gameObject=var "Audio Loop Pollen Blast", volume=1)
+    on FINISHED → Pollen Blast End
+  }
+
+  state Pollen Blast End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pollen Blast End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=flower_mask_crack (sfxstatic_assets_areashellwood.bundle), pitchMin=0.85, pitchMax=0.8, volume=0.25, delay=0.08, storePlayer=<null>)
+    on FINISHED → Idle
+  }
+
+  state Stunned Colliders {
+    ActivateGameObject(gameObject=var "Stun Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    on FINISHED → Stunned
+  }
+
+  var Angle: float = 0
+  var Angle Max: float = 0
+  var Angle Min: float = 0
+  var Phase1 Y: float = 95.7
+  var Stun Timer: float = 0
+  var Target Speed: float = 0
+  var X Max: float = 27.1
+  var X Min: float = 9.9
+  var X Pos: float = 0
+  var Y Max: float = 98.5
+  var Y Min: float = 92
+  var Distance: float = 0
+  var P2 HP: int = 250
+  var Phase: int = 1
+  var Shots: int = 0
+  var Did First Attack: bool = false
+  var Do Pose: bool = false
+  var Do Spikes: bool = false
+  var Hornet Dead: bool = false
+  var In Pollen Blast Range: bool = false
+  var Last Attack Was Spike: bool = false
+  var Respawn Plat Is Active: bool = false
+  var Shoot Pattern Alt: bool = false
+  var Can Pollen Blast: bool = false
+  var Start Pos: vector2 = (0, 0)
+  var Audio Player: gameObject = <null>
+  var Body Collider: gameObject = Boss Scene/Flower Queen Boss/Body Collider
+  var Boss Scene: gameObject = <null>
+  var CamLock P1: gameObject = <null>
+  var CamLock P2: gameObject = <null>
+  var Leap Collider: gameObject = Boss Scene/Flower Queen Boss/Leap Collider
+  var Legs Idle: gameObject = Boss Scene/Flower Queen Boss/Legs Idle
+  var Legs Walk: gameObject = Boss Scene/Flower Queen Boss/Legs Walk
+  var Next Bramble: gameObject = <null>
+  var Projectile: gameObject = <null>
+  var Pt FloorAntic 2: gameObject = <null>
+  var Pt FloorBreak2: gameObject = <null>
+  var Pt Leap Antic: gameObject = Boss Scene/Flower Queen Boss/Pt Leap Antic
+  var Pt Leap Land: gameObject = Boss Scene/Flower Queen Boss/Pt Leap Land
+  var Pt Leap Trail: gameObject = Boss Scene/Flower Queen Boss/Pt Leap Trail
+  var Pt Petal Stun: gameObject = Boss Scene/Flower Queen Boss/Pt Petal Stun
+  var Pt Spit: gameObject = Boss Scene/Flower Queen Boss/Pt Spit
+  var Respawn Plat: gameObject = <null>
+  var Self: gameObject = Boss Scene/Flower Queen Boss
+  var Shoot Head Collider: gameObject = Boss Scene/Flower Queen Boss/Shoot Head Collider
+  var Shoot Loop: gameObject = Boss Scene/Flower Queen Boss/Shoot Loop
+  var Shoot Point: gameObject = Boss Scene/Flower Queen Boss/Shoot Point
+  var Sing Collider: gameObject = Boss Scene/Flower Queen Boss/Sing Collider
+  var Slam Effect: gameObject = Boss Scene/Flower Queen Boss/Slam Effect
+  var Slash 1: gameObject = Boss Scene/Flower Queen Boss/Slash 1
+  var Slash 2: gameObject = Boss Scene/Flower Queen Boss/Slash 2
+  var Slash 3: gameObject = Boss Scene/Flower Queen Boss/Slash 3
+  var Spike Balls: gameObject = <null>
+  var Spit Effect: gameObject = Boss Scene/Flower Queen Boss/Spit Effect
+  var Stun Collider: gameObject = Boss Scene/Flower Queen Boss/Stun Collider
+  var Terrain Phase 1: gameObject = <null>
+  var Terrain Phase 2: gameObject = <null>
+  var Walk Loop: gameObject = Boss Scene/Flower Queen Boss/Walk Loop
+  var Wall Spikes L: gameObject = <null>
+  var Wall Spikes R: gameObject = <null>
+  var Idle Hurtbox: gameObject = Boss Scene/Flower Queen Boss/Idle Hurtbox
+  var Slash 4: gameObject = Boss Scene/Flower Queen Boss/Slash 4
+  var Slash 5: gameObject = Boss Scene/Flower Queen Boss/Slash 5
+  var Slash 6: gameObject = Boss Scene/Flower Queen Boss/Slash 6
+  var Slash 7: gameObject = Boss Scene/Flower Queen Boss/Slash 7
+  var Slash 8: gameObject = Boss Scene/Flower Queen Boss/Slash 8
+  var pollen_flare_attack_boss: gameObject = Boss Scene/Flower Queen Boss/pollen_flare_attack_boss
+  var Audio Loop Pollen Blast: gameObject = Boss Scene/Flower Queen Boss/Audio Loop Pollen Blast
+  var Spit Effect 2: gameObject = Boss Scene/Flower Queen Boss/Spit Effect 2
+  var Mask Flash: gameObject = Boss Scene/Flower Queen Boss/Mask Flash
+  var Audio Loop Voice: gameObject = Boss Scene/Flower Queen Boss/Audio Loop Voice
+}

@@ -1,0 +1,133 @@
+# Conversation Control
+# 1 location(s):
+#   Abyss_04 / Wishing_Well_anims/Fountain Donation
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Idle
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=false, topRight=false, topCentre=true, topJustified=false, centreLeft=false, centreRight=false, centreCentre=false, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    on FINISHED → Inspect
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=true, topRight=false, topCentre=false, topJustified=false, centreLeft=false, centreRight=false, centreCentre=false, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Inspect {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["WISHING_WELL_INSPECT", "Lore Tablets"], storeResult=(unset var))
+    on CONVO_FINISH → Dial Box Down
+  }
+
+  state Dial Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="TALK END", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up YN
+  }
+
+  state Box Up YN {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="geo", storeValue=var "Geo on Hand")
+    IntCompare(integer1=var "Geo on Hand", integer2=0, equal=→"NO GEO", lessThan=→"NO GEO", greaterThan=(none), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+    on NO GEO → Talk Finish
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=0, everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["GEO_RELIEVE", "Prompts"], storeResult=(unset var))
+    on NO → Decline Pause
+    on YES → Deduct Geo
+  }
+
+  state Partial Donate {
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="fountainGeo", amount=var "Geo on Hand")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeGeo", parameters=[var "Geo on Hand"], storeResult=(unset var))
+    on FINISHED → Talk Finish
+  }
+
+  state Decline Pause {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    on FINISHED → Talk Finish
+  }
+
+  state Deduct Geo {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="geo", storeValue=var "Geo on Hand")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="fountainGeo", storeValue=var "Donated Geo")
+    GetLanguageString(sheetName="Prices", convName="WISH_FOUNTAIN", storeValue=var "Donation Limit Str")
+    ConvertStringToInt(stringVariable=var "Donation Limit Str", intVariable=var "Donation Limit Int", everyFrame=false)
+    IntOperator(integer1=var "Donation Limit Int", integer2=var "Donated Geo", operation=Subtract, storeResult=var "Amount to Donate", everyFrame=false)
+    IntCompare(integer1=var "Amount to Donate", integer2=var "Geo on Hand", equal=→"FULL DONATE", lessThan=→"FULL DONATE", greaterThan=→"PARTIAL DONATE", everyFrame=false)
+    on PARTIAL DONATE → Partial Donate
+    on FULL DONATE → Full Donation
+  }
+
+  state Full Donation {
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="fountainGeo", amount=var "Amount to Donate")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeGeo", parameters=[var "Amount to Donate"], storeResult=(unset var))
+    SetCollider(gameObject=Self, active=false)
+    SetPlayerDataBool(boolName="fountainVesselSummoned", value=true)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Event
+  }
+
+  state Send Event {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="FOUNTAIN PAID", delay=0, everyFrame=false)
+    on FINISHED → Talk Finish
+  }
+
+  var Amount to Donate: int = 0
+  var Donated Geo: int = 0
+  var Donation Limit Int: int = 0
+  var Geo Left to Donate: int = 0
+  var Geo on Hand: int = 0
+  var Something Cost: int = 0
+  var To Deduct: int = 0
+  var Toll Cost: int = 0
+  var Spoken: bool = false
+  var Donation Limit Str: string = ""
+  var Area Title: gameObject = <null>
+  var Self: gameObject = <null>
+}

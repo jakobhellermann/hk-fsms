@@ -1,0 +1,142 @@
+# Conversation Control
+# 1 location(s):
+#   Fungus2_21 / City Gate Control
+
+fsm Conversation Control {
+  start Pause
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Crest", storeResult=var "Crest")
+    FindChild(gameObject=Self, childName="Glow", storeResult=var "Glow")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="openedCityGate", isTrue=→"INACTIVE", isFalse=(none))
+    on FINISHED → Idle
+    on INACTIVE → Inactive
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    CreateObject(gameObject=Area Title (sharedassets9.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Area Title", networkInstantiate=false, networkGroup=0)  // disabled
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)  // disabled
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="RELICDEALER", everyFrame=false)  // disabled
+    on FINISHED → No Key
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state No Key {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CITY_GATE_NOKEY", "Prompts"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Key?
+  }
+
+  state Key? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasCityKey", isTrue=→"KEY", isFalse=→"NOKEY")
+    on KEY → Box Up YN
+    on NOKEY → Box Up
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=0, everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["CITY_GATE_KEY", "Prompts"], storeResult=(unset var))
+    on NO → Decline Pause
+    on YES → Yes
+  }
+
+  state Yes {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Activate
+  }
+
+  state Decline Pause {
+    Wait(time=0.3, finishEvent=→"TALK FINISH", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    on FINISHED → 
+  }
+
+  state Activate {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=manhole_key_turn (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=shiny_item_pickup (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetPlayerDataBool(boolName="hasCityKey", value=false)
+    SetPlayerDataBool(boolName="openedCityGate", value=true)
+    SetCollider(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Crest", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Glow", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    on FINISHED → Open
+  }
+
+  state Open {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="GATE OPEN", delay=0, everyFrame=false)
+    on FINISHED → Talk Finish
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Inactive {
+    ActivateGameObject(gameObject=var "Activated", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetSpriteRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false)
+  }
+
+  var Self X Scale: float = 0
+  var Elderbug State: int = 0
+  var History: int = 0
+  var Met Elderbug: bool = false
+  var Reintro Played: bool = false
+  var Visited Crossroads: bool = false
+  var mapCrossroads: bool = false
+  var Activate Anim: gameObject = City Gate Control/Activate Anim
+  var Activated: gameObject = City Gate Control/Activated
+  var Area Title: gameObject = <null>
+  var Crest: gameObject = <null>
+  var Door Closed: gameObject = <null>
+  var Door Object: gameObject = <null>
+  var Door Open: gameObject = <null>
+  var Glow: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Self: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

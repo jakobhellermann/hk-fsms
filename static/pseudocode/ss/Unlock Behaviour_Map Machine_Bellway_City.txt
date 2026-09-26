@@ -1,0 +1,80 @@
+# Unlock Behaviour
+# 1 location(s):
+#   Bellway_City / Map Machine
+
+fsm Unlock Behaviour {
+  start Init
+
+  state Inert {
+    SavedItemCanGetMore(Item=var "Map", trueEvent=(none), falseEvent=→"ACTIVATED", storeValue=(unset))
+    on INTERACT → Inspect
+    on ACTIVATED → Disabled
+  }
+
+  state End Interaction {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Inert
+  }
+
+  state Init {
+    SetAnimator(target=Self, active=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Inert
+  }
+
+  state Disabled {
+    ActivateGameObject(gameObject=Map Machine/Active, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+  }
+
+  sequence state Prompt {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    GetLocalisedString(Cell={Sheet="Fast Travel", Key="PAY_TOLL_MSG"}, StoreString=var "Prompt Text Override")
+    RunFSM(fsmTemplateControl=template=-8990696591063553075 in[Hornet Stays Reaching<-true, Prompt Text Override<-var "Prompt Text Override", Dish<-var "Dish", Cost Reference<-var "Cost Reference"], finishEvent=(none), everyFrame=false)
+    on CANCEL → End Interaction
+    on FINISHED → Drop Pause
+  }
+
+  sequence state Return Control {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)  // disabled
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Stand 3", AnimationCompleteEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Drop
+  }
+
+  state Get Item {
+    SavedItemGet(Item=var "Map")
+    on FINISHED → Return Control
+  }
+
+  sequence state Drop {
+    Wait(time=1, finishEvent=(none), realTime=false)
+    SetAnimator(target=Self, active=true)
+  }
+
+  state Inspect {
+    RunDialogue(Sheet="Inspect", Key="CITADEL_MAP_PROMPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=Top, OffsetY=0, Target=Self)
+    on CONVO_END → Prompt
+  }
+
+  state Drop Pause {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=toll_booth_mouth_appear (sfxstatic_assets_areacog.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Drop Item
+  }
+
+  state Drop Item {
+    SendMessage(gameObject=var "Dish", delivery=SendMessage, options=1, functionCall=StartTimedJitter())
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=toll_booth_mouth_spit (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Get Item
+  }
+
+  var Prompt Text Override: string = ""
+  var Cost Reference: object = City Map Machine Default (dataassets_assets_assets/dataassets/costs.bundle)
+  var Map: object = Halls Map (dataassets_assets_assets/dataassets/collectables/fakecollectables.bundle)
+
+  var Dish: gameObject = Map Machine/Active/Dish
+}

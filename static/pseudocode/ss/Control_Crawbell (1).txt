@@ -1,0 +1,127 @@
+# Control
+# 1 location(s):
+#   Belltown / Hornet House States/Full/Crawbell (1)
+
+fsm Control {
+  start Init
+
+  state Init {
+    ActivateGameObject(gameObject=var "Installable Parent", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Installed Parent", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "New Plink", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Craw Currency Audio", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → State?
+  }
+
+  state Installable {
+    SetInteractableLabel(Target=Self, Label=None, UseChildren=false)
+    ActivateGameObject(gameObject=var "Installable Parent", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on INTERACT → Install?
+  }
+
+  state State? {
+    GetPlayerDataBool(boolName="CrawbellCrawsInside", storeValue=var "Craws Inside")
+    ActivateGameObject(gameObject=var "Craw Inside Audio", activate=var "Craws Inside", recursive=false, resetOnExit=false, everyFrame=false)
+    PlayerDataBoolTest(boolName="CrawbellInstalled", isTrue=→"INSTALLED", isFalse=(none))
+    CollectableItemGetDataV3(CollectedAmount=(unset), IsHoldingAny=(unset), NeededAmount=1, IsCollected=→"INSTALLABLE", NotCollected=(none), ItemName="", Sprite=var "", ReadSource=Inventory, Item=Crawbell (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    on INSTALLED → Installed Start
+    on INSTALLABLE → Installable
+    on FINISHED → Inert
+  }
+
+  state Inert {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EnableFsmSelf(SetEnabled=false)
+  }
+
+  sequence state Installed {
+    WaitForFinishedEnteringScene(sendEvent=(none))
+    Wait(time=1, finishEvent=(none), realTime=false)
+    ActivateGameObject(gameObject=var "Craw Currency Audio", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on INTERACT → Get Currency
+  }
+
+  state Install? {
+    DialogueYesNoItemV4(Prompt={Sheet="UI", Key="INSTALL_ITEM_PROMPT"}, RequiredItem=Crawbell (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle), RequiredAmount=1, ShowCounter=false, ConsumeItem=true, TakeDisplay=Silent, WillGetItem=<null>, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Cancel
+    on TRUE → Reach Out
+  }
+
+  state Cancel {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → State?
+  }
+
+  sequence state Reach Out {
+    SetPlayerDataBool(boolName="CrawbellInstalled", value=true)
+    RunFSM(fsmTemplateControl=template=-1356260127934336636 in[Do Flash<-false], finishEvent=(none), everyFrame=false)  // disabled
+    ScreenFader(startColour=(unset), endColour=(0, 0, 0, 1), duration=1.5)
+    Wait(time=2, finishEvent=(none), realTime=false)
+    ActivateGameObject(gameObject=var "Installed Parent", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Installable Parent", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=crawbell_install_2d (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=4.5, finishEvent=(none), realTime=false)
+    ScreenFader(startColour=(unset), endColour=(0, 0, 0, 0), duration=1.5)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    RunFSM(fsmTemplateControl=template=4234581821092748796, finishEvent=(none), everyFrame=false)  // disabled
+    on FINISHED → Cancel
+  }
+
+  sequence state Get Currency {
+    FadeNestedFadeGroup(Target=var "New Plink", ToAlpha=0, FadeTime=0.5)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Stand 1", AnimationCompleteEvent=(none))
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    TakeCrawbellCurrency(StoreRosaries=var "Rosaries", StoreShellShards=var "Shell Shards")
+    on FINISHED → Rosaries?
+  }
+
+  state Inactive {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateGameObject(gameObject=var "New Plink", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+  }
+
+  state Installed Start {
+    ActivateGameObject(gameObject=var "Installed Parent", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayerDataVariableTest(VariableName="CrawbellHasSomething", ExpectedValue=false, IsExpectedEvent=→"CANCEL", IsNotExpectedEvent=(none))
+    SetInteractableLabel(Target=Self, Label=Take, UseChildren=false)
+    ActivateGameObject(gameObject=var "New Plink", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on CANCEL → Inactive
+    on FINISHED → Installed
+  }
+
+  state Rosaries? {
+    IntCompare(integer1=var "Rosaries", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    AddCurrency(Target=var "Hero", CurrencyType=Money, Amount=var "Rosaries")
+    PlayAudioEventRandom(audioClips=[rosary_collect_1 (sfxstatic_assets_currency.bundle), rosary_collect_2 (sfxstatic_assets_currency.bundle), rosary_collect_3 (sfxstatic_assets_currency.bundle), rosary_collect_4 (sfxstatic_assets_currency.bundle), rosary_collect_5 (sfxstatic_assets_currency.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Shards?
+  }
+
+  sequence state Get Currency End {
+    CallMethodProper(gameObject=Hornet House States/Full/Crawbell (1)/Installed/Deposit Box Animator, behaviour="CurveOffsetAnimation", methodName="StartAnimation", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Stand 3", AnimationCompleteEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Cancel
+  }
+
+  state Shards? {
+    IntCompare(integer1=var "Shell Shards", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    AddCurrency(Target=var "Hero", CurrencyType=Shard, Amount=var "Shell Shards")
+    PlayAudioEventRandom(audioClips=[shell_shard_pickup_1 (sfxstatic_assets_areabell.bundle), shell_shard_pickup_2 (sfxstatic_assets_areabell.bundle), shell_shard_pickup_3 (sfxstatic_assets_areabell.bundle), shell_shard_pickup_4 (sfxstatic_assets_areabell.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Get Currency End
+  }
+
+  var Rosaries: int = 0
+  var Shell Shards: int = 0
+  var Craws Inside: bool = false
+  var Craw Currency Audio: gameObject = Hornet House States/Full/Crawbell (1)/Audio Player Currency
+  var Craw Inside Audio: gameObject = Hornet House States/Full/Crawbell (1)/Installed/Audio Player Craws Inside
+  var Installable Parent: gameObject = Hornet House States/Full/Crawbell (1)/Installable
+  var Installed Parent: gameObject = Hornet House States/Full/Crawbell (1)/Installed
+  var New Plink: gameObject = Hornet House States/Full/Crawbell (1)/Installed/New Plink
+}

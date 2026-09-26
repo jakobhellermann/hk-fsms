@@ -1,0 +1,114 @@
+# Ball Control
+# 1 location(s):
+#   sharedassets355.assets / Dung Ball Large
+
+fsm Ball Control {
+  start Init
+  on JUST BURST → Break  // from any state
+  on ROAR WAVE START → Break  // from any state
+  on ORBIT SHIELD → Break  // from any state
+
+  state Detect {
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), space=0, everyFrame=true)
+    Trigger2dEvent(trigger=OnTriggerEnter2D, collideTag="Hero Spell", collideLayer="", sendEvent=→"JUST BURST", storeCollider=var "")
+    Collision2dEvent(collision=0, collideTag="Untagged", sendEvent=→"COLLISION ENTER 2D", storeCollider=var "Collider", storeForce=(unset))
+    Collision2dEvent(collision=1, collideTag="Untagged", sendEvent=→"COLLISION STAY 2D", storeCollider=var "Collider", storeForce=(unset))
+    FloatTestToBool(float1=var "X Speed", float2=0, tolerance=0, equalBool=var "Static", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    FloatAddV2(floatVariable=var "End Timer", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "Static")
+    FloatCompare(float1=var "End Timer", float2=0.25, tolerance=0, equal=→"JUST BURST", lessThan=(none), greaterThan=→"JUST BURST", everyFrame=true)
+    on COLLISION ENTER 2D → Check
+    on COLLISION STAY 2D → Check
+  }
+
+  state Check {
+    GetCollision2dInfo(gameObjectHit=var "", relativeVelocity=(unset), relativeSpeed=(unset), contactPoint=(unset), contactNormal=var "Contact Normal", shapeCount=(unset), physics2dMaterialName="")
+    GetVector3XYZ(vector3Variable=var "Contact Normal", storeX=var "Normal X", storeY=var "Normal Y", storeZ=(unset), everyFrame=false)
+    FloatCompare(float1=var "Normal Y", float2=1, tolerance=0.1, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Normal X", float2=1, tolerance=0.1, equal=→"FLIP", lessThan=(none), greaterThan=(none), everyFrame=false)  // disabled
+    FloatCompare(float1=var "Normal X", float2=-1, tolerance=0.1, equal=→"FLIP", lessThan=(none), greaterThan=(none), everyFrame=false)  // disabled
+    FloatTestToBool(float1=var "X Speed", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Moving Right", everyFrame=false)
+    FloatTestToBool(float1=var "Normal X", float2=-1, tolerance=0.1, equalBool=var "Hit Right", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=false)
+    FloatTestToBool(float1=var "Normal X", float2=1, tolerance=0.1, equalBool=var "Hit Left", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Hit Left", var "Moving Right"], boolStates=[true, false], trueEvent=→"FLIP", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Hit Right", var "Moving Right"], boolStates=[true, true], trueEvent=→"FLIP", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    FloatCompare(float1=var "Normal Y", float2=1, tolerance=0.1, equal=(none), lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    on CANCEL → Detect
+    on FINISHED → Bounce
+  }
+
+  state Break {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    ActivateGameObject(gameObject=var "Nail Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ball Burst", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    StopParticleEmitter(gameObject=var "Smoke")
+    StopParticleEmitter(gameObject=var "Chunks")
+    SetCircleCollider(gameObject=Self, active=false)
+    PlayParticleEmitter(gameObject=var "Break Chunks", emit=0)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[dung_ball_death_1, dung_ball_death_2, dung_ball_death_3, dung_ball_death_4], weights=[1, 1, 1, 1], pitchMin=0.9, pitchMax=1.1)
+    on FINISHED → Pause
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Init {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ball Idle")
+    ActivateGameObject(gameObject=var "Nail Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    PlayParticleEmitter(gameObject=var "Smoke", emit=0)
+    PlayParticleEmitter(gameObject=var "Chunks", emit=0)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetCircleCollider(gameObject=Self, active=true)
+    SetIntValue(intVariable=var "Bounces", intValue=5, everyFrame=false)
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Reset Timer
+  }
+
+  state Pause {
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Recycle
+  }
+
+  state Bounce {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[dung_ball_bounce_1, dung_ball_bounce_2, dung_ball_bounce_3], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1.1)
+    IntAdd(intVariable=var "Bounces", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Bounces", integer2=0, equal=→"BURST", lessThan=→"BURST", greaterThan=(none), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=38.5, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on BURST → Break
+    on FINISHED → Reset Timer
+  }
+
+  state Flip {
+    FloatMultiply(floatVariable=var "X Speed", multiplyBy=-1, everyFrame=false)
+    DebugFloat(logLevel=1, floatVariable=var "X Speed", sendToUnityLog=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), everyFrame=false)
+    on FINISHED → Reset Timer
+  }
+
+  state Reset Timer {
+    SetFloatValue(floatVariable=var "End Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Detect
+  }
+
+  var End Timer: float = 0
+  var Normal X: float = 0
+  var Normal Y: float = 0
+  var X Speed: float = 0
+  var Bounces: int = 0
+  var Hit Left: bool = false
+  var Hit Right: bool = false
+  var Moving Right: bool = false
+  var Static: bool = false
+  var Contact Normal: vector3 = (0, 0, 0)
+  var Break Chunks: gameObject = Dung Ball Large/Break Chunks
+  var Chunks: gameObject = Dung Ball Large/Chunks
+  var Collider: gameObject = <null>
+  var Nail Detector: gameObject = Dung Ball Large/Nail Detector
+  var Self: gameObject = <null>
+  var Smoke: gameObject = Dung Ball Large/Smoke
+}

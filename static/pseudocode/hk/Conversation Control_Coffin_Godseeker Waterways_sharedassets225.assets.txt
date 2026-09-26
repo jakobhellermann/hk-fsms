@@ -1,0 +1,157 @@
+# Conversation Control
+# 1 location(s):
+#   sharedassets225.assets / Godseeker Waterways/Coffin
+
+fsm Conversation Control {
+  start Pause
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    ActivateGameObject(gameObject=Godseeker Waterways/Shiny Item Godfinder, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Pt Shake", storeResult=var "Pt Shake")
+    FindChild(gameObject=Self, childName="Unlock Glow", storeResult=var "Unlock Glow")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="godseekerUnlocked", isTrue=→"INACTIVE", isFalse=→"FINISHED")
+    on FINISHED → Idle
+    on INACTIVE → Inactive
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → No Key
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    ActivateGameObject(gameObject=Godseeker Waterways/CameraLockArea, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state No Key {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["GODSEEKER_COFFIN_NOKEY", "CP3"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    ActivateGameObject(gameObject=Godseeker Waterways/CameraLockArea, activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Key?
+  }
+
+  state Key? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="simpleKeys", storeValue=var "Simple Keys")
+    IntCompare(integer1=var "Simple Keys", integer2=0, equal=→"NOKEY", lessThan=→"NOKEY", greaterThan=→"KEY", everyFrame=false)
+    on KEY → Box Up YN
+    on NOKEY → Box Up
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=0, everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["GODSEEKER_COFFIN_KEY", "CP3"], storeResult=(unset var))
+    on NO → Decline Pause
+    on YES → Yes
+  }
+
+  state Yes {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Activate
+  }
+
+  state Decline Pause {
+    Wait(time=0.3, finishEvent=→"TALK FINISH", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    on FINISHED → 
+  }
+
+  state Activate {
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="simpleKeys", amount=var "Decrement")
+    SetPlayerDataBool(boolName="godseekerUnlocked", value=true)
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)  // disabled
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=manhole_key_turn (sharedassets7.assets))
+    ActivateGameObject(gameObject=var "Key", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Unlock Glow", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=final_boss_atrium_white_4, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Shake
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Inactive {
+    ActivateGameObject(gameObject=Godseeker Waterways/CameraLockArea, activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Godseeker Fall", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Shake {
+    ObjectJitter(gameObject=Godseeker Waterways/Coffin/GG_Waterways_Coffin_0003_1, x=0.1, y=0.1, z=(unset), allowMovement=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hollow_knight_rumble_pre_chain_break)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObject(var "Hero"), sendEvent="ROAR ENTER", delay=0, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt Shake", emit=0)
+    on FINISHED → Break
+  }
+
+  state Break {
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObject(var "Hero"), sendEvent="ROAR EXIT", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=coccoon_burst_open, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=Godseeker Waterways/Coffin/Pieces, activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FlingObjects(containerObject=Godseeker Waterways/Coffin/Pieces, adjustPosition=(0, 0, 0), randomisePosition=false, speedMin=30, speedMax=60, angleMin=60, angleMax=120)
+    ActivateGameObject(gameObject=Godseeker Waterways/Coffin/Burst, activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Godseeker Fall", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObject(var "Godseeker Fall"), sendEvent="DO FALL", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=Godseeker Waterways/Coffin/GG_Waterways_Coffin_0003_1, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="BigShake", delay=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(0))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    on FINISHED → 
+  }
+
+  var Decrement: int = -1
+  var Simple Keys: int = 0
+  var Godseeker: gameObject = Godseeker Waterways/Godseeker Awake
+  var Godseeker Fall: gameObject = Godseeker Waterways/Godseeker Fall
+  var Key: gameObject = Godseeker Waterways/Coffin/GG_Waterways_Coffin_0003_1/Key
+  var Pt Shake: gameObject = <null>
+  var Self: gameObject = <null>
+  var Unlock Glow: gameObject = <null>
+}

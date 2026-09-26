@@ -1,0 +1,438 @@
+# Nail Arts
+# 1 location(s):
+#   heroloading_assets_all.bundle / Hero_Hornet
+
+// uses template: hornet_nail_arts
+fsm Nail Arts {
+  start Init
+  on HERO DAMAGED → Cancel All  // from any state
+  on LEAVING SCENE → Cancel All  // from any state
+  on FSM CANCEL → Cancel All  // from any state
+
+  state Inactive {
+    SetBoolValue(boolVariable=var "Queued Attack", boolValue=false, everyFrame=false)
+    ListenForAttack(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    on BUTTON UP → Can Nail Art?
+  }
+
+  state Regain Full Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=NeedleArtRecovery())
+    on FINISHED → Inactive
+  }
+
+  state Init {
+    FindChild(gameObject=Self, childName="Special Attacks", storeResult=var "Special Attack Folder")
+    FindChild(gameObject=var "Special Attack Folder", childName="Sphere Flash", storeResult=var "Sphere Flash")
+    FindChild(gameObject=Self, childName="Effects/Dash Burst", storeResult=var "Dash Burst")
+    FindChild(gameObject=Self, childName="Attacks/Charge Slash Warrior", storeResult=var "Charge Slash Warrior")
+    FindChild(gameObject=Self, childName="Attacks/Charge Slash Warrior Rage", storeResult=var "Charge Slash Warrior R")
+    FindChild(gameObject=Self, childName="Attacks/Charge Slash Toolmaster/damager/dash stopper", storeResult=var "Dash Stopper")
+    FindChild(gameObject=Self, childName="Attacks/Charge Slash Wanderer/Lunge Stopper", storeResult=var "Wanderer Lunge Stopper")
+    FindChild(gameObject=Self, childName="Attacks/Charge Slash Warrior/Lunge Stopper", storeResult=var "Beast Lunge Stopper")
+    FindChild(gameObject=Self, childName="Attacks/Charge Slash Warrior Rage/Lunge Stopper", storeResult=var "Rage Lunge Stopper")
+    on FINISHED → Inactive
+  }
+
+  state Cancel All {
+    BoolTest(boolVariable=var "Queued Attack", isTrue=→"DO ATTACK", isFalse=(none), everyFrame=false)
+    DestroyObject(gameObject=var "Audio Player", delay=0, detachChildren=false)
+    ActivateGameObject(gameObject=var "Charge Slash Basic", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Charge Slash Upgraded", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Burst", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Inactive
+    on DO ATTACK → Get Charge Slash
+  }
+
+  state Can Nail Art? {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["dashing"], storeResult=var "Dashing", EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanNailArt", parameters=[], storeResult=var "Return Bool", EveryFrame=false)
+    BoolTest(boolVariable=var "Return Bool", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Inactive
+    on FINISHED → FSM CANCEL
+  }
+
+  state Take Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControlNotVelocity())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=var "Velocity Before Cancel", x=(unset), y=(unset), everyFrame=false)
+    DebugLogConsole(logLevel=0, text="TAKEN", sendToUnityLog=true)
+    on FINISHED → Facing?
+  }
+
+  state Wallslide? {
+    SetBoolValue(boolVariable=var "Queued Attack", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="TrySetCorrectFacing", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["wallSliding"], storeResult=var "Wall Sliding", EveryFrame=false)
+    BoolTest(boolVariable=var "Wall Sliding", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlipSprite())
+    on FINISHED → Take Control
+  }
+
+  state Antic {
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=0, functionCall=flashFocusHeal(), everyFrame=false)
+    ActivateGameObject(gameObject=var "Sphere Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash_Charged", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Lunge?
+  }
+
+  state Facing? {
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"LEFT", negativeEvent=→"RIGHT", space=0)
+    on LEFT → Left
+    on RIGHT → Right
+  }
+
+  state Left {
+    SetDamageEnemyDirectionV2(Target=var "Current Charge Slash", Direction=180, UseChildren=true)  // disabled
+    SetStringValue(stringVariable=var "Recoil Method", stringValue="ChargeSlashRecoilRight", everyFrame=false)
+    on FINISHED → Antic Type
+  }
+
+  state Right {
+    SetDamageEnemyDirectionV2(Target=var "Current Charge Slash", Direction=0, UseChildren=true)  // disabled
+    SetStringValue(stringVariable=var "Recoil Method", stringValue="ChargeSlashRecoilLeft", everyFrame=false)
+    on FINISHED → Antic Type
+  }
+
+  state Regain Partial Control {
+    SendMessageV2(gameObject=var "Current Charge Slash", delivery=SendMessage, options=1, functionCall=SetKeepWorldPosition(true), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="AffectedByGravity", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=ResetHardLandingTimer())
+    DoHeroMovement()
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName=var "Recoil Method", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Is Anim Finished", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=var "Deceleration", brakeOnExit=false)
+    on FINISHED → Regain Full Control
+  }
+
+  state FSM CANCEL {
+    SetBoolValue(boolVariable=var "Queued Attack", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetAllowNailChargingWhileRelinquished", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    GetVelocity2d(gameObject=Self, vector=var "Velocity Before Cancel", x=(unset), y=(unset), space=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+  }
+
+  state Do Slash {
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessageV2(gameObject=var "Current Charge Slash", delivery=SendMessage, options=1, functionCall=SetKeepWorldPosition(false), everyFrame=false)
+    SendMessageV2(gameObject=var "Current Charge Slash", delivery=SendMessage, options=1, functionCall=OnSlashStarting(), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Deceleration", brakeOnExit=false)
+    SetBoolValue(boolVariable=var "Is Anim Finished", boolValue=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=→"CANCEL")
+    on FINISHED → Regain Partial Control
+    on CANCEL → Set Finished
+  }
+
+  state Get Charge Slash {
+    GetHeroAttackObject(Target=var "Hero", Attack=ChargeSlash, StoreAttack=var "Current Charge Slash")
+    on FINISHED → Wallslide?
+  }
+
+  state Set Finished {
+    SetBoolValue(boolVariable=var "Is Anim Finished", boolValue=true, everyFrame=false)
+    on FINISHED → Regain Partial Control
+  }
+
+  state Lunge? {
+    GetHeroConfigVariable(VariableName="ChargeSlashLungeSpeed", StoreValue=var "Lunge Speed")
+    FloatCompare(float1=var "Lunge Speed", float2=0, tolerance=0, equal=(none), lessThan=→"TRUE", greaterThan=→"TRUE", everyFrame=false)
+    GetHeroConfigVariable(VariableName="ChargeSlashChain", StoreValue=var "Chain")
+    IntCompare(integer1=var "Chain", integer2=0, equal=(none), lessThan=(none), greaterThan=→"SPIN", everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FALSE", delay=0, everyFrame=false)
+    on TRUE → Do Lunge
+    on FALSE → Slash Recoil?
+    on SPIN → Begin Spin
+  }
+
+  state Do Lunge {
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessageV2(gameObject=var "Current Charge Slash", delivery=SendMessage, options=0, functionCall=SetKeepWorldPosition(false), everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=var "Lunge Speed", ySpeed=0, everyFrame=false)
+    GetHeroConfigVariable(VariableName="ChargeSlashLungeDeceleration", StoreValue=var "Lunge Deceleration")
+    DecelerateV2(gameObject=Self, deceleration=var "Lunge Deceleration", brakeOnExit=false)
+    SetBoolValue(boolVariable=var "Is Anim Finished", boolValue=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=→"CANCEL")
+    Trigger2dEvent(gameObject=var "Dash Stopper", trigger=0, collideTag="", sendEvent=→"DECEL", storeCollider=var "")
+    Trigger2dEvent(gameObject=var "Dash Stopper", trigger=1, collideTag="", sendEvent=→"DECEL", storeCollider=var "")
+    on FINISHED → Regain Partial Control
+    on CANCEL → Set Finished
+    on DECEL → Lunge Decel
+  }
+
+  state Do Spin {
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessageV2(gameObject=var "Current Charge Slash", delivery=SendMessage, options=0, functionCall=SetKeepWorldPosition(false), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Deceleration", brakeOnExit=false)  // disabled
+    SetBoolValue(boolVariable=var "Is Anim Finished", boolValue=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=→"CANCEL")
+    ListenForAttack(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    UmbrellaMotionXV2(gameObject=Self, accelerationFactor=var "Cyclone Accel", decelerationFactor=var "Cyclone Decel", maxSpeed=var "Cyclone Speed Max", active=true)
+    on FINISHED → Regain Partial Control
+    on CANCEL → Set Finished
+    on BUTTON DOWN → Queued Spin
+  }
+
+  state Queued Spin {
+    AudioStop(gameObject=var "Audio Player", fadeTime=0)  // disabled
+    PlayAudioEvent(audioClip=hornet_witch_needle_art (herosfxstatic_assets_all.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    DecelerateV2(gameObject=Self, deceleration=var "Deceleration", brakeOnExit=false)  // disabled
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=→"FINISHED")
+    UmbrellaMotionXV2(gameObject=Self, accelerationFactor=var "Cyclone Accel", decelerationFactor=var "Cyclone Decel", maxSpeed=var "Cyclone Speed Max", active=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Velocity Y", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Velocity Y", minValue=0, maxValue=100, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Velocity Y", everyFrame=false)
+    on FINISHED → Loop Spin
+  }
+
+  state Loop Spin {
+    IntOperator(integer1=var "Chain", integer2=1, operation=Subtract, storeResult=var "Chain", everyFrame=false)
+    IntCompare(integer1=var "Chain", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash_Charged_Loop", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Do Spin
+    on CANCEL → Regain Partial Control
+  }
+
+  state Antic Type {
+    PlayAudioEvent(audioClip=hornet_needle_art_release_burst (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    CheckIfCrestEquipped(Crest=Reaper (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"REAPER", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Wanderer (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"WANDERER", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Warrior (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"WARRIOR", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Toolmaster (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"TOOLMASTER", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Spell (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"SHAMAN", falseEvent=(none), storeValue=(unset))
+    on FINISHED → Antic
+    on REAPER → Reaper Kickoff
+    on WANDERER → Wanderer Antic
+    on WARRIOR → Warrior2 Antic
+    on TOOLMASTER → Antic Drill
+    on SHAMAN → Shaman Kickoff
+  }
+
+  state Antic Rpr {
+    PlayAudioEvent(audioClip=hornet_reaper_nailart_start_on_flash (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=0, functionCall=flashFocusHeal(), everyFrame=false)
+    ActivateGameObject(gameObject=var "Sphere Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash_Charged", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    on FINISHED → Lunge?
+  }
+
+  state Wanderer Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash_Charged", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=true)
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=0, functionCall=flashFocusHeal(), everyFrame=false)
+    ActivateGameObject(gameObject=var "Sphere Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Wanderer Attack
+  }
+
+  state Wanderer Attack {
+    PlayAudioEvent(audioClip=hornet_wanderer_needle_art (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetVelocityByScale(gameObject=Self, speed=-45, ySpeed=0, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.78, brakeOnExit=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.25, targetSpeed=-10)
+    DecelerateXY(gameObject=Self, decelerationX=0.78, decelerationY=(unset), brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Trigger2dEvent(gameObject=var "Wanderer Lunge Stopper", trigger=0, collideTag="", sendEvent=→"ATTACK LANDED", storeCollider=var "")
+    Trigger2dEvent(gameObject=var "Wanderer Lunge Stopper", trigger=0, collideTag="", sendEvent=→"ATTACK LANDED", storeCollider=var "")
+    on FINISHED → Set Finished
+    on ATTACK LANDED → Wanderer DmgBrake
+  }
+
+  state Wanderer DmgBrake {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Set Finished
+  }
+
+  state Warrior Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash_Charged", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=5, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=false)
+    UmbrellaMotionX(gameObject=Self, accelerationFactor=1.5, decelerationFactor=0, maxSpeed=10)
+    on FINISHED → State 1
+  }
+
+  state Warrior Attack {
+    PlayAudioEvent(audioClip=hornet_beast_needle_art (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=0, functionCall=flashFocusHeal(), everyFrame=false)
+    ActivateGameObject(gameObject=var "Sphere Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-50, ySpeed=-20, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=0.85, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    Trigger2dEvent(gameObject=var "Current Lunge Stopper", trigger=0, collideTag="", sendEvent=→"ATTACK LANDED", storeCollider=var "")
+    Trigger2dEvent(gameObject=var "Current Lunge Stopper", trigger=0, collideTag="", sendEvent=→"ATTACK LANDED", storeCollider=var "")
+    on FINISHED → Set Finished
+    on ATTACK LANDED → Warrior DmgBrake
+  }
+
+  state Warrior DmgBrake {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Set Finished
+  }
+
+  state In Rage Mode? {
+    HeroGetWarriorCrestState(IsInRageMode=var "In Rage Mode")
+    BoolTest(boolVariable=var "In Rage Mode", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Set Nml
+    on TRUE → Set Rage
+  }
+
+  state Set Nml {
+    SetGameObject(variable=var "Current Charge Slash", gameObject=var "Charge Slash Warrior", everyFrame=false)
+    SetGameObject(variable=var "Current Lunge Stopper", gameObject=var "Beast Lunge Stopper", everyFrame=false)  // disabled
+    on FINISHED → Warrior2 Slash
+  }
+
+  state Set Rage {
+    SetGameObject(variable=var "Current Charge Slash", gameObject=var "Charge Slash Warrior R", everyFrame=false)
+    SetGameObject(variable=var "Current Lunge Stopper", gameObject=var "Rage Lunge Stopper", everyFrame=false)  // disabled
+    on FINISHED → Warrior2 Slash
+  }
+
+  state Begin Spin {
+    PlayAudioEvent(audioClip=hornet_witch_needle_art (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="AffectedByGravity", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    FindNamedChild(gameObject=var "Current Charge Slash", storeResult=var "damager 01")
+    FindNamedChild(gameObject=var "Current Charge Slash", storeResult=var "damager 02")
+    SendMessage(gameObject=var "damager 01", delivery=SendMessage, options=1, functionCall=SetSilkGenerationFull())  // disabled
+    SendMessage(gameObject=var "damager 02", delivery=SendMessage, options=1, functionCall=SetSilkGenerationFull())  // disabled
+    CallMethodProper(gameObject=var "damager 01", behaviour="DamageEnemies", methodName="SetSilkGenerationFull", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "damager 02", behaviour="DamageEnemies", methodName="SetSilkGenerationFull", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Do Spin
+  }
+
+  state Lunge Decel {
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    SetBoolValue(boolVariable=var "Is Anim Finished", boolValue=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=→"CANCEL")
+    on FINISHED → Regain Partial Control
+    on CANCEL → Set Finished
+  }
+
+  state Antic Drill {
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=0, functionCall=flashFocusHeal(), everyFrame=false)
+    ActivateGameObject(gameObject=var "Sphere Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash_Charged", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Is Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Is Grounded", floatVariable=var "Velocity Y", falseValue=0, trueValue=1.5, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=30, ySpeed=var "Velocity Y", everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.83, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Drill Sfx
+  }
+
+  state Reaper Kickoff {
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"FINISHED", EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)
+    on FINISHED → Antic Rpr
+  }
+
+  state Slash Recoil? {
+    CheckIfCrestEquipped(Crest=Spell (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName=var "Recoil Method", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Do Slash
+  }
+
+  state Drill Sfx {
+    PlayAudioEvent(audioClip=hornet_architect_charge_attack (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Lunge?
+  }
+
+  state Warrior2 Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NeedleArt Dash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=0, functionCall=flashFocusHeal(), everyFrame=false)
+    ActivateGameObject(gameObject=var "Sphere Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Warrior2 Leap
+  }
+
+  state State 1 {
+    on FINISHED → Warrior Attack
+  }
+
+  state Warrior2 Leap {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Is Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Is Grounded", floatVariable=var "Velocity Y", falseValue=10, trueValue=17, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-15, ySpeed=var "Velocity Y", everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_jump_nogap (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValueAtTime(BoolVariable=var "Can Drift", BoolValue=true, Time=0.05, SetOppositeOnStateEntry=true)
+    UmbrellaMotionXV2(gameObject=Self, accelerationFactor=1, decelerationFactor=0, maxSpeed=20, active=var "Can Drift")
+    on FINISHED → In Rage Mode?
+  }
+
+  state Warrior2 Slash {
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_reaper_needle_art (herosfxstatic_assets_all.bundle), pitchMin=1.15, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Warrior2 End
+  }
+
+  state Warrior2 End {
+    DecelerateXY(gameObject=Self, decelerationX=0, decelerationY=(unset), brakeOnExit=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Current Charge Slash", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Set Finished
+  }
+
+  state Shaman Kickoff {
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"FINISHED", EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)
+    on FINISHED → Antic
+  }
+
+  var Lunge Speed: float = 0
+  var Lunge Deceleration: float = 0
+  var Deceleration: float = 0.92
+  var Cyclone Accel: float = 1
+  var Cyclone Decel: float = 0
+  var Cyclone Speed Max: float = 8
+  var Velocity Y: float = 0
+  var Chain: int = 0
+  var Dashing: bool = false
+  var Queued Attack: bool = false
+  var Return Bool: bool = false
+  var Wall Sliding: bool = false
+  var Is Anim Finished: bool = false
+  var In Rage Mode: bool = false
+  var Is Grounded: bool = false
+  var Can Drift: bool = false
+  var Recoil Method: string = ""
+  var Velocity Before Cancel: vector2 = (0, 0)
+  var Audio Player: gameObject = <null>
+  var Charge Slash Basic: gameObject = <null>
+  var Charge Slash Upgraded: gameObject = <null>
+  var Current Charge Slash: gameObject = <null>
+  var Special Attack Folder: gameObject = <null>
+  var Sphere Flash: gameObject = <null>
+  var Dash Burst: gameObject = <null>
+  var Charge Slash Warrior: gameObject = <null>
+  var Charge Slash Warrior R: gameObject = <null>
+  var Dash Stopper: gameObject = <null>
+  var Wanderer Lunge Stopper: gameObject = <null>
+  var Beast Lunge Stopper: gameObject = <null>
+  var Rage Lunge Stopper: gameObject = <null>
+  var Current Lunge Stopper: gameObject = <null>
+  var damager 01: gameObject = <null>
+  var damager 02: gameObject = <null>
+}

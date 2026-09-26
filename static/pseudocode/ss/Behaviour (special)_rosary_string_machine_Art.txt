@@ -1,0 +1,87 @@
+# Behaviour (special)
+# 2 location(s):
+#   Greymoor_01 / rosary_stringer/Art/rosary_string_machine
+#   Shellwood_08c / rosary_stringer/Art/rosary_string_machine
+
+fsm Behaviour (special) {
+  start Inert
+
+  state Inert {
+    on INTERACT → Confirm
+  }
+
+  state Confirm {
+    GetCostFromReference(Reference=var "Cost Reference", StoreValue=var "Cost")
+    DialogueYesNoV2(TranslationSheet="Fast Travel", TranslationKey="PAY_TOLL_MSG", UseCurrency=true, CurrencyCost=var "Cost", CurrencyType=var "Currency Type", ConsumeCurrency=false, WillGetItem=var "Collectable Item", YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on YES → Start Sequence
+    on NO → End Interaction
+    on CONVO_END_FORCED → End Interaction
+  }
+
+  state End Interaction {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Inert
+  }
+
+  state Wait For Currency Counter {
+    SendMessageV2(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl(), everyFrame=false)
+    SetPlayerDataVariable(VariableName="disableSaveQuit", SetValue=true)
+    TakeCurrency(CurrencyType=var "Currency Type", Amount=var "Cost")
+    RespondToCurrencyCounterEvents(CurrencyType=var "Currency Type", StateEvent=StartTake, Response=→"FINISHED")  // disabled
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fill Start
+  }
+
+  state Taking Currency {
+    RespondToCurrencyCounterEvents(CurrencyType=var "Currency Type", StateEvent=Stopped, Response=→"FINISHED")
+    SetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=var "Dish", vector=(unset), x=(unset), y=-0.05, z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    iTweenMoveTo(gameObject=var "Dish", id="", transformPosition=var "", vectorPosition=var "Dish Start Position", time=0.1, delay=0, speed=(unset), space=1, easeType=21, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"TICK", realTime=false, stopOnExit=true, loopDontFinish=false)
+    on TICK → Taking Currency
+    on FINISHED → Take End
+  }
+
+  state Take End {
+    SetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Fill End
+  }
+
+  state Start Sequence {
+    GetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Stand 1", AnimationCompleteEvent=(none))
+    on FINISHED → Wait For Currency Counter
+  }
+
+  sequence state Give Object {
+    CollectableItemCollect(Amount=1, Item=var "Collectable Item")
+    SetPlayerDataVariable(VariableName="disableSaveQuit", SetValue=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Stand 3", AnimationCompleteEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → End Interaction
+  }
+
+  sequence state Fill End {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Is Hero Right", leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Is Hero Right", stringVariable=var "End Anim", falseString="Fill End R", trueString="Fill End L", everyFrame=false)
+    AnimatorPlayStateWait(target=Self, stateName=var "End Anim", finishEvent=(none))
+    on FINISHED → Give Object
+  }
+
+  state Fill Start {
+    AnimatorPlay(gameObject=Self, stateName="Fill", layer=0, normalizedTime=0, everyFrame=false)
+    PlayAudioEvent(audioClip=rosary_string_machine_load_rosaries (sfxstatic_assets_areagreymoorareahangareashellwood.bundle), pitchMin=0.98, pitchMax=1.02, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Taking Currency
+  }
+
+  var Collectable Item: object = Rosary_Set_Small (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle)
+  var Cost Reference: object = Rosary Set Small (dataassets_assets_assets/dataassets/costs.bundle)
+
+  var Cost: int = 100
+  var Is Hero Right: bool = false
+  var End Anim: string = ""
+  var Dish Start Position: vector3 = (0, 0, 0)
+  var Dish: gameObject = rosary_stringer/Art/rosary_string_machine/Active/rosary_string_machine_dish
+  var Currency Type: enum = CurrencyType(0)
+}

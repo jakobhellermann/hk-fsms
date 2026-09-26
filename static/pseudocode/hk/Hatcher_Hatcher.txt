@@ -1,0 +1,94 @@
+# Hatcher
+# 7 location(s):
+#   Crossroads_19 / _Enemies/Hatcher
+#   Crossroads_22 / Hatcher
+#   Crossroads_27 / _Enemies/Hatcher 1
+#   Crossroads_27 / _Enemies/Hatcher
+#   Crossroads_27 / _Enemies/Hatcher 2
+#   Crossroads_35 / _Enemies/Hatcher
+#   Crossroads_35 / Infected_Parent/Hatcher (1)
+
+// component disabled: this FSM does not run until something enables it
+fsm Hatcher {
+  start Initiate
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Tk2dPlayFrame(gameObject=Self, frame=2)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    IdleBuzz(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=1.75, accelerationMax=15, roamingRange=1)
+    GetFsmBool(gameObject=Self, fsmName="line_of_sight_alert", variableName="Can See Hero", storeValue=var "Can See Hero", everyFrame=true)  // disabled
+    GetFsmBool(gameObject=var "Alerter", fsmName="alert_range", variableName="In Alert Range", storeValue=var "In Alert Range", everyFrame=true)  // disabled
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)  // disabled
+    BoolTest(boolVariable=var "startAlert", isTrue=→"ALERT", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Alert Range", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    on ALERT → Distance Fly
+  }
+
+  state Distance Fly {
+    SetAudioPitch(gameObject=Self, pitch=1.2, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Tk2dPlayFrame(gameObject=Self, frame=2)
+    RandomFloat(min=3, max=4, storeResult=var "Fire Timer")  // disabled
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=3.5, acceleration=0.1, targetsHeight=true, height=3.5)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=true, everyFrame=true)
+    Wait(time=var "Fire Timer", finishEvent=→"WAIT", realTime=false)  // disabled
+    WaitRandom(timeMin=2, timeMax=3, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Hatched Max Check
+  }
+
+  state Fire {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[hatcher_give_birth (resources.assets)], weights=[1], pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    GetRandomChild(gameObject=var "Cage", storeResult=var "Shot")
+    GameObjectIsNull(gameObject=var "Shot", isNull=→"CANCEL", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Spawn X", y=var "Spawn Y", z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Spawn Y", add=-1, everyFrame=false, perSecond=false)
+    SetPosition(gameObject=var "Shot", vector=(unset), x=var "Spawn X", y=var "Spawn Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Shot"), sendEvent="SPAWN", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=var "Shot", vector=(unset), x=(unset), y=-5, everyFrame=false)
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=(0, -1, 0), spawnMin=5, spawnMax=6, speedMin=2, speedMax=5, angleMin=210, angleMax=330, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    IntAdd(intVariable=var "Spawned", add=1, everyFrame=false)  // disabled
+    SetFsmGameObject(gameObject=var "Shot", fsmName="health_manager_enemy", variableName="Spawner", setValue=var "Self", everyFrame=false)  // disabled
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Distance Fly
+    on CANCEL → Distance Fly
+  }
+
+  state Fire Anticipate {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fire")
+    Wait(time=0.335, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Fire
+  }
+
+  state Initiate {
+    GetOwner(storeGameObject=var "Self")
+    GetHero(storeResult=var "Hero")
+    FindGameObject(objectName="", withTag="Extra Tag", store=var "Cage")
+    on FINISHED → Idle
+  }
+
+  state Hatched Max Check {
+    IntCompare(integer1=var "Spawned", integer2=var "Hatched Max", equal=→"TRUE", lessThan=→"FALSE", greaterThan=→"TRUE", everyFrame=false)  // disabled
+    GetChildCount(gameObject=var "Cage", storeResult=var "Cage Children")
+    IntCompare(integer1=var "Cage Children", integer2=0, equal=→"TRUE", lessThan=→"TRUE", greaterThan=→"FALSE", everyFrame=false)
+    on TRUE → Distance Fly
+    on FALSE → Fire Anticipate
+  }
+
+  var Fire Timer: float = 0
+  var Spawn X: float = 0
+  var Spawn Y: float = 0
+  var Cage Children: int = 0
+  var Hatched Max: int = 5
+  var Spawned: int = 0
+  var Alert Range: bool = false
+  var Can See Hero: bool = false
+  var In Alert Range: bool = false
+  var startAlert: bool = false
+  var Alerter: gameObject = <null>
+  var Cage: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shot: gameObject = <null>
+}

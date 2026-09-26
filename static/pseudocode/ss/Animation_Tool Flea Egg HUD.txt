@@ -1,0 +1,117 @@
+# Animation
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Tool Flea Egg HUD
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Tool Flea Egg HUD
+
+fsm Animation {
+  start Pause
+  on TOOL EQUIPS CHANGED → Was Equipped?  // from any state
+
+  state Inert {
+    AnimatorPlay(gameObject=Self, stateName="Disappear", layer=0, normalizedTime=1, everyFrame=false)
+    SetBoolValue(boolVariable=var "Effect Active", boolValue=false, everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+  }
+
+  state Appear {
+    SetBoolValue(boolVariable=var "Was Equipped", boolValue=true, everyFrame=false)
+    AnimatorPlayStateWait(target=Self, stateName="Appear", finishEvent=(none))
+    on FINISHED → Activate?
+  }
+
+  state Idle Inactive {
+    EnableFsmSelf(SetEnabled=false)
+    SetBoolValue(boolVariable=var "Effect Active", boolValue=false, everyFrame=false)
+    on SILK REFRESHED → Activate?
+    on HEALTH UPDATE → Activate?
+    on HERO HEALED → Activate?
+  }
+
+  state Pause {
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Equipped?
+  }
+
+  sequence state Disappear {
+    SetBoolValue(boolVariable=var "Was Equipped", boolValue=false, everyFrame=false)
+    AnimatorPlayStateWait(target=Self, stateName="Disappear", finishEvent=(none))
+    on FINISHED → Inert
+  }
+
+  state Equipped? {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Inert
+    on TRUE → Appear
+  }
+
+  state Was Equipped? {
+    BoolTest(boolVariable=var "Was Equipped", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Equipped?
+    on TRUE → Equipped? 2
+  }
+
+  state Equipped? 2 {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Disappear
+    on TRUE → Activate?
+  }
+
+  state Equipped? 3 {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Disappear
+    on TRUE → Appear
+  }
+
+  sequence state Activate? {
+    NextFrameEvent(sendEvent=(none))
+    GetPlayerDataVariable(VariableName="health", StoreValue=var "Current Health")
+    GetPlayerDataVariable(VariableName="CurrentMaxHealth", StoreValue=var "Max Health")
+    IntCompare(integer1=var "Current Health", integer2=var "Max Health", equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    GetSilk(StoreAmount=var "Silk")
+    IntCompare(integer1=var "Silk", integer2=3, equal=→"ACTIVATE", lessThan=→"FINISHED", greaterThan=→"ACTIVATE", everyFrame=false)
+    on ACTIVATE → Activate
+    on FINISHED → Idle Inactive
+  }
+
+  state Activate {
+    BoolTest(boolVariable=var "Effect Active", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CheckHudVisible(trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset), everyFrame=false)
+    AnimatorPlay(gameObject=Self, stateName="Activate", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Effect Active", boolValue=true, everyFrame=false)
+    on FINISHED → Idle Active
+  }
+
+  state Idle Active {
+    EnableFsmSelf(SetEnabled=false)
+    on SILK REFRESHED → Deactivate?
+    on HEALTH UPDATE → Deactivate?
+    on HERO HEALED → Deactivate?
+    on HUD COMING IN → Activate
+  }
+
+  sequence state Deactivate? {
+    NextFrameEvent(sendEvent=(none))
+    GetPlayerDataVariable(VariableName="health", StoreValue=var "Current Health")
+    GetPlayerDataVariable(VariableName="CurrentMaxHealth", StoreValue=var "Max Health")
+    IntCompare(integer1=var "Current Health", integer2=var "Max Health", equal=(none), lessThan=→"DEACTIVATE", greaterThan=(none), everyFrame=false)
+    GetSilk(StoreAmount=var "Silk")
+    IntCompare(integer1=var "Silk", integer2=3, equal=→"FINISHED", lessThan=→"DEACTIVATE", greaterThan=→"FINISHED", everyFrame=false)
+    on DEACTIVATE → Deactivate
+    on FINISHED → Idle Active
+  }
+
+  state Deactivate {
+    AnimatorPlay(gameObject=Self, stateName="Deactivate", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    on FINISHED → Idle Inactive
+  }
+
+  var Silk: int = 0
+  var Current Health: int = 0
+  var Max Health: int = 0
+  var Was Equipped: bool = false
+  var Effect Active: bool = false
+  var Sprite: gameObject = <null>
+  var Spawned Audio: gameObject = <null>
+  var Tool: object = Flea Charm (dataassets_assets_assets/dataassets/tools/toolitems.bundle)
+}

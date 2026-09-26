@@ -1,0 +1,104 @@
+# Trapdoor
+# 1 location(s):
+#   Halfway_01 / cellar trapdoor set
+
+fsm Trapdoor {
+  start Init
+  on CLOSE TEST → Close  // from any state
+
+  sequence state Init {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    NextFrameEvent(sendEvent=(none))
+    AnimatorPlay(gameObject=Self, stateName="Closed", layer=0, normalizedTime=1, everyFrame=false)
+    on OPEN TRAPDOOR → Open
+    on START ENTRY → Cancel Superjump?
+  }
+
+  state Open {
+    AnimatorPlayStateWait(target=Self, stateName="Open", finishEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=item_chest_open (sfxstatic_assets_areaantareadustareagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Opened
+  }
+
+  state Hop In Antic {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Hop", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=hornet_run_start_1 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Hop In
+  }
+
+  state Hop In {
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.6)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 13), x=(unset), y=(unset), everyFrame=false)
+    SetCollider(gameObject=var "Hero", active=false, resetOnExit=false)
+    CameraFreezeInPlace(freezeTargetAlso=true)
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=hornet_jump_ss (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Fall
+  }
+
+  state Opened {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on INTERACT → Set Respawn
+  }
+
+  state Fall {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Fall", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GetPosition2D(gameObject=var "Fall Stop Point", vector=(unset), x=(unset), y=var "Fall Stop Y", space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Y", float2=var "Fall Stop Y", tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Stop
+  }
+
+  state Stop {
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    SetCollider(gameObject=var "Hero", active=true, resetOnExit=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Transition
+  }
+
+  state Transition {
+    EndInteractEvents(Target=Self)
+    GetProperty(targetProperty=TransitionPoint.targetScene on cellar trapdoor set/bot1@TransitionPoint, everyFrame=false)
+    GetProperty(targetProperty=TransitionPoint.entryPoint on cellar trapdoor set/bot1@TransitionPoint, everyFrame=false)
+    BeginSceneTransition(sceneName=var "Target Scene", entryGateName=var "Entry Gate", entryDelay=0, visualization=Default, preventCameraFadeOut=true)
+  }
+
+  state Start Open {
+    SendEventToRegister(eventName="OPEN TRAPDOOR")
+    AnimatorPlay(gameObject=Self, stateName="Open", layer=0, normalizedTime=1, everyFrame=false)
+    on FINISH ENTRY → Has Nectar
+  }
+
+  state Has Nectar {
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=1, IsCollected=→"TRUE", NotCollected=→"FALSE", ItemName="", Sprite=var "", Item=Vintage Nectar (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    on FALSE → Opened
+    on TRUE → Close
+  }
+
+  sequence state Close {
+    AddHeroInputBlocker(Blocker=Self)
+    AnimatorPlayStateWait(target=Self, stateName="Close", finishEvent=(none))
+    SendEventToRegister(eventName="FINISHED BASEMENT")
+    RemoveHeroInputBlocker(Blocker=Self)
+  }
+
+  state Set Respawn {
+    SetDeathRespawnV2(RespawnMarkerName="RestBench", RespawnType=1, RespawnFacingRight=false, RespawnMapZone=NONE, RespawnExtraRestZone=None)
+    on FINISHED → Hop In Antic
+  }
+
+  state Cancel Superjump? {
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=1, IsCollected=(none), NotCollected=→"FINISHED", ItemName="", Sprite=var "", Item=Vintage Nectar (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ResetSceneExitedStates", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Start Open
+  }
+
+  var Fall Stop Y: float = 0
+  var Hero Y: float = 0
+  var Entry Gate: string = ""
+  var Target Scene: string = ""
+  var Door: gameObject = cellar trapdoor set/bot1
+  var Fall Stop Point: gameObject = cellar trapdoor set/Fall Stop Point
+}

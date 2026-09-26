@@ -1,0 +1,152 @@
+# Dialogue
+# 1 location(s):
+#   Belltown / Town States/Spinner Defeated/Bagpipers/Leader
+
+fsm Dialogue {
+  start Init
+
+  state Init {
+    on FINISHED → Here?
+  }
+
+  state Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=(none), ActiveOuter=→"SING", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Met?
+    on SING → Sing Start
+  }
+
+  sequence state End {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    SetFsmBool(gameObject=Self, fsmName="Animation", variableName="Is Talking", setValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Meet {
+    SetPlayerDataVariable(VariableName="MetBelltownBagpipers", SetValue=true)
+    RunDialogue(Sheet="Caravan", Key="BAGPIPER_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Caravan", Key="BAGPIPER_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  sequence state Try End Quest {
+    QuestCompleteYesNo(Quest=var "Quest", ConsumeCurrency=true, YesEvent=→"SUCCESS", NoEvent=→"FAILURE", ReturnHUDAfter=false)  // disabled
+    TryEndQuestV2(ConsumeCurrency=true, FailEvent=→"FAILURE", SuccessEvent=→"SUCCESS", Quest=var "Quest")
+    on FAILURE → Quest Repeat
+    on SUCCESS → Complete Text
+  }
+
+  state Complete Text {
+    SendEventByName(eventTarget=GameObject(var "Root"), sendEvent="RESPONSE LONG", delay=0, everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key="BAGPIPER_QUEST_COMPLETE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Quest Status? {
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=→"TRACKED", CompletedEvent=→"COMPLETE", Quest=var "Quest")
+    CanBeginQuest(CannotBeginEvent=→"CANCEL", CanBeginEvent=(none), StoreValue=(unset), Quest=var "Quest")
+    on CANCEL → Repeat
+    on FINISHED → Offered?
+    on TRACKED → Try End Quest
+    on COMPLETE → Repeat
+  }
+
+  state Offer Quest {
+    SetPlayerDataVariable(VariableName="BelltownBagpipersOfferedQuest", SetValue=true)
+    RunDialogue(Sheet="Caravan", Key="BAGPIPER_QUEST_OFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Prompt
+  }
+
+  state Quest Repeat {
+    RunDialogue(Sheet="Caravan", Key="BAGPIPER_QUEST_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  sequence state Quest Prompt {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    QuestYesNo(Quest=var "Quest", YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Quest Decline
+    on TRUE → Quest Accept
+  }
+
+  state Quest Decline {
+    RunDialogue(Sheet="Caravan", Key="BAGPIPER_QUEST_DECLINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Quest Accept {
+    SendEventByName(eventTarget=GameObject(var "Root"), sendEvent="RESPONSE SHORT", delay=0, everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key="BAGPIPER_QUEST_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Offered? {
+    PlayerDataVariableTest(VariableName="BelltownBagpipersOfferedQuest", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Offer Quest
+    on TRUE → Reoffer Quest
+  }
+
+  state Reoffer Quest {
+    RunDialogue(Sheet="Caravan", Key="BAGPIPER_QUEST_REOFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Prompt
+  }
+
+  state Met? {
+    SetFsmBool(gameObject=Self, fsmName="Animation", variableName="Is Talking", setValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Root"), sendEvent="RESPONSE SHORT", delay=0, everyFrame=false)
+    PlayerDataVariableTest(VariableName="MetBelltownBagpipers", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Meet
+    on TRUE → Quest Status?
+  }
+
+  state Here? {
+    SendEvent(eventTarget=Self, sendEvent=→"CANCEL", delay=0, everyFrame=false)
+    PlayerDataVariableTest(VariableName="citadelWoken", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"CANCEL")
+    ActivateGameObject(gameObject=var "State Parent Here", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "State Parent Not Here", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on CANCEL → Not Here
+    on FINISHED → Idle
+  }
+
+  state Not Here {
+    ActivateGameObject(gameObject=var "State Parent Here", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "State Parent Not Here", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Root", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Sing {
+    SendEventByName(eventTarget=GameObject(var "Root"), sendEvent="SING", delay=0, everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    WaitRandom(timeMin=2, timeMax=3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Sing Play
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    SendEventByName(eventTarget=GameObject(var "Root"), sendEvent="SING END", delay=0, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Sing Start {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Sing
+  }
+
+  state Sing Play {
+    SendEventByName(eventTarget=GameObject(var "Root"), sendEvent="SING END", delay=0, everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    WaitRandom(timeMin=0.7, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Sing
+    on CANCEL → Sing End
+  }
+
+  var State Parent Here: gameObject = Town States/Spinner Defeated/Bagpipers Here
+  var State Parent Not Here: gameObject = Town States/Spinner Defeated/Bagpipers Not Here
+
+  var Root: gameObject = Town States/Spinner Defeated/Bagpipers
+  var Quest: object = <null>
+}

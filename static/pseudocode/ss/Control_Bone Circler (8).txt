@@ -1,0 +1,154 @@
+# Control
+# 1 location(s):
+#   Bone_14 / Black Thread States Thread Only Variant/Black Thread World/Bone Circler (8)
+
+fsm Control {
+  start Start Pause
+  on RESET POS → Init  // from any state
+  on GO UP → Go Up  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    FindAlertRange(target=Self, storeResult=var "Alert Range", childName="Alert Range")
+    SetParent(gameObject=var "Home", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject2D(gameObject=var "Home", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1.5, speedMax=2, accelerationMin=10, accelerationMax=15, roamingRangeX=1.5, roamingRangeY=1.5, manualStartPos=var "Start Pos")
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=var "Alert", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    BoolTest(boolVariable=var "Alert", isTrue=→"CHASE", isFalse=(none), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=→"CHASE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    GameObjectIsNull(gameObject=var "NPC Target", isNull=(none), isNotNull=→"TARGET", storeResult=(unset), everyFrame=false)
+    on CHASE → Startle
+    on SING → Sing
+    on TARGET → Chase Target
+    on TOOK DAMAGE → Dmg Check
+  }
+
+  state Chase {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=var "Alert", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=var "Close Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    GetDistance(gameObject=var "Hero", target=var "Home", storeResult=var "Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=var "Chase Distance", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Range Out", everyFrame=true)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=false, everyFrame=true)
+    ChaseObject(gameObject=Self, target=var "Hero", speedMax=5, acceleration=0.125, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0, offsetX=0, offsetY=0)
+    BoolTestMulti(boolVariables=[var "Alert", var "Range Out", var "Close Range"], boolStates=[false, true, false], trueEvent=→"RANGE OUT", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    GameObjectIsNull(gameObject=var "NPC Target", isNull=(none), isNotNull=→"TARGET", storeResult=(unset), everyFrame=false)
+    on RANGE OUT → Pursue
+    on SING → Sing
+    on TARGET → Chase Target
+  }
+
+  state Return {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=0.75, speedMax=7, accelerationMin=50, accelerationMax=50, roamingRangeX=1, roamingRangeY=1, manualStartPos=var "Start Pos")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=(unset), sendEvent="CHASE", outOfRangeEvent="", everyFrame=true)
+    on FINISHED → Idle
+    on CHASE → Startle
+    on TOOK DAMAGE → Startle
+  }
+
+  state Startle {
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[bone_circler_attack_1 (sfxstatic_assets_areabone.bundle), bone_circler_attack_2 (sfxstatic_assets_areabone.bundle), bone_circler_attack_3 (sfxstatic_assets_areabone.bundle)], weights=[1, 1, 1], pitchMin=0.85, pitchMax=1.15, stopPreviousSound=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip=" ", resetFrame=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase Start
+  }
+
+  state Chase End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="AggroEnd", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.975, brakeOnExit=false)
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[bone_circler_alert_1 (sfxstatic_assets_areabone.bundle), bone_circler_alert_2 (sfxstatic_assets_areabone.bundle), bone_circler_alert_3 (sfxstatic_assets_areabone.bundle)], weights=[1, 1, 1], pitchMin=0.85, pitchMax=1.15, stopPreviousSound=false)
+    on FINISHED → Return
+  }
+
+  state Pursue {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=var "Alert", sendEvent="CHASE", outOfRangeEvent="", everyFrame=true)
+    GetDistance(gameObject=var "Hero", target=var "Home", storeResult=var "Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=var "Chase Distance", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Range Out", everyFrame=true)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=false, everyFrame=true)
+    ChaseObject(gameObject=Self, target=var "Hero", speedMax=5, acceleration=0.125, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0, offsetX=0, offsetY=0)
+    BoolTestMulti(boolVariables=[var "Range Out"], boolStates=[false], trueEvent=→"CHASE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    Wait(time=3, finishEvent=→"RANGE OUT", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CHASE → Chase
+    on RANGE OUT → Chase End
+    on SING → Sing
+  }
+
+  state Chase Start {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Aggro")
+    on FINISHED → Chase
+  }
+
+  state Sing {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    IdleBuzzV4(gameObject=Self, waitMin=0.5, waitMax=0.75, speedMax=2, deceleration=0.8, accelerationMin=5, accelerationMax=5, roamingRangeX=0.15, roamingRangeY=0.15, manualStartPos=(unset))
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=<null>, noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.15, cancelOnEarlyExit=false)
+    on FINISHED → Chase Start
+  }
+
+  state Chase Target {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Aggro")
+    FaceObject(objectA=var "Self", objectB=var "NPC Target", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=false, everyFrame=true)
+    ChaseObject(gameObject=Self, target=var "NPC Target", speedMax=4, acceleration=0.1, targetSpread=2, spreadResetTimeMin=1, spreadResetTimeMax=3, offsetX=0, offsetY=0)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    WaitRandom(timeMin=1, timeMax=4, finishEvent=→"ROAR", realTime=false)
+    on SING → Sing
+    on ROAR → Roar
+  }
+
+  state Go Up {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    on FINISHED → Pursue
+  }
+
+  state Start Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Dmg Check {
+    BoolTest(boolVariable=var "No Dmg Response", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Startle
+    on CANCEL → Idle
+  }
+
+  state Roar {
+    FaceObject(objectA=var "Self", objectB=var "NPC Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[bone_circler_attack_1 (sfxstatic_assets_areabone.bundle), bone_circler_attack_2 (sfxstatic_assets_areabone.bundle), bone_circler_attack_3 (sfxstatic_assets_areabone.bundle)], weights=[1, 1, 1], pitchMin=0.85, pitchMax=1.15, stopPreviousSound=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase Target
+  }
+
+  var No Dmg Response: bool = false
+  var NPC Target: gameObject = <null>
+
+  var Chase Distance: float = 8
+  var Distance: float = 0
+  var Alert: bool = false
+  var Range Out: bool = false
+  var Close Range: bool = false
+  var Start Pos: vector3 = (0, 0, 0)
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Black Thread World/Bone Circler (8)/Audio Loop Voice
+  var Home: gameObject = Black Thread States Thread Only Variant/Black Thread World/Bone Circler (8)/Home
+  var Self: gameObject = <null>
+  var Alert Range: object = <null>
+}

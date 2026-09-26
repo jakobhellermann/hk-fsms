@@ -1,0 +1,1834 @@
+# Sprint
+# 1 location(s):
+#   heroloading_assets_all.bundle / Hero_Hornet
+
+// uses template: hornet_sprint
+fsm Sprint {
+  start Init
+  on HERO DAMAGED → Cancel All  // from any state
+  on FSM CANCEL → Cancel All  // from any state
+  on SPRINT CANCEL → Cancel All  // from any state
+  on MANTLE SPRINT → Start Sprint  // from any state
+  on LEAVING SCENE → Leaving Scene  // from any state
+  on HC CONFIG UPDATED → Cancel All  // from any state
+  on DO SPRINT SKID → Do Sprint Skid  // from any state
+  on SKID END → Skid SFX?  // from any state
+  on ENTER SPRINTING → Enter Sprint Wait  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindGameObject(objectName="", withTag="CameraTarget", store=var "Camera Target")
+    FindChild(gameObject=Self, childName="Centre", storeResult=var "Centre")
+    FindChild(gameObject=Self, childName="Effects", storeResult=var "Effects")
+    FindChild(gameObject=var "Effects", childName="Dash Burst", storeResult=var "Dash Burst")
+    FindChild(gameObject=var "Effects", childName="Hunter SprintAttackBurst", storeResult=var "Hunter SprintAttackBurst")
+    FindChild(gameObject=var "Effects", childName="Wall Bump", storeResult=var "Wall Bump")
+    FindChild(gameObject=Self, childName="Sounds", storeResult=var "Sounds")
+    FindChild(gameObject=var "Sounds", childName="Sprint Air Flip", storeResult=var "Sprint Air Sound")
+    GetHeroAttackObject(Target=Self, Attack=DashStab, StoreAttack=var "Dash Stab")
+    GetHeroAttackObject(Target=Self, Attack=DashStabAlt, StoreAttack=var "Dash Stab Alt")
+    GetHeroConfigVariable(VariableName="DashStabSpeed", StoreValue=var "Attack Speed")
+    GetHeroConfigVariable(VariableName="DashStabTime", StoreValue=var "Attack Time")
+    FindChild(gameObject=Self, childName="HeroBox", storeResult=var "HeroBox")  // disabled
+    FindChild(gameObject=Self, childName="Attacks/Scythe/DashUpper Slash", storeResult=var "Reaper Slash")
+    FindChild(gameObject=Self, childName="Attacks/Wanderer/RecoilStab", storeResult=var "Wanderer RecoilStab")
+    FindChild(gameObject=Self, childName="Attacks/Warrior/DashSpinSlash", storeResult=var "SpinSlash")
+    FindChild(gameObject=Self, childName="Attacks/Warrior/DashSlash", storeResult=var "Warrior Dash Slash")
+    FindChild(gameObject=Self, childName="Attacks/Warrior/DashSlash Rage", storeResult=var "Warrior Dash Slash R")
+    FindChild(gameObject=Self, childName="Attacks/Witch/Sprint Lash Damager", storeResult=var "Witch Lash Damager")
+    FindChild(gameObject=Self, childName="Attacks/Toolmaster/Dash Stab", storeResult=var "Toolmaster Drill Stab")
+    FindChild(gameObject=Self, childName="Attacks/Toolmaster/Dash Stab Charged", storeResult=var "Toolmaster Drill Stab Charged")
+    FindChild(gameObject=Self, childName="Attacks/Shaman/DashSlash", storeResult=var "Shaman Dash Slash")
+    FindChild(gameObject=Self, childName="Effects/Wanderer DashCombo Burst", storeResult=var "Wanderer DashCombo Burst")
+    FindChild(gameObject=Self, childName="Attacks/Witch/Dash Stab Parent/Dash Stab 2", storeResult=var "Witch DashSlashFinal")
+    FindChild(gameObject=Self, childName="Attacks/Witch/Followup Slash", storeResult=var "Followup Slash")
+    FindChild(gameObject=Self, childName="Attacks/Witch/Lash Checker Sprint", storeResult=var "Lash Checker")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Entered Sprinting", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Alt Timer", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Should Hard Land", boolValue=false, everyFrame=false)
+    FloatAdd(floatVariable=var "Can Attack Bonk", add=-1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Can Attack Bonk", minValue=0, maxValue=10, everyFrame=false)
+    on DASHED → Dashed
+    on TRY SPRINT → Instant Sprint
+    on WANDERER DASH COMBO → To Wanderer Combo
+    on DAMAGER TINKED → Idle To Bonk
+  }
+
+  state Try {
+    SetFloatValue(floatVariable=var "Sprint Stop Wait", floatValue=0, everyFrame=false)
+    DebugLogConsole(logLevel=0, text="Trying Sprint", sendToUnityLog=true)  // disabled
+    SetFloatValue(floatVariable=var "Sprint Timer", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Fast Skid Timer", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Sprint Deceleration", floatValue=var "Sprint Deceleration Slow", everyFrame=false)
+    CheckHeroCanSprint(storeValue=false, everyFrame=false, isTrue=(none), isFalse=→"CANCEL")
+    on CANCEL → No Sprint
+    on FINISHED → Start Sprint
+  }
+
+  state Start Sprint {
+    SetFloatValue(floatVariable=var "Attack Cooldown", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "In Jump Antic", boolValue=false, everyFrame=false)
+    SetStringValue(stringVariable=var "Sprint Anim", stringValue="Sprint", everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    SetBoolValue(boolVariable=var "Allowed Nail Charge", boolValue=true, everyFrame=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=RelinquishControlNotVelocity, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    GetHeroCState(VariableName="onGround", StoreValue=var "On Ground", EveryFrame=false)
+    HeroBoxControl(heroBoxState=Sprint)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Sprint Speed Regular", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Speed Crt", everyFrame=false)
+    SetFloatValue(floatVariable=var "Sprint Start Speed", floatValue=var "Dash Speed", everyFrame=false)
+    FloatSubtract(floatVariable=var "Sprint Start Speed", subtract=var "Add Speed", everyFrame=false, perSecond=false)
+    SetFloatValue(floatVariable=var "Add Speed", floatValue=0, everyFrame=false)
+    FloatOperator(float1=var "Sprint Start Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Start Speed", everyFrame=false)
+    SetHeroAffectedByGravity(SetTime=0, CanSet=var "Entered Sprinting", SetAffectedByGravity=false)
+    TimeLimitCheck(storedValue=var "Force Grounded Timer", aboveEvent=(none), belowEvent=→"GROUND", EveryFrame=false)
+    BoolTest(boolVariable=var "On Ground", isTrue=→"GROUND", isFalse=→"AIR", everyFrame=false)
+    on AIR → Start Speed 2
+    on GROUND → Start Speed
+  }
+
+  state Ground Sprint R {
+    Translate(gameObject=Self, vector=(unset), x=0.05, y=(unset), z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    ConvertDoubleBoolToFloat(boolVariable1=var "Is Quickening Active", boolVariable2=var "Sprintmaster Active", floatVariable=var "Sprint Speed", bothFalseValue=var "Sprint Speed Regular", oneTrueValue=var "Sprint Speed Quick", bothTrueValue=var "Sprint Speed Quicker", everyFrame=true)
+    ConvertDoubleBoolToString(boolVariable1=var "Is Quickening Active", boolVariable2=var "Sprintmaster Active", stringVariable=var "Sprint Anim", bothFalseValue="Sprint", oneTrueValue="Sprint Lv2", bothTrueValue="Sprint Lv3", everyFrame=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=true)
+    FloatOperator(float1=var "Sprint Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Speed Crt", everyFrame=true)
+    SetTransitionBlocked(SetTime=var "Force Grounded Timer", SetIsBlocked=false)
+    TimeLimitCheckV2(StoredValue=var "Fast Skid Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Fast Skid Timer Ended", EveryFrame=true)
+    ConvertBoolToFloat(boolVariable=var "Fast Skid Timer Ended", floatVariable=var "Sprint Deceleration", falseValue=var "Sprint Deceleration Fast", trueValue=var "Sprint Deceleration Slow", everyFrame=true)
+    SpawnRunEffects(SpawnPoint=Self, RunEffectsPrefab=Run Effects (globalpoolprefabs_assets_all.bundle), StoreObject=var "Spawned Run Effects", DoSprintmasterEffect=true, StopOnExit=true)
+    tk2dPlayAnimationOptionalReset(Target=Self, AnimName=var "Sprint Anim", ResetFrame=var "Reset Sprint Anim", EveryFrame=false)
+    SetStringValue(stringVariable=var "Sprint Anim", stringValue="Sprint", everyFrame=false)
+    SetBoolValue(boolVariable=var "Reset Sprint Anim", boolValue=false, everyFrame=false)
+    SetVector2XY(vector2Variable=var "Raycast Dir", vector2Value=(unset), x=1, y=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Sprint Timer", add=1, everyFrame=true, perSecond=true)
+    AccelerateToX(gameObject=Self, accelerationFactor=1.1, targetSpeed=var "Sprint Speed Crt")
+    ListenForDash(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"SKID END", delayBeforeActive=var "Sprint Stop Wait")
+    TimeLimitCheckV2(StoredValue=var "Force Grounded Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Not Forcing Grounded", EveryFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Sprint Stop Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Sprint Stop Timer Ended", EveryFrame=true)
+    SetHeroAffectedByGravity(SetTime=var "Set Gravity Timer", CanSet=var "Entered Sprinting", SetAffectedByGravity=true)
+    SetFloatValue(floatVariable=var "Sprint Stop Wait", floatValue=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Attack Cooldown", add=-1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Attack Cooldown", minValue=0, maxValue=10, everyFrame=true)
+    FloatTestToBool(float1=var "Attack Cooldown", float2=0, tolerance=0, equalBool=var "Attack Ready", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    GetWasButtonPressedQueued(Button=ATTACK, Consume=true, StoreWasPressed=(unset), PressedEvent=→"ATTACK", NotPressedEvent=(none), IsActive=var "Attack Ready", EveryFrame=true)
+    HeroControllerMethods(method=ThrowToolCooldownReady, parameters=[], everyFrame=true, storeValue=(unset var), isTrue=(none), isFalse=(none))
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=var "Can Throw Tool")
+    SetBoolValue(boolVariable=var "Grounded", boolValue=true, everyFrame=false)
+    GetWasButtonPressedQueued(Button=JUMP, Consume=true, StoreWasPressed=(unset), PressedEvent=→"JUMP", NotPressedEvent=(none), IsActive=var "Not Forcing Grounded", EveryFrame=true)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=var "Grounded Distance", SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=true)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=var "Short Grounded Distance", SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Short Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=true)
+    SetBoolValue(boolVariable=var "Was Short Grounded", boolValue=var "Short Grounded", everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Was Short Grounded", BoolValue=var "Short Grounded", Time=var "Set Gravity Timer", SetOppositeOnStateEntry=false)
+    BoolKeepValue(MonitorBool=var "Short Grounded", KeepBool=var "Was Short Grounded", TargetValue=false, EveryFrame=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=var "Hit Ground", leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    SetBoolValueAtTime(BoolVariable=var "Can Do Land", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    BoolTestMulti(boolVariables=[var "Hit Ground", var "Was Short Grounded", var "Not Forcing Grounded", var "Can Do Land"], boolStates=[true, false, true, true], trueEvent=→"LAND", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    HeroCheckForBumpV2(Direction=1, StoreHitBump=var "Hit Bump", StoreHitWall=var "Hit Wall", StoreHitHighWall=var "Hit High Wall", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), HighWallEvent=(none), EveryFrame=true)
+    TimeLimitSetV2(TimeDelay=var "Bump Force Grounded Delay", StoreValue=var "Bump Force Grounded Timer", CanSet=var "Hit Bump", EveryFrame=true)
+    GetHeroCState(VariableName="onConveyor", StoreValue=var "On Conveyor", EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall", var "Hit Bump", var "Not Forcing Grounded", var "On Conveyor"], boolStates=[true, false, true, false], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Bump Force Grounded Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Not Bump Forcing Grounded", EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Grounded", var "Not Forcing Grounded"], boolStates=[false, true], trueEvent=→"AIR", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Short Grounded", var "Not Forcing Grounded", var "Not Bump Forcing Grounded"], boolStates=[false, true, true], trueEvent=(none), falseEvent=(none), storeResult=var "Falling Short", everyFrame=true)
+    tk2dPlayAnimationConditional(Target=Self, AnimName="Sprint Air Short", Condition=var "Falling Short", EveryFrame=true)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Right Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Left Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    SetBoolValue(boolVariable=var "Turn Blocked", boolValue=true, everyFrame=false)  // disabled
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), space=0, everyFrame=true)
+    FloatInRange(floatVariable=var "X Speed", lowerValue=-2, upperValue=2, boolVariable=var "Turn Blocked", trueEvent=(none), falseEvent=(none), everyFrame=true)  // disabled
+    SetBoolValue(boolVariable=var "Turn Blocked", boolValue=false, everyFrame=false)  // disabled
+    BoolTestMulti(boolVariables=[var "Right Is Pressed", var "Left Is Pressed", var "Sprint Stop Timer Ended", var "Turn Blocked"], boolStates=[false, true, true, false], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Jump Queue Timer", AboveEvent=(none), BelowEvent=→"JUMP", StoreBool=(unset), EveryFrame=false)
+    FloatAdd(floatVariable=var "Alt Timer", add=-1, everyFrame=true, perSecond=true)
+    ClampVelocity2D(gameObject=Self, xMin=-40, xMax=40, yMin=(unset), yMax=(unset), everyFrame=true)
+    on TURN → Turn Anim
+    on ATTACK → Dash Stab Dir
+    on JUMP → Jump Antic
+    on WALL → Vault?
+    on AIR → Allow Air Jump 2
+    on LAND → Land Frame
+    on TOOLTHROW → Tool Throw Cancel
+  }
+
+  state Skid End 1 {
+    SetHeroCState(VariableName="isSprinting", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    SetBoolValue(boolVariable=var "Jump Queued", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Skid", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignToBool(Value=var "X Scale", StoreIsPositive=var "Is Facing Left", EveryFrame=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Left Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Right Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    BoolTestMulti(boolVariables=[var "Left Is Pressed", var "Is Facing Left"], boolStates=[true, true], trueEvent=(none), falseEvent=(none), storeResult=var "Will Move Left", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Right Is Pressed", var "Is Facing Left"], boolStates=[true, false], trueEvent=(none), falseEvent=(none), storeResult=var "Will Move Right", everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Will Move Left", var "Will Move Right"], sendEvent=(none), storeResult=var "Will Move", everyFrame=true)
+    ConvertBoolToFloat(boolVariable=var "Will Move", floatVariable=var "Skid Deceleration", falseValue=0.85, trueValue=0.95, everyFrame=true)
+    FloatCompare(float1=var "Sprint Timer", float2=var "Sprint Grace", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Skid", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Skid End 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=var "Skid Deceleration", decelerationY=(unset), brakeOnExit=false)
+    CameraTargetMethods(method=SetSprint, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=(unset))
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=var "Grounded Distance", SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Grounded", var "Entered Sprinting"], boolStates=[false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=true)  // disabled
+    BoolTestMulti(boolVariables=[var "Grounded"], boolStates=[false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    GetWasButtonPressedQueued(Button=JUMP, Consume=true, StoreWasPressed=(unset), PressedEvent=→"JUMP", NotPressedEvent=(none), IsActive=true, EveryFrame=true)
+    on FINISHED → Skid End 2
+    on ATTACK → Attack Cancel?
+    on TOOLTHROW → Tool Throw Cancel
+    on JUMP → Ground Jump Cancel
+  }
+
+  state Regain Control Normal {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Regain Control Shared
+  }
+
+  state Turn Anim {
+    SetFloatValue(floatVariable=var "Alt Timer", floatValue=0, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[hornet_misc_foley_move_1 (herosfxstatic_assets_all.bundle), hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle)], pitchMin=0.8, pitchMax=1.2, volume=0.8, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="PreventShuttlecock", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=hornet_slide_after_sprint (sfxstatic_assets_shared.bundle), pitchMin=1.25, pitchMax=1.4, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Entered Sprinting", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sprint Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    HeroControllerMethods(method=FlipSprite, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    FloatAdd(floatVariable=var "Attack Cooldown", add=-1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Attack Cooldown", minValue=0, maxValue=10, everyFrame=true)
+    FloatTestToBool(float1=var "Attack Cooldown", float2=0, tolerance=0, equalBool=var "Attack Ready", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    GetWasButtonPressedQueued(Button=ATTACK, Consume=true, StoreWasPressed=(unset), PressedEvent=→"ATTACK", NotPressedEvent=(none), IsActive=var "Attack Ready", EveryFrame=true)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=var "Grounded Distance", SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"FINISHED", EveryFrame=true)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    TimeLimitCheckV2(StoredValue=var "Jump Queue Timer", AboveEvent=(none), BelowEvent=→"JUMP", StoreBool=(unset), EveryFrame=false)
+    SpawnRunEffects(SpawnPoint=Self, RunEffectsPrefab=Run Effects (globalpoolprefabs_assets_all.bundle), StoreObject=var "Spawned Run Effects", DoSprintmasterEffect=false, StopOnExit=true)
+    on FINISHED → Turn
+    on ATTACK → Dash Stab Dir
+    on JUMP → Backflip Jump
+  }
+
+  state Ground Dir {
+    SetBoolValue(boolVariable=var "Is Sprinting", boolValue=true, everyFrame=false)
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    SetFloatValue(floatVariable=var "Sprint Air Volume", floatValue=0.5, everyFrame=false)
+    SetHeroCState(VariableName="isSprinting", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=RefreshAnimationEvents, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Sprint Speed Regular", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Speed Crt", everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Sprint Silk Usage"), sendEvent="START SILK USAGE", delay=0, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → Ground Sprint L
+    on R → Ground Sprint R
+  }
+
+  state Ground Sprint L {
+    Translate(gameObject=Self, vector=(unset), x=-0.05, y=(unset), z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    ConvertDoubleBoolToFloat(boolVariable1=var "Is Quickening Active", boolVariable2=var "Sprintmaster Active", floatVariable=var "Sprint Speed", bothFalseValue=var "Sprint Speed Regular", oneTrueValue=var "Sprint Speed Quick", bothTrueValue=var "Sprint Speed Quicker", everyFrame=true)
+    ConvertDoubleBoolToString(boolVariable1=var "Is Quickening Active", boolVariable2=var "Sprintmaster Active", stringVariable=var "Sprint Anim", bothFalseValue="Sprint", oneTrueValue="Sprint Lv2", bothTrueValue="Sprint Lv3", everyFrame=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=true)
+    FloatOperator(float1=var "Sprint Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Speed Crt", everyFrame=true)
+    SetTransitionBlocked(SetTime=var "Force Grounded Timer", SetIsBlocked=false)
+    TimeLimitCheckV2(StoredValue=var "Fast Skid Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Fast Skid Timer Ended", EveryFrame=true)
+    ConvertBoolToFloat(boolVariable=var "Fast Skid Timer Ended", floatVariable=var "Sprint Deceleration", falseValue=var "Sprint Deceleration Fast", trueValue=var "Sprint Deceleration Slow", everyFrame=true)
+    SpawnRunEffects(SpawnPoint=Self, RunEffectsPrefab=Run Effects (globalpoolprefabs_assets_all.bundle), StoreObject=var "Spawned Run Effects", DoSprintmasterEffect=true, StopOnExit=true)
+    tk2dPlayAnimationOptionalReset(Target=Self, AnimName=var "Sprint Anim", ResetFrame=var "Reset Sprint Anim", EveryFrame=false)
+    SetBoolValue(boolVariable=var "Reset Sprint Anim", boolValue=false, everyFrame=false)
+    SetVector2XY(vector2Variable=var "Raycast Dir", vector2Value=(unset), x=-1, y=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Sprint Timer", add=1, everyFrame=true, perSecond=true)
+    AccelerateToX(gameObject=Self, accelerationFactor=1.1, targetSpeed=var "Sprint Speed Crt")
+    ListenForDash(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"SKID END", delayBeforeActive=var "Sprint Stop Wait")
+    TimeLimitCheckV2(StoredValue=var "Force Grounded Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Not Forcing Grounded", EveryFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Sprint Stop Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Sprint Stop Timer Ended", EveryFrame=true)
+    SetHeroAffectedByGravity(SetTime=var "Set Gravity Timer", CanSet=var "Entered Sprinting", SetAffectedByGravity=true)
+    SetFloatValue(floatVariable=var "Sprint Stop Wait", floatValue=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Attack Cooldown", add=-1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Attack Cooldown", minValue=0, maxValue=10, everyFrame=true)
+    FloatTestToBool(float1=var "Attack Cooldown", float2=0, tolerance=0, equalBool=var "Attack Ready", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    GetWasButtonPressedQueued(Button=ATTACK, Consume=true, StoreWasPressed=(unset), PressedEvent=→"ATTACK", NotPressedEvent=(none), IsActive=var "Attack Ready", EveryFrame=true)
+    HeroControllerMethods(method=ThrowToolCooldownReady, parameters=[], everyFrame=true, storeValue=(unset var), isTrue=(none), isFalse=(none))
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=var "Can Throw Tool")
+    GetWasButtonPressedQueued(Button=JUMP, Consume=true, StoreWasPressed=(unset), PressedEvent=→"JUMP", NotPressedEvent=(none), IsActive=var "Not Forcing Grounded", EveryFrame=true)
+    SetBoolValue(boolVariable=var "Grounded", boolValue=true, everyFrame=false)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=var "Grounded Distance", SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=true)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=var "Short Grounded Distance", SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Short Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=true)
+    SetBoolValue(boolVariable=var "Was Short Grounded", boolValue=var "Short Grounded", everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Was Short Grounded", BoolValue=var "Short Grounded", Time=var "Set Gravity Timer", SetOppositeOnStateEntry=false)
+    BoolKeepValue(MonitorBool=var "Short Grounded", KeepBool=var "Was Short Grounded", TargetValue=false, EveryFrame=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=var "Hit Ground", leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    SetBoolValueAtTime(BoolVariable=var "Can Do Land", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    BoolTestMulti(boolVariables=[var "Hit Ground", var "Was Short Grounded", var "Not Forcing Grounded", var "Can Do Land"], boolStates=[true, false, true, true], trueEvent=→"LAND", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    HeroCheckForBumpV2(Direction=-1, StoreHitBump=var "Hit Bump", StoreHitWall=var "Hit Wall", StoreHitHighWall=var "Hit High Wall", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), HighWallEvent=(none), EveryFrame=true)
+    TimeLimitSetV2(TimeDelay=var "Bump Force Grounded Delay", StoreValue=var "Bump Force Grounded Timer", CanSet=var "Hit Bump", EveryFrame=true)
+    GetHeroCState(VariableName="onConveyor", StoreValue=var "On Conveyor", EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall", var "Hit Bump", var "Not Forcing Grounded", var "On Conveyor"], boolStates=[true, false, true, false], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Bump Force Grounded Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Not Bump Forcing Grounded", EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Grounded", var "Not Forcing Grounded"], boolStates=[false, true], trueEvent=→"AIR", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Short Grounded", var "Not Forcing Grounded", var "Not Bump Forcing Grounded"], boolStates=[false, true, true], trueEvent=(none), falseEvent=(none), storeResult=var "Falling Short", everyFrame=true)
+    tk2dPlayAnimationConditional(Target=Self, AnimName="Sprint Air Short", Condition=var "Falling Short", EveryFrame=true)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Right Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Left Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    SetBoolValue(boolVariable=var "Turn Blocked", boolValue=true, everyFrame=false)  // disabled
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), space=0, everyFrame=true)
+    FloatInRange(floatVariable=var "X Speed", lowerValue=-2, upperValue=2, boolVariable=var "Turn Blocked", trueEvent=(none), falseEvent=(none), everyFrame=true)  // disabled
+    SetBoolValue(boolVariable=var "Turn Blocked", boolValue=false, everyFrame=false)  // disabled
+    BoolTestMulti(boolVariables=[var "Right Is Pressed", var "Left Is Pressed", var "Sprint Stop Timer Ended", var "Turn Blocked"], boolStates=[true, false, true, false], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Jump Queue Timer", AboveEvent=(none), BelowEvent=→"JUMP", StoreBool=(unset), EveryFrame=false)
+    FloatAdd(floatVariable=var "Alt Timer", add=-1, everyFrame=true, perSecond=true)
+    ClampVelocity2D(gameObject=Self, xMin=-40, xMax=40, yMin=(unset), yMax=(unset), everyFrame=true)
+    on TURN → Turn Anim
+    on ATTACK → Dash Stab Dir
+    on JUMP → Jump Antic
+    on WALL → Vault?
+    on AIR → Allow Air Jump
+    on LAND → Land Frame
+    on TOOLTHROW → Tool Throw Cancel
+  }
+
+  state Turn {
+    SetFloatValue(floatVariable=var "Sprint Timer", floatValue=var "Sprint Grace", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=true)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → Ground Sprint L
+    on R → Ground Sprint R
+    on CANCEL → Regain Control Normal
+  }
+
+  state Cancel All {
+    AudioStop(gameObject=var "Spawned Sound", fadeTime=0)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ResetShuttlecock", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=false)
+    GetHeroAttackObject(Target=Self, Attack=DashStab, StoreAttack=var "Dash Stab")
+    GetHeroAttackObject(Target=Self, Attack=DashStabAlt, StoreAttack=var "Dash Stab Alt")
+    GetHeroConfigVariable(VariableName="DashStabSpeed", StoreValue=var "Attack Speed")
+    GetHeroConfigVariable(VariableName="DashStabTime", StoreValue=var "Attack Time")
+    GetHeroConfigVariable(VariableName="DashStabSteps", StoreValue=var "Attack Steps")
+    DebugLogConsole(logLevel=0, text="Sprint canceled", sendToUnityLog=true)  // disabled
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSprint", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    HeroControllerMethods(method=SetAllowRecoilWhileRelinquished, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetBoolValue(boolVariable=var "Should Hard Land", boolValue=false, everyFrame=false)
+    on FINISHED → Reset
+  }
+
+  state Attack Antic {
+    PlayAudioEvent(audioClip=hornet_new_kickoff (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Attack Antic Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)  // disabled
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Attack Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Attack Speed Crt", everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Set Gravity
+  }
+
+  state Attack Dash Start {
+    PlayRandomAudioClipTable(Table=Attack Heavy Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    CheckIfCrestEquipped(Crest=Cloakless (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=(none), falseEvent=(none), storeValue=var "Is Cloakless")
+    PlayAudioEvent(audioClip=var "Clip", pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Did First Slash", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="DamageEnemies", methodName="SetDirection", parameters=[var "Attack Direction"], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayFrame(gameObject=var "Dash Stab Crt", frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Attack Anim", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    TimeLimitSetV2(TimeDelay=var "Attack Time", StoreValue=var "Attack Time End", CanSet=(unset), EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Attack Speed Crt", y=(unset), everyFrame=false)
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=true, resetOnExit=false)
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="NailAttackBase", methodName="OnSlashStarting", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="NailAttackBase", methodName="OnPlaySlash", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=true)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)  // disabled
+    on FINISHED → Attack Dash
+  }
+
+  state Attack Recovery {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=false)
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=false)
+    CallMethodProper(gameObject=var "Dash Stab", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Attack Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Continue Sprint?
+  }
+
+  state Continue Sprint? {
+    BoolTest(boolVariable=var "Hit Enemy", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)  // disabled
+    ListenForDash(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"SPRINT", isNotPressed=→"FINISHED", delayBeforeActive=0)
+    on FINISHED → Regain Control To Idle
+    on SPRINT → Set Atk Cooldown
+  }
+
+  state Start Speed {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Sprint Start Speed", y=(unset), everyFrame=false)
+    CameraTargetMethods(method=SetSprint, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Ground Dir
+  }
+
+  state Jump {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithShuttlecock())
+    SetBoolValue(boolVariable=var "In Jump Antic", boolValue=false, everyFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state Jump Antic {
+    SetBoolValue(boolVariable=var "In Jump Antic", boolValue=true, everyFrame=false)
+    PlayRandomAudioClipTable(Table=Grunt Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Shuttlecock Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFloatValue(floatVariable=var "Alt Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Jump
+  }
+
+  state Wallrun Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wallrun Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=0)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    on FINISHED → Wallrun
+  }
+
+  state Wallrun {
+    SetBoolValue(boolVariable=var "Ray Hit", boolValue=true, everyFrame=false)
+    CameraTargetMethods(method=SetWallSprint, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Wallrun Speed", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wallrun")
+    ListenForDash(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"CLING", delayBeforeActive=0)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"ROOF", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    RayCast2d(fromGameObject=var "Centre", fromPosition=(0, -0.5), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Ray Hit", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    BoolTest(boolVariable=var "Ray Hit", isTrue=(none), isFalse=→"WALL END", everyFrame=true)
+    on CLING → Wallcling
+    on JUMP → Walljump Antic
+    on ROOF → Wallcling
+    on WALL END → Check Input
+  }
+
+  state Wallcling {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    CameraTargetMethods(method=SetWallSprint, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    Wait(time=1, finishEvent=→"END", realTime=false)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wall Cling")
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    DecelerateXY(gameObject=Self, decelerationX=0, decelerationY=0.8, brakeOnExit=false)
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"END", isNotPressed=(none), isPressedBool=(unset), queueBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForDash(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"SPRINT", isNotPressed=(none), delayBeforeActive=0)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Facing Right", greaterThanBool=var "Facing Left", everyFrame=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"END", isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"END", isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    on END → Drop Flip
+    on JUMP → Walljump Antic
+    on SPRINT → Cling-run Antic
+  }
+
+  state Walljump Flip {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FlipSprite", parameters=[], storeResult=(unset var), EveryFrame=false)
+    HeroControllerMethods(method=AffectedByGravity, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Jump
+  }
+
+  state Walljump Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Walljump Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetWallSprint", parameters=[false], storeResult=(unset var), EveryFrame=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Walljump Flip
+  }
+
+  state To Wall Run {
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=AffectedByGravity, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetVector2XY(vector2Variable=var "Raycast Dir", vector2Value=(unset), x=-1, y=0, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    SetVector2XY(vector2Variable=var "Raycast Dir", vector2Value=(unset), x=1, y=0, everyFrame=false)
+    on FINISHED → Cling-run Antic
+  }
+
+  state Drop Flip {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FlipSprite", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithWallslide())
+    HeroControllerMethods(method=AffectedByGravity, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Regain Control Normal
+  }
+
+  state Mantle Over {
+    HeroControllerMethods(method=AffectedByGravity, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CameraTargetMethods(method=SetSprint, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CameraTargetMethods(method=SetWallSprint, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithTallJump())
+    on FINISHED → Vault!
+  }
+
+  state Check Input {
+    CameraTargetMethods(method=SetWallSprint, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"OVER", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"OVER", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    SendEvent(eventTarget=Self, sendEvent=→"LAUNCH", delay=0, everyFrame=false)
+    on OVER → Mantle Over
+    on LAUNCH → Launch Up
+  }
+
+  state Launch Up {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithWallsprintLaunch())
+    HeroControllerMethods(method=AffectedByGravity, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Regain Control Normal
+  }
+
+  state Bonk? {
+    SetFloatValue(floatVariable=var "Alt Timer", floatValue=0, everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Centre", fromPosition=(unset), direction=(-1, 0), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Hero Detector(13)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    FloatCompare(float1=var "Sprint Timer", float2=0.35, tolerance=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=→"BONK", everyFrame=false)
+    on BONK → Run To WallBonk
+    on CANCEL → Wall Cancel
+  }
+
+  state Wall Cancel {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Regain Control To Idle
+  }
+
+  state Wall Bonk {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateAllChildren(gameObject=var "Wall Bump", activate=true)
+    on FINISHED → Bonk
+  }
+
+  state Start Wallcling {
+    RayCast2dV2(fromGameObject=var "Centre", fromPosition=(0, 0.5), direction=(-1, 0), space=1, distance=0.27, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ray Hit", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTest(boolVariable=var "Ray Hit", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=AffectedByGravity, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    on FINISHED → Wallcling
+    on CANCEL → Idle
+  }
+
+  state Cling-run Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wallrun Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Wallrun
+  }
+
+  state Skid End 2 {
+    BoolTest(boolVariable=var "Did Skid", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    DebugLogConsole(logLevel=0, text="Doing skid", sendToUnityLog=true)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Skid End 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=var "Skid Deceleration", decelerationY=(unset), brakeOnExit=false)
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=(unset))
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=var "Grounded Distance", SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Grounded", var "Entered Sprinting"], boolStates=[false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    GetWasButtonPressedQueued(Button=JUMP, Consume=true, StoreWasPressed=(unset), PressedEvent=→"JUMP", NotPressedEvent=(none), IsActive=true, EveryFrame=true)
+    on FINISHED → Regain Control Normal
+    on JUMP → Ground Jump Cancel
+    on ATTACK → Attack Cancel
+    on TOOLTHROW → Tool Throw Cancel
+    on CANCEL → Regain Control To Idle
+  }
+
+  state Ground Jump Cancel {
+    SetHeroCState(VariableName="onGround", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=SetStartWithFullJump())
+    on FINISHED → Regain Control Normal
+  }
+
+  state Attack Cancel {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithAttack())
+    on FINISHED → Retain Extra Velocity
+  }
+
+  state Start Speed 2 {
+    HeroControllerMethods(method=ResetGravity, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Air Dir
+  }
+
+  state Air Dir {
+    GetPlayerDataBool(boolName="hasBrolly", storeValue=var "Has Brolly")
+    SetBoolValue(boolVariable=var "Is Sprinting", boolValue=true, everyFrame=false)
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    SetFloatValue(floatVariable=var "Sprint Air Volume", floatValue=1, everyFrame=false)
+    SetHeroCState(VariableName="isSprinting", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Air Sprint Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Speed Crt", everyFrame=false)
+    AudioPlayV2(gameObject=var "Sprint Air Sound", volume=var "Sprint Air Volume", oneShotClip=<null>, finishedEvent=(none))
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → Air Sprint L
+    on R → Air Sprint R
+  }
+
+  state Air Sprint L {
+    FloatClamp(floatVariable=var "Attack Cooldown", minValue=0.1, maxValue=10, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Jump Grace", BoolValue=false, Time=0.075, SetOppositeOnStateEntry=true)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Sprint Silk Usage"), sendEvent="STOP SILK USAGE", delay=0, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Below", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    ConvertBoolToString(boolVariable=var "Ground Below", stringVariable=var "Sprint Air Anim", falseString="Sprint Air", trueString="Sprint Air Short", everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Warrior Slash To Fall", stringVariable=var "Sprint Air Anim", falseString=var "Sprint Air Anim", trueString="Sprint Air Short", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Sprint Air Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Warrior Slash To Fall", boolValue=false, everyFrame=false)
+    Wait(time=0.235, finishEvent=→"FINISHED", realTime=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=1.1, targetSpeed=var "Sprint Speed Crt")
+    HeroControllerMethods(method=TryFsmCancelToWallSlide, parameters=[], everyFrame=true, storeValue=(unset var), isTrue=(none), isFalse=(none))
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=→"END", otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    FloatAdd(floatVariable=var "Attack Cooldown", add=-1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Attack Cooldown", minValue=0, maxValue=10, everyFrame=true)
+    FloatTestToBool(float1=var "Attack Cooldown", float2=0, tolerance=0, equalBool=var "Attack Ready", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    GetWasButtonPressedQueued(Button=ATTACK, Consume=true, StoreWasPressed=(unset), PressedEvent=→"ATTACK", NotPressedEvent=(none), IsActive=var "Attack Ready", EveryFrame=true)
+    HeroControllerMethods(method=ThrowToolCooldownReady, parameters=[], everyFrame=true, storeValue=(unset var), isTrue=(none), isFalse=(none))
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=var "Can Throw Tool")
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=var "Has Brolly", stateEntryOnly=false)
+    ListenForDashV2(EventTarget=Self, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), DelayBeforeActive=0, IsActive=true)
+    EaseFloat(fromValue=-10, toValue=-30, floatVariable=var "Fall Clamp", time=1, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    ClampVelocity2D(gameObject=Self, xMin=(unset), xMax=(unset), yMin=var "Fall Clamp", yMax=(unset), everyFrame=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Play Audio", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on LAND → Land
+    on END → Regain Control Normal
+    on ATTACK → Attack Cancel
+    on JUMP → Queue Sprint Jump?
+    on FINISHED → Allow Shuttlecock
+    on TOOLTHROW → Tool Throw Cancel
+    on DASH CANCEL → Air Dash Cancel
+  }
+
+  state Air Sprint R {
+    FloatClamp(floatVariable=var "Attack Cooldown", minValue=0.1, maxValue=10, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Jump Grace", BoolValue=false, Time=0.075, SetOppositeOnStateEntry=true)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Sprint Silk Usage"), sendEvent="STOP SILK USAGE", delay=0, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Below", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    ConvertBoolToString(boolVariable=var "Ground Below", stringVariable=var "Sprint Air Anim", falseString="Sprint Air", trueString="Sprint Air Short", everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Warrior Slash To Fall", stringVariable=var "Sprint Air Anim", falseString=var "Sprint Air Anim", trueString="Sprint Air Short", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Sprint Air Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Warrior Slash To Fall", boolValue=false, everyFrame=false)
+    Wait(time=0.235, finishEvent=→"FINISHED", realTime=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=1.1, targetSpeed=var "Sprint Speed Crt")
+    HeroControllerMethods(method=TryFsmCancelToWallSlide, parameters=[], everyFrame=true, storeValue=(unset var), isTrue=(none), isFalse=(none))
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"END", bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    FloatAdd(floatVariable=var "Attack Cooldown", add=-1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Attack Cooldown", minValue=0, maxValue=10, everyFrame=true)
+    FloatTestToBool(float1=var "Attack Cooldown", float2=0, tolerance=0, equalBool=var "Attack Ready", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    GetWasButtonPressedQueued(Button=ATTACK, Consume=true, StoreWasPressed=(unset), PressedEvent=→"ATTACK", NotPressedEvent=(none), IsActive=var "Attack Ready", EveryFrame=true)
+    HeroControllerMethods(method=ThrowToolCooldownReady, parameters=[], everyFrame=true, storeValue=(unset var), isTrue=(none), isFalse=(none))
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=var "Can Throw Tool")
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=var "Has Brolly", stateEntryOnly=false)
+    ListenForDashV2(EventTarget=Self, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), DelayBeforeActive=0, IsActive=true)
+    EaseFloat(fromValue=-10, toValue=-30, floatVariable=var "Fall Clamp", time=1, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    ClampVelocity2D(gameObject=Self, xMin=(unset), xMax=(unset), yMin=var "Fall Clamp", yMax=(unset), everyFrame=true)
+    on LAND → Land
+    on END → Regain Control Normal
+    on ATTACK → Attack Cancel
+    on JUMP → Queue Sprint Jump?
+    on FINISHED → Allow Shuttlecock
+    on TOOLTHROW → Tool Throw Cancel
+    on DASH CANCEL → Air Dash Cancel
+  }
+
+  state Vault? {
+    SetBoolValue(boolVariable=var "High Wall", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Facing Direction", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiplyV2(floatVariable=var "Facing Direction", multiplyBy=-1, everyFrame=false, fixedUpdate=false)
+    SetVector2XY(vector2Variable=var "High Wall Raycast Dir", vector2Value=var "High Wall Raycast Dir", x=var "Facing Direction", y=0, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=var "High Wall Raycast Dir", space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "High Wall", storeHitObject=var "Bonking Wall", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Hero Detector(13)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    CheckIsClamberBlocked(trueEvent=→"FINISHED", falseEvent=(none), storeValue=(unset))
+    RayCast2dV2(fromGameObject=Self, fromPosition=(0, -1.5), direction=var "High Wall Raycast Dir", space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Bonking Wall", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Hero Detector(13)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    HasComponent(gameObject=var "Bonking Wall", component="SteepSlope", removeOnExit=false, trueEvent=→"FINISHED", falseEvent=(none), store=(unset), everyFrame=false)
+    BoolAnyTrue(boolVariables=[var "High Wall", var "Hit High Wall"], sendEvent=(none), storeResult=var "High Wall", everyFrame=false)
+    BoolTest(boolVariable=var "High Wall", isTrue=→"FINISHED", isFalse=→"VAULT", everyFrame=false)
+    DebugLogConsole(logLevel=0, text="Wall", sendToUnityLog=true)  // disabled
+    on FINISHED → Bonk?
+    on VAULT → Vault!
+  }
+
+  state Vault! {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ResetHardLandingTimer", parameters=[], storeResult=(unset var), EveryFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[hornet_edge_grab_v2_1 (herosfxstatic_assets_all.bundle), hornet_edge_grab_v2_2 (sfxstatic_assets_shared.bundle), hornet_edge_grab_v2_3 (sfxstatic_assets_shared.bundle), hornet_edge_grab_v2_4 (sfxstatic_assets_shared.bundle)], weights=[0.25, 0.25, 0.25, 0.25], pitchMin=1, pitchMax=1)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Sprint Speed Regular", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Speed Crt", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Sprint Speed Crt", y=0, everyFrame=true)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=1.1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Mantle Vault", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Land
+  }
+
+  state Set Air Jump {
+    CameraTargetMethods(method=SetSprint, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CameraTargetMethods(method=SetWallSprint, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=SetStartWithAnyJump, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Regain Control Normal
+  }
+
+  state Hit Enemy {
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    CallMethodProper(gameObject=var "Dash Stab", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDashStabBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StartDownspikeInvulnerability", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state Dash Stab Dir {
+    SetFloatValue(floatVariable=var "Attack Direction", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Stabbing Right", boolValue=true, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=(none), negativeEvent=→"FINISHED", space=0)
+    SetFloatValue(floatVariable=var "Attack Direction", floatValue=180, everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Stabbing Right", boolValue=false, everyFrame=false)
+    on FINISHED → Start Attack
+  }
+
+  state Leaving Scene {
+    SetFloatValue(floatVariable=var "Add Speed", floatValue=0, everyFrame=false)
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=false)
+    BoolTest(boolVariable=var "Is Sprinting", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on FINISHED → Skid Anims?
+    on CANCEL → Idle
+  }
+
+  state Reset {
+    SetFloatValue(floatVariable=var "Add Speed", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "In Attack", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Sprint Silk Usage"), sendEvent="STOP SILK USAGE", delay=0, everyFrame=false)
+    SetHeroCState(VariableName="isSprinting", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    SetBoolValue(boolVariable=var "Warrior Slash To Fall", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Skid", boolValue=false, everyFrame=false)
+    DebugLogConsole(logLevel=0, text="Sprint reset", sendToUnityLog=true)  // disabled
+    SetVector2Value(vector2Variable=var "Extra Velocity", vector2Value=(0, 0), everyFrame=false)
+    BoolTest(boolVariable=var "Is Sprinting", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    SetBoolValue(boolVariable=var "Is Sprinting", boolValue=false, everyFrame=false)
+    on FINISHED → Reset Nail Charge State
+  }
+
+  state Enter Sprinting {
+    SetFloatValue(floatVariable=var "Sprint Stop Wait", floatValue=0.05, everyFrame=false)
+    TimeLimitSet(timeDelay=var "Sprint Stop Wait", storeValue=var "Sprint Stop Timer")
+    TimeLimitSet(timeDelay=0.3, storeValue=var "Force Grounded Timer")
+    TimeLimitSet(timeDelay=0.1, storeValue=var "Set Gravity Timer")
+    TimeLimitSet(timeDelay=0, storeValue=var "Fast Skid Timer")
+    SetTransitionBlocked(SetTime=0, SetIsBlocked=true)
+    SetBoolValue(boolVariable=var "Entered Sprinting", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Short Grounded", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Was Short Grounded", boolValue=true, everyFrame=false)
+    DebugLogConsole(logLevel=0, text="Entered Sprinting", sendToUnityLog=true)
+    SetFloatValue(floatVariable=var "Sprint Timer", floatValue=var "Sprint Grace", everyFrame=false)
+    FloatAdd(floatVariable=var "Sprint Timer", add=1, everyFrame=false, perSecond=false)
+    SetFloatValue(floatVariable=var "Sprint Deceleration", floatValue=var "Sprint Deceleration Fast", everyFrame=false)
+    on FINISHED → Start Sprint
+  }
+
+  state Air Sprint Loop {
+    ListenForDash(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"END", delayBeforeActive=var "Sprint Stop Wait")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sprint Air Loop")
+    AccelerateToX(gameObject=Self, accelerationFactor=1.1, targetSpeed=var "Sprint Speed Crt")
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"END", bottomHitEvent=→"LAND", leftHitEvent=→"END", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetFloatValue(floatVariable=var "Sprint Stop Wait", floatValue=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Attack Cooldown", add=-1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Attack Cooldown", minValue=0, maxValue=10, everyFrame=true)
+    FloatTestToBool(float1=var "Attack Cooldown", float2=0, tolerance=0, equalBool=var "Attack Ready", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    GetWasButtonPressedQueued(Button=ATTACK, Consume=true, StoreWasPressed=(unset), PressedEvent=→"ATTACK", NotPressedEvent=(none), IsActive=var "Attack Ready", EveryFrame=true)
+    HeroControllerMethods(method=ThrowToolCooldownReady, parameters=[], everyFrame=true, storeValue=(unset var), isTrue=(none), isFalse=(none))
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=var "Can Throw Tool")
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=var "Has Brolly", stateEntryOnly=false)
+    CameraTargetMethods(method=SetSprint, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroClampFallVelocity(Hero=Self)
+    on LAND → Land
+    on END → Regain Control Normal
+    on ATTACK → Attack Cancel
+    on JUMP → Queue Sprint Jump?
+    on TOOLTHROW → Tool Throw Cancel
+    on HARD LANDING → Regain Control To Idle
+  }
+
+  state Land {
+    GetCollision2dInfo(gameObjectHit=var "Landed On Obj", relativeVelocity=(unset), relativeSpeed=(unset), contactPoint=(unset), contactNormal=(unset), shapeCount=(unset), physics2dMaterialName="")
+    HeroControllerMethods(method=ShouldHardLand, parameters=[var "Landed On Obj"], everyFrame=false, storeValue=var "Should Hard Land", isTrue=→"CANCEL", isFalse=(none))
+    SetStringValue(stringVariable=var "Sprint Anim", stringValue="Land to Sprint", everyFrame=false)
+    SetBoolValue(boolVariable=var "Reset Sprint Anim", boolValue=true, everyFrame=false)  // disabled
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ResetAirMoves", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    AudioStop(gameObject=var "Sprint Air Sound", fadeTime=0)
+    ListenForDash(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"CANCEL", delayBeforeActive=(unset))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetBackOnGround", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    HeroControllerMethods(method=TrySpawnSoftLandEffect, parameters=[], everyFrame=false, storeValue=var "Reset Sprint Anim", isTrue=(none), isFalse=(none))
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Ground Dir
+    on CANCEL → Regain Control To Idle
+  }
+
+  state Wait For Scene Load {
+    on LEVEL LOADED → Regain Control Normal
+  }
+
+  state Attack Dash {
+    TimeLimitCheckV2(StoredValue=var "Attack Time End", AboveEvent=→"FINISHED", BelowEvent=(none), StoreBool=(unset), EveryFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Attack Speed Crt", y=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.925, decelerationY=(unset), brakeOnExit=false)
+    HeroCheckForBump(Direction=-1, StoreHitBump=var "Hit Bump Left", StoreHitWall=var "Hit Wall Left", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    HeroCheckForBump(Direction=1, StoreHitBump=var "Hit Bump Right", StoreHitWall=var "Hit Wall Right", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall Left", var "Hit Bump Left", var "Is Stabbing Right"], boolStates=[true, false, false], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall Right", var "Hit Bump Right", var "Is Stabbing Right"], boolStates=[true, false, true], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Hit Bump Left", var "Hit Bump Right"], sendEvent=→"BUMP", storeResult=(unset), everyFrame=true)
+    FindChild(gameObject=var "Dash Stab Crt", childName="Clash Tink", storeResult=var "Clash Tink")
+    SetPolygonCollider(gameObject=var "Clash Tink", active=true, resetOnExit=true)
+    on FINISHED → Loop?
+    on WALL → Atk To WallBonk
+    on BUMP → Bump Up
+    on DASH HIT → Hit Enemy Wait
+    on DASH RECOIL → Attack Recoil
+    on DAMAGER TINKED → Bonk
+  }
+
+  state Bump Up {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Attack Dash
+  }
+
+  state Attack Cancel? {
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"CANCEL", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"CANCEL", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Attack Cancel
+    on CANCEL → Dash Stab Dir
+  }
+
+  state Tool Throw Cancel {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithToolThrow())
+    on FINISHED → Retain Extra Velocity
+  }
+
+  state Attack Recoil {
+    TimeLimitCheckV2(StoredValue=var "Attack Time End", AboveEvent=→"FINISHED", BelowEvent=(none), StoreBool=(unset), EveryFrame=true)
+    FloatOperator(float1=var "Attack Speed Crt", float2=-0.1, operation=Multiply, storeResult=var "Attack Speed Crt", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Attack Speed Crt", y=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.925, decelerationY=(unset), brakeOnExit=false)
+    on DASH HIT → Hit Enemy Wait
+    on FINISHED → Loop?
+  }
+
+  state Do Sprint Skid {
+    SetFloatValue(floatVariable=var "Sprint Timer", floatValue=var "Sprint Grace", everyFrame=false)
+    FloatOperator(float1=var "Sprint Timer", float2=1, operation=Add, storeResult=var "Sprint Timer", everyFrame=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Sprint Speed Regular", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Speed Crt", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Sprint Speed Crt", y=(unset), everyFrame=false)
+    on FINISHED → Skid SFX?
+  }
+
+  state Start Attack {
+    SetBoolValue(boolVariable=var "Did First Slash", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=(unset), floatValue=0, everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "In Attack", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="IncrementAttackCounter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetHeroCState(VariableName="isSprinting", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetAllowNailChargingWhileRelinquished", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CheckIfCrestEquipped(Crest=Reaper (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"REAPER", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Wanderer (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"WANDERER", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Warrior (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"WARRIOR", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Toolmaster (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"TOOLMASTER", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Spell (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"SHAMAN", falseEvent=(none), storeValue=(unset))
+    SetIntValue(intVariable=var "Attack Step", intValue=1, everyFrame=false)
+    IntCompare(integer1=var "Attack Steps", integer2=1, equal=→"SINGLE", lessThan=→"SINGLE", greaterThan=→"MULTIPLE", everyFrame=false)
+    on SINGLE → Set Attack Single
+    on MULTIPLE → Set Attack Multiple
+    on REAPER → Reaper Antic
+    on WANDERER → Wanderer Set 
+    on WARRIOR → Warrior Antic
+    on SHAMAN → Shaman Antic
+    on TOOLMASTER → Drill Charge Start
+  }
+
+  state Set Attack Single {
+    SetFloatValue(floatVariable=var "Can Attack Bonk", floatValue=0.1, everyFrame=false)
+    SetStringValue(stringVariable=var "Attack Antic Anim", stringValue="Dash Attack Antic", everyFrame=false)
+    SetStringValue(stringVariable=var "Attack Anim", stringValue="Dash Attack", everyFrame=false)
+    SetGameObject(variable=var "Dash Stab Crt", gameObject=var "Dash Stab", everyFrame=false)
+    on FINISHED → Attack Antic
+  }
+
+  state Loop? {
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    IntCompare(integer1=var "Attack Step", integer2=var "Attack Steps", equal=→"CANCEL", lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    IntOperator(integer1=var "Attack Step", integer2=1, operation=Add, storeResult=var "Attack Step", everyFrame=false)
+    on FINISHED → Set Attack Multiple
+    on CANCEL → Attack Recovery
+  }
+
+  state Set Attack Multiple {
+    SetFloatValue(floatVariable=var "Can Attack Bonk", floatValue=0.1, everyFrame=false)  // disabled
+    FormatString(format="Dash Attack Antic {0}", variables=[var "Attack Step"], storeResult=var "Attack Antic Anim", everyFrame=false)
+    FormatString(format="Dash Attack {0}", variables=[var "Attack Step"], storeResult=var "Attack Anim", everyFrame=false)
+    FormatString(format="Dash Stab {0}", variables=[var "Attack Step"], storeResult=var "Attack Child Name", everyFrame=false)
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=false)
+    FindChild(gameObject=var "Dash Stab", childName=var "Attack Child Name", storeResult=var "Dash Stab Crt")
+    on FINISHED → Attack Antic
+  }
+
+  state Queue Sprint Jump? {
+    HeroControllerMethods(method=CouldJumpCancel, parameters=[], everyFrame=false, storeValue=var "Can Any Jump", isTrue=→"CANCEL", isFalse=(none))
+    TimeLimitSetV2(TimeDelay=0.075, StoreValue=var "Jump Queue Timer", CanSet=(unset), EveryFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on CANCEL → Set Air Jump
+    on FINISHED → Allow Shuttlecock
+  }
+
+  state Dashed {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Sprint Silk Usage"), sendEvent="START SILK USAGE BURST", delay=0, everyFrame=false)
+    HeroBoxControl(heroBoxState=Sprint)
+    SetBoolValue(boolVariable=var "High Wall", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Facing Direction", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiplyV2(floatVariable=var "Facing Direction", multiplyBy=-1, everyFrame=false, fixedUpdate=false)
+    SetVector2XY(vector2Variable=var "High Wall Raycast Dir", vector2Value=var "High Wall Raycast Dir", x=var "Facing Direction", y=0, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=var "High Wall Raycast Dir", space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "High Wall", storeHitObject=var "Bonking Wall", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Hero Detector(13)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    CheckIsClamberBlocked(trueEvent=(none), falseEvent=(none), storeValue=var "Is Clamber Blocked")
+    HeroCheckForBumpV2(Direction=var "Facing Direction", StoreHitBump=var "Hit Bump", StoreHitWall=var "Hit Wall", StoreHitHighWall=var "Hit High Wall", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), HighWallEvent=(none), EveryFrame=true)
+    GetHeroCState(VariableName="onConveyor", StoreValue=var "On Conveyor", EveryFrame=true)
+    BoolAnyTrue(boolVariables=[var "High Wall", var "Hit High Wall"], sendEvent=(none), storeResult=var "High Wall", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Bump", var "Hit Wall", var "On Conveyor", var "High Wall", var "Is Clamber Blocked"], boolStates=[false, true, false, false, false], trueEvent=→"VAULT", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on TRY SPRINT → Try
+    on CANCEL SPRINT → No Sprint
+    on VAULT → Dash To Vault
+  }
+
+  state No Sprint {
+    HeroBoxControl(heroBoxState=Normal)
+    on FINISHED → Reset
+  }
+
+  state Instant Sprint {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Sprint Silk Usage"), sendEvent="START SILK USAGE BURST", delay=0, everyFrame=false)
+    HeroBoxControl(heroBoxState=Sprint)
+    on FINISHED → Try
+  }
+
+  sequence state Skid Anims? {
+    BoolTestMulti(boolVariables=[var "Did Skid", var "In Jump Antic", var "In Attack"], boolStates=[false, false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Skid End 2", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Sprint Skid To Run", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Wait For Scene Load
+    on LEVEL LOADED → Regain Control Normal
+  }
+
+  state Backflip Jump {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "X Scale", float2=-40, operation=Multiply, storeResult=var "Speed X", everyFrame=false)
+    SetVector2XY(vector2Variable=var "Extra Velocity", vector2Value=(unset), x=var "Speed X", y=0, everyFrame=false)
+    HeroAddExtraAirMoveVelocityV2(Velocity=var "Extra Velocity", Decay=0.1, CancelOnTurn=true, SkipBehaviour=WhileMovingForward)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithBackflipJump())
+    on FINISHED → Regain Control Normal
+  }
+
+  state Land Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Land
+  }
+
+  state Reaper Antic {
+    PlayAudioEvent(audioClip=hornet_reaper_dash_scrape (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    PlayRandomAudioClipTableV2(Table=Attack Normal Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Upper Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.65, brakeOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetAllowRecoilWhileRelinquished", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Reaper Upper
+  }
+
+  state Reaper Upper {
+    PlayAudioEvent(audioClip=hornet_reaper_dash_scrape (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=AffectedByGravity(false))
+    CallMethodProper(gameObject=var "Reaper Slash", behaviour="DamageEnemies", methodName="SetDirection", parameters=[var "Attack Direction"], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Reaper Slash", delivery=SendMessage, options=0, functionCall=StartSlash())
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSprint", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-50, ySpeed=(unset), everyFrame=false)
+    SetHeroCState(VariableName="onGround", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Upper", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CurveFloat(floatVariable=var "Speed Y", fromValue=0, toValue=0, animCurve=curve[(time=0, value=2.5, inSlope=0, outSlope=0), (time=0.35, value=25, inSlope=0, outSlope=0), (time=1, value=7, inSlope=0, outSlope=0)], calculation=AddToValue, time=0.3, speed=(unset), delay=(unset), ignoreCurveOffset=true, finishEvent=(none), realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Speed Y", everyFrame=true)
+    on FINISHED → Reaper End
+  }
+
+  state Reaper End {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=7, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartFromReaperUpperslash())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetAllowRecoilWhileRelinquished", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state Bonk {
+    SetMeshRenderer(gameObject=var "Dash Stab", active=false)
+    CallMethodProper(gameObject=var "Dash Stab", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sprint Bonk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FloatMultiply(floatVariable=var "Sprint Speed Crt", multiplyBy=-2, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Sprint Speed Crt", y=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    HeroControllerMethods(method=AffectedByGravity, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=false)
+    SetBoolValue(boolVariable=var "Hit Wall Left", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Hit Wall Right", boolValue=false, everyFrame=false)
+    SendEventByNameUpwards(Target=var "Bonking Wall", EventName="SPRINT BONKED")
+    CallStaticMethod(className="DeliveryQuestItem", methodName="TakeHit", parameters=[], storeResult=(unset var), everyFrame=false)
+    on FINISHED → Regain Control To Idle
+  }
+
+  sequence state Hit Enemy Wait {
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    NextFrameEvent(sendEvent=(none))  // disabled
+    NextFrameEvent(sendEvent=(none))  // disabled
+    on DAMAGER TINKED → Bonk
+    on FINISHED → Reaction Type
+  }
+
+  state Wanderer Nml {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wanderer Dash Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    ConvertDoubleBoolToFloat(boolVariable1=var "Is Quickening Active", boolVariable2=var "Sprintmaster Active", floatVariable=var "Sprint Speed", bothFalseValue=var "Sprint Speed Regular", oneTrueValue=var "Sprint Speed Quick", bothTrueValue=var "Sprint Speed Quicker", everyFrame=false)
+    FloatOperator(float1=var "Sprint Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Attack Speed Crt", everyFrame=false)
+    SetGameObject(variable=var "Dash Stab Crt", gameObject=var "Dash Stab", everyFrame=false)
+    SetFloatValue(floatVariable=var "Alt Timer", floatValue=0.5, everyFrame=false)
+    on FINISHED → Wanderer Nml Audio
+  }
+
+  state Wanderer Attack Start {
+    PlayRandomAudioClipTable(Table=Attack Heavy Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    TimeLimitSetV2(TimeDelay=0.15, StoreValue=var "Attack Time End", CanSet=(unset), EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Attack Speed Crt", y=(unset), everyFrame=false)
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="DamageEnemies", methodName="SetDirection", parameters=[var "Attack Direction"], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Dash Stab Crt", delivery=SendMessage, options=1, functionCall=StartSlash())
+    on FINISHED → Wanderer Attacking
+  }
+
+  state Wanderer Recoil {
+    SetHeroCState(VariableName="onGround", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    PlayAudioEvent(audioClip=hornet_forward_spin_single (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Attack Queued", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=var "Dash Stab Crt", delivery=SendMessage, options=1, functionCall=CancelAttack())
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wanderer DashRecoil", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SetVelocityByScale(gameObject=Self, speed=(unset), ySpeed=20, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=30, ySpeed=(unset), everyFrame=false)
+    ListenForAttackV2(EventTarget=Self, WasPressed=(none), WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=var "Attack Queued", DelayBeforeActive=0.13, IsActive=true)
+    SetBoolValueAtTime(BoolVariable=var "Can Jump cancel", BoolValue=true, Time=0.13, SetOppositeOnStateEntry=true)
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=var "Jump Queued", activeBool=var "Can Jump cancel", stateEntryOnly=false)
+    on FINISHED → W Recoil Cancelable
+  }
+
+  state Wanderer Attacking {
+    TimeLimitCheckV2(StoredValue=var "Attack Time End", AboveEvent=→"FINISHED", BelowEvent=(none), StoreBool=(unset), EveryFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Attack Speed Crt", y=(unset), everyFrame=true)
+    DecelerateXY(gameObject=Self, decelerationX=0.925, decelerationY=(unset), brakeOnExit=false)  // disabled
+    HeroCheckForBump(Direction=-1, StoreHitBump=var "Hit Bump Left", StoreHitWall=var "Hit Wall Left", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    HeroCheckForBump(Direction=1, StoreHitBump=var "Hit Bump Right", StoreHitWall=var "Hit Wall Right", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall Left", var "Hit Bump Left", var "Is Stabbing Right"], boolStates=[true, false, false], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall Right", var "Hit Bump Right", var "Is Stabbing Right"], boolStates=[true, false, true], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Hit Bump Left", var "Hit Bump Right"], sendEvent=→"BUMP", storeResult=(unset), everyFrame=true)
+    on FINISHED → Wanderer Recovery
+    on BUMP → Bump Up 2
+    on DASH HIT → Hit Enemy Wait 2
+    on DAMAGER TINKED → Bonk
+    on WALL → Atk To WallBonk
+  }
+
+  state Bump Up 2 {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Wanderer Attacking
+  }
+
+  state Wanderer Recovery {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Attack Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Attack Speed Crt", y=(unset), everyFrame=false)  // disabled
+    on FINISHED → Continue Sprint?
+  }
+
+  state Wanderer Set  {
+    SetFloatValue(floatVariable=var "Can Attack Bonk", floatValue=0.1, everyFrame=false)
+    FloatCompare(float1=var "Alt Timer", float2=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"ALT", everyFrame=false)
+    on FINISHED → Wanderer Nml
+    on ALT → Wanderer Alt
+  }
+
+  state Wanderer Alt {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wanderer Dash Attack Alt", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    ConvertDoubleBoolToFloat(boolVariable1=var "Is Quickening Active", boolVariable2=var "Sprintmaster Active", floatVariable=var "Sprint Speed", bothFalseValue=var "Sprint Speed Regular", oneTrueValue=var "Sprint Speed Quick", bothTrueValue=var "Sprint Speed Quicker", everyFrame=false)
+    FloatOperator(float1=var "Sprint Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Attack Speed Crt", everyFrame=false)
+    SetGameObject(variable=var "Dash Stab Crt", gameObject=var "Dash Stab Alt", everyFrame=false)
+    SetFloatValue(floatVariable=var "Alt Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Wanderer Alt Audio
+  }
+
+  state W Recoil Cancelable {
+    ListenForAttackV2(EventTarget=Self, WasPressed=(none), WasReleased=(none), IsPressed=→"ATTACK", IsNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=var "Attack Queued")
+    ListenForAttackV2(EventTarget=Self, WasPressed=→"ATTACK", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=true)
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"JUMP", isNotPressed=(none), queueBool=(unset), activeBool=var "Jump Queued", stateEntryOnly=false)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForDash(eventTarget=Self, wasPressed=→"DASHED", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → W Recoil End
+    on ATTACK → RecoilStab Dir
+    on DASHED → W DashCancel
+    on JUMP → W JumpCancel
+  }
+
+  state RecoilStab Antic {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    PlayRandomAudioClipTable(Table=Attack Normal Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wanderer RecoilStab", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → RecoilStab Dash
+  }
+
+  state RecoilStab Dash {
+    ActivateGameObject(gameObject=var "Wanderer DashCombo Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_hunter_new_dash (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wanderer RecoilStab", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-45, ySpeed=-15, everyFrame=false)
+    on FINISHED → RecoilStab Attack
+  }
+
+  state RecoilStab Attack {
+    SendMessage(gameObject=var "Wanderer RecoilStab", delivery=SendMessage, options=1, functionCall=StartSlash())
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wanderer RecoilStab", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Regain Control Normal
+    on DASH HIT → RecoilStab Bounce
+  }
+
+  state RecoilStab Bounce {
+    SendMessage(gameObject=var "Wanderer RecoilStab", delivery=SendMessage, options=1, functionCall=CancelAttack())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDashStabBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state RecoilStab Dir {
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"L", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"R", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → RecoilStab L
+    on R → RecoilStab R
+  }
+
+  state RecoilStab L {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on FINISHED → RecoilStab Antic
+  }
+
+  state RecoilStab R {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceRight())
+    on FINISHED → RecoilStab Antic
+  }
+
+  state W DashCancel {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithDash())
+    on FINISHED → Regain Control Normal
+  }
+
+  sequence state Hit Enemy Wait 2 {
+    NextFrameEvent(sendEvent=(none))
+    NextFrameEvent(sendEvent=(none))
+    on DAMAGER TINKED → Bonk
+    on FINISHED → Wanderer Recoil
+  }
+
+  state W Recoil End {
+    SetHeroCState(VariableName="onGround", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StartWandererDashComboWindow", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state To Wanderer Combo {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControlNotVelocity())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    on FINISHED → RecoilStab Dir
+  }
+
+  state Warrior Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dash Attack Antic")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)  // disabled
+    PlayAudioEvent(audioClip=hornet_beast_dash_attack_foley (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Warrior Leap
+  }
+
+  state Warrior Leap {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dash Attack Leap")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=18, everyFrame=false)
+    UmbrellaMotionXV2(gameObject=Self, accelerationFactor=1.5, decelerationFactor=0, maxSpeed=20, active=var "Can Drift")
+    SetBoolValueAtTime(BoolVariable=var "Can Drift", BoolValue=true, Time=0.05, SetOppositeOnStateEntry=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed X", y=(unset), space=0, everyFrame=true)
+    FloatMinClamp(floatVariable=var "Speed X", minValue=-3, maxValue=3, everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed X", y=(unset), everyFrame=true)
+    on FINISHED → Rage Mode?
+  }
+
+  state Warrior Slash {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dash Attack Slash")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CallMethodProper(gameObject=var "Current Attack", behaviour="DamageEnemies", methodName="SetDirection", parameters=[var "Attack Direction"], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Current Attack", delivery=SendMessage, options=1, functionCall=StartSlash())
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    AddForce2d(gameObject=Self, forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=-60, vector3=(unset), everyFrame=true)
+    UmbrellaMotionXV2(gameObject=Self, accelerationFactor=1, decelerationFactor=0, maxSpeed=20, active=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed X", y=(unset), space=0, everyFrame=true)  // disabled
+    FloatMinClamp(floatVariable=var "Speed X", minValue=-5, maxValue=5, everyFrame=true)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed X", y=(unset), everyFrame=true)  // disabled
+    on FINISHED → Continue Sprint? 2
+    on DASH HIT → Warrior Bounce
+    on LAND → Warrior Land
+    on BOUNCE CANCEL → Warrior End
+    on HERO TOUCHED GROUND → Warrior Land
+    on NAIL CLASH → Dash Stab Bounce
+  }
+
+  state Warrior End {
+    SendMessage(gameObject=var "Current Attack", delivery=SendMessage, options=1, functionCall=CancelAttack())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CrestAttackRecovery())
+    on FINISHED → Regain Control Normal
+  }
+
+  state Warrior Bounce {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDownSpikeBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state Warrior Land {
+    SetHeroCState(VariableName="isSprinting", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Downspike Recovery Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSprint", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Continue Sprint? 2
+  }
+
+  state Continue Sprint? 2 {
+    ListenForDash(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"SPRINT", isNotPressed=→"FINISHED", delayBeforeActive=0)
+    on FINISHED → Regain Control Normal
+    on SPRINT → Restart Sprint
+  }
+
+  state Restart Sprint {
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=(unset), everyFrame=false)  // disabled
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed X", y=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed X", multiplyBy=0.75, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed X", y=(unset), everyFrame=false)
+    SetFloatValue(floatVariable=var "Attack Cooldown", floatValue=0.25, everyFrame=false)
+    SetBoolValue(boolVariable=var "Warrior Slash To Fall", boolValue=true, everyFrame=false)
+    on FINISHED → Air Dir
+  }
+
+  state Set Gravity {
+    CheckIfCrestEquipped(Crest=Witch (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"FINISHED", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Cursed (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"FINISHED", falseEvent=(none), storeValue=(unset))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    on FINISHED → Witch?
+  }
+
+  state Skid SFX? {
+    PlayAudioEvent(audioClip=hornet_slide_after_sprint (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    GetSpeed2d(gameObject=Self, storeResult=var "Skid Speed", everyFrame=false)
+    FloatCompare(float1=var "Skid Speed", float2=4, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    on FINISHED → Skid End 1
+  }
+
+  state Rage Mode? {
+    HeroGetWarriorCrestState(IsInRageMode=var "Rage Mode")
+    BoolTestToGameObject(Test=var "Rage Mode", ExpectedValue=true, TrueGameObject=var "Warrior Dash Slash R", FalseGameObject=var "Warrior Dash Slash", StoreResult=var "Current Attack", EveryFrame=false)
+    on FINISHED → Warrior Slash
+  }
+
+  state Wanderer Nml Audio {
+    PlayAudioEvent(audioClip=hornet_wanderer_dash_sword_1 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Wanderer Attack Start
+  }
+
+  state Wanderer Alt Audio {
+    PlayAudioEvent(audioClip=hornet_wanderer_dash_sword_2 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Wanderer Attack Start
+  }
+
+  state Hard Landed? {
+    BoolTest(boolVariable=var "Should Hard Land", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    HeroControllerMethods(method=DoHardLanding, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Enable Renderer Check
+  }
+
+  state Run To WallBonk {
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    CreateNoiseV2(From=Self, LocalOrigin=(0, 0), Radius=8, Intensity=Intense)
+    on FINISHED → Wall Bonk
+  }
+
+  state Atk To WallBonk {
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=hornet_hit_reject_dull (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Wall Bonk
+  }
+
+  state Shaman Antic {
+    SetGameObject(variable=var "Current Attack", gameObject=var "Shaman Dash Slash", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dash Attack Antic")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=hornet_beast_dash_attack_foley (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Shaman Leap
+  }
+
+  state Shaman Leap {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dash Attack Leap")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=14.5, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=true)
+    PlayRandomAudioClipTableV2(Table=Attack Normal Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    on FINISHED → Shaman Slash
+  }
+
+  state Shaman Slash {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dash Attack Slash")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CallMethodProper(gameObject=var "Current Attack", behaviour="DamageEnemies", methodName="SetDirection", parameters=[var "Attack Direction"], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Current Attack", delivery=SendMessage, options=1, functionCall=StartSlash())
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetVelocityByScale(gameObject=Self, speed=8, ySpeed=10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Warrior End
+    on ATTACK LANDED → Warrior Bounce
+    on LAND → Warrior Land
+    on BOUNCE CANCEL → Warrior End
+  }
+
+  state Drill Charge Start {
+    PlayAudioEvent(audioClip=hornet_architect_charge_attack_grounded_start (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Sound")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Attack Charge", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"CANCEL", EveryFrame=true)
+    on FINISHED → Drill Charge
+    on CANCEL → Drill End
+  }
+
+  state Drill Charge {
+    PlayAudioEvent(audioClip=hornet_architect_charge_prep_long (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Sound")
+    ListenForAttack(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"UNCHARGED", delayBeforeActive=0)
+    Wait(time=0.375, finishEvent=→"CHARGED", realTime=false)  // disabled
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"CHARGED")
+    on UNCHARGED → Set Uncharged
+    on CHARGED → Set Charged
+    on CANCEL → Drill End
+  }
+
+  state Set Uncharged {
+    SetBoolValue(boolVariable=var "Charged", boolValue=false, everyFrame=false)
+    SetGameObject(variable=var "Drill Stab Crt", gameObject=var "Toolmaster Drill Stab", everyFrame=false)
+    on FINISHED → Drill Antic
+  }
+
+  state Set Charged {
+    SetBoolValue(boolVariable=var "Charged", boolValue=true, everyFrame=false)
+    SetGameObject(variable=var "Drill Stab Crt", gameObject=var "Toolmaster Drill Stab Charged", everyFrame=false)
+    on FINISHED → Drill Antic
+  }
+
+  state Drill Antic {
+    AudioStop(gameObject=var "Spawned Sound", fadeTime=0)
+    on FINISHED → Drill Type
+  }
+
+  state Drill Type {
+    PlayRandomAudioClipTableV2(Table=Attack Normal Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    CallMethodProper(gameObject=var "Drill Stab Crt", behaviour="DamageEnemies", methodName="SetDirection", parameters=[var "Attack Direction"], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Charged", isTrue=→"CHARGED", isFalse=→"UNCHARGED", everyFrame=false)
+    on UNCHARGED → Drill Attack Unch
+    on CHARGED → Drill Attack Ch
+  }
+
+  state Drill Attack Unch {
+    PlayAudioEvent(audioClip=hornet_architect_charge_attack_slashes_short (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Sound")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Attack", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-22, ySpeed=(unset), everyFrame=false)
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    SendMessage(gameObject=var "Drill Stab Crt", delivery=SendMessage, options=1, functionCall=StartSlash())
+    HeroCheckForBump(Direction=-1, StoreHitBump=var "Hit Bump Left", StoreHitWall=var "Hit Wall Left", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    HeroCheckForBump(Direction=1, StoreHitBump=var "Hit Bump Right", StoreHitWall=var "Hit Wall Right", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall Left", var "Is Stabbing Right"], boolStates=[true, false], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall Right", var "Is Stabbing Right"], boolStates=[true, true], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on FINISHED → Drill End
+    on DASH HIT → Drill Grind Unch
+    on WALL → Atk To WallBonk
+    on DAMAGER TINKED → Bonk
+  }
+
+  state Drill End {
+    on FINISHED → Attack Recovery
+  }
+
+  state Drill Attack Ch {
+    ActivateGameObject(gameObject=var "Dash Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_architect_charge_attack_slashes_long (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Sound")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Attack", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-30, ySpeed=(unset), everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    SendMessage(gameObject=var "Drill Stab Crt", delivery=SendMessage, options=1, functionCall=StartSlash())
+    HeroCheckForBump(Direction=-1, StoreHitBump=var "Hit Bump Left", StoreHitWall=var "Hit Wall Left", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    HeroCheckForBump(Direction=1, StoreHitBump=var "Hit Bump Right", StoreHitWall=var "Hit Wall Right", BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall Left", var "Is Stabbing Right"], boolStates=[true, false], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hit Wall Right", var "Is Stabbing Right"], boolStates=[true, true], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on FINISHED → Drill End
+    on DASH HIT → Drill Grind Ch
+    on WALL → Atk To WallBonk
+    on DAMAGER TINKED → Bonk
+  }
+
+  state Drill Bounce {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDownSpikeBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithRecoilBack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Drill Stab Crt", delivery=SendMessage, options=1, functionCall=CancelAttack())
+    on FINISHED → Regain Control Normal
+  }
+
+  state Drill Grind Ch {
+    Tk2dPlayAnimation(gameObject=var "Drill Stab Crt", animLibName="", clipName="DashStabEffect")
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    on FINISHED → Drill Bounce
+  }
+
+  state Reaction Type {
+    CheckIfCrestEquipped(Crest=Witch (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"WITCH", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Cursed (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"WITCH", falseEvent=(none), storeValue=(unset))
+    on FINISHED → Hit Enemy
+    on WITCH → Witch Lash Start
+  }
+
+  state W JumpCancel {
+    PlayerDataBoolTest(boolName="hasDoubleJump", isTrue=→"JUMP", isFalse=(none))
+    PlayerDataBoolTest(boolName="hasBrolly", isTrue=→"BROLLY", isFalse=(none))
+    on FINISHED → Regain Control Normal
+    on BROLLY → W To Brolly
+    on JUMP → W To D Jump
+  }
+
+  state W To Brolly {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithBrolly())
+    on FINISHED → Regain Control Normal
+  }
+
+  state W To D Jump {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithDoubleJump())
+    on FINISHED → Regain Control Normal
+  }
+
+  state Set Atk Cooldown {
+    CheckIfCrestEquipped(Crest=Wanderer (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=(none), falseEvent=(none), storeValue=var "Chooser")
+    ConvertBoolToFloat(boolVariable=var "Chooser", floatVariable=var "Attack Cooldown", falseValue=0.25, trueValue=0.1, everyFrame=false)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"AIR", EveryFrame=false)
+    on FINISHED → Ground Dir
+    on AIR → Air Dir
+  }
+
+  state Witch Connect {
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    CallMethodProper(gameObject=var "Dash Stab", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.075, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Witch Lash To
+    on DAMAGER TINKED → Bonk
+  }
+
+  state Witch Lash To {
+    PlayAudioEvent(audioClip=hornet_witch_downslash_contact (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StartDownspikeInvulnerabilityLong", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sprint Followup")
+    SetVelocityByScale(gameObject=Self, speed=-35, ySpeed=(unset), everyFrame=false)
+    Trigger2dEventV2(gameObject=var "Witch Lash Damager", trigger=0, collideTag="", collideLayer=Enemies(11), sendEvent=→"LASH LANDED", storeCollider=var "")
+    Trigger2dEventV2(gameObject=var "Witch Lash Damager", trigger=1, collideTag="", collideLayer=Enemies(11), sendEvent=→"LASH LANDED", storeCollider=var "")
+    Wait(time=0.08, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Witch Lash Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Attack Recovery
+    on LASH LANDED → Witch Lash Bounce
+  }
+
+  state Witch Lash Bounce {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDashStabBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithRecoilBack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state Enter Sprint Wait {
+    DebugLogConsole(logLevel=0, text="Entering Sprinting...", sendToUnityLog=true)
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Enter Sprinting
+  }
+
+  state Air Dash Cancel {
+    HeroControllerMethods(method=DashCooldownReady, parameters=[], everyFrame=false, storeValue=var "Can Dash", isTrue=(none), isFalse=→"CANCEL")
+    HeroControllerMethods(method=SetStartWithDash, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Regain Control Normal
+    on CANCEL → Restart Air Sprint
+  }
+
+  sequence state Restart Air Sprint {
+    NextFrameEvent(sendEvent=(none))
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → Air Sprint L
+    on R → Air Sprint R
+  }
+
+  state Regain Control To Idle {
+    HeroControllerMethods(method=StartAnimationControlToIdle, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ResetShuttlecock", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Shared
+  }
+
+  state Regain Control Shared {
+    AudioStop(gameObject=var "Sprint Air Sound", fadeTime=0)
+    SetPolygonCollider(gameObject=var "Dash Stab", active=false, resetOnExit=false)
+    SetBoolValue(boolVariable=var "Hit Enemy", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Allowed Nail Charge", boolValue=false, everyFrame=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FinishedSprint(var "Did Skid"))
+    CameraTargetMethods(method=SetSprint, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CameraTargetMethods(method=SetWallSprint, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=RegainControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    GetHeroCState(VariableName="downSpikeAntic", StoreValue=var "Chooser", EveryFrame=false)
+    BoolTest(boolVariable=var "Chooser", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    HeroAddExtraAirMoveVelocity(Velocity=var "Extra Velocity", Decay=10, CancelOnTurn=true, SkipApplyWhileMoving=true)
+    on FINISHED → No Sprint
+  }
+
+  state Idle To Bonk {
+    FloatCompare(float1=var "Can Attack Bonk", float2=0, tolerance=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Bonk
+    on CANCEL → Idle
+  }
+
+  state Dash To Vault {
+    CheckIsClamberBlocked(trueEvent=→"CANCEL", falseEvent=(none), storeValue=(unset))
+    SetFloatValue(floatVariable=var "Attack Cooldown", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "In Jump Antic", boolValue=false, everyFrame=false)
+    SetStringValue(stringVariable=var "Sprint Anim", stringValue="Sprint", everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    SetBoolValue(boolVariable=var "Allowed Nail Charge", boolValue=true, everyFrame=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=RelinquishControlNotVelocity, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    GetHeroCState(VariableName="onGround", StoreValue=var "On Ground", EveryFrame=false)
+    HeroBoxControl(heroBoxState=Sprint)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Sprint Speed Regular", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Speed Crt", everyFrame=false)
+    FloatOperator(float1=var "Dash Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Sprint Start Speed", everyFrame=false)
+    SetHeroAffectedByGravity(SetTime=0, CanSet=var "Entered Sprinting", SetAffectedByGravity=false)
+    SendEvent(eventTarget=Self, sendEvent=→"VAULT", delay=0, everyFrame=false)
+    on CANCEL → No Sprint
+    on VAULT → Vault!
+  }
+
+  state Allow Shuttlecock {
+    HeroControllerMethods(method=AllowShuttleCock, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Air Sprint Loop
+  }
+
+  state NewLash End {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetBoolValue(boolVariable=var "Disabled Renderer", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Followup Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Witch Downslash Bounce
+    on DAMAGER TINKED → NewLash Tink Cancel
+  }
+
+  state NewLash Move {
+    ActivateGameObject(gameObject=var "Followup Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Lash Checker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    FloatAdd(floatVariable=var "Wait Time", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Wait Time", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    Trigger2dEvent(gameObject=var "Lash Checker", trigger=0, collideTag="", sendEvent=→"STOP", storeCollider=var "")
+    Trigger2dEvent(gameObject=var "Lash Checker", trigger=1, collideTag="", sendEvent=→"STOP", storeCollider=var "")
+    SetHeroCState(VariableName="whipLashing", Value=true, EveryFrame=false, SetOppositeOnExit=true)
+    on FINISHED → NewLash End
+    on STOP → NewLash Stop
+    on DAMAGER TINKED → NewLash Tink Cancel
+  }
+
+  state NewLash Stop {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    FloatAdd(floatVariable=var "Wait Time", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Wait Time", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    SetHeroCState(VariableName="whipLashing", Value=true, EveryFrame=false, SetOppositeOnExit=true)
+    on FINISHED → NewLash End
+  }
+
+  state Witch Downslash Bounce {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="Hornet CrestWeapon Witch Anim", clipName="Downspike Followup")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StartDownspikeInvulnerability", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDownSpikeBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithRecoilBackLong", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state Witch Lash Start {
+    SetPolygonCollider(gameObject=var "Dash Stab Crt", active=false, resetOnExit=false)
+    CallMethodProper(gameObject=var "Dash Stab", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetMeshRenderer(gameObject=var "Dash Stab Crt", active=false)
+    SetVelocityByScale(gameObject=Self, speed=-12, ySpeed=(unset), everyFrame=false)
+    SetRotation(gameObject=var "Followup Slash", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetPosition2d(gameObject=var "Followup Slash", vector=(unset), x=-5, y=-0.6, space=1, everyFrame=false, lateUpdate=false)
+    RandomlyFlipYScale(gameObject=var "Followup Slash")
+    SetFloatValue(floatVariable=var "Wait Time", floatValue=0.18, everyFrame=false)
+    SetBoolValue(boolVariable=var "Disabled Renderer", boolValue=true, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Followup Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Witch DashSlashFinal", delivery=SendMessage, options=0, functionCall=FullCancelAttack())  // disabled
+    on FINISHED → NewLash Move
+  }
+
+  state Witch? {
+    CheckIfCrestEquipped(Crest=Witch (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"WITCH", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Cursed (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"WITCH", falseEvent=(none), storeValue=(unset))
+    CheckIfCrestEquipped(Crest=Cloakless (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=(none), falseEvent=(none), storeValue=var "Is Cloakless")
+    BoolTestToObject(Test=var "Is Cloakless", ExpectedValue=true, TrueObject=hornet_cloakless_dash_attack (sfxstatic_assets_shared.bundle), FalseObject=hornet_sword_4 (herosfxstatic_assets_all.bundle), StoreResult=var "Clip", EveryFrame=false)
+    ActivateGameObject(gameObject=var "Hunter SprintAttackBurst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Attack Dash Start
+    on WITCH → Set Audio Witch
+  }
+
+  state Set Audio Witch {
+    BoolTestToObject(Test=var "Did First Slash", ExpectedValue=true, TrueObject=hornet_witch_slash_3 (sfxstatic_assets_shared.bundle), FalseObject=hornet_witch_slash_4 (sfxstatic_assets_shared.bundle), StoreResult=var "Clip", EveryFrame=false)
+    on FINISHED → Attack Dash Start
+  }
+
+  state Drill Grind Unch {
+    Tk2dPlayAnimation(gameObject=var "Drill Stab Crt", animLibName="", clipName="DashStabEffect")
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    on FINISHED → Drill Bounce
+  }
+
+  state Set Speed Clamp {
+    on FINISHED → Warrior Leap
+  }
+
+  state Dash Stab Bounce {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDashStabBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state NewLash Tink Cancel {
+    CallMethodProper(gameObject=var "Dash Stab Crt", behaviour="NailAttackBase", methodName="OnCancelAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Followup Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Bonk
+  }
+
+  state Enable Renderer Check {
+    BoolTest(boolVariable=var "Disabled Renderer", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetBoolValue(boolVariable=var "Disabled Renderer", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Retain Extra Velocity {
+    GetVelocity2d(gameObject=Self, vector=var "Extra Velocity", x=(unset), y=(unset), space=0, everyFrame=false)
+    SetVector2XY(vector2Variable=var "Extra Velocity", vector2Value=(unset), x=(unset), y=0, everyFrame=false)
+    on FINISHED → Regain Control Normal
+  }
+
+  state Allow Air Jump {
+    SetBoolValue(boolVariable=var "Has Brolly", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Warrior Slash To Fall", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Play Audio", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlip(boolVariable=var "Play Audio")
+    PlayAudioEventRandomBool(audioClips=[hornet_sprint_jump_2nd_spin (herosfxstatic_assets_all.bundle)], doPlay=var "Play Audio", pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Air Sprint L
+  }
+
+  state Allow Air Jump 2 {
+    SetBoolValue(boolVariable=var "Has Brolly", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Warrior Slash To Fall", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Play Audio", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlip(boolVariable=var "Play Audio")
+    PlayAudioEventRandomBool(audioClips=[hornet_sprint_jump_2nd_spin (herosfxstatic_assets_all.bundle)], doPlay=var "Play Audio", pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Air Sprint R
+  }
+
+  state Reset Nail Charge State {
+    BoolTest(boolVariable=var "Allowed Nail Charge", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Allowed Nail Charge", boolValue=false, everyFrame=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Hard Landed?
+  }
+
+  var Air Sprint Speed: float = -12
+  var Dash Speed: float = -28
+  var Sprint Speed Quick: float = -23.5
+  var Sprint Speed Regular: float = -17.5
+  var Wallrun Speed: float = 13.5
+  var Sprint Speed Quicker: float = -27.5
+
+  var Attack Direction: float = 0
+  var Attack Speed: float = -32
+  var Attack Speed Crt: float = 0
+  var Attack Time: float = 0.2
+  var Attack Time End: float = 0
+  var Bump Force Grounded Delay: float = 0.5
+  var Bump Force Grounded Timer: float = 0
+  var Facing Direction: float = 0
+  var Fast Skid Timer: float = 0
+  var Force Grounded Timer: float = 0
+  var Grounded Distance: float = 1.2
+  var Set Gravity Timer: float = 0
+  var Short Grounded Distance: float = 0.2
+  var Skid Deceleration: float = 0
+  var Sprint Air Volume: float = 0
+  var Sprint Deceleration: float = 0
+  var Sprint Deceleration Fast: float = 0.85
+  var Sprint Deceleration Slow: float = 0.95
+  var Sprint Grace: float = 0.3
+  var Sprint Speed: float = 0
+  var Sprint Speed Crt: float = 0
+  var Sprint Start Speed: float = 0
+  var Sprint Stop Wait: float = 0
+  var Sprint Timer: float = 0
+  var X Scale: float = 0
+  var Jump Queue Timer: float = 0
+  var Speed Y: float = 0
+  var Alt Timer: float = 0
+  var Skid Speed: float = 0
+  var Sprint Stop Timer: float = 0
+  var Attack Cooldown: float = 0
+  var Speed X: float = 0
+  var Can Attack Bonk: float = 0
+  var Wait Time: float = 0
+  var X Speed: float = 0
+  var Fall Clamp: float = 0
+  var Add Speed: float = 0
+  var Attack Steps: int = 0
+  var Attack Step: int = 0
+  var Attack Queued: bool = false
+  var Attack Ready: bool = false
+  var Can Any Jump: bool = false
+  var Can Dash: bool = false
+  var Can Jump cancel: bool = false
+  var Charged: bool = false
+  var Chooser: bool = false
+  var Did First Slash: bool = false
+  var Did Skid: bool = false
+  var Entered Sprinting: bool = false
+  var Facing Left: bool = false
+  var Facing Right: bool = false
+  var Falling Short: bool = false
+  var Fast Skid Timer Ended: bool = false
+  var Grounded: bool = false
+  var Has Brolly: bool = false
+  var High Wall: bool = false
+  var Hit Bump: bool = false
+  var Hit Bump Left: bool = false
+  var Hit Bump Right: bool = false
+  var Hit Enemy: bool = false
+  var Hit Ground: bool = false
+  var Hit High Wall: bool = false
+  var Hit Wall: bool = false
+  var Hit Wall Left: bool = false
+  var Hit Wall Right: bool = false
+  var In Attack: bool = false
+  var In Jump Antic: bool = false
+  var Is Clamber Blocked: bool = false
+  var Is Cloakless: bool = false
+  var Is Facing Left: bool = false
+  var Is Quickening Active: bool = false
+  var Is Sprinting: bool = false
+  var Is Stabbing Right: bool = false
+  var Jump Grace: bool = false
+  var Jump Queued: bool = false
+  var Left Is Pressed: bool = false
+  var Not Bump Forcing Grounded: bool = false
+  var Not Forcing Grounded: bool = false
+  var On Conveyor: bool = false
+  var On Ground: bool = false
+  var Rage Mode: bool = false
+  var Ray Hit: bool = false
+  var Reset Sprint Anim: bool = false
+  var Right Is Pressed: bool = false
+  var Short Grounded: bool = false
+  var Should Hard Land: bool = false
+  var Sprint Stop Timer Ended: bool = false
+  var Sprintmaster Active: bool = false
+  var Was Short Grounded: bool = false
+  var Will Move: bool = false
+  var Will Move Left: bool = false
+  var Will Move Right: bool = false
+  var Can Drift: bool = false
+  var Turn Blocked: bool = false
+  var Disabled Renderer: bool = false
+  var Can Throw Tool: bool = false
+  var Allowed Nail Charge: bool = false
+  var Play Audio: bool = false
+  var Ground Below: bool = false
+  var Warrior Slash To Fall: bool = false
+  var Can Do Land: bool = false
+  var Sprint Anim: string = ""
+  var Attack Antic Anim: string = ""
+  var Attack Anim: string = ""
+  var Attack Child Name: string = ""
+  var Sprint Air Anim: string = ""
+  var High Wall Raycast Dir: vector2 = (0, 0)
+  var Raycast Dir: vector2 = (0, 0)
+  var Extra Velocity: vector2 = (0, 0)
+  var Camera Target: gameObject = <null>
+  var Centre: gameObject = <null>
+  var Dash Burst: gameObject = <null>
+  var Dash Stab: gameObject = <null>
+  var Effects: gameObject = <null>
+  var Sounds: gameObject = <null>
+  var Spawned Run Effects: gameObject = <null>
+  var Sprint Air Sound: gameObject = <null>
+  var Wall Bump: gameObject = <null>
+  var Dash Stab Crt: gameObject = <null>
+  var HeroBox: gameObject = <null>
+  var Bonking Wall: gameObject = <null>
+  var Reaper Slash: gameObject = <null>
+  var Dash Stab Alt: gameObject = <null>
+  var Wanderer RecoilStab: gameObject = <null>
+  var SpinSlash: gameObject = <null>
+  var Warrior Dash Slash: gameObject = <null>
+  var Self: gameObject = <null>
+  var Warrior Dash Slash R: gameObject = <null>
+  var Current Attack: gameObject = <null>
+  var Landed On Obj: gameObject = <null>
+  var Shaman Dash Slash: gameObject = <null>
+  var Hunter SprintAttackBurst: gameObject = <null>
+  var Drill Stab Crt: gameObject = <null>
+  var Toolmaster Drill Stab: gameObject = <null>
+  var Toolmaster Drill Stab Charged: gameObject = <null>
+  var Wanderer DashCombo Burst: gameObject = <null>
+  var Witch Lash Damager: gameObject = <null>
+  var Spawned Sound: gameObject = <null>
+  var Followup Slash: gameObject = <null>
+  var Lash Checker: gameObject = <null>
+  var Witch DashSlashFinal: gameObject = <null>
+  var Clash Tink: gameObject = <null>
+  var Clip: object = <null>
+}

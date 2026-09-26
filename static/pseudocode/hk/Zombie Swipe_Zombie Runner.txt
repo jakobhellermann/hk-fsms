@@ -1,0 +1,159 @@
+# Zombie Swipe
+# 26 location(s):
+#   Ruins1_28 / Zombie Runner
+#   Ruins1_28 / Zombie Runner (1)
+#   Fungus1_03 / Zombie Runner
+#   Fungus1_03 / Zombie Runner (1)
+#   Fungus1_34 / Zombie Runner
+#   Deepnest_03 / Zombie Runner Sp
+#   Deepnest_03 / Zombie Runner Sp (2)
+#   Deepnest_03 / Zombie Runner Sp (5)
+#   Deepnest_33 / Zombie Runner Sp (1)
+#   Deepnest_34 / Zombie Runner Sp (1)
+#   Deepnest_34 / Zombie Runner Sp
+#   Deepnest_35 / Zombie Runner Sp
+#   Crossroads_01 / _Enemies/Zombie Runner
+#   Crossroads_01 / Uninfected Parent/Zombie Runner 1
+#   Crossroads_04 / UnInfected Parent/Zombie Runner
+#   Crossroads_05 / Uninfected Parent/Zombie Runner
+#   Crossroads_10_boss / Battle Scene/Pre Battle Enemies/Zombie Runner
+#   Crossroads_19 / _Enemies/Zombie Runner
+#   Crossroads_21 / non_infected_event/Zombie Runner
+#   Crossroads_37 / Zombie Runner (1)
+#   Crossroads_37 / _Enemies/Zombie Runner 1
+#   Crossroads_39 / non_infected_event/Zombie Runner
+#   Crossroads_39 / non_infected_event/Zombie Runner 1
+#   Crossroads_40 / Uninfected Parent/Zombie Runner 2
+#   Crossroads_ShamanTemple / _Enemies/Zombie Runner
+#   Ruins1_04 / _Enemies/Zombie Runner
+
+// uses template: zombie_swipe
+fsm Zombie Swipe {
+  start Initialise
+  on RECOIL HORIZONTAL → Reset  // from any state
+
+  state Initialise {
+    FindChild(gameObject=Self, childName=var "Swipe Particle", storeResult=var "Swipe Particle Object")
+    GetComponent(gameObject=Self, storeComponent=var "Line Of Sight Detector", everyFrame=false)
+    FindAlertRange(target=Self, storeResult=var "Attack Range", childName="Attack Range")
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Coward
+  }
+
+  state Ready {
+    GetCanSeeHero(lineOfSightDetector=var "Line Of Sight Detector", storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRange(alertRange=var "Attack Range", storeResult=var "In Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Attack Range"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    on ATTACK ALERT → Left or Right?
+    on TOOK DAMAGE → Left or Right?
+  }
+
+  state Anticipate {
+    RandomFloat(min=0.9, max=1.1, storeResult=var "Chooser")
+    SetAudioPitch(gameObject=var "Self", pitch=var "Chooser", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[zombie_chase_1, zombie_chase_2], weights=[1, 1], pitchMin=0.85, pitchMax=1.15)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Anticipate")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Reverse Back
+  }
+
+  state Left or Right? {
+    StopWalker(target=Self, everyFrame=false)
+    SetFloatValue(floatVariable=var "Lunge Speed Adjust", floatValue=var "Lunge Speed", everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Self X", tolerance=0, equal=→"HERO IS LEFT", lessThan=→"HERO IS LEFT", greaterThan=→"HERO IS RIGHT", everyFrame=false)
+    on HERO IS RIGHT → R? 2
+    on HERO IS LEFT → R?
+  }
+
+  state Face Left {
+    FloatMultiply(floatVariable=var "Lunge Speed Adjust", multiplyBy=-1, everyFrame=false)
+    SetScale(gameObject=var "Self", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetWalkerFacing(walkRight=false, randomStartDir=false, target=Self, everyFrame=false)
+    on FINISHED → Reverse
+  }
+
+  state Face Right {
+    SetScale(gameObject=var "Self", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetWalkerFacing(walkRight=true, randomStartDir=false, target=Self, everyFrame=false)
+    on FINISHED → Reverse
+  }
+
+  state Lunge {
+    PlayParticleEmitter(gameObject=var "Swipe Particle Object", emit=0)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Lunge")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetVelocity2d(gameObject=var "Self", vector=(unset), x=var "Lunge Speed Adjust", y=(unset), everyFrame=true)
+    on WAIT → Cooldown
+  }
+
+  state Cooldown {
+    StopParticleEmitter(gameObject=var "Swipe Particle Object")
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Cooldown")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on WAIT → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Wait(time=var "Idle Time", finishEvent=→"WAIT", realTime=false)
+    on WAIT → Reset
+  }
+
+  state Reset {
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    on FINISHED → Coward
+  }
+
+  state R? {
+    BoolTest(boolVariable=var "Reverse", isTrue=→"REVERSE", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Face Left
+    on REVERSE → Face Right
+  }
+
+  state R? 2 {
+    BoolTest(boolVariable=var "Reverse", isTrue=→"REVERSE", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Face Right
+    on REVERSE → Face Left
+  }
+
+  state Reverse {
+    BoolTest(boolVariable=var "Reverse", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FlipScale(gameObject=var "Self", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Anticipate
+  }
+
+  state Reverse Back {
+    BoolTest(boolVariable=var "Reverse", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FlipScale(gameObject=var "Self", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Lunge
+  }
+
+  state Coward {
+    BoolTest(boolVariable=var "Coward", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", →"ATTACK ALERT"], weights=[0.5, 0.5], delay=0)
+    BoolFlip(boolVariable=var "Reverse")
+    on FINISHED → Ready
+  }
+
+  var Idle Time: float = 0.25
+  var Lunge Speed: float = 6
+  var Coward: bool = false
+  var Reverse: bool = false
+  var Swipe Particle: string = "Charge Dust"
+
+  var Chooser: float = 0
+  var Hero X: float = 0
+  var Lunge Speed Adjust: float = 0
+  var Self X: float = 0
+  var Can See Hero: bool = false
+  var In Attack Range: bool = false
+  var Hero Position: vector3 = (0, 0, 0)
+  var Self: gameObject = <null>
+  var Swipe Particle Object: gameObject = <null>
+  var Attack Range: object = <null>
+  var Line Of Sight Detector: object = <null>
+}

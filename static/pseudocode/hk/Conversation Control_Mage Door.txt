@@ -1,0 +1,148 @@
+# Conversation Control
+# 1 location(s):
+#   Ruins1_31 / Mage Door
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Mask", storeResult=var "Mask")
+    on FINISHED → Idle
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    CreateObject(gameObject=Area Title (sharedassets9.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Area Title", networkInstantiate=false, networkGroup=0)  // disabled
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)  // disabled
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="RELICDEALER", everyFrame=false)  // disabled
+    on FINISHED → No Key
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpEnd")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Read {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["RELICDEALER_DOOR", "Relic Dealer"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Check Key
+  }
+
+  state Check Key {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasWhiteKey", isTrue=→"KEY", isFalse=→"NO KEY")
+    on KEY → Box Up YN
+    on NO KEY → Box Up
+  }
+
+  state No Key {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MAGE_DOOR_NOKEY", "Prompts"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Box Up YN {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=0, everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["MAGE_DOOR_KEY", "Prompts"], storeResult=(unset var))
+    on NO → No
+    on YES → Yes
+  }
+
+  state No {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="LookUpEnd", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End 2
+  }
+
+  state End 2 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Yes {
+    SetPlayerDataBool(boolName="usedWhiteKey", value=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="LookUpToIdle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetPlayerDataBool(boolName="openedMageDoor_v2", value=true)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Open Anim 1
+  }
+
+  state Open Anim 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Mage Door Open 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Shine Particle", emit=0)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=manhole_key_turn (sharedassets7.assets))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=white_seal_1 (sharedassets19.assets))
+    on FINISHED → Open Anim 2
+  }
+
+  state Destroy {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    StopParticleEmitter(gameObject=var "Dust")
+    ActivateGameObject(gameObject=var "Phys Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=jiji_door_open_pt_2 (sharedassets7.assets))
+    SetCollider(gameObject=Self, active=false)
+  }
+
+  state Open Anim 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Mage Door Open 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Dust", emit=0)
+    SendEventByName(eventTarget=GameObject(var "Mask"), sendEvent="DOWN", delay=0, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=lift_activate (sharedassets7.assets))
+    on FINISHED → Destroy
+  }
+
+  var Self X Scale: float = 0
+  var Elderbug State: int = 0
+  var History: int = 0
+  var Toll Cost: int = 80
+  var Met Elderbug: bool = false
+  var Reintro Played: bool = false
+  var Visited Crossroads: bool = false
+  var mapCrossroads: bool = false
+  var Area Title: gameObject = <null>
+  var Dust: gameObject = Mage Door/Dust
+  var Mask: gameObject = <null>
+  var Phys Box: gameObject = Mage Door/Phys Box
+  var Self: gameObject = <null>
+  var Shine Particle: gameObject = Mage Door/Shine Particle
+  var Voice Player: gameObject = <null>
+}

@@ -1,0 +1,115 @@
+# Conversation Control
+# 1 location(s):
+#   Room_temple / Hornet Black Egg NPC
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Active?
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="HORNET", everyFrame=false)
+    on FINISHED → Choice
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Greet {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HORNET_PRE_FINAL_BATTLE", "Hornet"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Hornet_Dialogue_Generic_05 (sharedassets19.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Audio Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Active? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="guardiansDefeated", storeValue=var "Guardians Defeated")
+    IntCompare(integer1=var "Guardians Defeated", integer2=3, equal=(none), lessThan=→"ABSENT", greaterThan=(none), everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="royalCharmState", storeValue=var "Royal Charm State")
+    IntCompare(integer1=var "Royal Charm State", integer2=4, equal=(none), lessThan=→"ABSENT", greaterThan=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="openedBlackEggDoor", isTrue=→"FINISHED", isFalse=→"INACTIVE")
+    on FINISHED → Idle
+    on ABSENT → Absent
+    on INACTIVE → Idle
+  }
+
+  state Absent {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Inactive {
+    SetCollider(gameObject=Self, active=false)
+    on HORNET ACTIVE → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true)
+    on FINISHED → Idle
+  }
+
+  state Choice {
+    SetAudioVolume(gameObject=var "Audio Player", volume=0, everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="openedBlackEggDoor", isTrue=(none), isFalse=→"UNOPENED")
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REPEAT", isFalse=→"GREET", everyFrame=false)
+    on GREET → Greet
+    on REPEAT → Repeat
+    on UNOPENED → Unopened
+  }
+
+  state Repeat {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HORNET_PRE_FINAL_BATTLE_REPEAT", "Hornet"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Hornet_Dialogue_Generic_03 (sharedassets19.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Audio Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Unopened {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HORNET_DOOR_UNOPENED", "Hornet"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Hornet_Dialogue_Generic_03 (sharedassets19.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Audio Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  var Guardians Defeated: int = 0
+  var Royal Charm State: int = 0
+  var Spoken: bool = false
+  var Area Title: gameObject = <null>
+  var Audio Player: gameObject = <null>
+  var Self: gameObject = <null>
+}

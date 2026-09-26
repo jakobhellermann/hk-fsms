@@ -1,0 +1,389 @@
+# Shop Region
+# 1 location(s):
+#   Room_Charm_Shop / Shop Region
+
+fsm Shop Region {
+  start Pause
+  on SHOP CLOSED QUICK → Out Of Range  // from any state
+  on DO SHOP OPEN → Re Init  // from any state
+  on SHOP OPEN AUTO → Shop Up Msg  // from any state
+  on SHOP REGION INACTIVE → Inactive  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=var "Self", childName="Prompt Marker", storeResult=var "Prompt Marker")
+    FindGameObject(objectName="", withTag="Shop Window", store=var "Shop Object")
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    on FINISHED → Out Of Range
+  }
+
+  state Out Of Range {
+    HidePromptMarker(storedObject=var "Prompt")
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="", collideLayer="", sendEvent=→"IN RANGE", storeCollider=var "")
+    on IN RANGE → In Range
+  }
+
+  state In Range {
+    ShowPromptMarker(prefab=Arrow Prompt New (resources.assets), labelName="Shop", spawnPoint=var "Prompt Marker", storeObject=var "Prompt")
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="", collideLayer="", sendEvent=→"OUT OF RANGE", storeCollider=var "")
+    GetAxis(axisName="Vertical", multiplier=1, store=var "Axis Vert", everyFrame=true)  // disabled
+    FloatCompare(float1=var "Axis Vert", float2=0.6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UP PRESSED", everyFrame=true)  // disabled
+    ListenForUp(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    on OUT OF RANGE → Out Of Range
+    on UP PRESSED → Can Inspect?
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Range
+  }
+
+  state Can Inspect? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanInput", parameters=[], storeResult=var "Can Input")
+    BoolTest(boolVariable=var "Can Input", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["onGround"], storeResult=var "On Ground")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["attacking"], storeResult=var "Attacking")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["upAttacking"], storeResult=var "Attacking Up")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["downAttacking"], storeResult=var "Attacking Down")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["dashing"], storeResult=var "Dashing")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["backDashing"], storeResult=var "Backdashing")
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolAnyTrue(boolVariables=[var "Attacking", var "Attacking Down", var "Attacking Up", var "Backdashing", var "Dashing"], sendEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Take Control
+  }
+
+  state Take Control {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    HidePromptMarker(storedObject=var "Prompt")
+    on FINISHED → Check Proximity
+  }
+
+  state Shop Up {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player UI (resources.assets), spawnPoint=var "Hero", audioClip=ui_change_selection (sharedassets0.assets), pitchMin=0.85, pitchMax=0.85, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "Shop Object"), sendEvent="SHOP UP", delay=0, everyFrame=false)
+    on SHOP CLOSED → Regain Control
+  }
+
+  state Regain Control {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHOP STOP", delay=0, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Out Of Range
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Hero Idle {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName=var "Hero Anim")
+    on FINISHED → Shop Up Msg
+  }
+
+  state Check Proximity {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Hero X", float2=var "Move To X", tolerance=0.5, equalBool=var "Hero Mid", lessThanBool=var "Hero On Left", greaterThanBool=var "Hero On Right", everyFrame=false)
+    GetScale(gameObject=var "Hero", vector=(unset), xScale=var "Hero X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Hero X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Facing Right", greaterThanBool=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Hero Mid", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Hero On Left", isTrue=→"MOVE RIGHT", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Hero On Right", isTrue=→"MOVE LEFT", isFalse=(none), everyFrame=false)
+    on MOVE RIGHT → Move Hero Right
+    on MOVE LEFT → Move Hero Left
+    on FINISHED → Check Facing
+  }
+
+  state Move Hero Right {
+    ForceHeroFootstepSound(forceFootstepSound=Walk, endOnStateExit=true)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Move To X", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    SetBoolValue(boolVariable=var "Hero Facing Right", boolValue=true, everyFrame=false)
+    on FINISHED → Check Facing
+  }
+
+  state Turn Hero Left {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hero Idle
+  }
+
+  state Move Hero Left {
+    ForceHeroFootstepSound(forceFootstepSound=Walk, endOnStateExit=true)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=-6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Move To X", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    SetBoolValue(boolVariable=var "Hero Facing Right", boolValue=false, everyFrame=false)
+    on FINISHED → Check Facing
+  }
+
+  state Turn Hero Right {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hero Idle
+  }
+
+  state Check Facing {
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Face Hero Right", var "Hero Facing Right"], boolStates=[true, false], trueEvent=→"TURN RIGHT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Face Hero Right", var "Hero Facing Right"], boolStates=[false, true], trueEvent=→"TURN LEFT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on TURN LEFT → Turn Hero Left
+    on TURN RIGHT → Turn Hero Right
+    on FINISHED → Hero Idle
+  }
+
+  state Intro Convo? {
+    BoolTest(boolVariable=var "Intro Msg", isTrue=→"YES", isFalse=→"NO", everyFrame=false)
+    on YES → Check Intro Bool
+    on NO → Sly Key Convo?
+  }
+
+  state Check Intro Bool {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "Intro Msg Bool", isTrue=→"YES", isFalse=→"NO")
+    on YES → Sly Key Convo?
+    on NO → Title Up
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Sly Key Convo?
+  }
+
+  state Box Up {
+    SetPlayerDataBool(boolName=var "Intro Msg Bool", value=true)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Voice
+  }
+
+  state Convo {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Intro Msg Convo", var "Intro Msg Sheet"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down
+  }
+
+  state Title Up {
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="Area Title Control", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="Area Title Control", variableName="Area Event", setValue=var "NPC Title", everyFrame=false)
+    on FINISHED → Box Up
+  }
+
+  state Shop Up Msg {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHOP START", delay=0, everyFrame=false)
+    Wait(time=var "Open Anim Pause", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Intro Convo?
+  }
+
+  state Re Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=var "Self", childName="Prompt Marker", storeResult=var "Prompt Marker")
+    FindGameObject(objectName="", withTag="Shop Window", store=var "Shop Object")
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    on FINISHED → Take Control
+  }
+
+  state Relic Dealer? {
+    BoolTest(boolVariable=var "Relic Dealer", isTrue=→"YES", isFalse=→"NO", everyFrame=false)
+    on YES → Check Relics
+    on NO → Shop Up
+  }
+
+  state Check Relics {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_10", isTrue=→"DUNG", isFalse=(none))
+    SetIntValue(intVariable=var "Relics Total", intValue=0, everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="trinket1", storeValue=var "Relic 1")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="trinket2", storeValue=var "Relic 2")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="trinket3", storeValue=var "Relic 3")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="trinket4", storeValue=var "Relic 4")
+    IntAdd(intVariable=var "Relics Total", add=var "Relic 1", everyFrame=false)
+    IntAdd(intVariable=var "Relics Total", add=var "Relic 2", everyFrame=false)
+    IntAdd(intVariable=var "Relics Total", add=var "Relic 3", everyFrame=false)
+    IntAdd(intVariable=var "Relics Total", add=var "Relic 4", everyFrame=false)
+    IntCompare(integer1=var "Relics Total", integer2=0, equal=→"NO RELIC", lessThan=→"NO RELIC", greaterThan=→"HAS RELIC", everyFrame=false)
+    on HAS RELIC → Check Relic 1
+    on NO RELIC → Box Up Relic
+    on DUNG → Box Up Relic 2
+  }
+
+  state Box Up Relic {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo Relic
+  }
+
+  state Convo Relic {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["RELICDEALER_NO_RELICS", "Relic Dealer"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Relic_Dealer_06 (sharedassets10.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Box Down Relic
+  }
+
+  state Box Down Relic {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Regain Control
+  }
+
+  state Check Relic 1 {
+    SetPlayerDataBool(boolName="noTrinket1", value=true)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Relic_Dealer_03 (sharedassets10.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    IntCompare(integer1=var "Relic 1", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetPlayerDataBool(boolName="noTrinket1", value=false)
+    on FINISHED → Check Relic 2
+  }
+
+  state Check Relic 2 {
+    SetPlayerDataBool(boolName="noTrinket2", value=true)
+    IntCompare(integer1=var "Relic 2", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetPlayerDataBool(boolName="noTrinket2", value=false)
+    on FINISHED → Check Relic 3
+  }
+
+  state Check Relic 3 {
+    SetPlayerDataBool(boolName="noTrinket3", value=true)
+    IntCompare(integer1=var "Relic 3", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetPlayerDataBool(boolName="noTrinket3", value=false)
+    on FINISHED → Check Relic 4
+  }
+
+  state Check Relic 4 {
+    SetPlayerDataBool(boolName="noTrinket4", value=true)
+    IntCompare(integer1=var "Relic 4", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetPlayerDataBool(boolName="noTrinket4", value=false)
+    on FINISHED → Shop Up
+  }
+
+  state Inactive {
+    HidePromptMarker(storedObject=var "Prompt")
+    on SHOP REGION ACTIVE → Out Of Range
+  }
+
+  state Sly Key Convo? {
+    BoolTest(boolVariable=var "Sly", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasSlykey", isTrue=(none), isFalse=→"FINISHED")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="gaveSlykey", isTrue=→"FINISHED", isFalse=→"YES")
+    on FINISHED → Relic Dealer?
+    on YES → Set Bool
+  }
+
+  state Set Bool {
+    SetPlayerDataBool(boolName="gaveSlykey", value=true)
+    SetPlayerDataBool(boolName="hasSlykey", value=false)
+    SendMessage(gameObject=var "Shop Object", delivery=SendMessage, options=1, functionCall=UpdateStock())
+    on FINISHED → Box Up 2
+  }
+
+  state Box Down 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Relic Dealer?
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo 2
+  }
+
+  state Convo 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["SLY_KEY", "Sly"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Sly_wake_talk (sharedassets10.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Box Up Relic 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo Relic 2
+  }
+
+  state Convo Relic 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["RELICDEALER_DUNG", "Relic Dealer"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Relic_Dealer_04 (sharedassets10.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Box Down Relic
+  }
+
+  state Voice {
+    StringCompare(stringVariable=var "NPC Title", compareTo="RELICDEALER", equalEvent=→"LEMM", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "NPC Title", compareTo="SLY", equalEvent=→"SLY", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "NPC Title", compareTo="CHARM_SLUG", equalEvent=→"SALUBRA", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on LEMM → Lemm
+    on FINISHED → Convo
+    on SALUBRA → Convo
+    on SLY → Sly
+  }
+
+  state Lemm {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Relic_Dealer_01 (sharedassets10.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Convo
+  }
+
+  state Salubra {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Salubra_Shop_Greet (sharedassets10.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Convo
+  }
+
+  state Sly {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Sly_talk_03 (sharedassets10.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Convo
+  }
+
+  var Move To X: float = 15.97
+  var Open Anim Pause: float = 1
+  var Face Hero Right: bool = true
+  var Intro Msg: bool = true
+  var Relic Dealer: bool = false
+  var Sly: bool = false
+  var Hero Anim: string = "Idle"
+  var Intro Msg Bool: string = "metCharmSlug"
+  var Intro Msg Convo: string = "CHARMSLUG_MEET"
+  var Intro Msg Sheet: string = "Charm Slug"
+  var NPC Title: string = "CHARM_SLUG"
+
+  var Axis Vert: float = 0
+  var Hero X: float = 0
+  var Hero X Scale: float = 0
+  var Relic 1: int = 0
+  var Relic 2: int = 0
+  var Relic 3: int = 0
+  var Relic 4: int = 0
+  var Relics Total: int = 0
+  var Attacking: bool = false
+  var Attacking Down: bool = false
+  var Attacking Up: bool = false
+  var Backdashing: bool = false
+  var Can Input: bool = false
+  var Dashing: bool = false
+  var Hero Facing Right: bool = false
+  var Hero Mid: bool = false
+  var Hero On Left: bool = false
+  var Hero On Right: bool = false
+  var On Ground: bool = false
+  var Area Title: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Prompt Marker: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shop Object: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

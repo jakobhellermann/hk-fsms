@@ -1,0 +1,115 @@
+# GG Boss UI
+# 1 location(s):
+#   GG_Workshop / GG_Statue_WatcherKnights/Inspect
+
+// uses template: gg_boss_ui_inspect
+fsm GG Boss UI {
+  start Inert
+  on CONVO START → Open UI  // from any state
+
+  state Inert {
+    GetHero(storeResult=var "Hero")
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+  }
+
+  state Open UI {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    ShowBossChallengeUI(prefab=GG_Challenge_Statue_Canvas, bossNameSheet=var "Boss Name Sheet", bossNameKey=var "Boss Name Key", descriptionSheet=var "Description Sheet", descriptionKey=var "Description Key", levelSelectedEvent=→"DREAM")
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Close UI
+    on DREAM → Take Control
+  }
+
+  state Close UI {
+    SendEventByNameV2(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "CamLock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Take Control {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    SetFsmBool(gameObject=var "Hero", fsmName="Dream Nail", variableName="Dream Convo", setValue=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    on FINISHED → Set Facing
+  }
+
+  state Impact {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DREAM ENTER", delay=0, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SetPlayerDataString(gameObject=var "GameManager", stringName="dreamReturnScene", value=var "Return Scene")
+    CreateObject(gameObject=dream_area_effect (sharedassets6.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    ActivateAllChildren(gameObject=var "Self", activate=true)
+    on FINISHED → Dream Box Down
+  }
+
+  state Change Scene {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=TimePasses())
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=ResetSemiPersistentItems())
+    SetFsmBool(gameObject=var "MainCamera", fsmName="CameraFade", variableName="No Fade", setValue=true, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=EnterWithoutInput(true))
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AcceptInput())
+    GetStaticVariable(variableName="bossSceneToLoad", storeValue=var "To Scene")
+    BeginSceneTransition(sceneName=var "To Scene", entryGateName="door_dreamEnter", entryDelay=0, visualization=GodsAndGlory, preventCameraFadeOut=true)
+  }
+
+  state Dream Box Down {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CONVO CANCEL", delay=0, everyFrame=false)
+    on FINISHED → Transition
+  }
+
+  state Set Facing {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Self X", tolerance=0, equal=→"ON LEFT", lessThan=→"ON LEFT", greaterThan=→"ON RIGHT", everyFrame=false)
+    on ON LEFT → On Left
+    on ON RIGHT → On Right
+  }
+
+  state On Left {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on FINISHED → Challenge
+  }
+
+  state On Right {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    on FINISHED → Challenge
+  }
+
+  state Challenge {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Challenge Start")
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Challenge Audio
+  }
+
+  state Challenge Audio {
+    AudioPlay(gameObject=var "Hero", volume=1, oneShotClip=hero_unsheath (sharedassets180.assets), finishedEvent=(none))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Impact
+  }
+
+  state Transition {
+    CreateObject(gameObject=gg_battle_transitions (sharedassets425.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Transitions", networkInstantiate=false, networkGroup=0)
+    SendEventByName(eventTarget=GameObject(var "Transitions"), sendEvent="GG TRANSITION OUT", delay=0, everyFrame=false)
+    on GG TRANSITION END → Reset Player
+  }
+
+  state Reset Player {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ClearMPSendEvents", parameters=[], storeResult=(unset var))
+    on FINISHED → Change Scene
+  }
+
+  var CamLock: gameObject = GG_Statue_WatcherKnights/CameraLockArea
+
+  var Hero X: float = 0
+  var Self X: float = 0
+  var Boss Name Key: string = ""
+  var Boss Name Sheet: string = ""
+  var Description Key: string = ""
+  var Description Sheet: string = ""
+  var Return Scene: string = "GG_Workshop"
+  var To Scene: string = ""
+  var Hero: gameObject = <null>
+  var Self: gameObject = <null>
+  var Transitions: gameObject = <null>
+}

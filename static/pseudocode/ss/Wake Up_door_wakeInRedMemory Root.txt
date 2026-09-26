@@ -1,0 +1,185 @@
+# Wake Up
+# 1 location(s):
+#   Memory_Red / Memory Control/door_wakeInRedMemory Root
+
+fsm Wake Up {
+  start Pause
+
+  state Pause {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    ActivateGameObject(gameObject=var "Timeline", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on TEST → Take Control
+    on START ENTRY → Blank Screen
+  }
+
+  state Regain Control {
+    ActivateGameObject(gameObject=var "Timeline", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=3)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    HeroControllerMethods(method=StartAnimationControl, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControlToIdle", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    BoolTest(boolVariable=var "Do Soft Landing", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ForceSoftLanding", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → End
+  }
+
+  state Take Control {
+    ActivateGameObject(gameObject=var "z_ActivateOnStartEntry", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    on FINISHED → Start Wait
+  }
+
+  state End {
+    SendEventToRegister(eventName="HEARTBEAT_SCENE_END")
+  }
+
+  state Blank Screen {
+    ScreenFader(startColour=(unset), endColour=(0.8509804, 0.26666668, 0.26666668, 1), duration=0)  // disabled
+    ActivateGameObject(gameObject=var "z_ActivateOnStartEntry", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Lighting Group", ToAlpha=1, FadeTime=0)
+    on FINISH ENTRY → Take Control
+  }
+
+  state Start Wait {
+    SendEventToRegister(eventName="HEARTBEAT_SCENE_START")
+    CameraBlurPlaneFadeToV3(Spacing=30, Vibrancy=0.5, MaskLerp=0, MaskScale=4, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Duration=0)
+    ActivateGameObject(gameObject=var "Timeline", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CameraRepositionToHero()
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Low Graphics?
+  }
+
+  state Play Timeline {
+    SetMainCameraFovOffset(FovOffset=3, TransitionTime=0, TransitionCurve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)])
+    SetMainCameraFovOffset(FovOffset=0, TransitionTime=8, TransitionCurve=curve[(time=0, value=0, inSlope=0, outSlope=0), (time=1, value=1, inSlope=0, outSlope=0)])
+    ScreenFaderAlpha(EndAlpha=0, Duration=8)
+    CameraBlurPlaneFadeToV3(Spacing=var "Blur Spacing", Vibrancy=0, MaskLerp=1, MaskScale=4, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Duration=var "Blur Fade Time")
+    PlayTimeline(Target=var "Timeline", FinishEvent=(none))
+    FindNamedChild(gameObject=var "Timeline", storeResult=var "Audio Memory Music")
+    AudioPlaySimple(gameObject=var "Audio Memory Music", volume=1, oneShotClip=<null>)
+    SendEventByName(eventTarget=GameObject(var "Timeline"), sendEvent="TIMELINE START", delay=0, everyFrame=false)
+    on DLG → Dlg State
+    on ENDING → Fade Out
+    on ENDED → Is End?
+  }
+
+  state Is End? {
+    BoolTest(boolVariable=var "Is End", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Set State
+    on FALSE → Regain Control
+  }
+
+  state End Scene {
+    BeginSceneTransitionV2(SceneName="Tut_04", EntryGateName="door_ritualEnd", EntryDelay=0, Visualization=Default, PreventCameraFadeOut=true, TryClearMemory=true)
+  }
+
+  state Set State {
+    SetPlayerDataBool(boolName="CompletedRedMemory", value=true)
+    SavedItemGetV2(Item=White Flower (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle), Amount=1, ShowPopup=false)
+    CompleteJournalRecord(Record=White Palace Fly (dataassets_assets_assets/dataassets/enemyjournal/journalrecords.bundle), ShowPopup=false)
+    QueueAutoSave(nameEnum=GAINED_WHITE_FLOWER)
+    on FINISHED → Get Item Msg
+  }
+
+  sequence state Get Item Msg {
+    TransitionToAudioSnapshot(snapshot=at None (audioobjects_assets_all.bundle), transitionTime=1)
+    ScreenFader(startColour=(1, 1, 1, 1), endColour=(0, 0, 0, 1), duration=1.5)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    AddEventRegister(target=Self, eventName="GET ITEM MSG STING")
+    AddEventRegister(target=Self, eventName="GET ITEM MSG END")
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (prompts_assets_all.bundle), storeObject=var "UI Msg", sprite=melody_prompts_0000_flower (atlases_assets_assets/sprites/_atlases/prompts.spriteatlas.bundle))
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Flower", everyFrame=false)
+    on GET ITEM MSG STING → Music Fade
+    on GET ITEM MSG END → Award Achievement
+  }
+
+  state Fade Out {
+    FadeNestedFadeGroupV3(Target=var "Lighting Group", ToAlpha=0, FadeTime=5, Curve=curve[(time=0, value=0, inSlope=0, outSlope=0), (time=1, value=1, inSlope=0, outSlope=0)], Realtime=false)
+    AudioStopV2(gameObject=var "Audio Memory Music", fadeTime=3, cancelOnEarlyExit=false)  // disabled
+    SendEventByName(eventTarget=GameObject(var "Audio Memory Music"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    on ENDED → Is End?
+  }
+
+  state Dlg State {
+    PauseTimeline(Target=var "Timeline")
+    ArrayGetNext(array=var "Dialogues", startIndex=0, endIndex=0, loopEvent=(none), resetFlag=(unset), finishedEvent=(none), result=var "Dlg Cell", currentIndex=var "Dlg Index")
+    SetBoolValue(boolVariable=var "Hide Decorator", boolValue=true, everyFrame=false)
+    SetEnumValue(enumVariable=var "Dlg Alignment", enumValue=Center, everyFrame=false)
+    SetFloatValue(floatVariable=var "Dlg Offset Y", floatValue=2, everyFrame=false)
+    IntCompare(integer1=var "Dlg Index", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetEnumValue(enumVariable=var "Dlg Alignment", enumValue=TopLeft, everyFrame=false)
+    SetFloatValue(floatVariable=var "Dlg Offset Y", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Hide Decorator", boolValue=false, everyFrame=false)
+    IntSwitch(intVariable=var "Dlg Index", compareTo=[1, 2], sendEvent=[→"1", →"2"], everyFrame=false)
+    on FINISHED → Dlg
+    on 1 → Transformed
+    on 2 → Flower
+  }
+
+  sequence state End Dlg {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    ResumeTimeline(Target=var "Timeline")
+    on DLG → Dlg State
+    on ENDING → Fade Out
+    on ENDED → Is End?
+  }
+
+  state Dlg {
+    RunDialogueV5(CustomText="", Sheet="Lore", Key=var "Dlg Cell", TextColor=(unset), StopOffsetY=-1, NpcVoiceTableOverride=var "NPC Voice Table", OverrideContinue=false, PlayerVoiceTableOverride=Hornet_talk_memory (sfxdynamic_assets_areamemory.bundle), PreventHeroAnimation=false, HideDecorators=var "Hide Decorator", TextAlignment=var "Dlg Alignment", OffsetY=var "Dlg Offset Y", Target=Self)
+    on CONVO_END → End Dlg
+  }
+
+  state Transformed {
+    AnimatorPlay(gameObject=var "Timeline", stateName="Transformed", layer=0, normalizedTime=1, everyFrame=false)
+    on FINISHED → Dlg
+  }
+
+  state Flower {
+    AnimatorPlay(gameObject=var "Timeline", stateName="Flower Appear", layer=0, normalizedTime=1, everyFrame=false)
+    on FINISHED → Dlg
+  }
+
+  state Low Graphics? {
+    SetFloatValue(floatVariable=var "Blur Spacing", floatValue=0, everyFrame=false)
+    CheckPlatformGraphicsTier(CheckValue=Low, EqualEvent=→"FINISHED", HigherEvent=(none), LowerEvent=→"FINISHED", NotEqualEvent=(none))
+    SetFloatValue(floatVariable=var "Blur Spacing", floatValue=30, everyFrame=false)
+    on FINISHED → Play Timeline
+  }
+
+  state Music Fade {
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=15)
+    on GET ITEM MSG END → Award Achievement
+  }
+
+  state Award Achievement {
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=2)
+    AutoEquipCrestV3(Crest=<null>, SkipToAppear=true, IsTemp=false)
+    Wait(time=1, finishEvent=(none), realTime=false)  // disabled
+    on FINISHED → End Scene
+  }
+
+  var Blur Fade Time: float = 8
+  var Is End: bool = true
+  var Do Soft Landing: bool = false
+  var Timeline: gameObject = Memory Control/root_memory
+  var Lighting Group: gameObject = <null>
+  var z_ActivateOnStartEntry: gameObject = Scenery Groups/End Scenery
+  var NPC Voice Table: object = White_Lady_Silksong_talk (sfxdynamic_assets_areamemoryareatutorial.bundle)
+  var Dialogues: array = var "Dialogues"
+
+  var Dlg Offset Y: float = 0
+  var Blur Spacing: float = 0
+  var Blur Vibrancy: float = 0
+  var Dlg Index: int = 0
+  var Hide Decorator: bool = false
+  var Dlg Cell: string = ""
+  var Anim: string = ""
+  var Self: gameObject = <null>
+  var UI Msg: gameObject = <null>
+  var Audio Memory Music: gameObject = <null>
+  var Dlg Alignment: enum = TextAlignmentOptions(0)
+}

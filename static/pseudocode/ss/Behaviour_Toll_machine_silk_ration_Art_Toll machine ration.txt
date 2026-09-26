@@ -1,0 +1,163 @@
+# Behaviour
+# 1 location(s):
+#   Song_29 / Toll machine ration/Art/Toll_machine_silk_ration
+
+fsm Behaviour {
+  start Wait
+
+  state Inert {
+    ActivateGameObject(gameObject=var "Shot Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on INTERACT → Any Left?
+  }
+
+  sequence state Confirm {
+    GetCostFromReference(Reference=var "Cost Reference", StoreValue=var "Cost")
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    DialogueYesNo(Text="", TranslationSheet="Fast Travel", TranslationKey="PAY_TOLL_MSG", UseCurrency=true, CurrencyCost=var "Cost", CurrencyType=var "Currency Type", YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on YES → Start Sequence
+    on NO → End Interaction
+    on CONVO_END_FORCED → End Interaction
+  }
+
+  state End Interaction {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Has Any?
+  }
+
+  state Wait For Currency Counter {
+    SendMessageV2(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl(), everyFrame=false)
+    TakeCurrency(CurrencyType=var "Currency Type", Amount=var "Cost")
+    RespondToCurrencyCounterEvents(CurrencyType=var "Currency Type", StateEvent=StartTake, Response=→"FINISHED")
+    on FINISHED → Taking Currency
+  }
+
+  state Taking Currency {
+    RespondToCurrencyCounterEvents(CurrencyType=var "Currency Type", StateEvent=Stopped, Response=→"FINISHED")
+    SetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=var "Dish", vector=(unset), x=(unset), y=-0.05, z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    iTweenMoveTo(gameObject=var "Dish", id="", transformPosition=var "", vectorPosition=var "Dish Start Position", time=0.1, delay=0, speed=(unset), space=1, easeType=21, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"TICK", realTime=false, stopOnExit=true, loopDontFinish=false)
+    on TICK → Taking Currency
+    on FINISHED → Take End
+  }
+
+  state Take End {
+    SetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Sequence Animation
+  }
+
+  state Start Sequence {
+    GetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    on FINISHED → Wait For Currency Counter
+  }
+
+  state Ration Drop Inside {
+    SilkRationMachineGetRation(Target=Self, DidDropRation=var "Did Drop")
+    on FINISHED → Before Spit Pause
+  }
+
+  sequence state Sequence Animation {
+    SendMessageV2(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl(), everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Ration Drop Inside
+  }
+
+  state Before Spit Pause {
+    AudioPlayInState(gameObject=Self, volume=1)
+    CallMethodProper(gameObject=Self, behaviour="JitterSelf", methodName="StartJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Dust Parent", behaviour="PlayParticleEffects", methodName="PlayParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Direction
+  }
+
+  sequence state After Spit {
+    CallMethodProper(gameObject=var "Dust Parent", behaviour="PlayParticleEffects", methodName="StopParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Reactivate
+  }
+
+  sequence state Reactivate {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Has Any?
+  }
+
+  state Any Left? {
+    CallMethodProper(gameObject=Self, behaviour="SilkRationMachine", methodName="IsAnyRationsLeft", parameters=[], storeResult=var "Is Any Left", EveryFrame=false)
+    BoolTest(boolVariable=var "Is Any Left", isTrue=→"YES", isFalse=→"NO", everyFrame=false)
+    on NO → None Left Dlg
+    on YES → Pre Msg
+  }
+
+  state None Left Dlg {
+    RunDialogueV2(CustomText="", Sheet="UI", Key="SILK_RATION_MACHINE_EMPTY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Interaction
+  }
+
+  state Pre Msg {
+    RunDialogueV2(CustomText="", Sheet="UI", Key="YESNO_HINT_SILKMACHINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=Top, OffsetY=0, Target=Self)
+    on CONVO_END → Prompt
+  }
+
+  state Prompt {
+    RunFSM(fsmTemplateControl=template=-8990696591063553075 in[Hornet Stays Reaching<-false, Prompt Text Override<-"", Dish<-var "Dish", Cost Reference<-var "Cost Reference"], finishEvent=(none), everyFrame=false)
+    on CANCEL → End Interaction
+    on FINISHED → Sequence Animation
+  }
+
+  state Fire Pickup {
+    CallMethodProper(gameObject=Self, behaviour="JitterSelf", methodName="StopJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="JitterSelfForTime", methodName="StartTimedJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Shot Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Shot Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    PlayAudioEvent(audioClip=under_03d_hero_treadmil_reward_arrive (sfxstatic_assets_areaunderstore.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Shot Effect", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    BoolTest(boolVariable=var "Did Drop", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SpawnProjectileV2(SpawnPoint=var "Fire Point", Prefab=Silk Ration Citadel Large (localpoolprefabs_assets_areasong.bundle), Position=(unset), Rotation=(unset), FlipScaleFireLeft=true, Speed=15, MinAngle=var "Min Angle", MaxAngle=var "Max Angle", Space=0, StoreSpawned=var "")
+    on FINISHED → After Spit
+  }
+
+  state Has Any? {
+    CallMethodProper(gameObject=Self, behaviour="SilkRationMachine", methodName="IsAnyRationsLeft", parameters=[], storeResult=var "Is Any Left", EveryFrame=false)
+    BoolTest(boolVariable=var "Is Any Left", isTrue=→"YES", isFalse=→"NO", everyFrame=false)
+    on NO → Deactivate
+    on YES → Inert
+  }
+
+  state Deactivate {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EnableFsmSelf(SetEnabled=false)
+    ActivateBoxCollider2D(gameObject=Self, active=false, resetOnExit=false)
+  }
+
+  state Wait {
+    NextFrameEvent(sendEvent=(none))
+    on FINISHED → Has Any?
+  }
+
+  state Check Direction {
+    SetFloatValue(floatVariable=var "Min Angle", floatValue=125, everyFrame=false)
+    SetFloatValue(floatVariable=var "Max Angle", floatValue=145, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=1, everyFrame=false)
+    FloatSignTest(floatValue=var "X Scale", isPositive=→"FINISHED", isNegative=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Min Angle", floatValue=35, everyFrame=false)
+    SetFloatValue(floatVariable=var "Max Angle", floatValue=55, everyFrame=false)
+    on FINISHED → Fire Pickup
+  }
+
+  var Cost Reference: object = Silk Ration Machine (dataassets_assets_assets/dataassets/costs.bundle)
+
+  var Min Angle: float = 40
+  var Max Angle: float = 60
+  var X Scale: float = 0
+  var Cost: int = 100
+  var Is Any Left: bool = false
+  var Did Drop: bool = false
+  var Dish Start Position: vector3 = (0, 0, 0)
+  var Dish: gameObject = Toll machine ration/Art/Toll_machine_silk_ration/Art/Dish
+  var Dust Parent: gameObject = Toll machine ration/Art/Toll_machine_silk_ration/Shake Dust
+  var Shot Effect: gameObject = Toll machine ration/Art/Toll_machine_silk_ration/Pickup Fire Point/toll_machine_shot
+  var Fire Point: gameObject = Toll machine ration/Art/Toll_machine_silk_ration/Pickup Fire Point
+  var Currency Appear Region: object = Toll machine ration/Art/Toll_machine_silk_ration@CurrencyCounterAppearRegion
+  var Currency Type: enum = CurrencyType(0)
+}

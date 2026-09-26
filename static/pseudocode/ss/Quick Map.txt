@@ -1,0 +1,133 @@
+# Quick Map
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Quick Map
+#   Menu_Title / _GameCameras/HudCamera/In-game/Quick Map
+
+fsm Quick Map {
+  start Globalise
+  on NO MAP → No Map  // from any state
+  on LEVEL LOADED → Reset Override  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="No Map", storeResult=var "No Map Msg")
+    FindChild(gameObject=Self, childName="BG", storeResult=var "BG")
+    FindChild(gameObject=Self, childName="Area Name", storeResult=var "Area Name Txt")
+    ActivateGameObject(gameObject=var "No Map Msg", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Name Txt", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    FadeGroupDown(target=var "Area Name Txt", fast=true)
+    FadeGroupDown(target=var "BG", fast=true)
+    FadeGroupDown(target=var "No Map Msg", fast=true)
+    FadeNestedFadeGroup(Target=var "Game Map Quads", ToAlpha=0, FadeTime=0)
+    on OPEN QUICK MAP → Open
+  }
+
+  state Has Map {
+    SetTextMeshProText(gameObject=var "Area Name Txt", textString=var "Area Name")
+    FadeGroupUp(target=var "Area Name Txt")
+    SendEventByName(eventTarget=GameObject(var "Area Name Txt"), sendEvent="UP", delay=0, everyFrame=false)
+    FadeNestedFadeGroupV3(Target=var "Game Map Quads", ToAlpha=1, FadeTime=0.3, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    FadeGroupUp(target=var "BG")
+    on CLOSE QUICK MAP → Check State
+    on CLOSE QUICK MAP INSTANT → Close Instant
+  }
+
+  state No Map {
+    FadeGroupUp(target=var "No Map Msg")
+    GetHeroConfigVariable(VariableName="ForceBareInventory", StoreValue=var "Is Bare")
+    ActivateGameObject(gameObject=var "Msg Text", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeGroupUp(target=var "BG")
+    on CLOSE QUICK MAP → Check State
+    on CLOSE QUICK MAP INSTANT → Close Instant
+  }
+
+  state Close {
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    FadeGroupDown(target=var "Area Name Txt", fast=false)
+    FadeGroupDown(target=var "BG", fast=false)
+    FadeGroupDown(target=var "No Map Msg", fast=false)
+    FadeNestedFadeGroupV3(Target=var "Game Map Quads", ToAlpha=0, FadeTime=0.3, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    on OPEN QUICK MAP → Open
+  }
+
+  state Open {
+    SetFsmBool(gameObject=var "Game Map", fsmName="Map FSM State", variableName="Display Next Area", setValue=true, everyFrame=false)
+    FadeGroupUp(target=var "BG")  // disabled
+    FadeNestedFadeGroup(Target=var "Game Map Quads", ToAlpha=0, FadeTime=0)
+    SetPosition2D(GameObject=var "Game Map Quads", Vector=(0, 0), X=0, Y=0, Space=0, EveryFrame=false)
+    MapStopPan(target=var "Game Map")
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=true)
+    on CLOSE QUICK MAP → Close
+    on FINISHED → Get Map Zone
+    on CLOSE QUICK MAP INSTANT → Close Instant
+  }
+
+  state Reset Override {
+    SetBoolValue(boolVariable=var "In Room", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state In Room? {
+    BoolTest(boolVariable=var "In Room", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CallMethodProper(gameObject=var "Game Map", behaviour="GameMap", methodName="GetDoorMapZone", parameters=[], storeResult=var "Map Zone", EveryFrame=false)
+    on FINISHED → Try Quick Map
+  }
+
+  state Get Map Zone {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetCurrentMapZone", parameters=[], storeResult=var "Map Zone", EveryFrame=false)
+    on FINISHED → In Room?
+  }
+
+  state Globalise {
+    GetOwner(storeGameObject=var "Self")
+    SetGameObject(variable=var "Quick Map", gameObject=var "Self", everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Check State {
+    GetPlayerDataInt(intName="mapKeyPref", storeValue=var "Map Key Pref")
+    IntSwitch(intVariable=var "Map Key Pref", compareTo=[0, 1, 2], sendEvent=[→"KEY AND PIN", →"PIN", →"NONE"], everyFrame=false)
+    on KEY AND PIN → Pin On
+    on PIN → Pin On
+    on NONE → Pin Off
+  }
+
+  state Pin On {
+    on FINISHED → Close
+  }
+
+  state Pin Off {
+    on FINISHED → Close
+  }
+
+  state Try Quick Map {
+    TryOpenQuickMap(Target=var "Game Map", StoreDisplayName=var "Area Name", HasMapEvent=→"HAS MAP", NoMapEvent=→"NO MAP", StoreValue=(unset))
+    on NONE → No Map
+    on HAS MAP → Has Map
+  }
+
+  state Close Instant {
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    FadeGroupDown(target=var "Area Name Txt", fast=true)
+    FadeGroupDown(target=var "BG", fast=true)
+    FadeGroupDown(target=var "No Map Msg", fast=true)
+    FadeNestedFadeGroupV3(Target=var "Game Map Quads", ToAlpha=0, FadeTime=0, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    on OPEN QUICK MAP → Open
+  }
+
+  var Map Key Pref: int = 0
+  var In Room: bool = false
+  var Is Bare: bool = false
+  var Area Name: string = ""
+  var Map Zone: string = ""
+  var Area Name Txt: gameObject = <null>
+  var BG: gameObject = <null>
+  var No Map Msg: gameObject = <null>
+  var Self: gameObject = <null>
+  var Msg Text: gameObject = <null>
+  var Game Map Quads: gameObject = _GameCameras/HudCamera/In-game/Game Map Quads
+}

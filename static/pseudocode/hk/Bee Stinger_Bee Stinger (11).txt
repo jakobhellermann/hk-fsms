@@ -1,0 +1,190 @@
+# Bee Stinger
+# 1 location(s):
+#   Hive_04 / Bee Stinger (11)
+
+fsm Bee Stinger {
+  start Pause
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Terrain Block", storeResult=var "Terrain Block")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    BoolTestMulti(boolVariables=[var "Friendly", var "Hero in range"], boolStates=[false, true], trueEvent=→"ALERT", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    IdleBuzz(gameObject=Self, waitMin=0.5, waitMax=1.5, speedMax=5, accelerationMax=30, roamingRange=4)
+    FaceDirection(gameObject=Self, spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    on ALERT → Reset Timer
+    on TOOK DAMAGE → Unfriendly
+  }
+
+  state Chase {
+    RandomFloat(min=3, max=6, storeResult=var "Height")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=7, speedMax=7, acceleration=0.1, targetsHeight=true, height=var "Height")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    WaitRandom(timeMin=0, timeMax=2, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    SetBoolValue(boolVariable=var "Unalert Flip", boolValue=var "Unalert Range", everyFrame=false)
+    BoolFlipEveryFrame(boolVariable=var "Unalert Flip", everyFrame=true)
+    FloatAddV2(floatVariable=var "Unalert Timer", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "Unalert Flip")
+    FloatCompare(float1=var "Unalert Timer", float2=8, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UNALERT", everyFrame=false)
+    on FINISHED → Check Distance
+    on UNALERT → Idle
+  }
+
+  state Check Distance {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)  // disabled
+    FloatCompare(float1=var "Distance", float2=9, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"CANCEL", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Unalert Range", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Chase
+    on FINISHED → Antic
+  }
+
+  state Antic {
+    AudioStop(gameObject=Self)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=7, acceleration=0.5, targetsHeight=true, height=5.5)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=bee_soldier_roar_and_curl (sharedassets384.assets))
+    on FINISHED → Burst Effect
+    on GO LEFT → Chase
+    on GO RIGHT → Chase
+  }
+
+  state Pointing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    SetBoxCollider2DSize(gameObject1=Self, width=1.359833, height=1.011898, offsetX=-0.02475739, offsetY=-0.1717167)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    RandomFloat(min=4, max=7, storeResult=var "Height")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=10, acceleration=0.2, targetsHeight=true, height=var "Height")
+    SetScale(gameObject=Self, vector=(unset), x=1.25, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", everyFrame=true)
+    FloatSubtract(floatVariable=var "Angle", subtract=-90, everyFrame=true, perSecond=false)
+    RotateTo(gameObject=Self, targetAngle=var "Angle", speed=180)
+    WaitRandom(timeMin=0.5, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Alert
+  }
+
+  state Check Alert {
+    IntCompare(integer1=var "Unalert Count", integer2=3, equal=→"UNALERT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntAdd(intVariable=var "Unalert Count", add=1, everyFrame=false)
+    BoolTest(boolVariable=var "Unalert Range", isTrue=→"ALERT", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Pointing
+    on ALERT → Rear Back
+    on UNALERT → Recover
+  }
+
+  state Zing {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=bee_soldier_drill_charge (sharedassets384.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetAudioClip(gameObject=Self, audioClip=bee_soldier_drill_drilling_loop (sharedassets384.assets))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=15, everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=90, everyFrame=true)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=9999, accelerationForce=70, offsetX=0, offsetY=0)
+    Collision2dEvent(collision=0, collideTag="", sendEvent=→"COLLIDE", storeCollider=var "", storeForce=(unset))
+    Wait(time=1.5, finishEvent=→"END", realTime=false)
+    ActivateGameObject(gameObject=var "Sting Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Sting Box Hit", isTrue=→"DRILL", isFalse=(none), everyFrame=true)
+    on END → Recover
+    on COLLIDE → Recover
+    on GO LEFT → Recover
+    on GO RIGHT → Recover
+    on DRILL → Hit
+  }
+
+  state Rear Back {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Antic Angle", floatValue=var "Angle", everyFrame=false)
+    FloatAdd(floatVariable=var "Antic Angle", add=180, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Antic Angle", speed=5, everyFrame=true)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Zing
+    on GO LEFT → Recover
+    on GO RIGHT → Recover
+  }
+
+  state Hit {
+    AudioStop(gameObject=Self)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=bee_soldier_drill_drilling_loop (sharedassets384.assets), pitchMin=0.9, pitchMax=0.9, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=brkn_wand_down_stab_impact (sharedassets209.assets), pitchMin=0.9, pitchMax=0.9, volume=1, delay=0, storePlayer=<null>)
+    GetRotation(gameObject=var "Honey Spitter", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Honey Angle Min", space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Honey Angle Max", floatValue=var "Honey Angle Min", everyFrame=false)
+    FloatAdd(floatVariable=var "Honey Angle Min", add=-20, everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Honey Angle Max", add=20, everyFrame=false, perSecond=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    WaitRandom(timeMin=0.8, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    FlingObjectsFromGlobalPoolTime(gameObject=Spatter Honey (sharedassets384.assets), spawnPoint=var "Honey Spitter", position=(unset), frequency=0.05, spawnMin=2, spawnMax=3, speedMin=20, speedMax=25, angleMin=var "Honey Angle Min", angleMax=var "Honey Angle Max", originVariationX=0, originVariationY=0)
+    ActivateGameObject(gameObject=var "Drill Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    AudioStop(gameObject=Self)
+    SetAudioClip(gameObject=Self, audioClip=bee_soldier_fly_loop (sharedassets306.assets))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SetBoxCollider2DSize(gameObject1=Self, width=1.632181, height=1.402659, offsetX=0.158783, offsetY=-0.3670959)
+    ActivateGameObject(gameObject=var "Terrain Block", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Sting Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85)
+    ActivateGameObject(gameObject=var "Drill Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Orientate
+  }
+
+  state Orientate {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Reset Timer
+  }
+
+  state Burst Effect {
+    SetIntValue(intVariable=var "Unalert Count", intValue=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Thunk", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=bee_soldier_drill_prepare (sharedassets384.assets))
+    on FINISHED → Pointing
+  }
+
+  state Reset Timer {
+    SetFloatValue(floatVariable=var "Unalert Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Pause {
+    on FINISHED → Friendly?
+  }
+
+  state Friendly? {
+    GetPlayerDataBool(boolName="equippedCharm_29", storeValue=var "Friendly")
+    BoolTest(boolVariable=var "Friendly", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    on FINISHED → Init
+  }
+
+  state Unfriendly {
+    SetBoolValue(boolVariable=var "Friendly", boolValue=false, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    on FINISHED → Idle
+  }
+
+  var Angle: float = 0
+  var Antic Angle: float = 0
+  var Distance: float = 0
+  var Height: float = 0
+  var Honey Angle Max: float = 0
+  var Honey Angle Min: float = 0
+  var Unalert Timer: float = 0
+  var Unalert Count: int = 0
+  var Friendly: bool = false
+  var Hero in range: bool = false
+  var Sting Box Hit: bool = false
+  var Unalert Flip: bool = false
+  var Unalert Range: bool = false
+  var Drill Effect: gameObject = Bee Stinger (11)/Drill Effect
+  var Honey Spitter: gameObject = Bee Stinger (11)/Honey Spitter
+  var Self: gameObject = <null>
+  var Sting Hit: gameObject = Bee Stinger (11)/Sting Hit
+  var Terrain Block: gameObject = <null>
+  var Thunk: gameObject = Bee Stinger (11)/Thunk Effect
+}

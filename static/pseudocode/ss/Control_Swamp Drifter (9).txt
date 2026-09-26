@@ -1,0 +1,140 @@
+# Control
+# 1 location(s):
+#   Shadow_27 / Swamp Drifter (9)
+
+fsm Control {
+  start Init
+
+  state Start Type {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SendRandomEvent(events=[→"FALL", →"RISE"], weights=[0.5, 0.5], delay=0)
+    on RISE → Rise Antic
+    on FALL → Drift Brake
+  }
+
+  state Rise Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Dart Up", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=false)
+    SendMessage(gameObject=var "Sprite", delivery=SendMessage, options=1, functionCall=StopSway())  // disabled
+    PlayAudioEvent(audioClip=swamp_drifter_jump_midair (sfxstatic_assets_areaswamp.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=Audio Player Actor VeryShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Dart Up
+  }
+
+  state Start Pause {
+    WaitRandom(timeMin=0, timeMax=0.25, finishEvent=→"FINISHED", realTime=false)
+    GetDefaultTk2dClipName(gameObject=var "Sprite", storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Rest", equalEvent=→"REST", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    GameObjectIsVisible(gameObject=var "Sprite", trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Start Type
+    on REST → Rest
+  }
+
+  state Rest {
+    ActivateGameObject(gameObject=var "Alert Range Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"WAKE", ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on WAKE → Wake
+    on TOOK DAMAGE → Wake
+  }
+
+  state Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Alert Range Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Alert Range Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=swamp_drifter_jump (sfxstatic_assets_areaswamp.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Wake End
+  }
+
+  state Wake End {
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Dart Up Quick")
+    on FINISHED → Wake Dart Up
+  }
+
+  state Init {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    GetPosition2d(gameObject=var "Range Top", vector_2d=(unset), x=var "X Mid", y=var "Y Top", space=0, everyFrame=false)
+    GetPosition2d(gameObject=var "Range Bot", vector_2d=(unset), x=(unset), y=var "Y Bot", space=0, everyFrame=false)
+    FloatOperator(float1=var "X Mid", float2=1, operation=Add, storeResult=var "X Max", everyFrame=false)
+    FloatOperator(float1=var "X Mid", float2=-1, operation=Add, storeResult=var "X Min", everyFrame=false)
+    RandomlyFlipScale(gameObject=Self)
+    on FINISHED → Start Pause
+  }
+
+  state Dart Up {
+    RandomFloat(min=5, max=7, storeResult=var "Y Velocity")
+    SetFloatValue(floatVariable=var "Decel", floatValue=0.25, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", everyFrame=true)
+    RandomFloatEither(value1=0.33, value2=0.42, storeResult=var "Rise Time")
+    Wait(time=var "Rise Time", finishEvent=→"FINISHED", realTime=false)
+    CheckYPositionV2(gameObject=Self, compareTo=var "Y Top", compareToOffset=-3, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=(none), greaterThanBool=var "Over Max", everyFrame=true, space=0, activeBool=(unset))
+    SetBoolValueAtTime(BoolVariable=var "Can Emergency Brake", BoolValue=true, Time=0.17, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "Can Emergency Brake", var "Over Max"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Over Max?
+    on SING → Sing
+  }
+
+  state Over Max? {
+    CheckYPositionV2(gameObject=Self, compareTo=var "Y Top", compareToOffset=-2.5, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=var "Quick Drift", greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    on FINISHED → Drift Brake
+  }
+
+  state Drift Brake {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Drift Down", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AccelerateToY(gameObject=Self, accelerationFactor=var "Decel", targetSpeed=-5)
+    SendMessage(gameObject=var "Sprite", delivery=SendMessage, options=1, functionCall=StartSway())  // disabled
+    on FINISHED → Drift Down
+  }
+
+  state Drift Down {
+    CheckYPosition(gameObject=Self, compareTo=var "Y Bot", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"RISE", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    RandomFloat(min=0.15, max=0.6, storeResult=var "Rise Time")
+    WaitBool(boolTest=var "Quick Drift", time=var "Rise Time", finishEvent=→"RISE", realTime=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=var "Decel", targetSpeed=-5)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on RISE → Rise Antic
+    on SING → Sing
+  }
+
+  state Wake Dart Up {
+    PlayParticleEmitter(gameObject=var "Pt Wake", emit=0, resetIfPlaying=false)
+    SetFloatValue(floatVariable=var "Decel", floatValue=0.75, everyFrame=false)
+    RandomFloat(min=13, max=15, storeResult=var "Y Velocity")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", everyFrame=true)
+    RandomFloatEither(value1=0.2, value2=0.2, storeResult=var "Rise Time")
+    Wait(time=var "Rise Time", finishEvent=→"FINISHED", realTime=false)
+    CheckYPositionV2(gameObject=Self, compareTo=var "Y Top", compareToOffset=-3, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=(none), greaterThanBool=var "Over Max", everyFrame=true, space=0, activeBool=(unset))
+    SetBoolValueAtTime(BoolVariable=var "Can Emergency Brake", BoolValue=true, Time=0.17, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "Can Emergency Brake", var "Over Max"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    on FINISHED → Over Max?
+  }
+
+  state Sing {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=swamp_drifter_sing (sfxdynamic_assets_areaswamp.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on SING DURATION END → Rise Antic
+  }
+
+  var Rise Time: float = 0
+  var X Max: float = 0
+  var X Mid: float = 0
+  var X Min: float = 0
+  var Y Bot: float = 0
+  var Y Top: float = 0
+  var Y Velocity: float = 0
+  var Decel: float = 0.25
+  var Quick Drift: bool = false
+  var Over Max: bool = false
+  var Can Emergency Brake: bool = false
+  var Clip: string = ""
+  var Range Top: gameObject = Swamp Drifter (9)/Range Top
+  var Range Bot: gameObject = Swamp Drifter (9)/Range Bot
+  var Alert Range Obj: gameObject = Swamp Drifter (9)/Alert Range
+  var Sprite: gameObject = Swamp Drifter (9)/Sprite
+  var Pt Wake: gameObject = Swamp Drifter (9)/Pt Wake
+  var Audio Loop Voice: gameObject = Swamp Drifter (9)/Audio Loop Voice
+}

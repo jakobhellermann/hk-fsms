@@ -1,0 +1,270 @@
+# Control
+# 1 location(s):
+#   Crawl_02 / Pilgrim Fly (1)
+
+fsm Control {
+  start Init
+  on DISABLE → State 1  // from any state
+  on GO UP → Go Up  // from any state
+  on GO DOWN → Go Down  // from any state
+
+  sequence state Init {
+    FindAlertRange(target=Self, storeResult=var "Alert Range", childName="Alert Range")
+    CreateEmptyObject(gameObject=<null>, spawnPoint=var "Start Point", position=(unset), rotation=(unset), storeObject=var "Start Point New")
+    GameObjectIsNull(gameObject=var "NPC Target", isNull=(none), isNotNull=→"ATTACK NPC", storeResult=(unset), everyFrame=false)
+    SetGameObject(variable=var "Target", gameObject=var "Hero", everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    SetParent(gameObject=var "Patrol Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Start Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Start Check
+    on ATTACK NPC → Target NPC
+  }
+
+  state To Patrol {
+    SetBoolValue(boolVariable=var "Returning", boolValue=false, everyFrame=false)
+    ChaseObjectSpread(gameObject=Self, target=var "Patrol Point", speedMax=3, acceleration=0.2, targetSpreadX=0, targetSpreadY=1, spreadResetTimeMin=1, spreadResetTimeMax=2, offsetX=0, offsetY=0)
+    GetXDistance(gameObject=Self, target=var "Patrol Point", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=1, tolerance=0, equal=(none), lessThan=→"SHIFT", greaterThan=(none), everyFrame=true)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    on SHIFT → To Start
+    on TOOK DAMAGE → Attack Hero
+    on ATTACK → Attack Hero
+    on SING → Sing
+    on ALERT → Chase
+    on WAKE → Chase
+  }
+
+  state To Start {
+    TiltBySpeedY(gameObject=Self, tiltFactor=-1, tiltMax=15, rotationSpeed=50)
+    SetBoolValue(boolVariable=var "Returning", boolValue=true, everyFrame=false)
+    ChaseObjectSpread(gameObject=Self, target=var "Start Point New", speedMax=3, acceleration=0.2, targetSpreadX=0, targetSpreadY=1, spreadResetTimeMin=1, spreadResetTimeMax=2, offsetX=0, offsetY=0)
+    GetXDistance(gameObject=Self, target=var "Start Point New", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=1, tolerance=0, equal=(none), lessThan=→"SHIFT", greaterThan=(none), everyFrame=true)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    on SHIFT → To Patrol
+    on TOOK DAMAGE → Attack Hero
+    on ATTACK → Attack Hero
+    on SING → Sing
+    on ALERT → Chase
+    on WAKE → 
+  }
+
+  state Attack Hero {
+    SetGameObject(variable=var "Attack Target", gameObject=var "Hero", everyFrame=false)
+    on FINISHED → Charge Antic
+  }
+
+  state Cooldown {
+    WaitRandom(timeMin=0.4, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    UnalertTimer(alertRange=var "Alert Range", timerVariable=var "Unalert Timer", unalertTime=3, eventTarget=Self, unalertEvent=→"UNALERT", resetOnStateEntry=false)
+    TiltBySpeedY(gameObject=Self, tiltFactor=-1, tiltMax=15, rotationSpeed=50)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=4, speedMax=8, acceleration=0.25, targetsHeight=true, height=0, minAboveHero=(unset))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    on FINISHED → Chase
+    on UNALERT → Unalert Patrol
+    on SING → Sing
+  }
+
+  state Unalert Patrol {
+    IdleBuzzV2(gameObject=Self, waitMin=0.5, waitMax=1, speedMax=2.5, accelerationMax=15, roamingRangeX=4, roamingRangeY=4, manualStartPos=(unset))
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    ShoveFromWall(gameObject=Self, shoveForce=10, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on ATTACK → Attack Hero
+    on SING → Sing
+    on ALERT → Chase
+  }
+
+  state Charge {
+    PlayAudioEventRandom(audioClips=[grasshopper_slasher_dash_1 (sfxstatic_assets_areaclover.bundle), grasshopper_slasher_dash_2 (sfxstatic_assets_areaclover.bundle), grasshopper_slasher_dash_3 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=(unset), brakeOnExit=false)
+    SetVelocityByScale(gameObject=Self, speed=-30, ySpeed=-2, everyFrame=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.25, targetSpeed=5)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Velocity X", float2=0, tolerance=0.2, equal=→"BONK", lessThan=(none), greaterThan=(none), everyFrame=true)
+    on FINISHED → End
+    on BONK → Bonk
+  }
+
+  state End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.975, decelerationY=(unset), brakeOnExit=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=1, targetSpeed=5)
+    on FINISHED → Cooldown
+  }
+
+  state Chase {
+    ConvertBoolToFloat(boolVariable=var "Targeting NPC", floatVariable=var "Unalert Timer", falseValue=(unset), trueValue=0, everyFrame=true)
+    UnalertTimer(alertRange=var "Alert Range", timerVariable=var "Unalert Timer", unalertTime=3, eventTarget=Self, unalertEvent=→"UNALERT", resetOnStateEntry=false)
+    DistanceFly(gameObject=Self, target=var "Target", distance=4, speedMax=4.5, acceleration=0.2, targetsHeight=true, height=0.5, minAboveHero=(unset))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    RandomFloat(min=1, max=1.5, storeResult=var "Target NPC Time")
+    WaitBool(boolTest=var "Targeting NPC", time=var "Target NPC Time", finishEvent=→"ATTACK NPC", realTime=false)
+    on ATTACK → Attack Hero
+    on UNALERT → Unalert Patrol
+    on SING → Sing
+    on ATTACK NPC → Attack NPC
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=pilgrim_fly_sing (sfxdynamic_assets_pilgrimslowerpilgrimsupper.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase
+  }
+
+  state Start Check {
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Spawn Sing", equalEvent=→"SPAWN SING", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Ambush", equalEvent=→"AMBUSH", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep 1", equalEvent=→"SLEEP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep 2", equalEvent=→"SLEEP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → To Patrol
+    on SPAWN SING → Spawn Sing
+    on AMBUSH → Ambush Ready
+    on SLEEP → Sleep
+  }
+
+  state Spawn Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 10), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    on FINISHED → Sing End
+  }
+
+  state Ambush Ready {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Ambush Range", storeResult=false, sendEvent="AMBUSH", outOfRangeEvent="", everyFrame=true)
+    on AMBUSH → Ambush Pause
+    on BATTLE START → Ambush Pause
+  }
+
+  state Ambush Pause {
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ambush Antic
+  }
+
+  state Ambush Antic {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Ambush")
+    PlayRandomAudioClipTable(Table=enemy_dig_in_antic (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Ambush
+  }
+
+  state Ambush {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pilgrim_fly_attack (sfxdynamic_assets_pilgrimslowerpilgrimsupper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_emerge (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Spawn Sing
+  }
+
+  state Bonk {
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=(unset), everyFrame=false)
+    on FINISHED → End
+  }
+
+  state State 1 {
+    AudioStop(gameObject=var "Current Clip", fadeTime=0)
+  }
+
+  state Sleep {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on TOOK DAMAGE → Wake Start
+    on ALERT → Wake Start
+  }
+
+  state Wake Start {
+    BuildString(stringParts=[var "Clip", " Wake"], separator="", addToEnd=true, storeResult=var "Wake Clip", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Wake Clip", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pilgrim_fly_attack (sfxdynamic_assets_pilgrimslowerpilgrimsupper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Spawn Sing
+  }
+
+  state Go Up {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    NextFixedFrameEvent(SendEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Target NPC {
+    SetGameObject(variable=var "Target", gameObject=var "NPC Target", everyFrame=false)
+    SetBoolValue(boolVariable=var "Targeting NPC", boolValue=true, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Charge Antic {
+    PlayAudioEvent(audioClip=pilgrim_fly_antic (sfxstatic_assets_pilgrimslower.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pilgrim_fly_attack (sfxdynamic_assets_pilgrimslowerpilgrimsupper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Attack Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=15, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetVelocityByScale(gameObject=Self, speed=7, ySpeed=(unset), everyFrame=false)
+    on FINISHED → Charge
+  }
+
+  state Go Down {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    NextFixedFrameEvent(SendEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-10, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Attack NPC {
+    SetGameObject(variable=var "Attack Target", gameObject=var "NPC Target", everyFrame=false)
+    on FINISHED → Charge Antic
+  }
+
+  var NPC Target: gameObject = <null>
+
+  var Distance: float = 0
+  var Unalert Timer: float = 0
+  var Velocity X: float = 0
+  var Target NPC Time: float = 0
+  var Returning: bool = false
+  var Targeting NPC: bool = false
+  var Clip: string = ""
+  var Wake Clip: string = ""
+  var Patrol Point: gameObject = Pilgrim Fly (1)/Patrol Point
+  var Start Point: gameObject = Pilgrim Fly (1)/Start Point
+  var Pt Ambush: gameObject = Pilgrim Fly (1)/Pt Ambush
+  var Start Point New: gameObject = <null>
+  var Current Clip: gameObject = <null>
+  var Target: gameObject = <null>
+  var Attack Target: gameObject = <null>
+  var Audio Loop Voice: gameObject = Pilgrim Fly (1)/Audio Loop Voice
+  var Alert Range: object = <null>
+}

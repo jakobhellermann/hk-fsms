@@ -1,0 +1,366 @@
+# Control
+# 3 location(s):
+#   GG_Mighty_Zote / Battle Control/Dormant Warriors/Zote Crew Normal (3)
+#   GG_Mighty_Zote / Battle Control/Dormant Warriors/Zote Crew Normal (1)
+#   GG_Mighty_Zote / Battle Control/Dormant Warriors/Zote Crew Normal (2)
+
+fsm Control {
+  start Init
+  on HIT DOWN → Hit Down  // from any state
+  on HIT RIGHT → Hit Right  // from any state
+  on HIT LEFT → Hit Left  // from any state
+  on HIT UP → Hit Up  // from any state
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Pt Land", storeResult=var "Pt Land")
+    FindChild(gameObject=Self, childName="Pt Run", storeResult=var "Pt Run")
+    FindChild(gameObject=Self, childName="Pt Fall", storeResult=var "Pt Fall")
+    FindChild(gameObject=Self, childName="Bonker", storeResult=var "Bonker")
+    FindChild(gameObject=Self, childName="Attack Voice", storeResult=var "Attack Voice")
+    FindChild(gameObject=Self, childName="Spawn Lines", storeResult=var "Spawn Lines")
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetHP(target=Self, storeValue=var "HP")
+    on FINISHED → Dormant
+  }
+
+  state Tumble Out {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    RandomFloat(min=0, max=0, storeResult=var "Angle")  // disabled
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=20, everyFrame=false)  // disabled
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=false, pauseBetweenTurns=false, pauseTime=0)  // disabled
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Prev X Speed", y=(unset), space=0, everyFrame=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=→"LAND", leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=→"LAND", leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetFloatValue(floatVariable=var "Prev X Speed", floatValue=var "X Speed", everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), space=0, everyFrame=true)
+    on WALL → Reflect
+    on LAND → Grav
+  }
+
+  state Reflect {
+    FloatMultiply(floatVariable=var "Prev X Speed", multiplyBy=-1, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Prev X Speed", y=(unset), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → In Air
+  }
+
+  state Fall Over {
+    SetBoolValue(boolVariable=var "Will Fall", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset))
+    WaitRandom(timeMin=var "Tripped Time Min", timeMax=var "Tripped Time Max", finishEvent=→"FINISHED", realTime=false)
+    StopParticleEmitter(gameObject=var "Pt Run")
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=brkn_wand_land (sharedassets32.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Zote_battle_fall_01 (sharedassets32.assets), Zote_battle_fall_02 (sharedassets32.assets), Zote_battle_wound_02 (sharedassets32.assets), Zote_battle_wound_04 (sharedassets32.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Get Up
+  }
+
+  state Get Up {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Get Up", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    WaitRandom(timeMin=var "Idle Time Min", timeMax=var "Idle Time Max", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Move Choice
+  }
+
+  state Move Choice {
+    SendRandomEventV2(events=[→"ATTACK", →"JUMP"], weights=[0.35, 0.65], trackingInts=[var "Ct Attack", var "Ct Jump"], eventMax=[2, 3])
+    on ATTACK → Attack Antic
+    on JUMP → Jump Aim
+  }
+
+  state Jump Aim {
+    RandomFloat(min=-18, max=18, storeResult=var "Jump X")
+    RandomFloat(min=var "Jump Force Min", max=var "Jump Force Max", storeResult=var "Jump Y")
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    FloatCompare(float1=var "Jump X", float2=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Jump Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hornet_jump (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Jump Launch
+  }
+
+  state Jump Launch {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=var "Jump Y", everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Zote_battle_leap_01 (sharedassets32.assets), Zote_battle_leap_02 (sharedassets32.assets), Zote_battle_leap_03 (sharedassets32.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Extra Frame
+  }
+
+  state Trip? {
+    PlayParticleEmitter(gameObject=var "Pt Land", emit=0)
+    BoolTest(boolVariable=var "Roared", isTrue=(none), isFalse=→"TRIP", everyFrame=false)
+    BoolTest(boolVariable=var "Will Fall", isTrue=→"TRIP", isFalse=(none), everyFrame=false)
+    SendRandomEvent(events=[→"TRIP", →"LAND"], weights=[1, 1], delay=0)
+    on TRIP → Fall Over
+    on LAND → Land
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hornet_ground_land (sharedassets28.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Set Dmg
+  }
+
+  state Attack Antic {
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Chase
+  }
+
+  state Attack Chase {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Prev X Speed", y=(unset), space=0, everyFrame=false)
+    ChaseObjectGround(gameObject=Self, target=var "Hero", speedMax=var "Run Speed", acceleration=var "Run Accel", animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=true)
+    ActivateGameObject(gameObject=var "Bonker", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)  // disabled
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)  // disabled
+    SetFloatValue(floatVariable=var "Prev X Speed", floatValue=var "X Speed", everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), space=0, everyFrame=true)
+    PlayParticleEmitter(gameObject=var "Pt Run", emit=0)
+    WaitRandom(timeMin=var "Run Time Min", timeMax=var "Run Time Max", finishEvent=→"END", realTime=false)
+    AudioPlayInState(gameObject=var "Attack Voice", volume=1)
+    on WALL → Hit Wall
+    on END → Fall Over
+  }
+
+  state Hit Wall {
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Prev X Speed", multiplyBy=-1, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Prev X Speed", y=var "Wall Hit Force", everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    StopParticleEmitter(gameObject=var "Pt Run")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Zote_battle_wound_01 (sharedassets32.assets), Zote_battle_wound_02 (sharedassets32.assets), Zote_battle_wound_03 (sharedassets32.assets), Zote_battle_fall_01 (sharedassets32.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → In Air
+  }
+
+  state Hit Up {
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Fall", boolValue=true, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Run")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    RandomFloat(min=80, max=100, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Hit Up Force", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Zote_battle_wound_01 (sharedassets32.assets), Zote_battle_wound_02 (sharedassets32.assets), Zote_battle_wound_03 (sharedassets32.assets), Zote_battle_fall_01 (sharedassets32.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → In Air
+  }
+
+  state Hit Left {
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Fall", boolValue=true, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Run")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    RandomFloat(min=120, max=130, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=25, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Zote_battle_wound_01 (sharedassets32.assets), Zote_battle_wound_02 (sharedassets32.assets), Zote_battle_wound_03 (sharedassets32.assets), Zote_battle_fall_01 (sharedassets32.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → In Air
+  }
+
+  state Hit Right {
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Fall", boolValue=true, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Run")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    RandomFloat(min=50, max=60, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=25, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Zote_battle_wound_01 (sharedassets32.assets), Zote_battle_wound_02 (sharedassets32.assets), Zote_battle_wound_03 (sharedassets32.assets), Zote_battle_fall_01 (sharedassets32.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → In Air
+  }
+
+  state Hit Down {
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Fall", boolValue=true, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Run")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    RandomFloat(min=280, max=260, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=25, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Zote_battle_wound_01 (sharedassets32.assets), Zote_battle_wound_02 (sharedassets32.assets), Zote_battle_wound_03 (sharedassets32.assets), Zote_battle_fall_01 (sharedassets32.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → In Air
+  }
+
+  state Death {
+    SetParent(gameObject=Self, parent=var "Dormant Warriors", resetLocalPosition=false, resetLocalRotation=false)
+    SpawnObjectFromGlobalPool(gameObject=Zote Crew Death (sharedassets481.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    FloatAdd(floatVariable=var "Deaths", add=1, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Deaths", minValue=1, maxValue=25, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    NextFrameEvent(sendEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Run")
+    SendEventToRegister(eventName="ZOTE WARRIOR KILLED")
+    on FINISHED → Death Reset
+  }
+
+  state Death Reset {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=0, y=99, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dormant
+  }
+
+  state Multiply {
+    FloatOperator(float1=var "Deaths", float2=0.1, operation=Multiply, storeResult=var "Multiplier", everyFrame=false)
+    FloatOperator(float1=var "Deaths", float2=0.065, operation=Multiply, storeResult=var "Multiplier Low", everyFrame=false)
+    FloatOperator(float1=var "Deaths", float2=0.25, operation=Multiply, storeResult=var "Multiplier High", everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=1, operation=Add, storeResult=var "Multiplier", everyFrame=false)
+    FloatOperator(float1=var "Multiplier High", float2=1, operation=Add, storeResult=var "Multiplier High", everyFrame=false)
+    FloatOperator(float1=var "Multiplier Low", float2=1, operation=Add, storeResult=var "Multiplier Low", everyFrame=false)
+    FloatClamp(floatVariable=var "Multiplier", minValue=1, maxValue=20, everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=1, operation=Multiply, storeResult=var "Gravity", everyFrame=false)
+    FloatOperator(float1=var "Multiplier Low", float2=25, operation=Multiply, storeResult=var "Hit Up Force", everyFrame=false)
+    FloatOperator(float1=1, float2=var "Multiplier", operation=Divide, storeResult=var "Idle Time Max", everyFrame=false)
+    FloatOperator(float1=0.5, float2=var "Multiplier", operation=Divide, storeResult=var "Idle Time Min", everyFrame=false)
+    FloatOperator(float1=var "Multiplier Low", float2=30, operation=Multiply, storeResult=var "Jump Force Max", everyFrame=false)
+    FloatOperator(float1=var "Multiplier Low", float2=20, operation=Multiply, storeResult=var "Jump Force Min", everyFrame=false)
+    FloatOperator(float1=var "Multiplier High", float2=0.2, operation=Multiply, storeResult=var "Run Accel", everyFrame=false)
+    FloatOperator(float1=1, float2=6, operation=Multiply, storeResult=var "Run Time Max", everyFrame=false)
+    FloatOperator(float1=1, float2=3, operation=Multiply, storeResult=var "Run Time Min", everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=9, operation=Multiply, storeResult=var "Run Speed", everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=0.2, operation=Multiply, storeResult=var "Run Accel", everyFrame=false)
+    FloatOperator(float1=1.25, float2=var "Multiplier", operation=Divide, storeResult=var "Tripped Time Max", everyFrame=false)
+    FloatOperator(float1=0.75, float2=var "Multiplier", operation=Divide, storeResult=var "Tripped Time Min", everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=15, operation=Multiply, storeResult=var "Wall Hit Force", everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Activate {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetIsDead(target=Self, setValue=false)
+    SetHP(target=Self, hp=var "HP")
+    SetDamageHeroAmount(target=Self, damageDealt=var "Damage")
+    SetDamageHeroAmount(target=var "Bonker", damageDealt=(unset))
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    AudioStop(gameObject=var "Rumble Player")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=col_cage_open (sharedassets32.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Spawn Lines", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Tumble Out
+  }
+
+  state Set Damage {
+    FloatInRange(floatVariable=var "Deaths", lowerValue=0, upperValue=10, boolVariable=(unset), trueEvent=→"DMG 1", falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Deaths", lowerValue=0, upperValue=20, boolVariable=(unset), trueEvent=→"DMG 2", falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Deaths", lowerValue=0, upperValue=24, boolVariable=(unset), trueEvent=→"DMG 3", falseEvent=(none), everyFrame=false)
+    on DMG 1 → Dmg 1
+    on DMG 2 → Dmg 2
+    on FINISHED → Dmg 3
+  }
+
+  state Grav {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    on FINISHED → Trip?
+  }
+
+  state Dmg 1 {
+    SetIntValue(intVariable=var "Damage", intValue=1, everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Dmg 2 {
+    SetIntValue(intVariable=var "Damage", intValue=2, everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Dmg 3 {
+    SetIntValue(intVariable=var "Damage", intValue=3, everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Dmg 4 {
+    SetIntValue(intVariable=var "Damage", intValue=4, everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Set Dmg {
+    SetDamageHeroAmount(target=Self, damageDealt=var "Damage")
+    on FINISHED → Idle
+  }
+
+  state Dormant {
+    on SPAWN → Multiply
+  }
+
+  state Spawn Antic {
+    RandomFloat(min=91.54, max=114.56, storeResult=var "X Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=21.5, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0)
+    PlayParticleEmitterInState(gameObject=var "Pt Fall")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=misc_rumble_loop (sharedassets101.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Rumble Player")
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Activate
+  }
+
+  state Extra Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Air
+  }
+
+  var Deaths: float = 0
+  var Dormant Warriors: gameObject = Battle Control/Dormant Warriors
+
+  var Angle: float = 0
+  var Gravity: float = 0
+  var Hit Up Force: float = 25
+  var Idle Time Max: float = 1
+  var Idle Time Min: float = 0.5
+  var Jump Force Max: float = 30
+  var Jump Force Min: float = 20
+  var Jump X: float = 0
+  var Jump Y: float = 0
+  var Multiplier: float = 0
+  var Multiplier High: float = 0
+  var Multiplier Low: float = 0.2
+  var Prev X Speed: float = 9
+  var Run Accel: float = 6
+  var Run Speed: float = 3
+  var Run Time Max: float = 1.25
+  var Run Time Min: float = 0.75
+  var Tripped Time Max: float = 15
+  var Tripped Time Min: float = 0
+  var Wall Hit Force: float = 0
+  var X Pos: float = 0
+  var X Speed: float = 0
+  var Ct Attack: int = 0
+  var Ct Jump: int = 0
+  var Damage: int = 1
+  var HP: int = 250
+  var Roared: bool = false
+  var Will Fall: bool = false
+  var Attack Voice: gameObject = <null>
+  var Bonker: gameObject = <null>
+  var Pt Fall: gameObject = <null>
+  var Pt Land: gameObject = <null>
+  var Pt Run: gameObject = <null>
+  var Rumble Player: gameObject = <null>
+  var Self: gameObject = <null>
+  var Spawn Lines: gameObject = <null>
+}

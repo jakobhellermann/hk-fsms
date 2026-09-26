@@ -1,0 +1,401 @@
+# Ruins Sentry Fat
+# 3 location(s):
+#   Ruins2_01 / Ruins Sentry Fat
+#   Ruins2_05 / Ruins Sentry Fat
+#   Ruins1_05c / Ruins Sentry Fat
+
+fsm Ruins Sentry Fat {
+  start Init
+  on BATTLE SPAWN → Sp Pause  // from any state
+
+  state Init {
+    RandomBool(storeResult=var "Can Distance Charge")
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Head Box", storeResult=var "Head Box")
+    FindChild(gameObject=Self, childName="Patrol Voice", storeResult=var "Patrol Voice")
+    FindChild(gameObject=Self, childName="Run Check", storeResult=var "Run Check Obj")
+    FindChild(gameObject=Self, childName="Run Loop", storeResult=var "Run Loop")
+    on FINISHED → Spawner?
+  }
+
+  state Idle {
+    BoolTest(boolVariable=var "Alert Region", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    AudioPlayInState(gameObject=var "Patrol Voice", volume=1)
+    on ALERT → Init Chase
+    on TOOK DAMAGE → Init Chase
+  }
+
+  state Run {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Hero Is Right", leftBool=var "Hero Is Left", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Facing Right", var "Hero Is Left"], sendEvent=→"TURN", storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Hero Is Right"], boolStates=[false, true], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Run Speed Crt", y=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Unalert Region", isTrue=(none), isFalse=→"OUT OF RANGE", everyFrame=true)
+    BoolTest(boolVariable=var "Attack Region", isTrue=→"ATTACK", isFalse=(none), everyFrame=true)
+    FloatSubtract(floatVariable=var "Air Attack Pause", subtract=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Air Attack Pause", minValue=0, maxValue=9999, everyFrame=true)
+    FloatTestToBool(float1=var "Air Attack Pause", float2=0, tolerance=0, equalBool=var "Can Air Attack", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Air Region", var "Can Air Attack"], sendEvent=→"AIR ATTACK", storeResult=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    BoolAllTrue(boolVariables=[var "Can Distance Charge", var "Charge Region"], sendEvent=→"CHARGE", storeResult=(unset), everyFrame=true)
+    SetBoolValue(boolVariable=var "Run Safe", boolValue=true, everyFrame=false)
+    RayCast2d(fromGameObject=var "Run Check Obj", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Run Safe", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTest(boolVariable=var "Run Safe", isTrue=(none), isFalse=→"RUN STOP", everyFrame=true)
+    AudioPlayInState(gameObject=var "Run Loop", volume=1)
+    on TURN → Turn
+    on OUT OF RANGE → Run End
+    on ATTACK → Attack Choice
+    on AIR ATTACK → Air Attack?
+    on RUN STOP → Run Stop
+    on CHARGE → Charge Antic
+  }
+
+  state Init Chase {
+    StopWalker(target=Self, everyFrame=false)
+    SetFloatValue(floatVariable=var "Run Speed Crt", floatValue=var "Run Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Run Speed Crt", multiplyBy=-1, everyFrame=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Scale", float2=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    FloatMultiply(floatVariable=var "Run Speed Crt", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Startle
+  }
+
+  state Turn {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn B", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    FloatMultiply(floatVariable=var "Run Speed Crt", multiplyBy=-1, everyFrame=false)
+    BoolFlip(boolVariable=var "Facing Right")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Out Of Range?
+  }
+
+  state Run End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run End")  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    BoolTest(boolVariable=var "Unalert Region", isTrue=→"ALERT", isFalse=(none), everyFrame=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Alert Cooldown
+    on ALERT → Run
+  }
+
+  state Alert Cooldown {
+    WaitRandom(timeMin=2, timeMax=3, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    BoolTest(boolVariable=var "Unalert Region", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    on FINISHED → Check Facing
+    on ALERT → Run
+  }
+
+  state Out Of Range? {
+    BoolTest(boolVariable=var "Unalert Region", isTrue=(none), isFalse=→"OUT OF RANGE", everyFrame=false)
+    on FINISHED → Run
+    on OUT OF RANGE → Alert Cooldown
+  }
+
+  state Alert End {
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Attack Choice {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="CHARGE", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV2(events=[→"SINGLE", →"CHARGE", →"JUMP"], weights=[0.44, 0.28, 0.28], trackingInts=[var "Ct Slash", var "Ct Charge", var "Ct Jump"], eventMax=[2, 2, 2])
+    on SINGLE → Single Antic
+    on JUMP → Get Jump Distance
+    on CHARGE → Charge Antic
+  }
+
+  state Single Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetBoolValue(boolVariable=var "Can Distance Charge", boolValue=true, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Ruins_Sentry_Fat_attack_01 (sharedassets92.assets), Ruins_Sentry_Fat_attack_02 (sharedassets92.assets), Ruins_Sentry_Fat_attack_03 (sharedassets92.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Single Swipe
+  }
+
+  state Single Swipe {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=ruin_fat_sentry_sword (sharedassets33.assets), finishedEvent=(none))
+    ActivateGameObject(gameObject=var "Ground Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Single Recover
+  }
+
+  state Single Recover {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Ground Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Attack CD
+  }
+
+  state Attack CD {
+    WaitRandom(timeMin=0.25, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetCollider(gameObject=var "Head Box", active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Out Of Range?
+  }
+
+  state Get Jump Distance {
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=5, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Self X", tolerance=0, equal=→"HERO R", lessThan=→"HERO L", greaterThan=→"HERO R", everyFrame=false)
+    on HERO R → Hero Is R
+    on HERO L → Hero Is L
+    on SINGLE → Single Antic
+    on CANCEL → Single Antic
+  }
+
+  state Jump Antic {
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Jump Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Can Distance Charge", boolValue=true, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Ruins_Sentry_Fat_attack_01 (sharedassets92.assets), Ruins_Sentry_Fat_attack_02 (sharedassets92.assets), Ruins_Sentry_Fat_attack_03 (sharedassets92.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Launch
+  }
+
+  state Launch {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Jump Air")
+    SetCollider(gameObject=var "Head Box", active=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump Distance", y=30, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Jump Air", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=brkn_wand_jump (sharedassets34.assets), pitchMin=1.1, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Land
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Jump Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetCollider(gameObject=var "Head Box", active=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=brkn_wand_land (sharedassets32.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Swipe
+  }
+
+  state Swipe {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=ruin_fat_sentry_sword (sharedassets33.assets), finishedEvent=(none))
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Ground Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Single Recover
+  }
+
+  state Hero Is R {
+    SendRandomEvent(events=[→"EVADE", →"CANCEL"], weights=[0.4, 0.6], delay=0)
+    FloatSubtract(floatVariable=var "Hero X", subtract=var "Jump Distance Adjust", everyFrame=false, perSecond=false)
+    on FINISHED → Finish Jump Calc
+    on EVADE → Evade L
+  }
+
+  state Hero Is L {
+    SendRandomEvent(events=[→"EVADE", →"CANCEL"], weights=[0.4, 0.6], delay=0)
+    FloatAdd(floatVariable=var "Hero X", add=var "Jump Distance Adjust", everyFrame=false, perSecond=false)
+    on FINISHED → Finish Jump Calc
+    on EVADE → Evade R
+  }
+
+  state Finish Jump Calc {
+    FloatOperator(float1=var "Hero X", float2=var "Self X", operation=Subtract, storeResult=var "Jump Distance", everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump Distance", multiplyBy=var "Jump Multiply", everyFrame=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Air Attack? {
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=5, minDepth=(unset), maxDepth=(unset), hitEvent=→"END", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SendRandomEvent(events=[→"ATTACK", →"END"], weights=[1, 1], delay=0)
+    SetFloatValue(floatVariable=var "Air Attack Pause", floatValue=1, everyFrame=false)
+    on ATTACK → Get Jump Distance
+    on FINISHED → Run
+    on END → Air Reset
+  }
+
+  state Evade L {
+    SetFloatValue(floatVariable=var "Jump Distance", floatValue=-2, everyFrame=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Evade R {
+    SetFloatValue(floatVariable=var "Jump Distance", floatValue=2, everyFrame=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Check Facing {
+    SetWalkerFacing(walkRight=false, randomStartDir=false, target=Self, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignTest(floatValue=var "Scale", isPositive=→"FINISHED", isNegative=(none), everyFrame=false)
+    SetWalkerFacing(walkRight=true, randomStartDir=false, target=Self, everyFrame=false)
+    on FINISHED → Alert End
+  }
+
+  state Run Stop {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Run
+  }
+
+  state Run Check {
+    BoolTest(boolVariable=var "Unalert Region", isTrue=(none), isFalse=→"OUT OF RANGE", everyFrame=false)
+    BoolTest(boolVariable=var "Run Safe", isTrue=(none), isFalse=→"RUN STOP", everyFrame=false)  // disabled
+    RayCast2d(fromGameObject=var "Run Check Obj", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Run Safe", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    on FINISHED → Run
+    on RUN STOP → Run Stop
+    on OUT OF RANGE → Run End
+  }
+
+  state Startle {
+    BoolTest(boolVariable=var "Spawner", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Ruins_Sentry_Fat_startle_01 (sharedassets92.assets), Ruins_Sentry_Fat_startle_02 (sharedassets92.assets)], weights=[1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Run
+  }
+
+  state Charge Antic {
+    SetCollider(gameObject=var "Head Box", active=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ruin_fat_sentry_prepare (sharedassets92.assets), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    SetAudioClip(gameObject=Self, audioClip=ruin_fat_sentry_run_loop (sharedassets92.assets))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    BoolTest(boolVariable=var "Run Safe", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Can Distance Charge", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Run Safe", boolValue=true, everyFrame=false)
+    RayCast2d(fromGameObject=var "Run Check Obj", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Run Safe", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTest(boolVariable=var "Run Safe", isTrue=(none), isFalse=→"CANCEL", everyFrame=true)
+    on FINISHED → Charge
+    on CANCEL → Single Antic
+  }
+
+  state Charge {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Ruins_Sentry_Fat_charge_01 (sharedassets92.assets), Ruins_Sentry_Fat_charge_02 (sharedassets92.assets)], weights=[1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Scale", multiplyBy=-1, everyFrame=false)
+    ActivateGameObject(gameObject=var "Charge Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Charge Speed Crt", floatValue=var "Charge Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Charge Speed Crt", multiplyBy=var "Scale", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Charge Speed Crt", y=(unset), everyFrame=true)
+    Wait(time=1, finishEvent=→"END", realTime=false)
+    BoolTest(boolVariable=var "Run Safe", isTrue=(none), isFalse=→"INSTANT", everyFrame=true)  // disabled
+    BoolTest(boolVariable=var "Wall Check", isTrue=→"END", isFalse=(none), everyFrame=true)  // disabled
+    SetBoolValue(boolVariable=var "Run Safe", boolValue=true, everyFrame=false)
+    RayCast2d(fromGameObject=var "Run Check Obj", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Run Safe", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(-1, 0), space=1, distance=2.25, minDepth=(unset), maxDepth=(unset), hitEvent=→"END", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    BoolTest(boolVariable=var "Run Safe", isTrue=(none), isFalse=→"INSTANT", everyFrame=true)
+    on END → Charge End
+    on INSTANT → Charge End Instant
+  }
+
+  state Charge End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioStop(gameObject=Self)
+    SetAudioClip(gameObject=Self, audioClip=ruin_fat_sentry_walk_loop (sharedassets92.assets))
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=0)
+    ActivateGameObject(gameObject=var "Charge Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Attack CD
+  }
+
+  state Air Reset {
+    SetFloatValue(floatVariable=var "Air Attack Pause", floatValue=1, everyFrame=false)
+    on FINISHED → Run
+  }
+
+  state Charge End Instant {
+    AudioStop(gameObject=Self)
+    SetAudioClip(gameObject=Self, audioClip=ruin_fat_sentry_walk_loop (sharedassets92.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Charge Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Attack CD
+  }
+
+  state Spawner? {
+    BoolTest(boolVariable=var "Spawner", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Sp Pause
+  }
+
+  state Sp Pause {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    StopWalker(target=Self, everyFrame=false)
+    FindChild(gameObject=Self, childName="Alert Region", storeResult=var "Alert Region Obj")
+    FindChild(gameObject=Self, childName="Unalert Region", storeResult=var "Unalert Region Obj")
+    SetBoxCollider2DSize(gameObject1=var "Alert Region Obj", width=100, height=50, offsetX=(unset), offsetY=(unset))
+    SetBoxCollider2DSize(gameObject1=var "Unalert Region Obj", width=100, height=50, offsetX=(unset), offsetY=(unset))
+    on FINISHED → Shift?
+  }
+
+  state Shift? {
+    BoolTest(boolVariable=var "Attack Region", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)  // disabled
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=4, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Shift X", multiplyBy=var "Scale", everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Shift X", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Spawn Anim
+  }
+
+  state Spawn Anim {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spawn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetCollider(gameObject=Self, active=true)
+    on FINISHED → Init Chase
+  }
+
+  var Charge Speed: float = 14
+  var Jump Distance Adjust: float = 2.7
+  var Jump Multiply: float = 1.9
+  var Run Speed: float = 7.5
+  var Shift X: float = 7
+  var Spawner: bool = false
+
+  var Air Attack Pause: float = 0
+  var Charge Speed Crt: float = 0
+  var Distance: float = 0
+  var Hero X: float = 0
+  var Jump Distance: float = 0
+  var Run Speed Crt: float = 0
+  var Scale: float = 0
+  var Self X: float = 0
+  var Ct Charge: int = 0
+  var Ct Jump: int = 0
+  var Ct Slash: int = 0
+  var Air Region: bool = false
+  var Alert Region: bool = false
+  var Attack Region: bool = false
+  var Can Air Attack: bool = false
+  var Can Distance Charge: bool = false
+  var Charge Region: bool = false
+  var Facing Right: bool = false
+  var Hero Is Left: bool = false
+  var Hero Is Right: bool = false
+  var Run Safe: bool = false
+  var Unalert Region: bool = false
+  var Wall Check: bool = false
+  var Alert Region Obj: gameObject = <null>
+  var Charge Hit: gameObject = Ruins Sentry Fat/Charge Hit
+  var Ground Slash: gameObject = Ruins Sentry Fat/Ground Slash
+  var Head Box: gameObject = <null>
+  var Patrol Voice: gameObject = <null>
+  var Run Check Obj: gameObject = <null>
+  var Run Loop: gameObject = <null>
+  var Self: gameObject = <null>
+  var Unalert Region Obj: gameObject = <null>
+}

@@ -1,0 +1,1047 @@
+# Control
+# 1 location(s):
+#   Greymoor_05_boss / Vampire Gnat Boss Scene/Vampire Gnat
+
+fsm Control {
+  start Init
+  on STUN → Stun Start  // from any state
+  on ZERO HP → Dead  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "CameraLockArea Roar")
+    FindNamedChild(gameObject=Self, storeResult=var "Slash Terrain Detector")
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    GetHP(target=Self, storeValue=var "P2 HP")
+    MultiplyIntByFloat(integer=var "P2 HP", multiplyFloat=0.65, storeResult=var "P2 HP", everyFrame=false, forceRoundUp=false)
+    on FINISHED → Dormant
+  }
+
+  state Flap {
+    PlayRandomAudioClipTableV2(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flap")
+    SetFloatValue(floatVariable=var "X Offset", floatValue=-8, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"FINISHED", leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Offset", floatValue=8, everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  state Start Flap {
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=vampire_gnat_idle_loop (sfxstatic_assets_vampiregnat.bundle), autoPlay=true, stopOnExit=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="IDLE START", delay=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    RandomInt(min=2, max=3, storeResult=var "Flaps", inclusiveMax=true, noRepeat=false)
+    on FINISHED → Turn?
+  }
+
+  state In Air {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CheckYPosition(gameObject=Self, compareTo=var "Flap Y Min", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"BELOW MIN", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))  // disabled
+    ChaseObjectGround(gameObject=Self, target=var "Hero", xOffset=var "X Offset", speedMax=var "Speed Max", acceleration=var "Accel", animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0.5, snapTo=false, snapSpeedOnly=false, onlyOnStateEntry=false)
+    ShoveFromPlayer(gameObject=Self, shoveForce=250, rayLength=3, checkUp=false, checkDown=false, checkLeft=true, checkRight=true, rayOffset=(0, -1), everyFrame=true)
+    on FINISHED → Flap End
+    on BELOW MIN → Min Raise
+  }
+
+  state Min Raise {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Flap Y Min", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Flap End
+  }
+
+  state Turn? {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=→"TURN", facingBool=(unset), notFacingBool=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToFlap")
+    on FINISHED → Flap Strength
+    on TURN → Turn
+  }
+
+  state Turn {
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.85, brakeOnExit=false)
+    on FINISHED → Flap Strength
+  }
+
+  state Flap End {
+    IntAdd(intVariable=var "Flaps", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Flaps", integer2=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=false)
+    on FINISHED → Turn?
+    on END → Phase Check
+  }
+
+  state Close Range {
+    SendEvent(eventTarget=Self, sendEvent=→"CHARGE", delay=0, everyFrame=false)  // disabled
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    SendRandomEventV4(events=[→"FLAP SICKLE", →"CHARGE", →"SLASH", →"RAGE"], weights=[1, 1, 1, 1], eventMax=[1, 1, 2, 1], missedMax=[4, 4, 3, 4], activeBool=var "P2")
+    SendRandomEventV4(events=[→"FLAP SICKLE", →"CHARGE", →"SLASH"], weights=[1, 1, 1], eventMax=[1, 1, 2], missedMax=[3, 3, 2], activeBool=(unset))
+    on FLAP SICKLE → Sickle Antic
+    on CHARGE → Charge Antic 1
+    on SLASH → Slash Antic
+    on RAGE → Rage Antic
+    on SING → Sing
+  }
+
+  state Sickle Antic {
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SetBoolValue(boolVariable=var "Charge Flap", boolValue=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic Q")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToAntic Q", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_roar_short (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Double?
+  }
+
+  state Sickle Flap {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=var "In Close Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "In Close Range", floatVariable=var "Flap Speed X", falseValue=-7, trueValue=-10, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade Attack New", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=var "Flap Speed X", ySpeed=4, everyFrame=false)
+    on FINISHED → Summon Sickle
+  }
+
+  state Sickle Fire {
+    PlayAudioEvent(audioClip=moorwing_airball_shoot (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Sickle Flap Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SpawnObjectFromGlobalPool(gameObject=Vampire Gnat Sickle (localpoolprefabs_assets_vampiregnat.bundle), spawnPoint=var "Flap Sickle Pt", position=(unset), rotation=(unset), storeObject=var "Sickle")
+    MatchScaleSign(Target=var "Sickle", MatchTo=var "Self", EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Sickle"), sendEvent="FLAP SHOT", delay=0, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-12, ySpeed=10, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Start Flap
+  }
+
+  state Flap Strength {
+    BoolTest(boolVariable=var "Sub Battle", isTrue=→"SUB BATTLE", isFalse=(none), everyFrame=false)
+    CheckYPosition(gameObject=Self, compareTo=var "Flap Y Min", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"BELOW MIN", greaterThan=(none), everyFrame=false, space=0, activeBool=(unset))
+    CheckYPosition(gameObject=Self, compareTo=var "Flap Y Max", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"OVER MAX", everyFrame=false, space=0, activeBool=(unset))
+    on FINISHED → Med
+    on BELOW MIN → Low
+    on OVER MAX → High
+    on SUB BATTLE → Flap Strength Sub
+  }
+
+  state Med {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=4.7, everyFrame=false)
+    on FINISHED → Chase Strength
+  }
+
+  state Low {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=8.5, everyFrame=false)
+    BoolTest(boolVariable=var "Sub Battle", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=12, everyFrame=false)
+    on FINISHED → Chase Strength
+  }
+
+  state High {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=1, everyFrame=false)
+    on FINISHED → Chase Strength
+  }
+
+  state Charge Antic 1 {
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToAntic", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-30, ySpeed=(unset), everyFrame=false)
+    PlayRandomAudioClipTable(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_hiss (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Charge Flap Up
+  }
+
+  state Charge Flap Up {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly Quick")
+    CheckYPosition(gameObject=Self, compareTo=var "Charge Start Y", compareToOffset=0, tolerance=0, equal=→"ATTACK", lessThan=(none), greaterThan=→"ATTACK", everyFrame=true, space=0, activeBool=(unset))
+    SetVelocity2d(gameObject=Self, vector=(0, 20), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.5, finishEvent=→"ATTACK", realTime=false)
+    on ATTACK → Charge Antic 2
+  }
+
+  state Charge Antic 2 {
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToAntic", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Aim For Plat?
+  }
+
+  state Charge {
+    PlayAudioEvent(audioClip=moorwing_dive_attack (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant Explosion@AudioSource (localpoolprefabs_assets_vampiregnat.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_stagger (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    ActivateGameObject(gameObject=var "Charge Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Charge Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Charge Speed", multiplyBy=30, everyFrame=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=1, targetSpeed=var "Charge Speed")
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=true, DistancePast=5, StoreResult=var "Passed Target", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=true)
+    SetBoolValue(boolVariable=var "Charge Time Min", boolValue=false, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Charge Time Min", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=false)
+    BoolAllTrue(boolVariables=[var "Charge Time Min", var "Passed Target"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CHARGE START", delay=0, everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "X Velocity", float2=0, tolerance=0.1, equal=→"BONK", lessThan=(none), greaterThan=(none), everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Charge Velocity Y", everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.895, brakeOnExit=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Charge", volume=1, oneShotClip=<null>)
+    on FINISHED → Charge Sickle?
+    on BONK → Charge Bonk
+  }
+
+  state Charge Sickle Antic {
+    SetBoolValue(boolVariable=var "Charge Flap", boolValue=true, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Charge Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TurnTo Evade Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-8, ySpeed=10, everyFrame=false)
+    AudioStopV2(gameObject=var "Audio Loop Charge", fadeTime=0.2, cancelOnEarlyExit=false)
+    on FINISHED → Charge Sickle Summon
+  }
+
+  state Charge Stop {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CHARGE STOP", delay=0, everyFrame=false)
+    on FINISHED → Sickle Fire
+  }
+
+  state Slash Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic Screech", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 10), x=(unset), y=(unset), everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    PlayAudioEvent(audioClip=moorwing_scream_short (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_slash_antic (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayRandomAudioClipTable(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Slash Dive
+  }
+
+  state Slash Dive {
+    PlayAudioEvent(audioClip=moorwing_feet_slashes_attack (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Slash")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_slash_breath (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SLASH START", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slash")
+    BoolTest(boolVariable=var "Sub Battle", isTrue=→"SUB BATTLE", isFalse=(none), everyFrame=false)
+    ActivateGameObjectDelay(gameObject=var "Slashes", activate=true, resetOnExit=true, delay=0.067)
+    ActivateGameObjectDelay(gameObject=var "Slash Collider", activate=true, resetOnExit=true, delay=0.068)
+    SetCollider(gameObject=Self, active=false, resetOnExit=true)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slashing Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=25, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.925, decelerationY=(unset), brakeOnExit=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Start Y", z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Start Y", float2=2, operation=Subtract, storeResult=var "Slash Y Max", everyFrame=false)
+    FloatOperator(float1=var "Start Y", float2=10, operation=Subtract, storeResult=var "Slash Y Min", everyFrame=false)
+    SetFloatValue(floatVariable=var "Slash Y Target", floatValue=var "Slash Y", everyFrame=false)
+    FloatClamp(floatVariable=var "Slash Y", minValue=var "Slash Y Min", maxValue=var "Slash Y Max", everyFrame=false)
+    EaseFloat(fromValue=var "Start Y", toValue=var "Slash Y", floatVariable=var "Tween Y", time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Tween Y", z=(unset), space=0, everyFrame=true, lateUpdate=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    WaitBool(boolTest=var "P2", time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Slash End
+    on SLASH → Slash Antic 2
+    on MULTI HIT CONNECT → Multi Slash
+    on SUB BATTLE → Slash Dive Sub
+  }
+
+  state Slash End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SLASH STOP", delay=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Flap
+  }
+
+  state Charge Sickle? {
+    BoolTest(boolVariable=var "P2", isTrue=→"FLAP SICKLE", isFalse=→"FINISHED", everyFrame=false)
+    on FLAP SICKLE → Charge Sickle Antic
+    on FINISHED → Charge End
+  }
+
+  state Range Check {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="IDLE END", delay=0, everyFrame=false)
+    CheckAlertRange(alertRange=var "Escape Range", storeResult=(unset), InRangeEvent=→"ESCAPE", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FLAP SICKLE", delay=0, everyFrame=false)  // disabled
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=→"FAR ABOVE", belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=8, reverseIfNegativeScale=false, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=false, sendEvent="CLOSE", outOfRangeEvent="", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Mid Range", storeResult=false, sendEvent="MID", outOfRangeEvent="FAR", everyFrame=false)
+    on CLOSE → Close Range
+    on MID → Mid Range
+    on FAR → Far Range
+    on ESCAPE → Flap Strength 2
+    on FAR ABOVE → Start Flap Q
+  }
+
+  state Mid Range {
+    SendEvent(eventTarget=Self, sendEvent=→"CHARGE", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"FLAP SICKLE", →"CHARGE", →"RAGE"], weights=[1, 1, 1], eventMax=[2, 2, 2], missedMax=[3, 3, 3], activeBool=var "P2")
+    SendRandomEventV4(events=[→"FLAP SICKLE", →"CHARGE"], weights=[1, 1], eventMax=[2, 2], missedMax=[3, 3], activeBool=(unset))
+    on FLAP SICKLE → Sickle Antic
+    on CHARGE → Charge Antic 1
+    on RAGE → Rage Antic
+  }
+
+  state Far Range {
+    SendEvent(eventTarget=Self, sendEvent=→"CHARGE", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"FLAP", →"CHARGE"], weights=[1, 1], eventMax=[2, 2], missedMax=[3, 3], activeBool=(unset))
+    on FLAP → Start Flap
+    on CHARGE → Charge Antic 1
+  }
+
+  state Slash Antic 2 {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic Screech Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 10), x=(unset), y=(unset), everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Slash Dive 2
+  }
+
+  state Slash Dive 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slash")
+    ActivateGameObjectDelay(gameObject=var "Slashes", activate=true, resetOnExit=true, delay=0.067)
+    ActivateGameObjectDelay(gameObject=var "Slash Collider", activate=true, resetOnExit=true, delay=0.067)
+    SetCollider(gameObject=Self, active=false, resetOnExit=true)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slashing Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=30, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Start Y", z=(unset), space=0, everyFrame=false)
+    EaseFloat(fromValue=var "Start Y", toValue=var "Slash Y", floatVariable=var "Tween Y", time=0.4, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Tween Y", z=(unset), space=0, everyFrame=true, lateUpdate=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Slash End 2
+  }
+
+  state Slash End 2 {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Flap
+  }
+
+  state Multi Slash {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Slashes", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Medium Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=false, Delay=0)
+    GetPosition2D(gameObject=var "MultiHit", vector=var "MultiHit pos 2d", x=(unset), y=(unset), space=0, everyFrame=false)
+    AnimateRigidBody2DPositionTo(GameObject=var "Hero", ToValue=var "MultiHit pos 2d", time=0.25, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    AnimatePositionTo(gameObject=var "Hero", toValue=var "Multihit Pos", localSpace=false, time=0.25, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)  // disabled
+    SpawnObjectFromGlobalPoolOverTime(gameObject=Thread Sphere Slash (sharedeffects_assets_all.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), frequency=0.05)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → MultiSlash End
+  }
+
+  state MultiSlash End {
+    SendEventByName(eventTarget=GameObject(var "MultiHit"), sendEvent="MULTIHIT END", delay=0, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "Thread Sphere Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging_final_hit (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash End
+  }
+
+  state Double? {
+    BoolTest(boolVariable=var "Charge Flap", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "P2", isTrue=→"DOUBLE", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Sickle Flap
+    on DOUBLE → Double Flap 1
+  }
+
+  state Double Flap 1 {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade Attack New Double", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=var "In Close Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "In Close Range", floatVariable=var "Flap Speed X", falseValue=-7, trueValue=-10, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=var "Flap Speed X", ySpeed=4, everyFrame=false)
+    on FINISHED → Summon Sickle 2
+  }
+
+  state Double Flap 3 {
+    PlayAudioEvent(audioClip=moorwing_airball_prepare (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=2, everyFrame=false)
+    ActivateGameObject(gameObject=var "Summon Sickle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Summon Sickle Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EaseFloat(fromValue=0.75, toValue=1.5, floatVariable=var "Sickle Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle", vector=(unset), x=var "Sickle Scale", y=var "Sickle Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    EaseFloat(fromValue=1, toValue=1.75, floatVariable=var "Effect Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle Effect", vector=(unset), x=var "Effect Scale", y=var "Effect Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    on FINISHED → Double Flap 4
+  }
+
+  state Double Flap 4 {
+    PlayAudioEvent(audioClip=moorwing_airball_shoot (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Sickle Flap Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SpawnObjectFromGlobalPool(gameObject=Vampire Gnat Sickle (localpoolprefabs_assets_vampiregnat.bundle), spawnPoint=var "Flap Sickle Pt", position=(unset), rotation=(unset), storeObject=var "Sickle")
+    MatchScaleSign(Target=var "Sickle", MatchTo=var "Self", EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Sickle"), sendEvent="FLAP SHOT CURVE", delay=0, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-4, ySpeed=6, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Start Flap
+  }
+
+  state Chase Strength {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=false, sendEvent="CLOSE", outOfRangeEvent="FAR", everyFrame=false)
+    on FAR → Far Flap
+    on CLOSE → Close Flap
+  }
+
+  state Close Flap {
+    SetFloatValue(floatVariable=var "Speed Max", floatValue=5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Accel", floatValue=0.35, everyFrame=false)
+    on FINISHED → Flap
+  }
+
+  state Far Flap {
+    SetFloatValue(floatVariable=var "Speed Max", floatValue=11, everyFrame=false)
+    SetFloatValue(floatVariable=var "Accel", floatValue=0.85, everyFrame=false)
+    on FINISHED → Flap
+  }
+
+  state Rage Antic {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTableV2(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    PlayAudioEvent(audioClip=moorwing_scream (sfxstatic_assets_vampiregnat.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_roar_mid (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Rage Start
+  }
+
+  state Rage Start {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rage")
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    CheckYPosition(gameObject=Self, compareTo=var "Rage Y", compareToOffset=0, tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true, space=0, activeBool=(unset))
+    SetVelocity2d(gameObject=Self, vector=(0, 20), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    RandomFloatEither(value1=-1.5, value2=1.5, storeResult=var "X Offset")
+    on FINISHED → Rage 1
+  }
+
+  state Charge Bonk {
+    ActivateGameObject(gameObject=var "Charge Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_stun_hit (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CHARGE STOP", delay=0, everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=0.95, brakeOnExit=true)
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=8, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=false_knight_land_1st_time (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Start Flap
+  }
+
+  state Rage 1 {
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.7, brakeOnExit=true)
+    ChaseObjectGround(gameObject=Self, target=var "Hero", xOffset=var "X Offset", speedMax=8, acceleration=0.25, animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0.5, snapTo=false, snapSpeedOnly=false, onlyOnStateEntry=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rage Sickle Summon
+  }
+
+  state Rage Sickles {
+    ActivateGameObject(gameObject=var "Sickle Flap Effect Rage", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=moorwing_airball_shoot (sfxstatic_assets_vampiregnat.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    ChaseObjectGround(gameObject=Self, target=var "Hero", xOffset=var "X Offset", speedMax=5, acceleration=0.2, animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0.5, snapTo=false, snapSpeedOnly=false, onlyOnStateEntry=false)
+    SpawnObjectFromGlobalPool(gameObject=Vampire Gnat Sickle (localpoolprefabs_assets_vampiregnat.bundle), spawnPoint=var "Rage Sickle Point", position=(unset), rotation=(unset), storeObject=var "Sickle")
+    SetScale(gameObject=var "Sickle", vector=(unset), x=1.5, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Sickle"), sendEvent="DOWN SHOT NEW", delay=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Vampire Gnat Sickle (localpoolprefabs_assets_vampiregnat.bundle), spawnPoint=var "Rage Sickle Point", position=(unset), rotation=(unset), storeObject=var "Sickle")
+    SetScale(gameObject=var "Sickle", vector=(unset), x=-1.5, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Sickle"), sendEvent="DOWN SHOT NEW", delay=0, everyFrame=false)
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rage End
+  }
+
+  state Rage End {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    on FINISHED → Start Flap
+  }
+
+  state Stun Start {
+    AudioStopV2(gameObject=var "Audio Slash", fadeTime=0, cancelOnEarlyExit=false)
+    SetFloatValue(floatVariable=var "Stun Timer", floatValue=2, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Air")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    ActivateGameObject(gameObject=var "Charge Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slashing Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slashes", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CHARGE STOP", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SLASH STOP", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Terrain Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_stagger (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioStopV2(gameObject=var "Audio Loop Charge", fadeTime=0, cancelOnEarlyExit=false)
+    on FINISHED → Stun Air
+  }
+
+  state Stun Air {
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=false, limitFps=0)
+    on FINISHED → Stun Fall
+  }
+
+  state Stun Fall {
+    SetDamageHero(Target=Self, Enabled=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Fall")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-40, everyFrame=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    PlayParticleEmitterInState(gameObject=var "Pt FallTrail")
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Water Surface", collideLayer=Soft Terrain(25), sendEvent=→"SPLASH", storeCollider=var "")
+    PlayRandomAudioClipTable(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Wait(time=2, finishEvent=→"LAND", realTime=false)
+    on LAND → Stun Land
+    on SPLASH → Splash Enter
+  }
+
+  state Stunned {
+    FloatAdd(floatVariable=var "Stun Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on TOOK DAMAGE → Stun Damage
+    on END → Stun End
+    on SING → Stun To Sing
+  }
+
+  state Stun Damage {
+    PlayAudioEventRandom(audioClips=[moorwing_scream_shriek_1 (sfxstatic_assets_areagreymoor.bundle), moorwing_scream_shriek_2 (sfxstatic_assets_areagreymoor.bundle), moorwing_scream_shriek_3 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Hit")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FloatAdd(floatVariable=var "Stun Timer", add=-0.25, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=→"FINISHED", everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_stun_hit (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Stunned
+    on END → Stun End
+  }
+
+  state Stun End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    ActivateGameObject(gameObject=var "Stun Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=(unset), IsDownBlocked=(unset), IsLeftBlocked=false, IsRightBlocked=false)
+    ActivateGameObject(gameObject=var "Stun Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Stun Launch
+  }
+
+  state Stun Land {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Land")
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=vampire_gnat_stunned_loop (sfxstatic_assets_vampiregnat.bundle), autoPlay=true, stopOnExit=false)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Stun Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Land", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=false_knight_strike_ground (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Stunned
+  }
+
+  state Stun Launch {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=20, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Flap", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Launch", emit=0, resetIfPlaying=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.95, brakeOnExit=false)
+    PlayRandomAudioClipTable(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Start Flap
+  }
+
+  state Splash Enter {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Splash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Splash", emit=0, resetIfPlaying=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=big splash (sfxstatic_assets_water.bundle), pitchMin=0.9, pitchMax=0.9, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Splashed Wait
+  }
+
+  state Splashed Wait {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=-2, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=3.5, finishEvent=→"FINISHED", realTime=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Splash Out Antic
+  }
+
+  state Splash Out Antic {
+    PlayParticleEmitterInState(gameObject=var "Pt ReappearAntic")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayInState(gameObject=var "Water Emerge Antic Loop", volume=1)
+    on FINISHED → Splash Out
+  }
+
+  state Splash Out {
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Screech Emerge", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=35, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.95, brakeOnExit=false)
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=big splash (sfxstatic_assets_water.bundle), pitchMin=0.9, pitchMax=0.9, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=moorwing_scream (sfxstatic_assets_vampiregnat.bundle), pitchMin=1.25, pitchMax=1.25, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_stagger (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Splash Out FX
+  }
+
+  state Splash Out FX {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Splash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Splash", emit=0, resetIfPlaying=false)
+    on FINISHED → Start Flap
+  }
+
+  state Dormant {
+    on BATTLE START → Zoom Lock?
+  }
+
+  state Zoom Down {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetMeshRenderer(gameObject=Self, active=true)
+    CheckYPosition(gameObject=Self, compareTo=var "Entry Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    SetVelocity2d(gameObject=Self, vector=(0, -40), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Zoom")
+    PlayParticleEmitterInState(gameObject=var "Pt FallTrail")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=moorwing_dive_attack (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    PlayAudioEvent(audioClip=false_knight_land (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=0.7, audioPlayerPrefab=Audio Player Actor Distant@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Zoom Recover
+  }
+
+  state Zoom Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=true)
+    PlayRandomAudioClipTable(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Do Roar?
+  }
+
+  state Roar {
+    SetPlayerDataBool(boolName="encounteredVampireGnatBoss", value=true)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="VAMPIRE_GNAT")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Screech")
+    StartRoarEmitter(spawnPoint=var "Roar Point", delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    ActivateGameObject(gameObject=var "CameraLockArea Roar", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_roar_long (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Roar End
+  }
+
+  state Roar End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ApplyMusicCue(musicCue=Boss Strive (audiocuesdynamic_assets_boss.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.1)
+    on FINISHED → Start Flap
+  }
+
+  state Quick Start {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Start Flap
+  }
+
+  state Phase Check {
+    BoolTest(boolVariable=var "P2", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "P2 HP", equal=→"RAGE", lessThan=→"RAGE", greaterThan=(none), everyFrame=false)
+    on FINISHED → Range Check
+    on RAGE → Rage Roar Antic
+  }
+
+  state Rage Roar Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 10), x=(unset), y=(unset), everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[moorwing_flap_1 (sfxstatic_assets_vampiregnat.bundle), <null>, <null>, moorwing_flap_4 (sfxstatic_assets_vampiregnat.bundle), <null>, <null>, moorwing_flap_7 (sfxstatic_assets_vampiregnat.bundle), <null>], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Rage Roar
+  }
+
+  state Rage Roar {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Screech")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Wait(time=1.25, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "P2", boolValue=true, everyFrame=false)
+    StartRoarEmitter(spawnPoint=var "Roar Point", delay=0, stunHero=false, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_roar_long (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Rage End
+  }
+
+  state Flap 2 {
+    PlayRandomAudioClipTableV2(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flap")
+    SetFloatValue(floatVariable=var "X Offset", floatValue=-8, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Escape Point", aboveEvent=(none), belowEvent=(none), rightEvent=→"FINISHED", leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Offset", floatValue=8, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → In Air 2
+  }
+
+  state In Air 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ChaseObjectGround(gameObject=Self, target=var "Escape Point", xOffset=0, speedMax=var "Speed Max", acceleration=var "Accel", animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0.5, snapTo=false, snapSpeedOnly=false, onlyOnStateEntry=false)
+    on FINISHED → Keep Escaping?
+  }
+
+  state Flap Strength 2 {
+    CheckYPosition(gameObject=Self, compareTo=var "Escape Min Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"BELOW MIN", greaterThan=(none), everyFrame=false, space=0, activeBool=(unset))  // disabled
+    CheckYPosition(gameObject=Self, compareTo=var "Escape Max Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"OVER MAX", everyFrame=false, space=0, activeBool=(unset))  // disabled
+    on FINISHED → High 2
+  }
+
+  state Med 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=4.7, everyFrame=false)
+    on FINISHED → Close Flap 2
+  }
+
+  state Low 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)
+    on FINISHED → Far Flap 2
+  }
+
+  state High 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=1, everyFrame=false)
+    on FINISHED → Close Flap 2
+  }
+
+  state Close Flap 2 {
+    SetFloatValue(floatVariable=var "Speed Max", floatValue=6, everyFrame=false)
+    SetFloatValue(floatVariable=var "Accel", floatValue=0.35, everyFrame=false)
+    on FINISHED → Flap 2
+  }
+
+  state Far Flap 2 {
+    SetFloatValue(floatVariable=var "Speed Max", floatValue=12, everyFrame=false)
+    SetFloatValue(floatVariable=var "Accel", floatValue=0.85, everyFrame=false)
+    on FINISHED → Flap 2
+  }
+
+  state Keep Escaping? {
+    CheckAlertRange(alertRange=var "Escape Range", storeResult=(unset), InRangeEvent=→"ESCAPE", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    on FINISHED → Start Flap
+    on ESCAPE → Flap Strength 2
+  }
+
+  state Aim For Plat? {
+    BoolTest(boolVariable=var "Sub Battle", isTrue=→"SUB BATTLE", isFalse=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Charge Velocity Y", floatValue=-50, everyFrame=false)
+    CheckAlertRange(alertRange=var "BreakPlat Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"FINISHED", OutOfRangeDelay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Charge Velocity Y", floatValue=-70, everyFrame=false)
+    on FINISHED → Charge
+    on SUB BATTLE → Sub Battle Aim
+  }
+
+  state Do Roar? {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    BoolTest(boolVariable=var "Sub Battle", isTrue=→"SKIP", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(boolName="encounteredVampireGnatBoss", isTrue=(none), isFalse=→"FINISHED")  // disabled
+    PlayerDataBoolTest(boolName="vampireGnatAlternateLocation", isTrue=→"SKIP", isFalse=→"FINISHED")  // disabled
+    on FINISHED → Roar
+    on SKIP → Quick Roar
+  }
+
+  state Quick Roar {
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="VAMPIRE_GNAT")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Screech")
+    StartRoarEmitter(spawnPoint=var "Roar Point", delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vampire_gnat_roar_mid (sfxdynamic_assets_vampiregnat.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=1)
+    on FINISHED → Quick Roar End
+  }
+
+  state Dead {
+    SendEventToRegister(eventName="BOSS DEATH")
+  }
+
+  state Summon Sickle {
+    PlayAudioEvent(audioClip=moorwing_airball_prepare (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Summon Sickle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Summon Sickle Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EaseFloat(fromValue=0.75, toValue=1.5, floatVariable=var "Sickle Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle", vector=(unset), x=var "Sickle Scale", y=var "Sickle Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    EaseFloat(fromValue=1, toValue=1.75, floatVariable=var "Effect Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle Effect", vector=(unset), x=var "Effect Scale", y=var "Effect Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    on FINISHED → Sickle Fire
+  }
+
+  state Charge End {
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CHARGE STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=1, targetSpeed=10)
+    ActivateGameObject(gameObject=var "Charge Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStopV2(gameObject=var "Audio Loop Charge", fadeTime=0.2, cancelOnEarlyExit=false)
+    on FINISHED → Start Flap
+  }
+
+  state Charge Sickle Summon {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Summon Sickle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Summon Sickle Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EaseFloat(fromValue=0.75, toValue=1.5, floatVariable=var "Sickle Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle", vector=(unset), x=var "Sickle Scale", y=var "Sickle Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    EaseFloat(fromValue=1, toValue=1.75, floatVariable=var "Effect Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle Effect", vector=(unset), x=var "Sickle Scale", y=var "Sickle Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    PlayAudioEvent(audioClip=moorwing_airball_prepare (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Charge Stop
+  }
+
+  state Summon Sickle 2 {
+    PlayAudioEvent(audioClip=moorwing_airball_prepare (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Summon Sickle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Summon Sickle Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EaseFloat(fromValue=0.75, toValue=1.5, floatVariable=var "Sickle Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle", vector=(unset), x=var "Sickle Scale", y=var "Sickle Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    EaseFloat(fromValue=1, toValue=1.75, floatVariable=var "Effect Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle Effect", vector=(unset), x=var "Effect Scale", y=var "Effect Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    on FINISHED → Double Flap 5
+  }
+
+  state Double Flap 5 {
+    PlayAudioEvent(audioClip=moorwing_airball_shoot (sfxstatic_assets_vampiregnat.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Sickle Flap Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SpawnObjectFromGlobalPool(gameObject=Vampire Gnat Sickle (localpoolprefabs_assets_vampiregnat.bundle), spawnPoint=var "Flap Sickle Pt", position=(unset), rotation=(unset), storeObject=var "Sickle")
+    MatchScaleSign(Target=var "Sickle", MatchTo=var "Self", EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Sickle"), sendEvent="FLAP SHOT", delay=0, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-12, ySpeed=7, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Double Flap 3
+  }
+
+  state Rage Sickle Summon {
+    ActivateGameObject(gameObject=var "Summon Sickle Rage", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Summon Sickle Effect Rage", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EaseFloat(fromValue=0.75, toValue=1.5, floatVariable=var "Sickle Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle Rage", vector=(unset), x=var "Sickle Scale", y=var "Sickle Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    EaseFloat(fromValue=1, toValue=1.75, floatVariable=var "Effect Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Summon Sickle Effect Rage", vector=(unset), x=var "Effect Scale", y=var "Effect Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    Wait(time=0.33, finishEvent=→"FINISHED", realTime=false)
+    ChaseObjectGround(gameObject=Self, target=var "Hero", xOffset=var "X Offset", speedMax=8, acceleration=0.25, animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0.5, snapTo=false, snapSpeedOnly=false, onlyOnStateEntry=false)
+    AudioPlayInState(gameObject=var "Rage Sickle Antic Loop", volume=1)
+    on FINISHED → Rage Sickles
+  }
+
+  state Zoom Lock? {
+    BoolTest(boolVariable=var "Sub Battle", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    StartRoarEmitter(spawnPoint=var "Roar Point", delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=true, forceThroughBind=false, stopOnExit=false)
+    on FINISHED → Zoom Down
+  }
+
+  state Flap Strength Sub {
+    RayCast2dV2(fromGameObject=var "Hero", fromPosition=(unset), direction=(0, -1), space=1, distance=50, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Hero Ground Pos", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    GetVector2XY(vector2Variable=var "Hero Ground Pos", storeX=(unset), storeY=var "Hero Ground Y", everyFrame=false)
+    FloatOperator(float1=var "Hero Ground Y", float2=8, operation=Add, storeResult=var "Flap Y Min Sub", everyFrame=false)
+    FloatOperator(float1=var "Hero Ground Y", float2=12, operation=Add, storeResult=var "Flap Y Max Sub", everyFrame=false)
+    CheckYPosition(gameObject=Self, compareTo=var "Flap Y Min Sub", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"BELOW MIN", greaterThan=(none), everyFrame=false, space=0, activeBool=(unset))
+    CheckYPosition(gameObject=Self, compareTo=var "Flap Y Max Sub", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"OVER MAX", everyFrame=false, space=0, activeBool=(unset))
+    on FINISHED → Med
+    on BELOW MIN → Low
+    on OVER MAX → High
+  }
+
+  state Sub Battle Aim {
+    SetFloatValue(floatVariable=var "Charge Velocity Y", floatValue=-45, everyFrame=false)
+    on FINISHED → Charge
+  }
+
+  state Start Flap Q {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="IDLE START", delay=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    RandomInt(min=1, max=2, storeResult=var "Flaps", inclusiveMax=true, noRepeat=false)
+    on FINISHED → Turn?
+  }
+
+  state Quick Roar End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ApplyMusicCue(musicCue=None (audiocuesdynamic_assets_shared.bundle), delayTime=0, transitionTime=0)
+    ApplyMusicCue(musicCue=Greymoor (audiocuesdynamic_assets_areagreymoor.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Action Only (audioobjects_assets_all.bundle), transitionTime=0.1)
+    on FINISHED → Start Flap
+  }
+
+  state Slash Dive Sub {
+    ActivateGameObjectDelay(gameObject=var "Slashes", activate=true, resetOnExit=true, delay=0.067)
+    ActivateGameObjectDelay(gameObject=var "Slash Collider", activate=true, resetOnExit=true, delay=0.068)
+    SetCollider(gameObject=Self, active=false, resetOnExit=true)
+    ActivateGameObject(gameObject=var "Collider Idle Hurtbox", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slashing Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=25, ySpeed=-35, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.925, decelerationY=0.865, brakeOnExit=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    WaitBool(boolTest=var "P2", time=0.75, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Slash Terrain Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash End
+    on SLASH → Slash Antic 2
+    on MULTI HIT CONNECT → Multi Slash
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=var "Sing Radius", MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    DoCameraShakeRepeatingV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.15, vibrate=true)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=moorwing_sing (sfxdynamic_assets_areagreymoor.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Range Check
+  }
+
+  state Stun To Sing {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    ActivateGameObject(gameObject=var "Stun Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=(unset), IsDownBlocked=(unset), IsLeftBlocked=false, IsRightBlocked=false)
+    ActivateGameObject(gameObject=var "Stun Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Stun Launch 2
+  }
+
+  state Stun Launch 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=20, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Flap", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Launch", emit=0, resetIfPlaying=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.95, brakeOnExit=false)
+    PlayRandomAudioClipTable(Table=Moorwing Flap (sfxdynamic_assets_vampiregnat.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Sing
+  }
+
+  var Sub Battle: bool = true
+  var Escape Point: gameObject = Vampire Gnat Boss Scene/Escape Point
+  var Escape Range: object = Vampire Gnat Boss Scene/Escape Range@AlertRange
+  var BreakPlat Range: object = <null>
+
+  var Gravity: float = 0.35
+  var Flap Y Min: float = 9
+  var X Offset: float = 0
+  var Flap Y Max: float = 11
+  var Charge Start Y: float = 12
+  var Charge Speed: float = 0
+  var Start Y: float = 0
+  var Tween Y: float = 0
+  var Slash Y: float = 9.5
+  var Speed Max: float = 0
+  var Accel: float = 0
+  var Rage Y: float = 12
+  var X Velocity: float = 0
+  var Stun Timer: float = 0
+  var Entry Y: float = 0
+  var Charge Velocity Y: float = 0
+  var Sickle Scale: float = 0
+  var Flap Speed X: float = 0
+  var Effect Scale: float = 0
+  var Slash Y Max: float = 0
+  var Slash Y Min: float = 0
+  var Slash Y Target: float = 0
+  var Hero Ground Y: float = 0
+  var Flap Y Min Sub: float = 0
+  var Flap Y Max Sub: float = 0
+  var Escape Min Y: float = 18
+  var Escape Max Y: float = 20
+  var Sing Radius: float = 4
+  var Flaps: int = 0
+  var P2 HP: int = 0
+  var P2: bool = false
+  var Charge Flap: bool = false
+  var Passed Target: bool = false
+  var Charge Time Min: bool = false
+  var In Close Range: bool = false
+  var MultiHit pos 2d: vector2 = (0, 0)
+  var Hero Ground Pos: vector2 = (0, 0)
+  var Multihit Pos: vector3 = (0, 0, 0)
+  var Flap Sickle Pt: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Flap Sickle Point
+  var Sickle: gameObject = <null>
+  var Self: gameObject = Vampire Gnat Boss Scene/Vampire Gnat
+  var Sickle Flap Effect: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Sickle Flap Effect
+  var Charge Collider: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Charge Collider
+  var Slashes: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Slashes
+  var Slashing Collider: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Slashing Collider
+  var Slash Collider: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Slash Collider
+  var MultiHit: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Hero Slashed Point
+  var Thread Sphere Slash: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Thread Sphere Slash
+  var Rage Sickle Point: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Rage Sickle Point
+  var Parent: gameObject = <null>
+  var Charge Slam Effect: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Charge Slam Effect
+  var Rage Sickle Point Low: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Rage Sickle Point Low
+  var Slam Effect: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Slam Effect
+  var Stun Damager: gameObject = Pinstress Boss/Stun Damager (localpoolprefabs_assets_areaswamp.bundle)
+  var Stun Box: gameObject = <null>
+  var Pt FallTrail: gameObject = <null>
+  var Pt Land: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Pt Land
+  var Pt Launch: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Pt Launch
+  var Splash Effect: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Splash Effect
+  var Pt Splash: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Pt Splash
+  var Pt ReappearAntic: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Pt ReappearAntic
+  var Roar Point: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Roar Point
+  var Summon Sickle: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Summon Sickle
+  var Summon Sickle Effect: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Summon Sickle Effect
+  var Summon Sickle Rage: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Summon Sickle Rage
+  var Summon Sickle Effect Rage: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Summon Sickle Effect Rage
+  var Sickle Flap Effect Rage: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Sickle Flap Effect Rage
+  var CameraLockArea Roar: gameObject = <null>
+  var Rage Sickle Antic Loop: gameObject = <null>
+  var Water Emerge Antic Loop: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Water Emerge Antic Loop
+  var Audio Slash: gameObject = <null>
+  var Audio Loop Voice: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Audio Loop Voice
+  var Slash Terrain Detector: gameObject = <null>
+  var Audio Loop Charge: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Audio Loop Charge
+  var Collider Idle Hurtbox: gameObject = Vampire Gnat Boss Scene/Vampire Gnat/Collider Idle Hurtbox
+}

@@ -1,0 +1,410 @@
+# Dialogue
+# 1 location(s):
+#   Belltown_Room_Relic / relic_dealer/Relic Dealer NPC
+
+fsm Dialogue {
+  start Init
+
+  state Init {
+    GetPosition(gameObject=var "Prompt Marker", vector=var "Initial Prompt Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Tail Out?
+  }
+
+  state Idle {
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE IDLE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    WaitRandom(timeMin=5, timeMax=7, finishEvent=→"REST", realTime=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on INTERACT → Convo Check
+    on SING → Sing
+    on NOISE → Startle
+    on REST → Rummage Enter
+  }
+
+  state No Relics Dlg {
+    BoolTest(boolVariable=var "In Meet Dialogue", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(boolName="BelltownRelicDealerGaveRelic", isTrue=(none), isFalse=→"EMPTY")
+    RunDialogue(Sheet="Belltown", Key="RELIC_DEALER_NO_RELICS", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Open Relic Board
+    on EMPTY → Relics Empty
+    on CANCEL → Dlg End
+  }
+
+  state Dlg End {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    SetBoolValue(boolVariable=var "In Meet Dialogue", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  sequence state Give Relics? {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    RelicBoardOwnerYesNo(Target=Self, TranslationSheet="Belltown", TranslationKey="RELIC_DEALER_ASK_PROMPT", TranslationKeyPlural="RELIC_DEALER_ASK_PROMPT_PLURAL", YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on TRUE → Grab All Relics
+    on FALSE → Exit Observe
+  }
+
+  state Has Relics? {
+    CallMethodProper(gameObject=Self, behaviour="PlayMakerNPC", methodName="BeginHeroAnimManual", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RelicBoardOwner", methodName="IsAnyRelicsToDeposit", parameters=[], storeResult=var "Has Relics", EveryFrame=false)
+    BoolTest(boolVariable=var "Has Relics", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Has Relics
+    on FALSE → Librarian Dlg
+  }
+
+  state Declined Dlg {
+    RunDialogue(Sheet="Belltown", Key="RELIC_DEALER_DECLINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End
+  }
+
+  sequence state Grab All Relics {
+    SetPlayerDataBool(boolName="BelltownRelicDealerGaveRelic", value=true)
+    CallMethodProper(gameObject=Self, behaviour="RelicBoardOwner", methodName="DepositCollectedRelics", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Stand 1", AnimationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Scrounge_swipe (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=relic_dealer_lean_over_hornet_intimidatingly (sfxstatic_assets_areabellarealibrary.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Observe Snatch", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetBoolValue(boolVariable=var "Did Post Window Dlg", boolValue=false, everyFrame=false)
+    on FINISHED → Grab Flash
+  }
+
+  sequence state Open Relic Board {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    ShowRelicBoard(Target=Self, ClosedEvent=→"CANCEL")
+    on CANCEL → Post Window?
+  }
+
+  state Relic Got Dlg {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE IDLE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    StartHeroTalkAnimation(Target=Self)
+    RunDialogue(Sheet="Belltown", Key="RELIC_DEALER_GOT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Open Relic Board
+  }
+
+  state Grab Flash {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", position=(1, 0, 0), rotation=(unset), storeObject=var "Strike Effect")
+    SetScale(gameObject=var "Strike Effect", vector=(unset), x=1, y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashFocusHeal(), everyFrame=false)
+    SpawnObjectFromGlobalPoolV2(gameObject=Item Get Effect R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), amount=1, storeObject=var "", setParent=<null>)
+    PlayAudioEvent(audioClip=shiny_item_pickup (sfxstatic_assets_currency.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=Scrounge_relic_grab_grab (sfxstatic_assets_areabell.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → To Talk Idle
+  }
+
+  state Tail Out? {
+    PlayerDataVariableTest(VariableName="MetBelltownRelicDealer", ExpectedValue=false, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=(none))
+    SendRandomEvent(events=[→"TRUE", →"FALSE"], weights=[0.5, 0.5], delay=0)
+    on TRUE → Tail Out
+    on FALSE → Rummaging
+  }
+
+  state Tail Out {
+    AudioPlaySimple(gameObject=var "Rummage Audio Loop", volume=1, oneShotClip=<null>)
+    GetPosition(gameObject=relic_dealer/Relic Dealer NPC/Lower Prompt Pos, vector=var "Set Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Prompt Marker", vector=var "Set Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitterChildren(gameObject=var "Rummage Big Pt Parent", resetTimeIfPlaying=true, stopOnStateExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Tail", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.4, MaxReactDelay=1.9, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=var "Singing State", EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=Scrounge_rummage_loop_buried (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on PRE NOISE → Mark Noise
+    on INTERACT → Tail to Sing
+    on SING → Tail to Sing
+  }
+
+  state Rummaging {
+    AudioPlaySimple(gameObject=var "Rummage Audio Loop", volume=1, oneShotClip=<null>)
+    PlayParticleEmitterChildren(gameObject=var "Rummage Small Pt Parent", resetTimeIfPlaying=true, stopOnStateExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Rummage", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.4, MaxReactDelay=1.9, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=var "Singing State", EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=Scrounge_rummage_loop_regular (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on PRE NOISE → Mark Noise 2
+    on INTERACT → Rummage to Sing
+    on SING → Rummage to Sing
+  }
+
+  state Tail to Sing {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.1, cancelOnEarlyExit=false)
+    PlayRandomAudioClipTableV3(Table=scrounge_movement (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    PlayAudioEvent(audioClip=relic_dealer_lean_over_hornet_intimidatingly (sfxstatic_assets_areabellarealibrary.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    StopParticleEmittersInChildrenV2(Target=var "Rummage Big Pt Parent", StopBehaviour=1)
+    PlayParticleEmitterChildren(gameObject=relic_dealer/Relic Dealer NPC/Emerge Pt Parent, resetTimeIfPlaying=true, stopOnStateExit=false)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest To Sing", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioStop(gameObject=var "Rummage Audio Loop", fadeTime=0)
+    on FINISHED → Exclaim Sing Begin
+  }
+
+  state Rummage to Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    StopParticleEmittersInChildrenV2(Target=var "Rummage Small Pt Parent", StopBehaviour=1)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Rummage Exit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTableV3(Table=scrounge_movement (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    PlayAudioEvent(audioClip=relic_dealer_lean_back_to_normal (sfxstatic_assets_areabell.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStop(gameObject=var "Rummage Audio Loop", fadeTime=0)
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.1, cancelOnEarlyExit=false)
+    on FINISHED → Exclaim Sing Begin
+  }
+
+  sequence state Exclaim Sing {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Scrounge_startle (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=1, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Sing End", AnimationCompleteEvent=(none))
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE IDLE")
+    BoolTest(boolVariable=var "Woke From Noise", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Convo Check
+    on CANCEL → Idle
+  }
+
+  state Convo Check {
+    StartHeroTalkAnimation(Target=Self)
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    GetPlayerDataBool(boolName="MetBelltownRelicDealer", storeValue=var "Met NPC")
+    GetPlayerDataBool(boolName="MetBelltownRelicDealerAct3", storeValue=var "Met NPC Act 3")
+    BoolTestMulti(boolVariables=[var "Is Act 3", var "Met NPC Act 3", var "Met NPC"], boolStates=[true, false, false], trueEvent=→"MEET ACT 3", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Is Act 3", var "Met NPC Act 3", var "Met NPC"], boolStates=[true, false, true], trueEvent=→"REMEET ACT 3", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataVariableTest(VariableName="MetBelltownRelicDealer", ExpectedValue=true, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=→"MEET")
+    on MEET → Meet Dlg
+    on FINISHED → Has Relics?
+    on MEET ACT 3 → Meet Act3
+    on REMEET ACT 3 → Remeet Act3
+  }
+
+  state Meet Dlg {
+    SetPlayerDataVariable(VariableName="MetBelltownRelicDealer", SetValue=true)
+    GetPlayerDataBool(boolName="visitedBellhartHaunted", storeValue=var "Visited Haunted")
+    SetBoolValue(boolVariable=var "In Meet Dialogue", boolValue=true, everyFrame=false)
+    GetPlayerDataBool(boolName="citadelWoken", storeValue=var "Citadel Woken")
+    GetPlayerDataBool(boolName="spinnerDefeated", storeValue=var "Spinner Defeated")
+    BoolTestMulti(boolVariables=[var "Visited Haunted", var "Spinner Defeated"], boolStates=[false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Test", everyFrame=false)
+    BoolOperator(bool1=var "Test", bool2=var "Citadel Woken", operation=OR, storeResult=var "Test", everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Convo Key", falseString="RELIC_DEALER_MEET", trueString="RELIC_DEALER_MEET_ALT", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Has Relics?
+  }
+
+  sequence state Has Relics {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    PlayAudioEvent(audioClip=relic_dealer_lean_over_hornet_intimidatingly (sfxstatic_assets_areabellarealibrary.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Observe Enter", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Observe Loop", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE IDLE")
+    ConvertBoolToString(boolVariable=var "In Meet Dialogue", stringVariable=var "Convo Key", falseString="RELIC_DEALER_RELICS", trueString="RELIC_DEALER_RELICS_FIRST", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Relics?
+  }
+
+  sequence state Exit Observe {
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    PlayAudioEvent(audioClip=relic_dealer_lean_back_to_normal (sfxstatic_assets_areabell.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Observe To Talk", AnimationCompleteEvent=(none))
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE IDLE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Declined Dlg
+  }
+
+  state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.6, MaxReactDelay=0.8, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    PlayRandomAudioClipTableV3(Table=scrounge_movement (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Scrounge_sing (sfxdynamic_assets_areabell.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTableV3(Table=scrounge_movement (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    on FINISHED → Idle
+  }
+
+  state Rummaging Idle {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE IDLE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Rummage", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=Scrounge_rummage_loop_regular (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0.5)
+    on INTERACT → Rummage  Exit
+    on SING → Rummage Exit to Sing
+    on NOISE → Rummage Startled
+  }
+
+  sequence state Rummage  Exit {
+    StopParticleEmittersInChildrenV2(Target=var "Rummage Small Pt Parent", StopBehaviour=1)
+    PlayRandomAudioClipTableV3(Table=scrounge_movement (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    AudioStop(gameObject=var "Rummage Audio Loop", fadeTime=0)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Rest Rummage Exit", AnimationCompleteEvent=(none))
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE IDLE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    StartHeroTalkAnimation(Target=Self)
+    on FINISHED → Has Relics?
+  }
+
+  state Rummage Enter {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    PlayParticleEmitterChildren(gameObject=var "Rummage Small Pt Parent", resetTimeIfPlaying=true, stopOnStateExit=false)
+    AudioPlay(gameObject=var "Rummage Audio Loop", volume=1, oneShotClip=var "", WaitForEndOfClip=false, finishedEvent=(none))
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Rummage Enter", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTableV3(Table=scrounge_movement (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    PlayAudioEvent(audioClip=relic_dealer_lean_back_to_normal (sfxstatic_assets_areabell.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Rummaging Idle
+  }
+
+  state To Talk Idle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Observe To Talk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    tk2dPlayAnimAfterPreviousComplete(Target=Self, AnimName="Talk", StoreDidPlay=(unset))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect Stand 3", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    tk2dPlayAnimAfterPreviousComplete(Target=var "Hero", AnimName="Idle", StoreDidPlay=(unset))
+    on FINISHED → Relic Got Dlg
+  }
+
+  sequence state Rummage Exit to Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    StopParticleEmittersInChildrenV2(Target=var "Rummage Small Pt Parent", StopBehaviour=1)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    AudioStop(gameObject=var "Rummage Audio Loop", fadeTime=0)
+    PlayRandomAudioClipTableV3(Table=scrounge_movement (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Rest Rummage Exit", AnimationCompleteEvent=(none))
+    on FINISHED → Sing
+  }
+
+  state Mark Noise {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetBoolValue(boolVariable=var "Woke From Noise", boolValue=true, everyFrame=false)
+    on NOISE → Tail to Sing
+  }
+
+  state Mark Noise 2 {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetBoolValue(boolVariable=var "Woke From Noise", boolValue=true, everyFrame=false)
+    on NOISE → Rummage to Sing
+  }
+
+  sequence state Exclaim Sing Begin {
+    SetPosition(gameObject=var "Prompt Marker", vector=var "Initial Prompt Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    BoolTest(boolVariable=var "Woke From Noise", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    EnumCompare(enumVariable=var "Singing State", compareTo=ActiveInner, equalEvent=→"SING", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="PlayMakerNPC", methodName="BeginHeroAnimManual", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on SING → Sing
+    on FINISHED → Exclaim Sing
+  }
+
+  state Post Window? {
+    CallMethodProper(gameObject=Self, behaviour="RelicBoardOwner", methodName="IsAllRelicsDeposited", parameters=[], storeResult=var "Test", EveryFrame=false)
+    BoolTest(boolVariable=var "Test", isTrue=→"ALL COLLECTED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Did Post Window Dlg", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    GetPlayerDataBool(boolName="BelltownRelicDealerOutroConvo", storeValue=var "Did Outro Convo")
+    ConvertBoolToString(boolVariable=var "Did Outro Convo", stringVariable=var "Convo Key", falseString="RELIC_DEALER_POSTWINDOW_FIRST", trueString="RELIC_DEALER_POSTWINDOW", everyFrame=false)
+    SetPlayerDataBool(boolName="BelltownRelicDealerOutroConvo", value=true)
+    SetBoolValue(boolVariable=var "Did Post Window Dlg", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Dlg End
+    on CONVO_END → Dlg End
+    on ALL COLLECTED → Post Window? All Collected
+  }
+
+  state Meet Act3 {
+    SetBoolValue(boolVariable=var "In Meet Dialogue", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key="RELIC_DEALER_MEET_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataVariable(VariableName="MetBelltownRelicDealer", SetValue=true)
+    SetPlayerDataVariable(VariableName="MetBelltownRelicDealerAct3", SetValue=true)
+    on CONVO_END → Has Relics?
+  }
+
+  state Remeet Act3 {
+    SetBoolValue(boolVariable=var "In Meet Dialogue", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key="RELIC_DEALER_REMEET_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataVariable(VariableName="MetBelltownRelicDealerAct3", SetValue=true)
+    on CONVO_END → Has Relics?
+  }
+
+  state Relics Empty {
+    RunDialogue(Sheet="Belltown", Key="RELIC_DEALER_EMPTY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End
+  }
+
+  state Librarian Dlg {
+    BoolTest(boolVariable=var "In Meet Dialogue", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=relic_dealer/Relic Dealer NPC/Librarian Proxy, behaviour="RelicBoardOwner", methodName="IsAnyRelicsToDeposit", parameters=[], storeResult=var "Has Relics", EveryFrame=false)
+    BoolTest(boolVariable=var "Has Relics", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    PlayerDataBoolTest(boolName="BelltownRelicDealerCylinderConvo", isTrue=→"CANCEL", isFalse=(none))
+    SetPlayerDataBool(boolName="BelltownRelicDealerCylinderConvo", value=true)
+    RunDialogue(Sheet="Belltown", Key="RELIC_DEALER_CYLINDER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End
+    on CANCEL → No Relics Dlg
+  }
+
+  state Post Window? All Collected {
+    BoolTest(boolVariable=var "Did Post Window Dlg", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    GetPlayerDataBool(boolName="BelltownRelicDealerOutroConvoAllComplete", storeValue=var "Did Outro Convo")
+    ConvertBoolToString(boolVariable=var "Did Outro Convo", stringVariable=var "Convo Key", falseString="RELIC_DEALER_POSTWINDOW_COMPLETE", trueString="RELIC_DEALER_POSTWINDOW_COMPLETE_REPEAT", everyFrame=false)
+    SetPlayerDataBool(boolName="BelltownRelicDealerOutroConvoAllComplete", value=true)
+    SetBoolValue(boolVariable=var "Did Post Window Dlg", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Dlg End
+    on CONVO_END → Dlg End
+  }
+
+  sequence state Rummage Startled {
+    StopParticleEmittersInChildrenV2(Target=var "Rummage Small Pt Parent", StopBehaviour=1)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Scrounge_startle (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioStop(gameObject=var "Rummage Audio Loop", fadeTime=0)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Rest Rummage Exit", AnimationCompleteEvent=(none))
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE IDLE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Idle
+  }
+
+  state Startle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    SendEventToRegister(eventName="LIBRARIAN TENTACLE MOVE")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.4, finishEvent=→"CANCEL", realTime=false)
+    PlayRandomAudioClipTableV3(Table=scrounge_movement (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Scrounge_startle (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on CANCEL → Sing End
+  }
+
+  var Has Relics: bool = false
+  var Woke From Noise: bool = false
+  var Did Post Window Dlg: bool = false
+  var Did Outro Convo: bool = false
+  var Is Act 3: bool = false
+  var Met NPC: bool = false
+  var Met NPC Act 3: bool = false
+  var Visited Haunted: bool = false
+  var In Meet Dialogue: bool = false
+  var Citadel Woken: bool = false
+  var Test: bool = false
+  var Spinner Defeated: bool = false
+  var Convo Key: string = ""
+  var Initial Prompt Pos: vector3 = (0, 0, 0)
+  var Set Pos: vector3 = (0, 0, 0)
+  var Prompt Marker: gameObject = relic_dealer/Relic Dealer NPC/Prompt Marker
+  var Rummage Big Pt Parent: gameObject = relic_dealer/Relic Dealer NPC/Rummage Large Pt Parent
+  var Rummage Small Pt Parent: gameObject = relic_dealer/Relic Dealer NPC/Rummage Small Pt Parent
+  var Strike Effect: gameObject = <null>
+  var Rummage Audio Loop: gameObject = relic_dealer/Relic Dealer NPC/Rummage Audio Loop
+  var Self: gameObject = <null>
+  var Audio Loop Voice: gameObject = relic_dealer/Relic Dealer NPC/Audio Loop Voice
+  var Singing State: enum = HeroPerformanceRegion+AffectedState(0)
+}

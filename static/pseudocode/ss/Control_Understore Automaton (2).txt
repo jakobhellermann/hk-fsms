@@ -1,0 +1,136 @@
+# Control
+# 2 location(s):
+#   Under_13 / Understore Automaton (2)
+#   Under_19c / Understore Automaton (2)
+
+fsm Control {
+  start Init
+  on ZERO HP → Death Fling  // from any state
+  on HARPOON HOOKED → Harpoon Hook  // from any state
+
+  state Init {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    WaitRandom(timeMin=0, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Start Idle
+  }
+
+  state Idle {
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1.5, speedMax=3, accelerationMin=10, accelerationMax=15, roamingRangeX=0.25, roamingRangeY=0.25, manualStartPos=var "Start Pos")
+    AudioPlayInState(gameObject=Self, volume=1)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Slash Antic 1
+    on TOOK DAMAGE → Slash Antic 1
+    on SING → Sing
+  }
+
+  state Death Fling {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Damageable Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCircleCollider(gameObject=Self, active=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Respawn?
+  }
+
+  state Respawn? {
+    BoolTest(boolVariable=var "Respawner", isTrue=→"RESPAWN", isFalse=(none), everyFrame=false)
+    on RESPAWN → Fly In
+  }
+
+  state Fly In {
+    PlayRandomAudioClipTable(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    TranslateRandom(gameObject=Self, translateMin=(-0.5, -0.5, 0), translateMax=(0.5, 0.5, 0), space=1)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=40, z=25, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, -40, -25), time=1, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    PlayAudioEvent(audioClip=song_automaton_fly_antic (sfxstatic_assets_areacog.bundle), pitchMin=0.8, pitchMax=0.8, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Alert", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Damageable Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCircleCollider(gameObject=Self, active=true)
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Start Idle
+  }
+
+  state Slash Antic 1 {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=song_automaton_fly_antic (sfxstatic_assets_areacog.bundle), pitchMin=0.7, pitchMax=0.8, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=automaton_creature_chirp (sfxdynamic_assets_areacog.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Slash Antic 2
+  }
+
+  state Slash Antic 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=bone_circler_vicious_fly_attack (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=0.75, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=song_automaton_01_charge_antic (sfxstatic_assets_shared.bundle), pitchMin=1.2, pitchMax=1.3, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=10, position=(0, 0.5, 0), spread=0, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=false)
+    on FINISHED → Slash
+  }
+
+  state Slash Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RandomFloat(min=0.8, max=1.2, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlayInState(gameObject=Self, volume=1)
+    PlayAudioEvent(audioClip=song_automaton_goomba_antic (sfxstatic_assets_areacog.bundle), pitchMin=1.2, pitchMax=1.3, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1.5, speedMax=3, accelerationMin=10, accelerationMax=15, roamingRangeX=0.25, roamingRangeY=0.25, manualStartPos=var "Start Pos")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Slash End
+    on SING → Sing
+  }
+
+  state Start Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    RandomFloat(min=0.8, max=1.2, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Slash {
+    DecelerateV2(gameObject=Self, deceleration=0.96, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash Recover
+  }
+
+  state Slash End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Idle
+  }
+
+  state Harpoon Hook {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Recover")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Slash Antic 1
+  }
+
+  state Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=automaton_creature_sing (sfxdynamic_assets_areacog.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Recover")
+    on FINISHED → Slash End
+  }
+
+  var Respawner: bool = false
+
+  var Pitch: float = 0
+  var Start Pos: vector3 = (0, 0, 0)
+  var Damageable Collider: gameObject = Understore Automaton (2)/Damageable Collider
+  var Slash Collider: gameObject = Understore Automaton (2)/Slash Collider
+  var Audio Loop Voice: gameObject = Understore Automaton (2)/Audio Loop Voice
+}

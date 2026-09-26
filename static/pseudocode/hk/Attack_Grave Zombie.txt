@@ -1,0 +1,126 @@
+# Attack
+# 4 location(s):
+#   RestingGrounds_10 / Grave Zombie
+#   RestingGrounds_10 / Grave Zombie (2)
+#   RestingGrounds_10 / Grave Zombie (4)
+#   RestingGrounds_10 / Grave Zombie (1)
+
+fsm Attack {
+  start Initialise
+
+  state Initialise {
+    GetHero(storeResult=var "Hero")
+    FindChild(gameObject=Self, childName="Attack Range", storeResult=var "Attack Region")
+    FindChild(gameObject=Self, childName="Idle Audio", storeResult=var "Idle Audio")
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Ready
+  }
+
+  state Ready {
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Attack Range"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    on ATTACK ALERT → Left or Right?
+  }
+
+  state Anticipate {
+    RandomFloat(min=0.9, max=1.1, storeResult=var "Chooser")
+    SetAudioPitch(gameObject=var "Self", pitch=var "Chooser", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[Grave_Zombie_attack_01 (sharedassets33.assets), Grave_Zombie_attack_02 (sharedassets33.assets), Grave_Zombie_attack_03 (sharedassets33.assets)], weights=[1, 1, 1], pitchMin=0.85, pitchMax=1.15)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Anticipate")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Reverse Back
+  }
+
+  state Left or Right? {
+    StopWalker(target=Self, everyFrame=false)
+    AudioStop(gameObject=var "Idle Audio")
+    SetFloatValue(floatVariable=var "Lunge Speed Adjust", floatValue=var "Lunge Speed", everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Self X", tolerance=0, equal=→"HERO IS LEFT", lessThan=→"HERO IS LEFT", greaterThan=→"HERO IS RIGHT", everyFrame=false)
+    on HERO IS RIGHT → R? 2
+    on HERO IS LEFT → R?
+  }
+
+  state Face Left {
+    FloatMultiply(floatVariable=var "Lunge Speed Adjust", multiplyBy=-1, everyFrame=false)
+    SetScale(gameObject=var "Self", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetWalkerFacing(walkRight=false, randomStartDir=(unset), target=Self, everyFrame=false)
+    on FINISHED → Reverse
+  }
+
+  state Face Right {
+    SetScale(gameObject=var "Self", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetWalkerFacing(walkRight=true, randomStartDir=(unset), target=Self, everyFrame=false)
+    on FINISHED → Reverse
+  }
+
+  state Lunge {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Lunge")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetVelocity2d(gameObject=var "Self", vector=(unset), x=var "Lunge Speed Adjust", y=(unset), everyFrame=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mawlek_whip (sharedassets34.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on WAIT → Cooldown
+  }
+
+  state Cooldown {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Cooldown")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on WAIT → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Wait(time=var "Idle Time", finishEvent=→"WAIT", realTime=false)
+    on WAIT → Reset
+  }
+
+  state Reset {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    AudioPlaySimple(gameObject=var "Idle Audio", volume=1, oneShotClip=<null>)
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    on FINISHED → Ready
+  }
+
+  state R? {
+    BoolTest(boolVariable=var "Reverse", isTrue=→"REVERSE", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Face Left
+    on REVERSE → Face Right
+  }
+
+  state R? 2 {
+    BoolTest(boolVariable=var "Reverse", isTrue=→"REVERSE", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Face Right
+    on REVERSE → Face Left
+  }
+
+  state Reverse {
+    BoolTest(boolVariable=var "Reverse", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FlipScale(gameObject=var "Self", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Anticipate
+  }
+
+  state Reverse Back {
+    BoolTest(boolVariable=var "Reverse", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FlipScale(gameObject=var "Self", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Lunge
+  }
+
+  var Idle Time: float = 0.5
+  var Lunge Speed: float = 12
+  var Reverse: bool = false
+
+  var Chooser: float = 0
+  var Hero X: float = 0
+  var Lunge Speed Adjust: float = 0
+  var Self X: float = 0
+  var Can See Hero: bool = false
+  var In Attack Range: bool = false
+  var Attack Region: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Idle Audio: gameObject = <null>
+  var Self: gameObject = <null>
+}

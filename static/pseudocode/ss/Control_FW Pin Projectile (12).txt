@@ -1,0 +1,108 @@
+# Control
+# 1 location(s):
+#   Slab_10b / Boss Scene/Pin Projectiles/FW Pin Projectile (12)
+
+fsm Control {
+  start Init
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    GetGrandparent(gameObject=Self, storeResult=var "Boss Scene")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Loose Pins")
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetMeshRenderer(gameObject=var "Thread", active=false)
+    Wait(time=0.75, finishEvent=→"ATTACK", realTime=false)  // disabled
+    SetParent(gameObject=Self, parent=var "Parent", resetLocalPosition=false, resetLocalRotation=false)
+    on ATTACK → Attack Pause
+  }
+
+  state Move Pin {
+    GetRandomChild(gameObject=var "Loose Pins", storeResult=var "Loose Pin")
+    GameObjectIsNull(gameObject=var "Loose Pin", isNull=→"FAIL", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=var "Loose Pin", isKinematic=true)
+    SetFsmGameObject(gameObject=var "Loose Pin", fsmName="Control", variableName="Projectile Target", setValue=var "Self", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Loose Pin"), sendEvent="PULL", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FAIL → Dormant
+    on FINISHED → Antic
+    on BOSS STUNNED → Stun Cancel
+  }
+
+  state Antic {
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pin Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=first_sinner_needle_antic (sfxstatic_assets_areaslab.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Thread Pull
+    on BOSS STUNNED → Stun Cancel
+  }
+
+  state Thread Pull {
+    SetMeshRenderer(gameObject=var "Thread", active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Thread", clipName="Pin Thread", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayFrame(gameObject=var "Thread", frame=0)
+    Wait(time=0.55, finishEvent=→"ATTACK", realTime=false)
+    on ATTACK → Fire
+    on BOSS STUNNED → Stun Cancel
+  }
+
+  state Fire {
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tween Rotation", space=0, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Thread", active=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pin Fire")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Tween Rotation", speed=120, everyFrame=false)
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"LAND", storeCollider=var "", storeForce=(unset))
+    Collision2dEvent(gameObject=Self, collision=1, collideTag="", sendEvent=→"LAND", storeCollider=var "", storeForce=(unset))
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    ActivateGameObject(gameObject=var "Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[silk_boss_needle_throw_1 (sfxstatic_assets_areacradle.bundle), silk_boss_needle_throw_2 (sfxstatic_assets_areacradle.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on LAND → Thunk
+  }
+
+  state Thunk {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pin Hit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    PlayAudioEventRandom(audioClips=[silk_boss_needle_impact_1 (sfxstatic_assets_areacradle.bundle), silk_boss_needle_impact_2 (sfxstatic_assets_areacradle.bundle), silk_boss_needle_impact_3 (sfxstatic_assets_areacradle.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Release Pin
+  }
+
+  state Release Pin {
+    SendEventByName(eventTarget=GameObject(var "Loose Pin"), sendEvent="THUNK", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetPositionToObject2D(gameObject=var "Loose Pin", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Loose Pin", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    SetIsKinematic2d(gameObject=var "Loose Pin", isKinematic=true)  // disabled
+    SetParent(gameObject=var "Loose Pin", parent=var "Loose Pins", resetLocalPosition=false, resetLocalRotation=false)  // disabled
+    on FINISHED → Dormant
+  }
+
+  state Attack Pause {
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    WaitRandom(timeMin=0, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Move Pin
+    on BOSS STUNNED → Dormant
+  }
+
+  state Stun Cancel {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetMeshRenderer(gameObject=var "Thread", active=false)
+    SendEventByName(eventTarget=GameObject(var "Loose Pin"), sendEvent="STUN CANCEL", delay=0, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  var Tween Rotation: float = 0
+  var Start Pos: vector3 = (0, 0, 0)
+  var Boss Scene: gameObject = <null>
+  var Loose Pins: gameObject = <null>
+  var Loose Pin: gameObject = <null>
+  var Thread: gameObject = Boss Scene/Pin Projectiles/FW Pin Projectile (12)/Thread
+  var Self: gameObject = Boss Scene/Pin Projectiles/FW Pin Projectile (12)
+  var Parent: gameObject = <null>
+  var Damager: gameObject = Boss Scene/Pin Projectiles/FW Pin Projectile (12)/Damager
+}

@@ -1,0 +1,116 @@
+# blue_health_display
+# 1 location(s):
+#   resources.assets / Blue Health Hive
+
+// uses template: blue_health_display_hive
+fsm blue_health_display {
+  start Init
+  on HERO HEALED FULL → Health Reset  // from any state
+  on REMOVE BLUE HEALTH → Health Reset  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=var "Self", childName="Idle", storeResult=var "Idle Sprite")
+    FindChild(gameObject=var "Self", childName="Max Up", storeResult=var "Max Up")
+    SetScale(gameObject=Self, vector=(unset), x=0.75, y=0.75, z=(unset), everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=-2, space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Starting Idle?
+  }
+
+  state Starting Idle? {
+    BoolTest(boolVariable=var "Start Idle", isTrue=→"IDLE", isFalse=→"APPEAR", everyFrame=false)
+    Tk2dPlayFrame(gameObject=var "Self", frame=0)
+    on IDLE → Idle
+    on APPEAR → Appear
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Hive Health Idle B")
+    RandomInt(min=0, max=26, storeResult=var "Chooser", inclusiveMax=true)
+    Tk2dPlayFrame(gameObject=var "Self", frame=var "Chooser")
+    on HERO DAMAGED → Pause 2
+  }
+
+  state Destroy Self {
+    DestroySelf(detachChildren=false)
+  }
+
+  state Break? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="healthBlue", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"FULL", lessThan=→"EMPTY", greaterThan=→"FULL", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName="Hive Health Break B", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Pause
+    on FULL → Idle
+  }
+
+  state Appear {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName="Hive Health Appear B", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+    on HERO DAMAGED → Break?
+  }
+
+  state Health Reset {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName="Hive Health Break B", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Destroy Self
+  }
+
+  state Start Regen? {
+    IntAdd(intVariable=var "Current HP", add=1, everyFrame=false)
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"REGEN", lessThan=(none), greaterThan=(none), everyFrame=false)
+    on REGEN → Regen 1
+    on FINISHED → Finish Anim
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Start Regen?
+  }
+
+  state Regen 1 {
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hive Health Recover1 B")
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Recover Time", tolerance=0, equal=→"NEXT", lessThan=(none), greaterThan=→"NEXT", everyFrame=true)
+    on NEXT → Regen 2
+    on HERO DAMAGED → Destroy Self
+  }
+
+  state Finish Anim {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Destroy Self
+  }
+
+  state Regen 2 {
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hive Health Recover2 B")
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Recover Time", tolerance=0, equal=→"NEXT", lessThan=(none), greaterThan=→"NEXT", everyFrame=true)
+    on NEXT → Heal
+    on HERO DAMAGED → Destroy Self
+  }
+
+  state Heal {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Hive Health Refill B")
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="healthBlue")
+    CreateObject(gameObject=HP Up Particles HiveB, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="LOW HEALTH END", delay=0, everyFrame=false)
+    on HERO DAMAGED → Break?
+  }
+
+  state Pause 2 {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Break?
+  }
+
+  var Health Number: int = 0
+
+  var Recover Time: float = 10
+  var Timer: float = 0
+  var Chooser: int = 0
+  var Current HP: int = 0
+  var Start Idle: bool = false
+  var Idle Sprite: gameObject = <null>
+  var Max Up: gameObject = <null>
+  var Self: gameObject = <null>
+}

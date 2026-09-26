@@ -1,0 +1,64 @@
+# Multihitter
+# 5 location(s):
+#   Abyss_Cocoon / Boss Control/Lost Lace Boss/MultiHit
+#   Abyss_Cocoon / Boss Control/Lost Lace Boss/MultiHit Air
+#   Bone_East_12 / Boss Scene/Lace Boss1/MultiHit
+#   Song_Tower_01 / Boss Scene/Lace Boss2 New/MultiHit
+#   Song_Tower_01 / Boss Scene/Lace Boss2 New/MultiHit Air
+
+// uses template: lace_multi_hitter
+fsm Multihitter {
+  start Init
+  on PARRIED → Parried Recover  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Lace")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Trigger2dEventLayer(trigger=OnTriggerStay2D, collideTag="", collideLayer=Hero Box(20), sendEvent=→"TRIGGER", storeCollider=var "")
+    on TRIGGER → Start Hit?
+  }
+
+  state Start Hit? {
+    CanHeroTakeDamage(eventTarget=Self, canTakeDmgEvent=→"HIT", cannotTakeDmgEvent=→"CANCEL")
+    on CANCEL → Idle
+    on HIT → Hit
+  }
+
+  state Hit {
+    GetHeroCState(VariableName="parrying", StoreValue=var "Parrying", EveryFrame=false)
+    BoolTest(boolVariable=var "Parrying", isTrue=→"CROSS STITCH", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="WillDoBellBindHit", parameters=[], storeResult=var "Bind Bell Hit", EveryFrame=false)
+    BoolTest(boolVariable=var "Bind Bell Hit", isTrue=→"BIND BELL", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="HERO DAMAGED")
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="WOUND START", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Lace"), sendEvent="MULTI HIT CONNECT", delay=0, everyFrame=false)
+    Wait(time=2, finishEvent=→"MULTIHIT END", realTime=false)
+    on MULTIHIT END → Idle
+    on BIND BELL → Bind Bell Damage
+    on CROSS STITCH → Cross Stitch
+  }
+
+  state Bind Bell Damage {
+    DamageHeroDirectly(damager=Self, damageAmount=1, spikeHazard=false, sinkHazard=false)
+    on FINISHED → Idle
+  }
+
+  state Cross Stitch {
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="PARRIED", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Parried Recover {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  var Bind Bell Hit: bool = false
+  var Parrying: bool = false
+  var Lace: gameObject = <null>
+}

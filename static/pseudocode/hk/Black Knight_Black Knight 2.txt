@@ -1,0 +1,528 @@
+# Black Knight
+# 2 location(s):
+#   Ruins2_03_boss / Battle Control/Black Knight 2
+#   GG_Watcher_Knights / Battle Control/Black Knight 2
+
+fsm Black Knight {
+  start Pause
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Roll Audio", storeResult=var "Roll Audio")
+    FindChild(gameObject=Self, childName="Spinjump Audio", storeResult=var "Spinjump Audio")
+    on FINISHED → Init Facing
+  }
+
+  state Rest {
+    on WAKE → Bugs In
+    on BATTLE START → Set Battle Inert
+  }
+
+  state Bugs In {
+    PlayParticleEmitter(gameObject=var "Bugs In 1", emit=0)
+    PlayParticleEmitter(gameObject=var "Bugs In 2", emit=0)
+    PlayParticleEmitter(gameObject=var "Entry Steam", emit=0)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[misc_rumble_loop (sharedassets101.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    on FINISHED → Cloud Stop
+  }
+
+  state Cloud Stop {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    StopParticleEmitter(gameObject=var "Hover Bugs")
+    StopParticleEmitter(gameObject=var "Hover Steam")
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="SmallRumble", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=true, everyFrame=false)
+    on FINISHED → Bugs In End
+  }
+
+  state Bugs In End {
+    StopParticleEmitter(gameObject=var "Bugs In 1")
+    StopParticleEmitter(gameObject=var "Bugs In 2")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Title?
+  }
+
+  state Roar {
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetFsmGameObject(gameObject=var "Hero", fsmName="Roar Lock", variableName="Roar Object", setValue=var "Roar Point", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR ENTER", delay=0, everyFrame=false)  // disabled
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Roar Point", position=(unset), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    SendEventByName(eventTarget=GameObjectFSM(var "", fsm="CameraShake"), sendEvent="BigShake", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Roar Steam 1", emit=0)
+    PlayParticleEmitter(gameObject=var "Roar Steam 2", emit=0)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    CreateObject(gameObject=Death Wave Infected (sharedassets32.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Hit Effect", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=2, y=2, z=(unset), everyFrame=false, lateUpdate=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashInfected())
+    on FINISHED → Music?
+  }
+
+  state Roar End {
+    ActivateGameObject(gameObject=var "Hover Bugs", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hover Steam", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="RoarToIdle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetTag(gameObject=Self, tag="Boss")
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR EXIT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Roar Emitter"), sendEvent="END", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=(unset))
+    SetTag(gameObject=Self, tag="Spell Vulnerable")
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    on FINISHED → Set Time
+  }
+
+  state Idle {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Hero Is Right", leftBool=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Hero Is Right"], boolStates=[false, true], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Hero Is Right"], boolStates=[true, false], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    WaitRandom(timeMin=var "Idle Min", timeMax=var "Idle Max", finishEvent=→"MOVE CHOICE", realTime=false)
+    BoolTest(boolVariable=var "Slash Range", isTrue=→"RANGE CHOICE", isFalse=(none), everyFrame=true)
+    on CHARGE ROLL → Charge Start
+    on TURN → Turn
+    on JUMP ROLL → Jump Start
+    on MOVE CHOICE → Move Choice
+    on RANGE CHOICE → In Range Choice
+  }
+
+  state Roar Start {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    StopParticleEmitter(gameObject=var "Entry Steam")
+    RandomFloat(min=0.006, max=0.0079999, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Random", space=0, everyFrame=false, lateUpdate=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetCollider(gameObject=Self, active=true)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[hollow_knight_scream_distant (sharedassets115.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[misc_rumble_impact (sharedassets13.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    on FINISHED → Roar
+  }
+
+  state Init Facing {
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Scale", float2=0, tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    on FINISHED → Rest
+  }
+
+  state Turn {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    BoolFlip(boolVariable=var "Facing Right")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  state Charge Start {
+    BoolTest(boolVariable=var "Attack Range", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roll Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Set Dir
+    on CANCEL → Start Run
+  }
+
+  state Charge Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    AudioPlaySimple(gameObject=var "Roll Audio", volume=1, oneShotClip=<null>)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[blocker_close (resources.assets)], weights=[1], pitchMin=0.85, pitchMax=1)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=(unset))
+    SetFloatValue(floatVariable=var "Charge Antic Speed", floatValue=var "Charge Speed Crt", everyFrame=false)
+    FloatMultiply(floatVariable=var "Charge Antic Speed", multiplyBy=-0.25, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Charge Antic Speed", y=(unset), everyFrame=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    RandomFloat(min=1, max=1.5, storeResult=var "Charge Timer")
+    ActivateGameObject(gameObject=var "Sparks", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetScale(gameObject=var "Sparks", vector=(unset), x=0.25, y=0.25, z=(unset), everyFrame=false, lateUpdate=false)
+    iTweenScaleTo(gameObject=var "Sparks", id="", transformScale=var "", vectorScale=(1, 1.85, 1), time=0.4, delay=0, speed=(unset), easeType=easeOutSine, loopType=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=true)
+    iTweenScaleTo(gameObject=var "Sparks", id="", transformScale=var "", vectorScale=(1.9, 1.9, 1), time=0.3, delay=0, speed=(unset), easeType=easeOutSine, loopType=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=true)
+    on FINISHED → Charge
+  }
+
+  state Set Dir {
+    SetFloatValue(floatVariable=var "Charge Speed Crt", floatValue=var "Charge Speed", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Scale", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FloatMultiply(floatVariable=var "Charge Speed Crt", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Charge Antic
+  }
+
+  state Charge {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Charge Speed Crt", y=(unset), everyFrame=true)
+    FloatAdd(floatVariable=var "Charge Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Charge Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on END → Charge End
+    on WALL → Hit Wall
+  }
+
+  state Charge End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roll End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset))
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=(unset))
+    ActivateGameObject(gameObject=var "Sparks", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStop(gameObject=var "Roll Audio")
+    on FINISHED → Charge Recover
+  }
+
+  state Charge Recover {
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[blocker_open (resources.assets)], weights=[1], pitchMin=0.85, pitchMax=1)
+    on FINISHED → Set Facing
+  }
+
+  state Hit Wall {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=zombie_guard_club (sharedassets34.assets))
+    SpawnObjectFromGlobalPool(gameObject=Slam Effect R (resources.assets), spawnPoint=var "Slam Origin Wall", position=(unset), rotation=(0, 0, 270), storeObject=var "")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    FloatMultiply(floatVariable=var "Charge Speed Crt", multiplyBy=-0.75, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Charge Timer", subtract=0.5, everyFrame=false, perSecond=false)
+    on FINISHED → Charge
+  }
+
+  state Set Facing {
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Scale", float2=0, tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    on FINISHED → Set Time
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Jump Start {
+    BoolTest(boolVariable=var "Attack Range", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[blocker_close (resources.assets)], weights=[1], pitchMin=0.85, pitchMax=1)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roll Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Aim
+    on CANCEL → Start Run
+  }
+
+  state Aim {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Jump X", floatValue=var "Hero X", everyFrame=false)
+    FloatSubtract(floatVariable=var "Jump X", subtract=var "Self X", everyFrame=false, perSecond=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.2, everyFrame=false)
+    RandomFloat(min=-2, max=2, storeResult=var "Random")
+    FloatAdd(floatVariable=var "Jump X", add=var "Random", everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Jump X", minValue=-22, maxValue=22, everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Jump Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=20, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    AudioPlaySimple(gameObject=var "Spinjump Audio", volume=1, oneShotClip=<null>)
+    on FINISHED → Antic Air
+  }
+
+  state Antic Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Jump Launch
+    on WALL → Flip Jump Dir
+  }
+
+  state Jump Launch {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=50, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Slam Effect R (resources.assets), spawnPoint=var "Slam Origin Bot", position=(unset), rotation=(unset), storeObject=var "")
+    NextFrameEvent(sendEvent=→"END")
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "Sound Player")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=zombie_guard_club (sharedassets34.assets), pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=var "Sound Player")
+    on END → Jump Air
+  }
+
+  state Jump Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=→"LAND", leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=→"LAND", leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Bounce
+    on WALL → Flip Jump Dir
+  }
+
+  state Bounce {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=40, everyFrame=false)
+    NextFrameEvent(sendEvent=→"END")  // disabled
+    SpawnObjectFromGlobalPool(gameObject=Slam Effect R (resources.assets), spawnPoint=var "Slam Origin Bot", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "Sound Player")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=zombie_guard_club (sharedassets34.assets), pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=var "Sound Player")
+    Wait(time=0.25, finishEvent=→"END", realTime=false)
+    on END → Bounce Air
+  }
+
+  state Bounce Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Land
+  }
+
+  state Land {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=zombie_guard_club (sharedassets34.assets))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roll End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=(unset))
+    SpawnObjectFromGlobalPool(gameObject=Slam Effect R (resources.assets), spawnPoint=var "Slam Origin Bot", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "Spinjump Audio")
+    on FINISHED → Charge Recover
+  }
+
+  state Flip Jump Dir {
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=-1, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=(unset), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Slam Effect R (resources.assets), spawnPoint=var "Slam Origin Wall", position=(unset), rotation=(0, 0, 270), storeObject=var "")
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "Sound Player")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=zombie_guard_club (sharedassets34.assets), pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=var "Sound Player")
+    GotoPreviousState()
+  }
+
+  state Run To {
+    AudioPlayInState(gameObject=Self, volume=1)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Run Speed Crt", y=(unset), everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Hero Is Right", leftBool=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Hero Is Right", var "Attack Range"], boolStates=[false, true, true], trueEvent=→"JUMP ROLL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Hero Is Right", var "Attack Range"], boolStates=[true, false, true], trueEvent=→"JUMP ROLL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTest(boolVariable=var "Slash Range", isTrue=→"SLASH", isFalse=(none), everyFrame=true)
+    WaitRandom(timeMin=0.5, timeMax=0.8, finishEvent=→"CHARGE ROLL", realTime=false)
+    WaitRandom(timeMin=0.5, timeMax=0.8, finishEvent=→"JUMP ROLL", realTime=false)
+    on JUMP ROLL → Jump Start
+    on CHARGE ROLL → Attack Range?
+    on SLASH → Set Speed
+  }
+
+  state Start Run {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToRun", resetFrame=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Run Speed Crt", floatValue=var "Run Speed", everyFrame=false)
+    RandomFloat(min=1, max=1.5, storeResult=var "Run Modify")
+    FloatMultiply(floatVariable=var "Run Speed Crt", multiplyBy=var "Run Modify", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Scale", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FloatMultiply(floatVariable=var "Run Speed Crt", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Run To
+  }
+
+  state Slash Antic {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[zombie_shield_move (sharedassets32.assets), zombie_shield_raise (sharedassets32.assets), ruin_shield_sentry_prepare (sharedassets34.assets), ruin_shield_sentry_shield_move (sharedassets34.assets)], weights=[1, 1, 1, 0], pitchMin=0.85, pitchMax=1)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Slash1
+  }
+
+  state Slash1 {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=ruin_shield_sentry_sword_1 (sharedassets34.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash1 Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Slash Speed Crt", y=(unset), everyFrame=false)
+    on FINISHED → Slash1 Recover
+  }
+
+  state Slash1 Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash1 Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash1 Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Slash2
+  }
+
+  state Slash2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=ruin_shield_sentry_sword_2 (sharedassets34.assets))
+    ActivateGameObject(gameObject=var "Slash2 Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Slash Speed Crt", y=(unset), everyFrame=false)
+    on FINISHED → Slash2 Recover
+  }
+
+  state Slash2 Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash2 Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash2 Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Set Facing
+  }
+
+  state Move Choice {
+    BoolTestMulti(boolVariables=[var "Attack Range", var "Double"], boolStates=[false, true], trueEvent=→"SLASH", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    SendRandomEventV2(events=[→"CHARGE ROLL", →"JUMP ROLL", →"SLASH"], weights=[1, 1, 1], trackingInts=[var "Charge Count", var "Jump Count", var "Slash Count"], eventMax=[2, 2, 3])
+    on SLASH → Start Run
+    on CHARGE ROLL → Charge Start
+    on JUMP ROLL → Jump Start
+  }
+
+  state In Range Choice {
+    BoolTest(boolVariable=var "Double", isTrue=→"DOUBLE", isFalse=(none), everyFrame=false)
+    SendRandomEventV2(events=[→"CHARGE ROLL", →"JUMP ROLL", →"SLASH"], weights=[0.2, 0.2, 0.6], trackingInts=[var "Charge Count", var "Jump Count", var "Slash Count"], eventMax=[2, 2, 3])
+    on SLASH → Run To
+    on CHARGE ROLL → Charge Start
+    on JUMP ROLL → Jump Start
+    on DOUBLE → In Range Double
+  }
+
+  state Scale Sparks {
+    iTweenScaleTo(gameObject=var "Sparks", id="", transformScale=var "", vectorScale=(1.9, 1.9, 1), time=0.3, delay=0, speed=(unset), easeType=easeOutSine, loopType=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=true)
+    on FINISHED → Charge
+  }
+
+  state Set Speed {
+    SetFloatValue(floatVariable=var "Slash Speed Crt", floatValue=var "Slash Speed", everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    FloatMultiply(floatVariable=var "Slash Speed Crt", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Slash Antic
+  }
+
+  state Set Time {
+    SetBoolValue(boolVariable=var "Double", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Min", floatValue=0.2, everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Max", floatValue=0.4, everyFrame=false)
+    GetTagCount(tag="Spell Vulnerable", storeResult=var "Other Knights")
+    IntCompare(integer1=var "Other Knights", integer2=1, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Min", floatValue=0.6, everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Max", floatValue=0.8, everyFrame=false)
+    SetBoolValue(boolVariable=var "Double", boolValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state In Range Double {
+    SendRandomEventV2(events=[→"CHARGE ROLL", →"JUMP ROLL", →"SLASH", →"BACK ROLL"], weights=[0.25, 0.25, 0.3, 0.2], trackingInts=[var "Charge Count", var "Jump Count", var "Slash Count", var "Roll Count"], eventMax=[2, 2, 3, 1])
+    on SLASH → Run To
+    on CHARGE ROLL → Charge Start
+    on JUMP ROLL → Jump Start
+    on BACK ROLL → Roll Start
+  }
+
+  state Roll Start {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[blocker_close (resources.assets)], weights=[1], pitchMin=0.85, pitchMax=1)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roll Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Set Dir 2
+  }
+
+  state Set Dir 2 {
+    SetFloatValue(floatVariable=var "Charge Speed Crt", floatValue=var "Charge Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Charge Speed Crt", multiplyBy=-1, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Scale", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FloatMultiply(floatVariable=var "Charge Speed Crt", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Roll
+  }
+
+  state Roll {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Charge Speed Crt", y=(unset), everyFrame=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    AudioPlaySimple(gameObject=var "Roll Audio", volume=1, oneShotClip=<null>)
+    on FINISHED → Roll End
+  }
+
+  state Roll End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roll End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=(unset))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioStop(gameObject=var "Roll Audio")
+    on FINISHED → Set Facing
+  }
+
+  state Attack Range? {
+    BoolTest(boolVariable=var "Double", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BoolTest(boolVariable=var "Attack Range", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on FINISHED → Charge Start
+    on CANCEL → Run To
+  }
+
+  state Set Battle Inert {
+    SetCollider(gameObject=Self, active=false)
+    on FINISHED → Rest
+  }
+
+  state Title? {
+    AudioStop(gameObject=var "Sound Player")
+    BoolTest(boolVariable=var "Show Title", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="Visited", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="BLACK_KNIGHT", everyFrame=false)
+    on FINISHED → Roar Start
+  }
+
+  state Music? {
+    BoolTest(boolVariable=var "Show Title", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    GGCheckIfBossScene(bossSceneEvent=→"FINISHED", regularSceneEvent=(none))
+    TransitionToAudioSnapshot(snapshot=Normal (resources.assets), transitionTime=0)
+    ApplyMusicCue(musicCue=Boss1 (sharedassets48.assets), delayTime=0, transitionTime=0)
+    on FINISHED → Roar End
+  }
+
+  var Show Title: bool = false
+
+  var Charge Antic Speed: float = 0
+  var Charge Speed: float = 28
+  var Charge Speed Crt: float = 0
+  var Charge Timer: float = 0
+  var Hero X: float = 0
+  var Idle Max: float = 0.8
+  var Idle Min: float = 0.4
+  var Jump X: float = 0
+  var Random: float = 0
+  var Run Modify: float = 0
+  var Run Speed: float = 6
+  var Run Speed Crt: float = 0
+  var Self X: float = 0
+  var Slash Speed: float = -15
+  var Slash Speed Crt: float = 0
+  var X Scale: float = 0
+  var Charge Count: int = 0
+  var Jump Count: int = 0
+  var Other Knights: int = 0
+  var Roll Count: int = 0
+  var Slash Count: int = 0
+  var Attack Range: bool = false
+  var Double: bool = false
+  var Facing Right: bool = false
+  var Hero Is Right: bool = false
+  var Slash Range: bool = false
+  var Area Title: gameObject = <null>
+  var Bugs In 1: gameObject = Battle Control/Black Knight 2/Bugs In 1
+  var Bugs In 2: gameObject = Battle Control/Black Knight 2/Bugs In 2
+  var Entry Steam: gameObject = Battle Control/Black Knight 2/Entry Steam
+  var Hit Effect: gameObject = <null>
+  var Hover Bugs: gameObject = Battle Control/Black Knight 2/Hover Bugs
+  var Hover Steam: gameObject = Battle Control/Black Knight 2/Hover Steam
+  var Roar Emitter: gameObject = <null>
+  var Roar Point: gameObject = Battle Control/Black Knight 2/Roar Point
+  var Roar Steam 1: gameObject = Battle Control/Black Knight 2/Roar Steam 1
+  var Roar Steam 2: gameObject = Battle Control/Black Knight 2/Roar Steam 2
+  var Roll Audio: gameObject = <null>
+  var Self: gameObject = <null>
+  var Slam Origin Bot: gameObject = Battle Control/Black Knight 2/Slam Origin Bot
+  var Slam Origin Wall: gameObject = Battle Control/Black Knight 2/Slam Origin Wall
+  var Slam Player: gameObject = <null>
+  var Slash1 Hit: gameObject = Battle Control/Black Knight 2/Slash1 Hit
+  var Slash2 Hit: gameObject = Battle Control/Black Knight 2/Slash2 Hit
+  var Sound Player: gameObject = <null>
+  var Sparks: gameObject = Battle Control/Black Knight 2/Sparks
+  var Spinjump Audio: gameObject = <null>
+}

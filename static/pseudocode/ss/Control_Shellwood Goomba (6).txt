@@ -1,0 +1,176 @@
+# Control
+# 1 location(s):
+#   Shellwood_01 / Black Thread States/Normal World/Shellwood Goomba (6)
+
+fsm Control {
+  start Init
+  on BATTLE START → Battle Pause  // from any state
+
+  state Init {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    ActivateGameObject(gameObject=var "Emerge Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Is Hiding", isTrue=(none), isFalse=→"ACTIVE", everyFrame=false)
+    on ACTIVE → Start Walker
+    on FINISHED → Choose Anims
+  }
+
+  state Hiding {
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=3)
+    SetLayer(gameObject=Self, layer=Particle(18))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Rest Anim")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    WaitRandom(timeMin=4, timeMax=7, finishEvent=→"SHAKE", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.6, None=(none), ActiveInner=→"WAKE", ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=false, IsRightBlocked=false)
+    on SHAKE → Shake
+    on WAKE → Emerge Antic
+    on TOOK DAMAGE → Emerge
+  }
+
+  state Start Walker {
+    StartCrawler(Target=Self, ScheduleTurn=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.7, None=(none), ActiveInner=→"PRAY", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetPosition(gameObject=var "Alert Range", vector=(unset), x=0, y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=1.25, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"FALL", EveryFrame=true)
+    on PRAY → Stop Walker
+    on FALL → Start Fall
+  }
+
+  state Emerge {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest To Walk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    ActivateGameObject(gameObject=var "Emerge Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    on FINISHED → Start Walker
+  }
+
+  state Emerge Antic {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=shellwood_goomba_cry (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=shellwood_goomba_emerge (sfxstatic_assets_areashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Antic Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Radial Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    PlayParticleEmitterChildren(gameObject=var "Pt Emerge", resetTimeIfPlaying=false, stopOnStateExit=true)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Grounded", var "Is Roof Crawler"], boolStates=[false, false], trueEvent=→"FALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on FINISHED → Roof?
+    on FALL → Start Fall
+  }
+
+  state Choose Anims {
+    BoolTest(boolVariable=var "Is Roof Crawler", isTrue=→"ROOF", isFalse=(none), everyFrame=false)
+    SendRandomEvent(events=[→"1", →"2"], weights=[0.5, 0.5], delay=0)
+    on 1 → Set Anims 01
+    on 2 → Set Anims 02
+    on ROOF → Set Anims Roof
+  }
+
+  state Set Anims 01 {
+    SetStringValue(stringVariable=var "Rest Anim", stringValue="Rest Idle 01", everyFrame=false)
+    SetStringValue(stringVariable=var "Antic Anim", stringValue="Rest Antic 01", everyFrame=false)
+    on FINISHED → Hiding
+  }
+
+  state Set Anims 02 {
+    SetStringValue(stringVariable=var "Rest Anim", stringValue="Rest Idle 02", everyFrame=false)
+    SetStringValue(stringVariable=var "Antic Anim", stringValue="Rest Antic 02", everyFrame=false)
+    on FINISHED → Hiding
+  }
+
+  state Shake {
+    PlayAudioEvent(audioClip=stick_insect_antic (sfxstatic_assets_areashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player Actor ShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Antic Anim", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.1, None=(none), ActiveInner=→"WAKE", ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Hiding
+    on TOOK DAMAGE → Emerge
+    on WAKE → Emerge Antic
+  }
+
+  state Set Anims Roof {
+    SetStringValue(stringVariable=var "Rest Anim", stringValue="Rest Idle Roof", everyFrame=false)
+    SetStringValue(stringVariable=var "Antic Anim", stringValue="Rest Antic Roof", everyFrame=false)
+    SetRotation(gameObject=var "Pt Emerge", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=180, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Hiding
+  }
+
+  state Roof? {
+    BoolTest(boolVariable=var "Is Roof Crawler", isTrue=→"ROOF", isFalse=(none), everyFrame=false)
+    on FINISHED → Emerge
+    on ROOF → Roof Drop
+  }
+
+  state Roof Drop {
+    FlipScale(gameObject=var "Emerge Effect", flipHorizontally=false, flipVertically=true, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=shellwood_goomba_flyer_break_off_ceiling (sfxstatic_assets_areashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Emerge Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roof Drop", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    on FINISHED → Fall
+  }
+
+  state Fall {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fall", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    on LAND → Land
+  }
+
+  state Land {
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest To Walk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=bone_hopper_land (sfxstatic_assets_areawilds.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Start Walker
+  }
+
+  state Stop Walker {
+    StopCrawler(Target=Self, WaitForTurn=true)
+    on FINISHED → Pray
+  }
+
+  state Pray {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pray")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=shellwood_goomba_sing (sfxdynamic_assets_areashellwood.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Start Walker
+    on SING DURATION END → Start Walker
+  }
+
+  state Battle Pause {
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Emerge Antic
+  }
+
+  state Start Fall {
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    StopCrawler(Target=Self, WaitForTurn=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    on FINISHED → Fall
+  }
+
+  var Is Hiding: bool = true
+  var Is Roof Crawler: bool = false
+
+  var Grounded: bool = false
+  var Antic Anim: string = ""
+  var Rest Anim: string = ""
+  var Emerge Effect: gameObject = Black Thread States/Normal World/Shellwood Goomba (6)/Emerge Effect
+  var Pt Emerge: gameObject = Black Thread States/Normal World/Shellwood Goomba (6)/Pt Emerge
+  var Radial Burst: gameObject = Black Thread States/Normal World/Shellwood Goomba (6)/Radial Burst
+  var Self: gameObject = <null>
+  var Alert Range: gameObject = Black Thread States/Normal World/Shellwood Goomba (6)/Alert Range
+  var Audio Loop Voice: gameObject = Black Thread States/Normal World/Shellwood Goomba (6)/Audio Loop Voice
+}

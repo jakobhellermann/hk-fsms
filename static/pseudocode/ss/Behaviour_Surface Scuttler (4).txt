@@ -1,0 +1,197 @@
+# Behaviour
+# 1 location(s):
+#   Abandoned_town / Surface Scuttler (4)
+
+fsm Behaviour {
+  start Init
+  on HIDDEN → Hidden  // from any state
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    on FINISHED → Get Initial State
+  }
+
+  state Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)  // disabled
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=→"ALERT", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    WaitRandom(timeMin=2.5, timeMax=5, finishEvent=→"SHIFT", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on ALERT → Roar
+    on SHIFT → Shift Type
+    on TOOK DAMAGE → Roar
+  }
+
+  state Sing {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    SetStringValue(stringVariable=var "Idle Anim", stringValue="Idle", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Anim
+  }
+
+  sequence state Face Away {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=(none), notFacingEvent=→"FINISHED", facingBool=(unset), notFacingBool=(unset))
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Turn", AnimationCompleteEvent=(none))
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Run Start
+  }
+
+  sequence state Roar {
+    WaitRandom(timeMin=0.05, timeMax=0.15, finishEvent=(none), realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    GetCurrentTk2dClipName(gameObject=Self, storeName=var "Current Anim")
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=6)
+    PlayAudioEventRandom(audioClips=[grass_goomba_alert_1 (sfxstatic_assets_areawilds.bundle), grass_goomba_alert_2 (sfxstatic_assets_areawilds.bundle), grass_goomba_alert_3 (sfxstatic_assets_areawilds.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=Audio Player Actor VeryShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    StringCompare(stringVariable=var "Current Anim", compareTo="Idle Up", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    WaitRandom(timeMin=0.4, timeMax=0.6, finishEvent=(none), realTime=false)
+    on FINISHED → Face Away
+  }
+
+  state Scuttle Away {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scuttle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=true, facingEvent=→"CANCEL", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    SetVelocityByScale(gameObject=Self, speed=-12, ySpeed=(unset), everyFrame=false)
+    WaitRandom(timeMin=0.2, timeMax=0.8, finishEvent=→"FINISHED", realTime=false)
+    DetectGroundEdge(Body=Self, EdgeDistance=1, GroundDistance=0.5, EveryFixedUpdate=true, FoundWall=→"HIT WALL", FoundEdge=→"HIT WALL")
+    AudioPlayInState(gameObject=Self, volume=1)
+    PlayParticleEmitter(gameObject=var "Pt MoveDust", emit=0, resetIfPlaying=false)
+    on CANCEL → Roar
+    on FINISHED → Scuttle Pause
+    on HIT WALL → Dig Start
+  }
+
+  state Scuttle Pause {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    TimeLimitCheck(storedValue=var "Run End Time", aboveEvent=→"DIG", belowEvent=(none), EveryFrame=false)
+    WaitRandom(timeMin=0.07, timeMax=0.25, finishEvent=→"FINISHED", realTime=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=true, facingEvent=→"CANCEL", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    on CANCEL → Roar
+    on FINISHED → Scuttle Away
+    on DIG → Dig Start
+  }
+
+  state Start {
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetPosition(gameObject=Self, vector=var "Initial Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Initial Gravity")
+    SetMeshRenderer(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Dig Pt", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SelectRandomString(strings=["Idle", "Idle Up"], weights=[0.7, 0.3], storeString=var "Idle Anim")  // disabled
+    RandomlyFlipScale(gameObject=Self)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Pos Z", space=0, everyFrame=false)
+    FloatInRange(floatVariable=var "Pos Z", lowerValue=-1.5, upperValue=1.5, boolVariable=(unset), trueEvent=→"SET Z", falseEvent=(none), everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Idle Anim
+    on SET Z → Set Game Plane Z
+  }
+
+  state Run Start {
+    RandomFloat(min=0.5, max=2.5, storeResult=var "Run Duration")
+    TimeLimitSet(timeDelay=var "Run Duration", storeValue=var "Run End Time")
+    on FINISHED → Scuttle Away
+  }
+
+  state Dig Start {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Dig Pt", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig Escape", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=grub_burrow (sfxstatic_assets_areamemoryareaslabareasurface.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Dig Down
+  }
+
+  state Get Initial State {
+    GetPosition(gameObject=Self, vector=var "Initial Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetGravity2dScale(gameObject=Self, storeGravity=var "Initial Gravity", everyFrame=false)
+    SetTransformParent(gameObject=var "Reappear Range", parent=<null>, worldPositionStays=true)
+    on FINISHED → Start
+  }
+
+  sequence state Hide {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    StopParticleEmitter(gameObject=var "Dig Pt")
+    Wait(time=2, finishEvent=(none), realTime=false)
+    SendEvent(eventTarget=Self, sendEvent=→"HIDDEN", delay=0, everyFrame=false)
+  }
+
+  state Hidden {
+    CheckTrackTriggerCount(target=var "Reappear Range", count=0, test=LessThanOrEqual, everyFrame=true, successEvent=→"HERO GONE")
+    on HERO GONE → Start
+  }
+
+  state Dig Down {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    Wait(time=0.85, finishEvent=→"FINISHED", realTime=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-3, z=(unset), space=1, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Hide
+  }
+
+  state Death {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    PlayAudioEventRandom(audioClips=[grass_goomba_death_1 (sfxstatic_assets_areawilds.bundle), grass_goomba_death_2 (sfxstatic_assets_areawilds.bundle), grass_goomba_death_3 (sfxstatic_assets_areawilds.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=Audio Player Actor VeryShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Hide
+  }
+
+  state Shift Type {
+    SendRandomEventV4(events=[→"TURN", →"CALL"], weights=[0.5, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on TURN → Turn
+    on CALL → Call
+  }
+
+  state Idle Anim {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Idle
+  }
+
+  state Turn {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScaleOnExit(gameObject=Self, flipHorizontally=true, flipVertically=false)
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=→"ALERT", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    AudioPlayInState(gameObject=Self, volume=(unset))
+    FadeAudio(gameObject=Self, startVolume=1, endVolume=0, time=0.4)
+    on FINISHED → Idle Anim
+    on TOOK DAMAGE → Roar
+    on ALERT → Roar
+  }
+
+  state Call {
+    PlayAudioEventRandom(audioClips=[grass_goomba_alert_1 (sfxstatic_assets_areawilds.bundle), grass_goomba_alert_2 (sfxstatic_assets_areawilds.bundle), grass_goomba_alert_3 (sfxstatic_assets_areawilds.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=Audio Player Actor VeryShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Call", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Anim
+    on TOOK DAMAGE → Roar
+  }
+
+  state Set Game Plane Z {
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Pos Z")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Pos Z", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle Anim
+  }
+
+  var Pos Z: float = 0
+  var Run Duration: float = 0
+  var Run End Time: float = 0
+  var Initial Gravity: float = 0
+  var Idle Anim: string = ""
+  var Current Anim: string = ""
+  var Initial Position: vector3 = (0, 0, 0)
+  var Reappear Range: gameObject = Surface Scuttler (4)/Reappear Range
+  var Dig Pt: gameObject = Surface Scuttler (4)/Pt AmbushDust
+  var Pt MoveDust: gameObject = Surface Scuttler (4)/Pt MoveDust
+  var Alert Range: object = Surface Scuttler (4)/Alert Range@AlertRange
+}

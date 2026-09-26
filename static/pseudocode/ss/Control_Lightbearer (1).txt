@@ -1,0 +1,420 @@
+# Control
+# 1 location(s):
+#   Library_04 / Lightbearer (1)
+
+fsm Control {
+  start Init
+  on MINION PATROL → Scrollkeeper Patrol  // from any state
+  on MINION → Scrollkeeper  // from any state
+
+  state Init {
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Anim")
+    StringSwitch(stringVariable=var "Anim", compareTo=["Sleep 1", "Sleep 2", "Ambush"], sendEvent=[→"SLEEP", →"SLEEP", →"AMBUSH"], everyFrame=false)
+    SetGameObject(variable=var "Next Point", gameObject=var "Patrol Point", everyFrame=false)
+    SetParent(gameObject=var "Patrol Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Start Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Patrol
+    on AMBUSH → Ambush Ready
+    on SLEEP → Off Plane?
+  }
+
+  state Asleep {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    ActivateGameObject(gameObject=var "Body Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wake Range", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on ALERT → Wake Pause
+    on TOOK DAMAGE → Wake Thread
+    on BATTLE START → Wake Antic
+  }
+
+  state Wake Pause {
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=(none), realTime=false)
+    on FINISHED → Wake Thread
+  }
+
+  state Wake {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Body Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Target")
+    EaseFloat(fromValue=var "Z Pos", toValue=var "Z Target", floatVariable=var "Z Tween", time=0.2, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Tween", space=0, everyFrame=true, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Glow", clipName="Startle L", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Glow", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=var "Sprite Colour", duration=0.2)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    WaitRandom(timeMin=0.75, timeMax=0.95, finishEvent=→"NEXT", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 8), x=(unset), y=(unset), everyFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Lightbearer_alert (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on NEXT → Wake End
+    on TOOK DAMAGE → Wake End
+  }
+
+  state Wake End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    on FINISHED → In Range
+  }
+
+  state Wake Thread {
+    GetOwner(storeGameObject=var "Self")
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"BLACK THREAD", isFalse=(none))
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    SetParent(gameObject=var "Silk", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="PlayPossess", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Black Thread Wake
+    on BLACK THREAD → 
+  }
+
+  state Off Plane? {
+    ActivateGameObject(gameObject=var "Glow", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    FloatCompare(float1=var "Z Pos", float2=1, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"BG", everyFrame=false)
+    FloatCompare(float1=var "Z Pos", float2=-1, tolerance=0, equal=(none), lessThan=→"FG", greaterThan=(none), everyFrame=false)
+    on FINISHED → Asleep
+    on BG → BG
+    on FG → FG
+  }
+
+  state FG {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    CallMethodProper(gameObject=Self, behaviour="SetZ", methodName="CancelSetZ", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Asleep
+  }
+
+  state BG {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="SetZ", methodName="CancelSetZ", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0.75, 0.75, 0.75, 1), everyframe=false)
+    on FINISHED → Asleep
+  }
+
+  state Ambush Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    ActivateGameObject(gameObject=var "Body Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    ActivateGameObject(gameObject=var "Wake Range", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on ALERT → Ambush 1
+    on BATTLE START → Ambush 1
+  }
+
+  state Ambush 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ambush", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Ambush 2
+  }
+
+  state Ambush 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    ActivateGameObject(gameObject=var "Body Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → In Range
+  }
+
+  state Unalert Patrol {
+    IdleBuzzV2(gameObject=Self, waitMin=0.5, waitMax=1, speedMax=2.5, accelerationMax=15, roamingRangeX=4, roamingRangeY=4, manualStartPos=(unset))
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Fly L")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=(none), ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ALERT → In Range
+    on TOOK DAMAGE → In Range
+  }
+
+  state Startle {
+    PlayAudioEvent(audioClip=lightbearer_fly_notice_hero (sfxstatic_assets_arealibrary.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=3, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Startle L")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Lightbearer_alert (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → In Range
+  }
+
+  state In Range {
+    SetBoolValue(boolVariable=var "Did Idle Evade", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly Aggro")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8.5, speedMax=6, acceleration=0.3, targetsHeight=true, height=2, minAboveHero=(unset))
+    WaitRandom(timeMin=0.8, timeMax=1.2, finishEvent=→"ATTACK", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Throw Range", storeResult=false, sendEvent="", outOfRangeEvent="RANGE OUT", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Fly Aggro L")
+    SetBoolValueAtTime(BoolVariable=var "Can Evade", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Evade Range", storeResult=var "In Evade Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolFlip(boolVariable=var "Will Evade")
+    BoolTestMulti(boolVariables=[var "Can Evade", var "Did Throw Evade", var "In Evade Range", var "Will Evade"], boolStates=[true, false, true, true], trueEvent=→"EVADE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Throw Antic
+    on RANGE OUT → Out of Range
+    on EVADE → Idle Evade
+    on SING → Sing
+  }
+
+  state Throw Antic {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Lightbearer_attack_antic (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=true, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    RandomFloat(min=2, max=4, storeResult=var "Min Height")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=11, speedMax=8, acceleration=0.4, targetsHeight=true, height=var "Min Height", minAboveHero=(unset))
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Throw Antic L")
+    PlayAudioEvent(audioClip=lightbearer_fly_antic (sfxstatic_assets_arealibrary.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObjectDelay(gameObject=var "Antic Effect", activate=true, resetOnExit=false, delay=0.1)
+    on FINISHED → Aim Lock
+    on SING → Sing
+  }
+
+  state Out of Range {
+    Wait(time=6, finishEvent=→"UNALERT", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Throw Range", storeResult=false, sendEvent="RANGE IN", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8.5, speedMax=5, acceleration=0.3, targetsHeight=true, height=4, minAboveHero=(unset))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on RANGE IN → In Range
+    on UNALERT → Unalert Patrol
+    on SING → Sing
+  }
+
+  state Throw {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Lightbearer_attack_throw (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FlingObjectsFromGlobalPool(gameObject=Lightbearer Globe Projectile (localpoolprefabs_assets_arealibrary.bundle), spawnPoint=var "Throw Point", position=(unset), spawnMin=1, spawnMax=1, speedMin=22, speedMax=22, angleMin=var "Angle", angleMax=var "Angle", originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SetMeshRenderer(gameObject=var "Glow", active=false)
+    PlayAudioEvent(audioClip=lightbearer_fly_throw (sfxstatic_assets_arealibrary.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Throw Evade?
+  }
+
+  state Recover {
+    SetBoolValue(boolVariable=var "Did Throw Evade", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SetMeshRenderer(gameObject=var "Glow", active=true)
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Fly L")
+    on FINISHED → In Range
+  }
+
+  state Aim Lock {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=4.5, storeAngle=var "Angle", pause=0, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ClampAngleByScale(gameObject=Self, space=0, angleVariable=var "Angle", positiveMinValue=120, positiveMaxValue=240, negativeMinValue=-60, negativeMaxValue=60, everyFrame=false)
+    on FINISHED → Throw
+  }
+
+  state Patrol {
+    ChaseObjectVertical(gameObject=Self, target=var "Next Point", offset=0, speedMax=4, acceleration=0.3)
+    GetDistance(gameObject=Self, target=var "Next Point", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=1, tolerance=0, equal=→"NEXT", lessThan=→"NEXT", greaterThan=(none), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=(unset), sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=(none), ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on NEXT → Decel
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+  }
+
+  state Next Point {
+    RandomBool(storeResult=var "Will Turn")
+    GameObjectCompare(gameObjectVariable=var "Next Point", compareTo=var "Patrol Point", equalEvent=→"START", notEqualEvent=→"PATROL", storeResult=(unset), everyFrame=false)
+    on PATROL → To Patrol
+    on START → To Start
+  }
+
+  state To Patrol {
+    SetGameObject(variable=var "Next Point", gameObject=var "Patrol Point", everyFrame=false)
+    on FINISHED → Turn?
+  }
+
+  state To Start {
+    SetGameObject(variable=var "Next Point", gameObject=var "Start Point", everyFrame=false)
+    on FINISHED → Turn?
+  }
+
+  state Decel {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=(none), ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Next Point
+    on TOOK DAMAGE → 
+    on ALERT → 
+  }
+
+  state Turn? {
+    SendRandomEventV4(events=[→"NO TURN", →"TURN"], weights=[1, 1], eventMax=[2, 2], missedMax=[4, 4], activeBool=(unset))
+    on TURN → Turn
+    on NO TURN → Patrol
+  }
+
+  state Turn {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToFly")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Patrol
+  }
+
+  state Scrollkeeper {
+    SetBoolValue(boolVariable=var "Minion", boolValue=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Scrollkeeper", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    ChaseObject(gameObject=Self, target=var "Scrollkeeper Point", speedMax=1, acceleration=0.05, targetSpread=0.25, spreadResetTimeMin=0.5, spreadResetTimeMax=1, offsetX=0, offsetY=0)
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Fly L")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=(none), ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=Lightbearer_listen (sfxdynamic_assets_arealibrary.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on ALERT → Wake Scrollkeeper
+    on TOOK DAMAGE → Wake Scrollkeeper
+  }
+
+  state Wake Scrollkeeper {
+    SendEventByName(eventTarget=GameObject(var "Scrollkeeper"), sendEvent="ALERT", delay=0, everyFrame=false)
+    on FINISHED → Startle
+  }
+
+  state Scrollkeeper Patrol {
+    SetBoolValue(boolVariable=var "Minion", boolValue=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Scrollkeeper", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    ChaseObject(gameObject=Self, target=var "Scrollkeeper Point", speedMax=5, acceleration=0.15, targetSpread=0.25, spreadResetTimeMin=0.5, spreadResetTimeMax=1, offsetX=0, offsetY=0.5)
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Fly L")
+    GetDistance(gameObject=Self, target=var "Scrollkeeper Point", storeResult=var "Scrollkeeper Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Scrollkeeper Distance", float2=5, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Far From Scrollkeeper", everyFrame=true)
+    SetBoolValue(boolVariable=var "Close to Scrollkeeper", boolValue=var "Far From Scrollkeeper", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Close to Scrollkeeper", everyFrame=true)
+    SetFloatValueV2(floatVariable=var "Minion Timeout", floatValue=0, everyFrame=true, activeBool=var "Close to Scrollkeeper")
+    FloatAddV2(floatVariable=var "Minion Timeout", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "Far From Scrollkeeper")
+    FloatCompare(float1=var "Minion Timeout", float2=6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UNALERT", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=(none), ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ALERT → Wake Scrollkeeper
+    on TOOK DAMAGE → Wake Scrollkeeper
+    on UNALERT → Minion Cancel
+  }
+
+  state Wake Antic {
+    ObjectJitter(gameObject=Self, x=0.1, y=(unset), z=(unset), allowMovement=false, limitFps=30)
+    WaitRandom(timeMin=0.9, timeMax=1.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wake Thread
+  }
+
+  state Minion Cancel {
+    SetBoolValue(boolVariable=var "Minion", boolValue=false, everyFrame=false)
+    on FINISHED → Unalert Patrol
+  }
+
+  state Throw Evade? {
+    BoolTest(boolVariable=var "Did Idle Evade", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Evade", storeResult=false, sendEvent="EVADE", outOfRangeEvent="", everyFrame=false)
+    on FINISHED → Recover
+    on EVADE → Throw Evade
+  }
+
+  state Throw Evade {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Lightbearer_evade (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=24, ySpeed=10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.91, brakeOnExit=false)
+    SetBoolValue(boolVariable=var "Did Throw Evade", boolValue=true, everyFrame=false)
+    PlayAudioEvent(audioClip=lightbearer_fly_notice_hero (sfxstatic_assets_arealibrary.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=coral_flyer_in_air_dash_1 (sfxstatic_assets_areacoral.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → In Range
+  }
+
+  state Idle Evade {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Lightbearer_evade (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=24, ySpeed=10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetBoolValue(boolVariable=var "Did Idle Evade", boolValue=true, everyFrame=false)
+    PlayAudioEvent(audioClip=lightbearer_fly_notice_hero (sfxstatic_assets_arealibrary.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=coral_flyer_in_air_dash_1 (sfxstatic_assets_areacoral.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Evade To Throw?
+  }
+
+  state Evade To Throw? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Throw Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Throw Evade", boolValue=true, everyFrame=false)
+    on ATTACK → Throw Antic
+    on FINISHED → In Range
+  }
+
+  state Black Thread Wake {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=BecomeThreadedNoSing())
+    ObjectJitter(gameObject=Self, x=0.05, y=0.05, z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wake
+  }
+
+  state Sing {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Sing L")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Lightbearer_sing (sfxdynamic_assets_arealibrary.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=var "Glow", animLibName="", clipName="Recover L")
+    on FINISHED → In Range
+  }
+
+  var Z Pos: float = 0
+  var Z Target: float = 0
+  var Z Tween: float = 0
+  var Angle: float = 0
+  var Distance: float = 0
+  var Scrollkeeper Distance: float = 0
+  var Minion Timeout: float = 0
+  var Min Height: float = 0
+  var Close to Scrollkeeper: bool = false
+  var Did Idle Evade: bool = false
+  var Far From Scrollkeeper: bool = false
+  var Minion: bool = false
+  var Will Turn: bool = false
+  var Can Evade: bool = false
+  var Did Throw Evade: bool = false
+  var In Evade Range: bool = false
+  var Will Evade: bool = false
+  var Anim: string = ""
+  var Sprite Colour: color = (0.78431374, 0.78431374, 0.78431374, 1)
+  var Body Damager: gameObject = Scrollkeeper/Damage Collider (localpoolprefabs_assets_arealibrary.bundle)
+  var Self: gameObject = <null>
+  var Silk: gameObject = <null>
+  var Wake Range: gameObject = <null>
+  var Slam Effect: gameObject = Scrollkeeper/Slam Effect (localpoolprefabs_assets_arealibrary.bundle)
+  var Throw Point: gameObject = Lightbearer (1)/Throw Point
+  var Start Point: gameObject = Lightbearer (1)/Start Point
+  var Patrol Point: gameObject = Lightbearer (1)/Patrol Point
+  var Next Point: gameObject = <null>
+  var Scrollkeeper Point: gameObject = <null>
+  var Scrollkeeper: gameObject = <null>
+  var Glow: gameObject = Lightbearer (1)/Glow
+  var Antic Effect: gameObject = Lightbearer (1)/Antic Effect
+  var Audio Loop Voice: gameObject = Lightbearer (1)/Audio Loop Voice
+}

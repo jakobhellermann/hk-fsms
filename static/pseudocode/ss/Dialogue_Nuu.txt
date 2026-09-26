@@ -1,0 +1,532 @@
+# Dialogue
+# 1 location(s):
+#   Halfway_01 / _NPCs/Hunter Fan Control/Nuu
+
+fsm Dialogue {
+  start Init
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Nuu_Scrolls")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Audio Atmos Halfway")
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=var "Start X", y=(unset), space=0, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    ActivateTalkAnimNPC(Activate=false, StopInstantly=true, Target=Self)
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=Nuu_work_rummage_loop (sfxstatic_assets_areabone.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Writing
+  }
+
+  state Idle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    BoolTest(boolVariable=var "Queued Interact", isTrue=→"INTERACT", isFalse=(none), everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    CheckTrackTriggerCount(target=var "Turn Range", count=0, test=Equal, everyFrame=true, successEvent=→"CANCEL")
+    RandomWait(min=3, max=5, finishEvent=→"BORED", realTime=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=1.25, MaxReactDelay=1.25, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Has Met?
+    on BORED → Turn to Write Interruptable
+    on CANCEL → Turn Back Wait
+    on SING → Sing
+    on NOISE → Startle
+  }
+
+  state Meet {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataVariable(VariableName="MetHalfwayHunterFan", SetValue=true)
+    on CONVO_END → Journal Yes No
+  }
+
+  state Writing {
+    BoolTest(boolVariable=var "Queued Interact", isTrue=→"ENTER", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Write", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioPlayV2(gameObject=var "Writing Loop", volume=1, oneShotClip=var "", finishedEvent=(none))
+    CheckTrackTriggerCount(target=var "Turn Range", count=0, test=MoreThan, everyFrame=true, successEvent=→"ENTER")
+    SetBoolValue(boolVariable=var "Became Bored", boolValue=false, everyFrame=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=1.25, MaxReactDelay=1.35, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ENTER → Idle Wait
+    on INTERACT → Queue Interact
+    on SING → Sing
+    on NOISE → Turn to Idle
+  }
+
+  state Wave {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    PlayerDataVariableTest(VariableName="hasJournal", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle to Wave", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Nuu_wave (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Turn to Write
+  }
+
+  state Talk Journal Given {
+    ConvertBoolToString(boolVariable=var "Is Black Thead World", stringVariable=var "Convo Key", falseString="HUNTER_FAN_JOURNAL_GIVEN", trueString="HUNTER_FAN_JOURNAL_GIVEN_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    on CONVO_END → End Dialogue
+  }
+
+  sequence state End Dialogue {
+    ActivateGameObject(gameObject=var "CamLock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    ActivateTalkAnimNPC(Activate=false, StopInstantly=false, Target=Self)
+    on FINISHED → Get Reward?
+  }
+
+  state Has Met? {
+    CheckIsInEditor(trueEvent=→"TEST", falseEvent=(none), storeValue=(unset))  // disabled
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Black Thead World")
+    SetBoolValue(boolVariable=var "Queued Interact", boolValue=false, everyFrame=false)
+    ActivateTalkAnimNPC(Activate=true, StopInstantly=true, Target=Self)
+    PlayerDataVariableTest(VariableName="MetHalfwayHunterFan", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Act 3 Meet?
+    on TRUE → Has Journal?
+    on TEST → Final 1
+  }
+
+  state Talk Repeat {
+    ConvertBoolToString(boolVariable=var "Is Black Thead World", stringVariable=var "Convo Key", falseString="HUNTER_FAN_REPEAT", trueString="HUNTER_FAN_REPEAT_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Turn to Write {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn to Write", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=movement_wet (sfxdynamic_assets_areaboneareacoralareacrawlareagreymoorareashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=Nuu_work_rummage_loop (sfxstatic_assets_areabone.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Writing
+  }
+
+  state Idle Wait {
+    BoolTest(boolVariable=var "Queued Interact", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Became Bored", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CheckTrackTriggerCount(target=var "Turn Range", count=0, test=Equal, everyFrame=true, successEvent=→"CANCEL")
+    RandomWait(min=0.5, max=1.5, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=1, MaxReactDelay=1, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Reset Frame
+    on FINISHED → Turn to Idle
+    on SING → Sing
+    on NOISE → Turn to Idle
+  }
+
+  sequence state Journal {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    SetPlayerDataBool(boolName="hasJournal", value=true)
+    CallStaticMethod(className="EnemyJournalManager", methodName="CheckJournalAchievements", parameters=[], storeResult=(unset var), everyFrame=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (prompts_assets_all.bundle), storeObject=var "UI Msg", sprite=Journal_Prompt (atlases_assets_assets/sprites/_atlases/prompts.spriteatlas.bundle))
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Journal", everyFrame=false)
+    on GET ITEM MSG END → Talk Journal Given
+  }
+
+  state Turn to Idle {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=→"CANCEL", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Became Bored", boolValue=false, everyFrame=false)
+    AudioStopV2(gameObject=var "Writing Loop", fadeTime=0, cancelOnEarlyExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Nuu_notice (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayRandomAudioClipTable(Table=movement_wet (sfxdynamic_assets_areaboneareacoralareacrawlareagreymoorareashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn to Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+    on CANCEL → Writing
+  }
+
+  state Turn Back Wait {
+    PlayerDataVariableTest(VariableName="hasJournal", ExpectedValue=true, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=(none))
+    CheckTrackTriggerCount(target=var "Turn Range", count=0, test=MoreThan, everyFrame=true, successEvent=→"CANCEL")
+    RandomWait(min=0.3, max=0.5, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.25, MaxReactDelay=0.25, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Idle
+    on FINISHED → Wave
+    on INTERACT → Has Met?
+    on SING → Sing
+    on NOISE → Startle
+  }
+
+  state Turn to Write Interruptable {
+    SetBoolValue(boolVariable=var "Became Bored", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn to Write", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=movement_wet (sfxdynamic_assets_areaboneareacoralareacrawlareagreymoorareashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=Nuu_work_rummage_loop (sfxstatic_assets_areabone.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Writing
+    on INTERACT → Turn to Write Interrupted
+  }
+
+  state Turn to Write Interrupted {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Queue Interact
+  }
+
+  state Queue Interact {
+    SetBoolValue(boolVariable=var "Queued Interact", boolValue=true, everyFrame=false)
+    on FINISHED → Writing
+  }
+
+  state Reset Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.4, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    on FINISHED → Writing
+    on INTERACT → Queue Interact
+    on SING → Turn to Idle
+    on NOISE → Turn to Idle
+  }
+
+  state Journal Repeat {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_JOURNAL_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Journal Yes No
+  }
+
+  state Journal Yes No {
+    QuestYesNo(Quest=var "Quest", YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on TRUE → Talk Journal Give
+    on FALSE → Talk Journal Declined
+  }
+
+  state Talk Journal Declined {
+    ConvertBoolToString(boolVariable=var "Is Black Thead World", stringVariable=var "Convo Key", falseString="HUNTER_FAN_JOURNAL_DECLINED", trueString="HUNTER_FAN_JOURNAL_DECLINED_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Has Journal? {
+    PlayerDataVariableTest(VariableName="hasJournal", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Journal Repeat
+    on TRUE → Convo Choice
+  }
+
+  state Convo Choice {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Black Thead World")
+    CanEndQuestV2(RequireActive=true, CannotEndEvent=(none), CanEndEvent=→"CAN COMPLETE", StoreValue=(unset), Quest=var "Quest")
+    GetPlayerDataBool(boolName="nuuIntroAct3", storeValue=var "Black Thread Convo")
+    BoolTestMulti(boolVariables=[var "Black Thread Convo", var "Is Black Thead World"], boolStates=[false, true], trueEvent=→"ACT 3", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    GetQuestState(IsAccepted=(unset), IsCompleted=var "Quest Completed", Quest=var "Quest")
+    BoolTestMulti(boolVariables=[var "Quest Completed", var "Is Black Thead World"], boolStates=[true, false], trueEvent=→"ACT 2 COMPLETE", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REPEAT", isFalse=(none), everyFrame=false)
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=→"EVALUATE", CompletedEvent=→"COMPLETE", Quest=var "Quest")
+    on EVALUATE → Evaluate Intro
+    on REPEAT → Journal Hint
+    on COMPLETE → First Quest Completed
+    on CAN COMPLETE → Quest Completed
+    on ACT 3 → Act 3 Intro
+    on ACT 2 COMPLETE → Act 2 Complete
+  }
+
+  state Evaluate {
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=(none), CompletedEvent=→"COMPLETE", Quest=var "Quest")
+    CanEndQuestV2(RequireActive=false, CannotEndEvent=(none), CanEndEvent=→"CAN COMPLETE", StoreValue=(unset), Quest=var "Quest")
+    GetQuestInfo(TargetCount=(unset), CurrentCount=var "Quest Completion", Quest=var "Quest")
+    IntCompare(integer1=var "Quest Completion", integer2=60, equal=→"RESULT 2", lessThan=→"RESULT 1", greaterThan=→"RESULT 2", everyFrame=false)
+    on RESULT 1 → Completion 1
+    on RESULT 2 → Completion 2
+    on CAN COMPLETE → Quest Completed
+    on COMPLETE → Completion Evaluate
+  }
+
+  state Evaluate Intro {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_GREET", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    on CONVO_END → Evaluate
+  }
+
+  state Completion 1 {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_RESULT_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Completion 2 {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_RESULT_2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Full Completion 1 {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_COMPLETION_RESULT_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Quest Completed {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_JOURNAL_COMPLETE_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    on CONVO_END → Kiss Start
+  }
+
+  sequence state Complete Quest {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    EndQuest(ConsumeCurrency=false, Quest=var "Quest")
+    SetBoolValue(boolVariable=var "Get Reward", boolValue=true, everyFrame=false)
+    ActivateTalkAnimNPC(Activate=true, StopInstantly=false, Target=Self)
+    on FINISHED → Complete Convo 4
+  }
+
+  state Get Reward? {
+    BoolTest(boolVariable=var "Get Reward", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Get Reward", boolValue=false, everyFrame=false)
+    GetQuestReward(StoreReward=var "Reward", Quest=var "Quest")
+    SavedItemGet(Item=var "Reward")
+    on FINISHED → Idle
+  }
+
+  state Kiss Start {
+    ActivateTalkAnimNPC(Activate=false, StopInstantly=false, Target=Self)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.4, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Kiss", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Nuu_kiss_approach (sfxdynamic_assets_areacoral.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Kiss Move
+  }
+
+  state Sing {
+    PlayRandomAudioClipTable(Table=movement_wet (sfxdynamic_assets_areaboneareacoralareacrawlareagreymoorareashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioStopV2(gameObject=var "Writing Loop", fadeTime=0, cancelOnEarlyExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.65, MaxReactDelay=0.75, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Nuu_sing (sfxdynamic_assets_areacoral.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=movement_wet (sfxdynamic_assets_areaboneareacoralareacrawlareagreymoorareashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Idle
+  }
+
+  state Startle {
+    PlayRandomAudioClipTable(Table=movement_wet (sfxdynamic_assets_areaboneareacoralareacrawlareagreymoorareashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioStopV2(gameObject=var "Writing Loop", fadeTime=0, cancelOnEarlyExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Wait(time=0.5, finishEvent=→"CANCEL", realTime=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Nuu_startle (sfxdynamic_assets_areacoral.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on CANCEL → Sing End
+  }
+
+  state Kiss Move {
+    Translate(gameObject=Self, vector=(unset), x=0.3, y=(unset), z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Slap Antic
+  }
+
+  state Slap Antic {
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_1 (herosfxstatic_assets_all.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Translate(gameObject=Self, vector=(unset), x=0.3, y=(unset), z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    CallStaticMethod(className="HeroTalkAnimation", methodName="SetBlocked", parameters=[true], storeResult=(unset var), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Idle Slap", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Slap
+  }
+
+  state Slap {
+    PlayAudioEvent(audioClip=hornet_slap_B_2 (sfxstatic_assets_areabellareacoralareagreymoorareashellwoodareasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Nuu_kiss_hit (sfxdynamic_assets_areacoral.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Slap (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Slap", emit=0, resetIfPlaying=false)
+    CallMethodProper(gameObject=Self, behaviour="SpriteFlash", methodName="FlashEnemyHit", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slapped")
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Start X", localSpace=false, time=0.05, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    on FINISHED → Slapped Pause
+  }
+
+  state Slapped Pause {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallStaticMethod(className="HeroTalkAnimation", methodName="SetBlocked", parameters=[false], storeResult=(unset var), everyFrame=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Complete Convo 1
+  }
+
+  state Complete Convo 1 {
+    SetNPCSpeakingAudioTable(Target=Self, Table=Nuu_talk_after_hit (sfxdynamic_assets_areacoral.bundle))
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_JOURNAL_COMPLETE_2", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slapped Talk")
+    on CONVO_END → Complete Convo 3
+  }
+
+  state Complete Convo 3 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slap Recover")
+    SetNPCSpeakingAudioTable(Target=Self, Table=Nuu_talk (sfxdynamic_assets_areacoral.bundle))
+    PlayRandomAudioClipTable(Table=movement_wet (sfxdynamic_assets_areaboneareacoralareacrawlareagreymoorareashellwood.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_JOURNAL_COMPLETE_3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Complete Quest
+  }
+
+  state Complete Convo 4 {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_JOURNAL_COMPLETE_4", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Completion Evaluate {
+    GetPlayerDataBool(boolName="nuuMementoAwarded", storeValue=var "Memento Awarded")
+    GetPlayerDataVariable(VariableName="JournalIsCompleted", StoreValue=var "Journal Is Completed")
+    BoolTestMulti(boolVariables=[var "Journal Is Completed", var "Memento Awarded"], boolStates=[true, false], trueEvent=→"COMPLETED ALL", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    GetPlayerDataVariable(VariableName="JournalCompletedCount", StoreValue=var "Journal Completed Count")
+    IntCompare(integer1=var "Journal Completed Count", integer2=120, equal=(none), lessThan=→"RESULT 1", greaterThan=→"RESULT 2", everyFrame=false)
+    on RESULT 1 → Full Completion 1
+    on RESULT 2 → Full Completion 2
+    on COMPLETED ALL → Final 1
+    on FINISHED → Full Completion 1
+  }
+
+  state Full Completion 2 {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_COMPLETION_RESULT_2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Final 1 {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_FINAL_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Memento
+  }
+
+  state Act 3 Intro {
+    SetPlayerDataBool(boolName="nuuIntroAct3", value=true)
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_INTRO_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Talk Journal Give {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_JOURNAL_GIVE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    on CONVO_END → Journal
+  }
+
+  sequence state Give Memento {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.7, finishEvent=(none), realTime=false)
+    SetPlayerDataBool(boolName="nuuMementoAwarded", value=true)
+    CollectableItemCollect(Amount=1, Item=Hunter Memento (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    AwardAchievementProgress(Key="JOURNAL_FULL", CurrentValue=(unset), MaxValue=(unset))
+    Wait(time=2.5, finishEvent=(none), realTime=false)
+    on FINISHED → Final 2
+  }
+
+  state Act 2 Complete {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_JOURNAL_COMPLETE_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state First Quest Completed {
+    BoolTest(boolVariable=var "Is Black Thead World", isTrue=→"ACT 3", isFalse=→"FINISHED", everyFrame=false)
+    on ACT 3 → Evaluate Intro
+    on FINISHED → Act 2 Complete
+  }
+
+  state Final 2 {
+    SetProperty(targetProperty=NpcDialogueTitle.enabled on _NPCs/Hunter Fan Control/Nuu@NpcDialogueTitle, everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_FINAL_2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Pack Up
+  }
+
+  sequence state Pack Up {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.75)
+    TransitionToAudioSnapshot(snapshot=at None (audioobjects_assets_all.bundle), transitionTime=1)
+    SendEventToRegister(eventName="REST AREA MUSIC STOP FAST")
+    FadeAudio(gameObject=var "Audio Atmos Halfway", startVolume=1, endVolume=0, time=1)
+    Wait(time=1, finishEvent=(none), realTime=false)  // disabled
+    PlayAudioEvent(audioClip=on_black_scrolls_unfurling_2d (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=3, finishEvent=(none), realTime=false)
+    on FINISHED → Footsteps
+  }
+
+  sequence state Footsteps {
+    ActivateGameObject(gameObject=var "Nuu_Scrolls", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "CamLock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=0, functionCall=FaceRight())
+    AudioPlaySimple(gameObject=var "Audio Loop Footsteps", volume=1, oneShotClip=<null>)
+    FadeAudio(gameObject=var "Audio Loop Footsteps", startVolume=1, endVolume=0, time=2)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Fade Up
+  }
+
+  state Fade Up {
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=1)
+    SendEventToRegister(eventName="REST AREA MUSIC START")
+    TransitionToAudioSnapshot(snapshot=at Layer 3 Muffled (audioobjects_assets_all.bundle), transitionTime=1)
+    FadeAudio(gameObject=var "Audio Atmos Halfway", startVolume=0, endVolume=1, time=1)
+    on FINISHED → Return Control
+  }
+
+  sequence state Return Control {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Act 3 Meet? {
+    BoolTest(boolVariable=var "Is Black Thead World", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SetPlayerDataVariable(VariableName="MetHalfwayHunterFan", SetValue=true)
+    Comment(comment="Set nuuIntroAct3 to skip intro")
+    SetPlayerDataVariable(VariableName="nuuIntroAct3", SetValue=true)
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_MEET_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Journal Yes No
+    on CANCEL → Meet
+  }
+
+  state Journal Hint {
+    BoolTest(boolVariable=var "Hint Spoken", isTrue=→"FINISHED", isFalse=(none), everyFrame=true)
+    Comment(comment="Logic Below should only ever run once")
+    SetBoolValue(boolVariable=var "Hint Spoken", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Is Black Thead World", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    GetPlayerDataVariable(VariableName="JournalCompletedCount", StoreValue=var "Journal Completed Count")
+    IntCompare(integer1=var "Journal Completed Count", integer2=120, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    PlayerDataBoolTest(boolName="visitedWisp", isTrue=(none), isFalse=→"HINT_WISP")
+    GetJournalKillData(Record=Blue Assistant (dataassets_assets_assets/dataassets/enemyjournal/journalrecords.bundle), KillCount=(unset), IsKilled=(unset), IsCompleted=var "Is Complete", KilledEvent=(none), CompletedEvent=(none))
+    BoolTest(boolVariable=var "Is Complete", isTrue=(none), isFalse=→"HINT_ZANGO", everyFrame=false)
+    PlayerDataBoolTest(boolName="defeatedZapCoreEnemy", isTrue=(none), isFalse=→"HINT_VOLTNEST")
+    PlayerDataBoolTest(boolName="defeatedGreyWarrior", isTrue=(none), isFalse=→"HINT_GREYWARRIOR")
+    on FINISHED → Talk Repeat
+    on HINT_ZANGO → Zango Dialogue
+    on HINT_VOLTNEST → Voltnest Dialogue
+    on HINT_GREYWARRIOR → Greywarrior Dialogue
+    on HINT_WISP → Wisp Dialogue
+  }
+
+  state Zango Dialogue {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_HINT_ZANGO", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Voltnest Dialogue {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_HINT_VOLTNEST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Greywarrior Dialogue {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_HINT_GREYWARRIOR", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Wisp Dialogue {
+    RunDialogue(Sheet="Wanderers", Key="HUNTER_FAN_HINT_WISP", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  var Start X: float = 0
+  var Journal Completed Count: int = 0
+  var Quest Completion: int = 0
+  var Became Bored: bool = false
+  var Black Thread Convo: bool = false
+  var Get Reward: bool = false
+  var Is Black Thead World: bool = false
+  var Journal Is Completed: bool = false
+  var Memento Awarded: bool = false
+  var Quest Completed: bool = false
+  var Queued Interact: bool = false
+  var Spoken: bool = false
+  var Hint Spoken: bool = false
+  var Is Complete: bool = false
+  var Convo Key: string = ""
+  var Turn Range: gameObject = _NPCs/Hunter Fan Control/Nuu/Turn Range
+  var UI Msg: gameObject = <null>
+  var CamLock: gameObject = _NPCs/Hunter Fan Control/Nuu/CamLock
+  var Pt Slap: gameObject = _NPCs/Hunter Fan Control/Nuu/Pt Slap
+  var Writing Loop: gameObject = _NPCs/Hunter Fan Control/Nuu/Writing Loop
+  var Parent: gameObject = <null>
+  var Nuu_Scrolls: gameObject = <null>
+  var Audio Atmos Halfway: gameObject = <null>
+  var Audio Loop Footsteps: gameObject = _NPCs/Hunter Fan Control/Nuu/Audio Loop Footsteps
+  var Audio Loop Voice: gameObject = _NPCs/Hunter Fan Control/Nuu/Audio Loop Voice
+  var Quest: object = Journal (dataassets_assets_assets/dataassets/questsystem/quests.bundle)
+  var Reward: object = <null>
+}

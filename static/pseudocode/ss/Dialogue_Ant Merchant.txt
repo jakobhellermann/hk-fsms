@@ -1,0 +1,151 @@
+# Dialogue
+# 1 location(s):
+#   Ant_Merchant / _NPCs/Ant Merchant States/Ant Merchant
+
+fsm Dialogue {
+  start Init
+
+  state Init {
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hit Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayerDataVariableTest(VariableName="MetAntMerchant", ExpectedValue=true, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=(none))
+    CallMethodProper(gameObject=Self, behaviour="PlayMakerNPC", methodName="set_InteractLabel", parameters=[enum(1)], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=var "Is Hero Right", Target=Self)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=2, MaxReactDelay=2, None=(none), ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=var "Performance State", EveryFrame=true)
+    EnumCompare(enumVariable=var "Performance State", compareTo=ActiveInner, equalEvent=(none), notEqualEvent=(none), storeResult=var "Is Active Inner", everyFrame=true)
+    EnumCompare(enumVariable=var "Performance State", compareTo=ActiveOuter, equalEvent=(none), notEqualEvent=(none), storeResult=var "Is Active Outer", everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Is Active Inner", var "Is Active Outer"], sendEvent=(none), storeResult=var "Is In Performance Region", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Is In Performance Region", var "Can Sing React"], sendEvent=→"SING", storeResult=(unset), everyFrame=true)
+    on INTERACT → Met?
+    on SING → Sing
+    on ATTACKED → Block
+    on HIT MERCHANT HANG → Quick Dig
+    on STARTLE → Quick Dig
+  }
+
+  state End {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Is Hero Right", leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Sing {
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.75, MaxReactDelay=0.75, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayEnemySingAudio(gameObject=var "Audio Loop Sing", singAudioTable=bone_hunter_sing (sfxdynamic_assets_areaant.bundle))
+    ShowNeedolinTextForOwnerInState(Target=Self)
+    on CANCEL → Sing End
+  }
+
+  state Shop Up {
+    GetShopObject(StoreObject=var "Shop Object", Target=Self)
+    SendEventByName(eventTarget=GameObject(var "Shop Object"), sendEvent="SHOP UP", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on SHOP CLOSED → End
+    on SHOP NO STOCK → End
+  }
+
+  state Dig Away {
+    ActivateGameObject(gameObject=var "Hit Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig Away", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEffectsInState(Target=_NPCs/Ant Merchant States/Ant Merchant/Dig Particles, StartDelay=0)
+    PlayAudioEvent(audioClip=hunter_child_dive_underground (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Inert
+  }
+
+  state Inert {
+    SetMeshRenderer(gameObject=Self, active=false)
+    TriggerEnterEventSubscribe(trigger=_NPCs/Ant Merchant States/Ant Merchant/Exit Respawn Detector@TriggerEnterEvent, triggerEnteredEvent=(none), triggerExitedEvent=→"EXIT", triggerStayedEvent=(none))
+    on EXIT → Reappear
+  }
+
+  state Met? {
+    PlayerDataVariableTest(VariableName="MetAntMerchant", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"MEET")
+    BoolTest(boolVariable=var "Spoken", isTrue=(none), isFalse=→"GENERIC", everyFrame=false)
+    on MEET → Meet
+    on GENERIC → Repeat
+    on FINISHED → Play Voice
+  }
+
+  state Meet {
+    SetPlayerDataVariable(VariableName="MetAntMerchant", SetValue=true)
+    CallMethodProper(gameObject=Self, behaviour="PlayMakerNPC", methodName="set_InteractLabel", parameters=[enum(6)], storeResult=(unset var), EveryFrame=false)
+    RunDialogue(Sheet="Wilds", Key="ANT_MERCHANT_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Convo End
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Wilds", Key="ANT_MERCHANT_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Convo End
+  }
+
+  state Block {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Rest Animation"), sendEvent="FORCE END REST", delay=0, everyFrame=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Block Attack", AnimationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Sing", audioClipTable=ant_merchant_talk (sfxdynamic_assets_areaant.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Wait
+  }
+
+  state Wait {
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    on FINISHED → Dig Away
+  }
+
+  state Quick Dig {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Rest Animation"), sendEvent="FORCE END REST", delay=0, everyFrame=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Sing", audioClipTable=ant_merchant_talk (sfxdynamic_assets_areaant.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Dig Away
+  }
+
+  state Reappear {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Hit Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Convo End {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    on FINISHED → Shop Up
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Idle
+  }
+
+  state Play Voice {
+    AudioPlayRandomVoiceFromTable(gameObject=_NPCs/Ant Merchant States/Ant Merchant/Audio Loop Voice, audioClipTable=ant_merchant (sfxdynamic_assets_areaant.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=true)
+    on FINISHED → Shop Up
+  }
+
+  var Can Sing React: bool = false
+  var Is Active Inner: bool = false
+  var Is Active Outer: bool = false
+  var Is In Performance Region: bool = false
+  var Spoken: bool = false
+  var Is Hero Right: bool = true
+  var Shop Camlock: gameObject = _NPCs/Ant Merchant States/Ant Merchant/Shop Camlock
+  var Shop Object: gameObject = <null>
+  var Audio Loop Sing: gameObject = _NPCs/Ant Merchant States/Ant Merchant/Audio Loop Sing
+  var Hit Detector: gameObject = _NPCs/Ant Merchant States/Ant Merchant/Attack Blocker
+  var Performance State: enum = HeroPerformanceRegion+AffectedState(0)
+}

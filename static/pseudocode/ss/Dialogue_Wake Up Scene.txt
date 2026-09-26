@@ -1,0 +1,121 @@
+# Dialogue
+# 1 location(s):
+#   Room_Diving_Bell_Abyss / Wake Up Scene
+
+fsm Dialogue {
+  start Pause
+  on TEST → Take Control  // from any state
+  on START ENTRY → Door Entry  // from any state
+
+  state Pause {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    ActivateGameObject(gameObject=var "Activate On First Enter", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPlayerDataBool(boolName="visitedAbyss", storeValue=var "Visited Abyss")
+    ActivateGameObject(gameObject=var "Gramaphone Revisit", activate=var "Visited Abyss", recursive=false, resetOnExit=false, everyFrame=false)
+    BoolFlip(boolVariable=var "Visited Abyss")
+    ActivateGameObject(gameObject=var "Gramaphone", activate=var "Visited Abyss", recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Skip to repeat if visited
+  }
+
+  state Door Entry {
+    ActivateGameObject(gameObject=var "Activate On First Enter", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPlayerDataBool(boolName="visitedAbyss", storeValue=var "Visited Abyss")
+    ActivateGameObject(gameObject=var "Gramaphone Revisit", activate=var "Visited Abyss", recursive=false, resetOnExit=false, everyFrame=false)
+    BoolFlip(boolVariable=var "Visited Abyss")
+    ActivateGameObject(gameObject=var "Gramaphone", activate=var "Visited Abyss", recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISH ENTRY → Take Control
+  }
+
+  state Take Control {
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="WAKE ON GROUND START")
+    on FINISHED → Set Respawn
+  }
+
+  state Wait {
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=2)
+    ScreenFaderAlpha(EndAlpha=1, Duration=1)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Black Dlg
+  }
+
+  state Fade Up {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Prostrate", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ScreenFaderAlpha(EndAlpha=0, Duration=3)
+    Wait(time=4, finishEvent=→"FINISHED", realTime=false)
+    SendEventToRegister(eventName="THREAD BELL PRE DESTROY")
+    on FINISHED → Get Up Wait
+  }
+
+  sequence state Get Up {
+    RunFSM(fsmTemplateControl=template=-4922903412483150305 in[Slow<-false], finishEvent=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="WAKE ON GROUND GETUP")
+    on FINISHED → Save
+  }
+
+  state Save {
+    SaveGame()
+    SendEventToRegister(eventName="WAKE ON GROUND END")
+    SetPropertyV2(TargetProperty=PlayMakerNPC.HeroAnimBegin on Wake Up Scene/Gramaphone Talk@PlayMakerNPC, EveryFrame=false, ResetOnExit=false)
+    on FINISHED → End 2
+  }
+
+  state Set Respawn {
+    SetDeathRespawnMarker(Target=Wake Up Scene/RestBench)
+    on FINISHED → Wait
+  }
+
+  state Get Up Wait {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Up
+  }
+
+  state Black Dlg {
+    SetPropertyV2(TargetProperty=PlayMakerNPC.HeroAnimBegin on Wake Up Scene/Gramaphone Talk@PlayMakerNPC, EveryFrame=false, ResetOnExit=false)
+    RunDialogue(Sheet="Forge", Key="BALLOW_DIVING_BELL_ABYSS_BLACK", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "Gramaphone Talk")
+    on CONVO_END → Black Wait
+  }
+
+  sequence state Black Wait {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=var "Gramaphone Talk", UseChildren=false)
+    Wait(time=2, finishEvent=(none), realTime=false)
+    on FINISHED → Fade Up
+  }
+
+  state Idle {
+    on INTERACT → Talk Dlg
+  }
+
+  state Talk Dlg {
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Dlg", falseString="BALLOW_DIVING_BELL_ABYSS", trueString="BALLOW_DIVING_BELL_ABYSS_REPEAT", everyFrame=false)
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Forge", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TextAlignmentOptions(0), OffsetY=0, Target=var "Gramaphone Talk")
+    BoolOperator(bool1=false, bool2=false, operation=AND, storeResult=(unset), everyFrame=false)
+    on CONVO_END → End 2
+  }
+
+  state End 2 {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=var "Gramaphone Talk", UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  sequence state Skip to repeat if visited {
+    PlayerDataBoolTest(boolName="visitedAbyss", isTrue=(none), isFalse=→"FINISHED")
+    Comment(comment="Wait a frame to allow for persistent bool to update")
+    NextFrameEvent(sendEvent=(none))
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Activated: bool = false
+  var Visited Abyss: bool = false
+  var Dlg: string = ""
+  var Activate On First Enter: gameObject = Wake Up Scene/First Enter Effects
+  var Self: gameObject = <null>
+  var Gramaphone Talk: gameObject = Wake Up Scene/Gramaphone Talk
+  var Gramaphone: gameObject = Wake Up Scene/Gramaphone
+  var Gramaphone Revisit: gameObject = Wake Up Scene/Gramaphone Revist
+}

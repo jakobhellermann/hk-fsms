@@ -1,0 +1,1241 @@
+# FSM
+# 6 location(s):
+#   Fungus2_08 / Ruins_front_gate/Ruins_gate_0005_a
+#   Fungus2_23 / Waterways Gate
+#   Fungus2_31 / Mantis Chest (1)/Opened
+#   Fungus2_31 / Mantis Chest (2)/Opened
+#   Fungus2_31 / Mantis Chest/Opened
+#   Fungus2_31 / Lords Undefeated Group/Gate
+
+// uses template: health_manager_enemy
+fsm FSM {
+  start Init Pause
+  on KILL ALL ENEMIES → Kill All  // from any state
+  on INSTA KILL → Pause  // from any state
+  on INVULN → Invulnerable  // from any state
+  on FORCE KILL → Unset Special Death  // from any state
+
+  state Detecting {
+    SetScale(gameObject=var "Corpse Instance", vector=(unset), x=1, y=1, z=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Corpse Instance", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on TAKE DAMAGE → Get Damager Parameters
+    on EXTRA KILL → Pause
+  }
+
+  state Decrement Health {
+    IntOperator(integer1=var "HP", integer2=var "Attack Strength", operation=Subtract, storeResult=var "HP", everyFrame=false)
+    IntCompare(integer1=var "HP", integer2=0, equal=→"ZERO HP", lessThan=→"ZERO HP", greaterThan=(none), everyFrame=false)
+    on ZERO HP → Pause
+    on FINISHED → Invulnerable
+  }
+
+  state Destroy {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent=var "Death Broadcast Event", delay=0, everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=var "Snapshot On Death", transitionTime=6)
+    BoolTest(boolVariable=var "Recycle", isTrue=→"RECYCLE", isFalse=(none), everyFrame=false)
+    DestroySelf(detachChildren=false)
+    on RECYCLE → Recycle
+  }
+
+  state Invulnerable {
+    BoolTest(boolVariable=var "Ignore Invuln", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Play Animation", isTrue=→"PLAY ANIM", isFalse=(none), everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Detecting
+    on PLAY ANIM → Play Anim
+    on CANCEL → Detecting
+    on END ALL INVULN → Detecting
+    on EXTRA KILL → Pause
+  }
+
+  state Initiate {
+    GetOwner(storeGameObject=var "Self")
+    GetTag(gameObject=var "Self", storeResult=var "Tag", everyFrame=false)
+    BoolTest(boolVariable=var "Activated", isTrue=→"ACTIVATE", isFalse=(none), everyFrame=false)
+    SetGameObject(variable=var "Camera", gameObject=var "CameraParent", everyFrame=false)
+    SetGameObject(variable=var "Hero Object", gameObject=var "Hero", everyFrame=false)
+    GetScale(gameObject=var "Self", vector=(unset), xScale=var "X Scale", yScale=var "Y Scale", zScale=(unset), space=0, everyFrame=false)
+    CreateObject(gameObject=var "Corpse", spawnPoint=var "Self", position=var "Corpse Spawn Point", rotation=(unset), storeObject=var "Corpse Instance", networkInstantiate=false, networkGroup=0)
+    SetParent(gameObject=var "Corpse Instance", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetScale(gameObject=var "Corpse Instance", vector=(unset), x=1, y=1, z=1, everyFrame=false, lateUpdate=false)
+    BoolTest(boolVariable=var "Corpse Faces Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Corpse Faces Right
+    on FALSE → Corpse Faces Left
+    on ACTIVATE → Activated
+  }
+
+  state Get Damager Parameters {
+    GetEventSender(sentByGameObject=var "Damager")
+    GetTag(gameObject=var "Damager", storeResult=var "Damager Tag", everyFrame=false)
+    GetFsmFloat(gameObject=var "Damager", fsmName="damages_enemy", variableName="direction", storeValue=var "Attack Direction", everyFrame=false)
+    GetFsmBool(gameObject=var "Damager", fsmName="damages_enemy", variableName="Ignore Invuln", storeValue=var "Ignore Invuln", everyFrame=false)
+    GetFsmFloat(gameObject=var "Damager", fsmName="damages_enemy", variableName="magnitudeMult", storeValue=var "Attack Magnitude", everyFrame=false)
+    GetFsmInt(gameObject=var "Damager", fsmName="damages_enemy", variableName="attackType", storeValue=var "Attack Type", everyFrame=false)
+    GetFsmInt(gameObject=var "Damager", fsmName="damages_enemy", variableName="damageDealt", storeValue=var "Attack Strength", everyFrame=false)
+    GetFsmBool(gameObject=var "Damager", fsmName="damages_enemy", variableName="circleDirection", storeValue=var "Circle Direction", everyFrame=false)
+    GetFsmFloat(gameObject=var "Damager", fsmName="damages_enemy", variableName="Multiplier", storeValue=var "Attack Multiplier", everyFrame=false)
+    FloatCompare(float1=var "Attack Multiplier", float2=1, tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Attack Strength", floatVariable=var "Damage Float", everyFrame=false)
+    FloatMultiply(floatVariable=var "Damage Float", multiplyBy=var "Attack Multiplier", everyFrame=false)
+    ConvertFloatToInt(floatVariable=var "Damage Float", intVariable=var "Attack Strength", rounding=Nearest, everyFrame=false)
+    on FINISHED → Acid Skip
+  }
+
+  state Enemy Type {
+    IntSwitch(intVariable=var "Enemy Type", compareTo=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], sendEvent=[→"INFECTED", →"UNINFECTED", →"GHOST", →"SHADE", →"SMALL INFECTED", →"LARGE INFECTED", →"ARMOURED", →"BUBBLE", →"NO EFFECT", →"BLACK KNIGHT", →"DUNG"], everyFrame=false)
+    on INFECTED → Damage FX Infected
+    on SMALL INFECTED → Small
+    on LARGE INFECTED → Damage FX Large Inf
+    on ARMOURED → Damage FX Armoured
+    on BUBBLE → Decrement Health
+    on NO EFFECT → Decrement Health
+    on BLACK KNIGHT → Damage FX B Knight
+    on DUNG → 
+    on GHOST → Damage FX Ghost
+    on UNINFECTED → Damage FX Uninfected
+  }
+
+  state Damage FX Infected {
+    SendMessage(gameObject=var "Self", delivery=SendMessage, options=1, functionCall=flashInfected())
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="DAMAGE FLASH", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=0.75, pitchMax=1.25, volume=1, delay=0, storePlayer=<null>)
+    SpawnObjectFromGlobalPool(gameObject=Hit Flash Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on RIGHT → Infected Right
+    on LEFT → Infected Left
+    on UP → Infected Up
+    on DOWN → Infected Down
+  }
+
+  state Infected Right {
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=3, spawnMax=4, speedMin=10, speedMax=15, angleMin=120, angleMax=150, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=5, spawnMax=8, speedMin=10, speedMax=20, angleMin=30, angleMax=60, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Med (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(0, 90, 270), storeObject=var "")
+    on FINISHED → Decrement Health
+  }
+
+  state Infected Left {
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=3, spawnMax=4, speedMin=10, speedMax=15, angleMin=30, angleMax=60, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=5, spawnMax=8, speedMin=10, speedMax=20, angleMin=120, angleMax=150, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Med (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(180, 90, 270), storeObject=var "")
+    on FINISHED → Decrement Health
+  }
+
+  state Spawn Geo {
+    FlingObjectsFromGlobalPool(gameObject=Geo Small (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=var "Geo Small", spawnMax=var "Geo Small", speedMin=var "Geo Spawn Speed Min", speedMax=var "Geo Spawn Speed Max", angleMin=var "Geo Spawn Angle Min", angleMax=var "Geo Spawn Angle Max", originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Geo Med (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=var "Geo Medium", spawnMax=var "Geo Medium", speedMin=var "Geo Spawn Speed Min", speedMax=var "Geo Spawn Speed Max", angleMin=var "Geo Spawn Angle Min", angleMax=var "Geo Spawn Angle Max", originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Geo Large (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=var "Geo Large", spawnMax=var "Geo Large", speedMin=var "Geo Spawn Speed Min", speedMax=var "Geo Spawn Speed Max", angleMin=var "Geo Spawn Angle Min", angleMax=var "Geo Spawn Angle Max", originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → GeoDropUp Glass
+  }
+
+  state Infected Up {
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=5, spawnMax=8, speedMin=18, speedMax=25, angleMin=80, angleMax=100, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Med (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(270, 90, 270), storeObject=var "")
+    on FINISHED → Decrement Health
+  }
+
+  state Infected Down {
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=3, spawnMax=4, speedMin=10, speedMax=20, angleMin=140, angleMax=180, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=3, spawnMax=4, speedMin=10, speedMax=20, angleMin=360, angleMax=400, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Med (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(-72.5, -180, -180), storeObject=var "")
+    on FINISHED → Decrement Health
+  }
+
+  state Attack Type {
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="HIT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Damager"), sendEvent="HIT LANDED", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="TOOK DAMAGE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Send HIT to"), sendEvent="HIT", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "spellBurn", boolValue=false, everyFrame=false)
+    SendEvent(eventTarget=GameObject(var "Self"), sendEvent=→"BEGIN RECOIL", delay=0, everyFrame=false)
+    IntSwitch(intVariable=var "Attack Type", compareTo=[0, 1, 2, 3, 4, 5, 6, 7], sendEvent=[→"NAIL", →"GENERIC", →"SPELL", →"ACID", →"SPLATTER", →"WATER", →"SHARP SHADOW", →"BEAM"], everyFrame=false)
+    on NAIL → MP Charge
+    on GENERIC → Attack FX Generic
+    on SPELL → Attack FX Spell
+    on ACID → Decrement Health
+    on SPLATTER → Decrement Health
+    on WATER → Decrement Health
+    on SHARP SHADOW → Attack FX Sharp Shadow
+    on BEAM → Attack FX Nail
+  }
+
+  state Attack FX Nail {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="NAIL DAMAGE", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Freeze Moment", boolValue=true, everyFrame=false)
+    GetMidPoint(gameObject=var "Self", target=var "Damager", midPoint=var "Midpoint", everyFrame=false)
+    Vector3Add(vector3Variable=var "Midpoint", addVector=var "Effect Origin", everyFrame=false, perSecond=false)
+    CreateObject(gameObject=Strike Nail (sharedassets6.assets), spawnPoint=<null>, position=var "Midpoint", rotation=(unset), storeObject=var "Hit Effect", networkInstantiate=false, networkGroup=0)  // disabled
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (resources.assets), spawnPoint=<null>, position=var "Midpoint", rotation=(unset), storeObject=var "Hit Effect")
+    SpawnObjectFromGlobalPool(gameObject=Slash Impact R (resources.assets), spawnPoint=<null>, position=var "Midpoint", rotation=(unset), storeObject=var "Hit Effect")
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on LEFT → Nail Left
+    on RIGHT → Nail Right
+    on UP → Nail Up
+    on DOWN → Nail Down
+  }
+
+  state Enemy Type Death {
+    IntSwitch(intVariable=var "Attack Type", compareTo=[3], sendEvent=[→"ACID"], everyFrame=false)
+    IntSwitch(intVariable=var "Enemy Type", compareTo=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], sendEvent=[→"INFECTED", →"UNINFECTED", →"GHOST", →"SHADE", →"SMALL INFECTED", →"LARGE INFECTED", →"SHADE", →"BUBBLE", →"NO EFFECT", →"BLACK KNIGHT", →"DUNG"], everyFrame=false)
+    on INFECTED → Death FX Infected
+    on SMALL INFECTED → Death FX Small Infected
+    on LARGE INFECTED → Death FX Inf Large
+    on BUBBLE → Death FX Bubble
+    on NO EFFECT → Corpse Pause
+    on ACID → 
+    on BLACK KNIGHT → Death FX B Knight
+    on DUNG → Death FX Dung
+    on GHOST → Corpse Pause
+    on UNINFECTED → Death FX Uninfected
+  }
+
+  state Death FX Infected {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_death_sword (resources.assets), pitchMin=0.75, pitchMax=1.25, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=0.75, pitchMax=1.25, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Corpse Instance", delivery=SendMessage, options=1, functionCall=flashInfected())
+    SpawnObjectFromGlobalPool(gameObject=Death Wave Infected R (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect")
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=1.25, y=1.25, z=(unset), everyFrame=false, lateUpdate=false)
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=8, spawnMax=10, speedMin=15, speedMax=20, angleMin=0, angleMax=360, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    SpawnObjectFromGlobalPool(gameObject=Death Puff Med (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on LEFT → Infected Left Death
+    on RIGHT → Infected Right Death
+    on DOWN → Infected Down Death
+    on UP → Infected Up Death
+  }
+
+  state Infected Right Death {
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=5, speedMin=15, speedMax=20, angleMin=40, angleMax=55, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Inf Shake?
+  }
+
+  state Infected Left Death {
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=5, speedMin=15, speedMax=20, angleMin=125, angleMax=140, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Inf Shake?
+  }
+
+  state Infected Up Death {
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=5, speedMin=18, speedMax=25, angleMin=80, angleMax=100, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Inf Shake?
+  }
+
+  state Infected Down Death {
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=18, speedMax=25, angleMin=360, angleMax=400, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=18, speedMax=25, angleMin=140, angleMax=180, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Inf Shake?
+  }
+
+  state Spawn Corpse {
+    SetParent(gameObject=var "Corpse Instance", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Corpse Instance", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Corpse Instance", fsmName="corpse", variableName="spellBurn", setValue=var "spellBurn", everyFrame=false)
+    on FINISHED → Rotate?
+  }
+
+  state Fling Corpse Right {
+    SetVelocityAsAngle(gameObject=var "Corpse Instance", angle=var "Corpse Arc Right", speed=var "Corpse Fling Speed", everyFrame=false)
+    SetScale(gameObject=var "Corpse Instance", vector=(unset), x=var "Face Left Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Enemy Type Death
+  }
+
+  state Fling Corpse Left {
+    SetVelocityAsAngle(gameObject=var "Corpse Instance", angle=var "Corpse Arc Left", speed=var "Corpse Fling Speed", everyFrame=false)
+    SetScale(gameObject=var "Corpse Instance", vector=(unset), x=var "Face Right Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Enemy Type Death
+  }
+
+  state Fling Corpse Up {
+    FloatMultiply(floatVariable=var "Corpse Fling Speed", multiplyBy=1.3, everyFrame=false)
+    RandomFloat(min=75, max=105, storeResult=var "Chooser")
+    SetVelocityAsAngle(gameObject=var "Corpse Instance", angle=var "Chooser", speed=var "Corpse Fling Speed", everyFrame=false)
+    on FINISHED → Enemy Type Death
+  }
+
+  state Fling Corpse Down {
+    FloatMultiply(floatVariable=var "Corpse Fling Speed", multiplyBy=2, everyFrame=false)  // disabled
+    SetVelocityAsAngle(gameObject=var "Corpse Instance", angle=270, speed=var "Corpse Fling Speed", everyFrame=false)
+    on FINISHED → Enemy Type Death
+  }
+
+  state Small {
+    on FINISHED → Decrement Health
+  }
+
+  state Death FX Small Infected {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_death_sword (resources.assets), pitchMin=1.2, pitchMax=1.4, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=1.2, pitchMax=1.4, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    SpawnObjectFromGlobalPool(gameObject=Death Wave Infected Sml, spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect")
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=0.5, y=0.5, z=(unset), everyFrame=false, lateUpdate=false)
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=8, spawnMax=10, speedMin=15, speedMax=20, angleMin=0, angleMax=360, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    SendEventByName(eventTarget=Self, sendEvent="FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Centipede Spawner
+  }
+
+  state Corpse Faces Right {
+    GetScale(gameObject=var "Corpse Instance", vector=(unset), xScale=var "Face Left Scale", yScale=(unset), zScale=(unset), space=1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Face Right Scale", floatValue=var "Face Left Scale", everyFrame=false)
+    FloatMultiply(floatVariable=var "Face Left Scale", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Detecting
+  }
+
+  state Corpse Faces Left {
+    GetScale(gameObject=var "Corpse Instance", vector=(unset), xScale=var "Face Left Scale", yScale=(unset), zScale=(unset), space=1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Face Right Scale", floatValue=var "Face Left Scale", everyFrame=false)
+    FloatMultiply(floatVariable=var "Face Right Scale", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Detecting
+  }
+
+  state Damage FX Large Inf {
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="DAMAGE FLASH", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Self", delivery=SendMessage, options=1, functionCall=flashInfected())
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=0.65, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SpawnObjectFromGlobalPool(gameObject=Hit Flash Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on RIGHT → Large Inf Right
+    on LEFT → Large Inf Left
+    on UP → Large Inf Up
+    on DOWN → Large Inf Down
+  }
+
+  state Large Inf Right {
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Large (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(0, 90, 270), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=5, spawnMax=10, speedMin=10, speedMax=15, angleMin=120, angleMax=150, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=10, spawnMax=15, speedMin=10, speedMax=20, angleMin=30, angleMax=60, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Large Inf Left {
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Large (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(180, 90, 270), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=5, spawnMax=10, speedMin=10, speedMax=15, angleMin=30, angleMax=60, originVariationX=1, originVariationY=1, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=10, spawnMax=15, speedMin=10, speedMax=20, angleMin=120, angleMax=150, originVariationX=1, originVariationY=1, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Large Inf Up {
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Large (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(270, 90, 270), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=10, spawnMax=15, speedMin=18, speedMax=25, angleMin=80, angleMax=100, originVariationX=1, originVariationY=1, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Large Inf Down {
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Large (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(-72.5, -180, -180), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=7, spawnMax=10, speedMin=18, speedMax=25, angleMin=140, angleMax=180, originVariationX=1, originVariationY=1, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=7, spawnMax=10, speedMin=18, speedMax=25, angleMin=360, angleMax=400, originVariationX=1, originVariationY=1, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Death FX Inf Large {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_death_sword (resources.assets), pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Corpse Instance", delivery=SendMessage, options=1, functionCall=flashInfected())
+    SpawnObjectFromGlobalPool(gameObject=Death Puff Large (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Death Wave Infected R (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect")
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=2, y=2, z=(unset), everyFrame=false, lateUpdate=false)
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=75, spawnMax=80, speedMin=20, speedMax=25, angleMin=0, angleMax=100, originVariationX=2, originVariationY=2, FSM="", FSMEvent="")
+    on FINISHED → Inf Freeze?
+  }
+
+  state Check Invincibility {
+    BoolTest(boolVariable=var "Invincible", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Attack Type
+    on TRUE → Spell Vulnerable?
+  }
+
+  state Blocked Hit {
+    IntCompare(integer1=var "Attack Type", integer2=0, equal=(none), lessThan=→"NO EFFECT", greaterThan=→"NO EFFECT", everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendEvent(eventTarget=GameObject(var "Self"), sendEvent=→"BLOCKED HIT", delay=0, everyFrame=false)
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on RIGHT → Blocked Right
+    on LEFT → Blocked Left
+    on UP → Blocked Up
+    on DOWN → Blocked Down
+    on NO EFFECT → Invincible Pause
+  }
+
+  state Blocked Right {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="BLOCKED HIT R", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Damager", vector=(unset), x=(unset), y=var "Damager Y", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Damager X", y=(unset), z=(unset), space=0, everyFrame=false)
+    BoxColliderOffset(gameObject1=var "Self", offsetVector2=(unset), offsetX=var "Collider Origin X", offsetY=(unset), everyFrame=false)
+    FloatAdd(floatVariable=var "Damager X", add=var "Collider Origin X", everyFrame=false, perSecond=false)
+    BoundsBoxCollider(gameObject1=var "Self", scaleVector2=(unset), scaleX=var "Collider Width", scaleY=(unset), everyFrame=false)
+    FloatDivide(floatVariable=var "Collider Width", divideBy=2, everyFrame=false)
+    FloatSubtract(floatVariable=var "Damager X", subtract=var "Collider Width", everyFrame=false, perSecond=false)
+    SetVector3XYZ(vector3Variable=var "Block Spawn Pos", vector3Value=(unset), x=var "Damager X", y=var "Damager Y", z=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Block Hit (resources.assets), spawnPoint=<null>, position=var "Block Spawn Pos", rotation=(unset), storeObject=var "")
+    on FINISHED → Invince Sound
+  }
+
+  state Invincible Pause {
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Detecting
+  }
+
+  state Blocked Left {
+    GetPosition(gameObject=var "Damager", vector=(unset), x=(unset), y=var "Damager Y", z=(unset), space=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="BLOCKED HIT L", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Damager X", y=(unset), z=(unset), space=0, everyFrame=false)
+    BoxColliderOffset(gameObject1=var "Self", offsetVector2=(unset), offsetX=var "Collider Origin X", offsetY=(unset), everyFrame=false)
+    FloatAdd(floatVariable=var "Damager X", add=var "Collider Origin X", everyFrame=false, perSecond=false)
+    BoundsBoxCollider(gameObject1=var "Self", scaleVector2=(unset), scaleX=var "Collider Width", scaleY=(unset), everyFrame=false)
+    FloatDivide(floatVariable=var "Collider Width", divideBy=2, everyFrame=false)
+    FloatAdd(floatVariable=var "Damager X", add=var "Collider Width", everyFrame=false, perSecond=false)
+    SetVector3XYZ(vector3Variable=var "Block Spawn Pos", vector3Value=(unset), x=var "Damager X", y=var "Damager Y", z=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Block Hit (resources.assets), spawnPoint=<null>, position=var "Block Spawn Pos", rotation=(0, 0, 180), storeObject=var "")
+    on FINISHED → Invince Sound
+  }
+
+  state Blocked Up {
+    GetPosition(gameObject=var "Damager", vector=(unset), x=var "Damager X", y=var "Attack Y", z=(unset), space=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="BLOCKED HIT U", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=(unset), y=var "Damager Y", z=(unset), space=0, everyFrame=false)
+    BoxColliderOffset(gameObject1=var "Self", offsetVector2=(unset), offsetX=(unset), offsetY=var "Collider Origin Y", everyFrame=false)
+    FloatAdd(floatVariable=var "Damager Y", add=var "Collider Origin Y", everyFrame=false, perSecond=false)
+    BoundsBoxCollider(gameObject1=var "Self", scaleVector2=(unset), scaleX=(unset), scaleY=var "Collider Height", everyFrame=false)
+    FloatDivide(floatVariable=var "Collider Height", divideBy=2, everyFrame=false)
+    FloatSubtract(floatVariable=var "Damager Y", subtract=var "Collider Height", everyFrame=false, perSecond=false)
+    SetFloatToHighest(floatVariable=var "Damager Y", value1=var "Damager Y", value2=var "Attack Y", everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Block Spawn Pos", vector3Value=(unset), x=var "Damager X", y=var "Damager Y", z=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Block Hit (resources.assets), spawnPoint=<null>, position=var "Block Spawn Pos", rotation=(0, 0, 90), storeObject=var "")
+    on FINISHED → Invince Sound
+  }
+
+  state Blocked Down {
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="BLOCKED DOWN", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Damager", vector=(unset), x=var "Damager X", y=var "Attack Y", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=(unset), y=var "Damager Y", z=(unset), space=0, everyFrame=false)
+    BoxColliderOffset(gameObject1=var "Self", offsetVector2=(unset), offsetX=(unset), offsetY=var "Collider Origin Y", everyFrame=false)
+    FloatAdd(floatVariable=var "Damager Y", add=var "Collider Origin Y", everyFrame=false, perSecond=false)
+    BoundsBoxCollider(gameObject1=var "Self", scaleVector2=(unset), scaleX=(unset), scaleY=var "Collider Height", everyFrame=false)
+    FloatDivide(floatVariable=var "Collider Height", divideBy=2, everyFrame=false)
+    FloatAdd(floatVariable=var "Damager Y", add=var "Collider Height", everyFrame=false, perSecond=false)
+    SetFloatToSmallest(floatVariable=var "Damager Y", value1=var "Damager Y", value2=var "Attack Y", everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Block Spawn Pos", vector3Value=(unset), x=var "Damager X", y=var "Damager Y", z=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Block Hit (resources.assets), spawnPoint=<null>, position=var "Block Spawn Pos", rotation=(0, 0, 270), storeObject=var "")
+    on FINISHED → Invince Sound
+  }
+
+  state Nail Left {
+    CreateObject(gameObject=Slash Impact (sharedassets39.assets), spawnPoint=<null>, position=var "Midpoint", rotation=(unset), storeObject=var "Hit Effect", networkInstantiate=false, networkGroup=0)  // disabled
+    RandomFloat(min=340, max=380, storeResult=var "Chooser")
+    SetRotation(gameObject=var "Hit Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Chooser", space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=-1.5, y=1.5, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Enemy Type
+  }
+
+  state Nail Right {
+    RandomFloat(min=340, max=380, storeResult=var "Chooser")
+    SetRotation(gameObject=var "Hit Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Chooser", space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=1.5, y=1.5, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Enemy Type
+  }
+
+  state Nail Up {
+    RandomFloat(min=70, max=110, storeResult=var "Chooser")
+    SetRotation(gameObject=var "Hit Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Chooser", space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=1.5, y=1.5, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Enemy Type
+  }
+
+  state Nail Down {
+    RandomFloat(min=250, max=290, storeResult=var "Chooser")
+    SetRotation(gameObject=var "Hit Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Chooser", space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=1.5, y=1.5, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Enemy Type
+  }
+
+  state Pause {
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="ZERO HP", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Special Death", isTrue=→"RETURN", isFalse=(none), everyFrame=false)
+    SetFsmInt(gameObject=var "Self", fsmName="damages_hero", variableName="damageDealt", setValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    on RETURN → Invulnerable
+    on FINISHED → SemiPersistent?
+    on EXTRA KILL → SemiPersistent?
+  }
+
+  state Rotate? {
+    GetFsmBool(gameObject=var "Corpse Instance", fsmName="corpse", variableName="spellBurn", storeValue=var "bool test", everyFrame=false)
+    BoolTest(boolVariable=var "Rotate Corpse", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Rotate Corpse
+    on FALSE → Reset Rotation
+  }
+
+  state Corpse Direction Check {
+    FloatMultiply(floatVariable=var "Corpse Fling Speed", multiplyBy=var "Attack Magnitude", everyFrame=false)
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on LEFT → Fling Corpse Left
+    on DOWN → Fling Corpse Down
+    on RIGHT → Fling Corpse Right
+    on UP → Fling Corpse Up
+  }
+
+  state Rotate Corpse {
+    GetRotation(gameObject=var "Self", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false)
+    SetRotation(gameObject=var "Corpse Instance", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Low Arc?
+  }
+
+  state Attack FX Generic {
+    CreateObject(gameObject=Strike Nail (sharedassets6.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect", networkInstantiate=false, networkGroup=0)  // disabled
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (resources.assets), spawnPoint=var "Self", position=var "Midpoint", rotation=(unset), storeObject=var "Hit Effect")
+    SetBoolValue(boolVariable=var "Freeze Moment", boolValue=false, everyFrame=false)
+    on FINISHED → Enemy Type
+  }
+
+  state Damage Zero? {
+    IntCompare(integer1=var "Attack Strength", integer2=0, equal=→"TRUE", lessThan=→"TRUE", greaterThan=→"FALSE", everyFrame=false)
+    on FALSE → Circle Direction?
+    on TRUE → Pause Frame
+  }
+
+  state Pause Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Detecting
+  }
+
+  state Attack FX Spell {
+    SetBoolValue(boolVariable=var "spellBurn", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPELL DAMAGE", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Freeze Moment", boolValue=true, everyFrame=false)
+    CreateObject(gameObject=Fireball Hit (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect", networkInstantiate=false, networkGroup=0)  // disabled
+    SpawnObjectFromGlobalPool(gameObject=Fireball Hit (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect")
+    SetPosition(gameObject=var "Hit Effect", vector=(unset), x=(unset), y=(unset), z=0.0031, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Enemy Type
+  }
+
+  state Check Spawned {
+    SendEventByName(eventTarget=GameObject(var "KILLED GameObject"), sendEvent="KILLED", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Spawned", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    GetFsmInt(gameObject=var "Spawner", fsmName=var "Spawner FSM", variableName="Spawned", storeValue=var "Current Spawned", everyFrame=false)
+    IntOperator(integer1=var "Current Spawned", integer2=1, operation=Subtract, storeResult=var "Current Spawned", everyFrame=false)
+    SetFsmInt(gameObject=var "Spawner", fsmName=var "Spawner FSM", variableName="Spawned", setValue=var "Current Spawned", everyFrame=false)
+    on FINISHED → Splatter?
+  }
+
+  state Damage FX Armoured {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=false_knight_damage_armour, pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Self", delivery=SendMessage, options=1, functionCall=flashArmoured())
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="DAMAGE FLASH", delay=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Midpoint", vector3Value=(unset), x=(unset), y=(unset), z=-0.01, everyFrame=false)
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on RIGHT → Armoured Right
+    on LEFT → Armoured Left
+    on UP → Armoured Up
+    on DOWN → Armoured Down
+  }
+
+  state Armoured Right {
+    SpawnObjectFromGlobalPool(gameObject=Dust Hit Med R (resources.assets), spawnPoint=<null>, position=var "Midpoint", rotation=(180, 90, 270), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="ARMOUR HIT R", delay=0, everyFrame=false)
+    on FINISHED → Decrement Health
+  }
+
+  state Armoured Left {
+    SpawnObjectFromGlobalPool(gameObject=Dust Hit Med R (resources.assets), spawnPoint=<null>, position=var "Midpoint", rotation=(0, 90, 270), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="ARMOUR HIT L", delay=0, everyFrame=false)
+    on FINISHED → Decrement Health
+  }
+
+  state Armoured Up {
+    SpawnObjectFromGlobalPool(gameObject=Dust Hit Med R (resources.assets), spawnPoint=<null>, position=var "Midpoint", rotation=(270, 90, 270), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="ARMOUR HIT U", delay=0, everyFrame=false)
+    on FINISHED → Decrement Health
+  }
+
+  state Armoured Down {
+    SpawnObjectFromGlobalPool(gameObject=Dust Hit Med Down R (resources.assets), spawnPoint=<null>, position=var "Midpoint", rotation=(-72.5, -180, -180), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="ARMOUR HIT D", delay=0, everyFrame=false)
+    on FINISHED → Decrement Health
+  }
+
+  state Play Anim {
+    StringCompare(stringVariable=var "Animation", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Animation")
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Detecting
+  }
+
+  state Decrement Battle Enemies {
+    GetFsmInt(gameObject=var "Battle Scene", fsmName="Battle Control", variableName="Battle Enemies", storeValue=var "Battle Enemies", everyFrame=false)
+    IntOperator(integer1=var "Battle Enemies", integer2=1, operation=Subtract, storeResult=var "Battle Enemies", everyFrame=false)
+    SetFsmInt(gameObject=var "Battle Scene", fsmName="Battle Control", variableName="Battle Enemies", setValue=var "Battle Enemies", everyFrame=false)
+    on FINISHED → Snapshot
+  }
+
+  state Death FX Bubble {
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    CreateObject(gameObject=Bubble Pop, spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    on FINISHED → Corpse Pause
+  }
+
+  state Low Arc? {
+    BoolTest(boolVariable=var "Low Corpse Arc", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Corpse Arc Left", floatValue=170, everyFrame=false)
+    SetFloatValue(floatVariable=var "Corpse Arc Right", floatValue=10, everyFrame=false)
+    on FINISHED → Corpse Direction Check
+  }
+
+  state Invinc Effect? {
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="BLOCKED HIT", delay=0, everyFrame=false)
+    HasComponent(gameObject=var "Damager", component="DontClinkGates", removeOnExit=false, trueEvent=→"FALSE", falseEvent=(none), store=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="HIT", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Invincible No Effect", isTrue=→"FALSE", isFalse=→"TRUE", everyFrame=false)
+    on TRUE → Recoil Hero?
+    on FALSE → Invincible Pause
+  }
+
+  state Circle Direction? {
+    SendEventByName(eventTarget=GameObject(var "Damager"), sendEvent="DEALT DAMAGE", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Circle Direction", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Check Invincibility
+    on TRUE → Circ Dir Check
+  }
+
+  state Circ Dir Check {
+    GetAngleToTarget2D(gameObject=var "Self", target=var "Damager", offsetX=0, offsetY=0, storeAngle=var "Angle", everyFrame=false)
+    FloatSwitch(floatVariable=var "Angle", lessThan=[45, 135, 225, 315, 361], sendEvent=[→"LEFT", →"DOWN", →"RIGHT", →"UP", →"LEFT"], everyFrame=false)
+    on DOWN → Circ Down
+    on UP → Circ Up
+    on LEFT → Circ Left
+    on RIGHT → Circ Right
+  }
+
+  state Circ Down {
+    SetFloatValue(floatVariable=var "Attack Direction", floatValue=270, everyFrame=false)
+    on FINISHED → Check Invincibility
+  }
+
+  state Circ Up {
+    SetFloatValue(floatVariable=var "Attack Direction", floatValue=90, everyFrame=false)
+    on FINISHED → Check Invincibility
+  }
+
+  state Circ Left {
+    SetFloatValue(floatVariable=var "Attack Direction", floatValue=180, everyFrame=false)
+    on FINISHED → Check Invincibility
+  }
+
+  state Circ Right {
+    SetFloatValue(floatVariable=var "Attack Direction", floatValue=0, everyFrame=false)
+    on FINISHED → Check Invincibility
+  }
+
+  state Acid Death {
+    on FINISHED → Corpse Pause
+  }
+
+  state MP Charge {
+    IntSwitch(intVariable=var "Enemy Type", compareTo=[3, 6], sendEvent=[→"FINISHED", →"FINISHED"], everyFrame=false)
+    SendMessageV2(gameObject=var "Hero Object", delivery=SendMessage, options=1, functionCall=AddMPCharge(var "MP Charge"), everyFrame=false)  // disabled
+    SendMessageV2(gameObject=var "Hero Object", delivery=SendMessage, options=1, functionCall=SoulGain(), everyFrame=false)
+    on FINISHED → Attack FX Nail
+  }
+
+  state Inf Freeze? {
+    BoolTest(boolVariable=var "Freeze Moment", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    on FINISHED → Centipede Spawner
+  }
+
+  state Inf Shake? {
+    GameObjectIsVisible(gameObject=var "Self", trueEvent=(none), falseEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    on FINISHED → Inf Freeze?
+  }
+
+  state Kill All {
+    SetFloatValue(floatVariable=var "Attack Direction", floatValue=135, everyFrame=false)
+    BoolTest(boolVariable=var "ImmuneToKillAll", isTrue=→"FINISHED", isFalse=→"TAKE DAMAGE", everyFrame=false)
+    on TAKE DAMAGE → Pause
+    on FINISHED → Detecting
+  }
+
+  state Recoil Hero? {
+    IntCompare(integer1=var "Attack Type", integer2=0, equal=(none), lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on CANCEL → Blocked Hit
+    on FINISHED → Blocked Hit
+    on RIGHT → Recoil Hero Left
+    on LEFT → Recoil Hero Right
+    on UP → Blocked Hit
+    on DOWN → Blocked Hit
+  }
+
+  state Recoil Hero Right {
+    CallMethodProper(gameObject=var "Hero Object", behaviour="HeroController", methodName="RecoilRight", parameters=[], storeResult=(unset var))
+    on FINISHED → Blocked Hit
+  }
+
+  state Recoil Hero Left {
+    CallMethodProper(gameObject=var "Hero Object", behaviour="HeroController", methodName="RecoilLeft", parameters=[], storeResult=(unset var))
+    on FINISHED → Blocked Hit
+  }
+
+  state SemiPersistent? {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Special Death", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=SaveLevelState())
+    on FINISHED → Journal Entry?
+    on CANCEL → Invulnerable
+  }
+
+  state Init Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Find KILLED To
+  }
+
+  state Activated {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetCurrentMapZone", parameters=[], storeResult=var "Map Zone")
+    SendEventByName(eventTarget=Self, sendEvent=var "Map Zone", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on COLOSSEUM → Colosseum Revive
+  }
+
+  state Corpse Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Essence Chance
+  }
+
+  state Invincible Direction Choice {
+    IntCompare(integer1=var "Invincible Direction", integer2=0, equal=→"CANCEL", lessThan=(none), greaterThan=(none), everyFrame=false)
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on CANCEL → Invinc Effect?
+    on LEFT → Invince Left
+    on UP → Invince Up
+    on DOWN → Invince Down
+    on RIGHT → Invince right
+  }
+
+  state Invince Left {
+    IntCompare(integer1=var "Invincible Direction", integer2=9, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=6, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=11, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=3, equal=→"BLOCKED HIT", lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    on BLOCKED HIT → Invinc Effect?
+    on CANCEL → Attack Type
+  }
+
+  state Invince right {
+    IntCompare(integer1=var "Invincible Direction", integer2=5, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=8, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=10, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=1, equal=→"BLOCKED HIT", lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    on BLOCKED HIT → Invinc Effect?
+    on CANCEL → Attack Type
+  }
+
+  state Invince Down {
+    IntCompare(integer1=var "Invincible Direction", integer2=7, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=8, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=9, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=10, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=11, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=4, equal=→"BLOCKED HIT", lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    on BLOCKED HIT → Invinc Effect?
+    on CANCEL → Attack Type
+  }
+
+  state Invince Up {
+    IntCompare(integer1=var "Invincible Direction", integer2=5, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=8, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=9, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=6, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=7, equal=→"BLOCKED HIT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Invincible Direction", integer2=2, equal=→"BLOCKED HIT", lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    on BLOCKED HIT → Invinc Effect?
+    on CANCEL → Attack Type
+  }
+
+  state Snapshot {
+    TransitionToAudioSnapshot(snapshot=var "Snapshot On Death", transitionTime=6)
+    on FINISHED → Check Spawned
+  }
+
+  state Journal Entry? {
+    BuildString(stringParts=["killed", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "PD Killed Name", isTrue=→"FINISHED", isFalse=(none))
+    SetPlayerDataBool(boolName=var "PD Killed Name", value=true)
+    BuildString(stringParts=["newData", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    SetPlayerDataBool(boolName=var "PD Killed Name", value=true)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=(none), isFalse=→"FINISHED")
+    BuildString(stringParts=["kills", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName=var "PD Killed Name", storeValue=var "PD Kills")
+    IntCompare(integer1=var "PD Kills", integer2=1, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DESTROY JOURNAL MSG", delay=0, everyFrame=false)
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="journalEntriesCompleted")
+    CreateObject(gameObject=Journal Update Msg (resources.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    on FINISHED → Journal Update?
+  }
+
+  state Journal Update? {
+    BuildString(stringParts=["kills", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName=var "PD Killed Name", storeValue=var "PD Kills")
+    IntCompare(integer1=var "PD Kills", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    IntAdd(intVariable=var "PD Kills", add=-1, everyFrame=false)
+    SetPlayerDataInt(intName=var "PD Killed Name", value=var "PD Kills")
+    IntCompare(integer1=var "PD Kills", integer2=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    BuildString(stringParts=["newData", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    SetPlayerDataBool(boolName=var "PD Killed Name", value=true)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=(none), isFalse=→"FINISHED")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DESTROY JOURNAL MSG", delay=0, everyFrame=false)
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="journalNotesCompleted")
+    CreateObject(gameObject=Journal Update Msg (resources.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Msg", networkInstantiate=false, networkGroup=0)
+    SetFsmBool(gameObject=var "Msg", fsmName="Journal Msg", variableName="Full", setValue=true, everyFrame=false)
+    on FINISHED → Decrement Battle Enemies
+  }
+
+  state Damage FX B Knight {
+    RandomFloat(min=0.7, max=1, storeResult=var "Chooser")
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="DAMAGE FLASH", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Self", delivery=SendMessage, options=1, functionCall=flashInfected())
+    SetAudioPitch(gameObject=var "Audio Player", pitch=var "Chooser", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=false_knight_damage_armour)
+    SpawnObjectFromGlobalPool(gameObject=Hit Flash Orange (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on RIGHT → B Knight Right
+    on LEFT → B Knight Left
+    on UP → B Knight Up
+    on DOWN → B Knight Down
+  }
+
+  state B Knight Right {
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Large (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(0, 90, 270), storeObject=var "")
+    on FINISHED → Decrement Health
+  }
+
+  state B Knight Left {
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Large (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(180, 90, 270), storeObject=var "")
+    on FINISHED → Decrement Health
+  }
+
+  state B Knight Up {
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Large (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(270, 90, 270), storeObject=var "")
+    on FINISHED → Decrement Health
+  }
+
+  state B Knight Down {
+    SpawnObjectFromGlobalPool(gameObject=Hit Puff Large (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(-72.5, -180, -180), storeObject=var "")
+    on FINISHED → Decrement Health
+  }
+
+  state Death FX B Knight {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=false_knight_damage_armour_final, pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Corpse Instance", delivery=SendMessage, options=1, functionCall=flashInfected())
+    CreateObject(gameObject=Death Puff Large (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    CreateObject(gameObject=Death Wave Infected (sharedassets32.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=2, y=2, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Centipede Spawner
+  }
+
+  state Splatter? {
+    IntCompare(integer1=var "Attack Type", integer2=4, equal=→"SPLATTER", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Attack Type", integer2=5, equal=→"WATER", lessThan=(none), greaterThan=(none), everyFrame=false)
+    on FINISHED → Geo Mega Fling?
+    on SPLATTER → Splatter
+    on WATER → Water
+  }
+
+  state Splatter {
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    CreateObject(gameObject=Corpse Splat (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_death_sword (resources.assets), pitchMin=0.85, pitchMax=0.85, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_death_sword (resources.assets), pitchMin=1.15, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=chain_plat_land, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Destroy
+  }
+
+  state Water {
+    SetParent(gameObject=var "Corpse Instance", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetFsmBool(gameObject=var "Corpse Instance", fsmName="corpse", variableName="No Steam", setValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Corpse Instance", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Destroy
+  }
+
+  state Reset Rotation {
+    SetRotation(gameObject=var "Corpse Instance", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Low Arc?
+  }
+
+  state Invince Sound {
+    BoolTest(boolVariable=var "Invincible Alt Sound", isTrue=→"ALT", isFalse=(none), everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[sword_hit_reject (resources.assets)], weights=[1], pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Invincible Pause
+    on ALT → Alt Sound
+  }
+
+  state Alt Sound {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[sword_hit_reject (resources.assets)], weights=[1], pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)  // disabled
+    AudioPlay(gameObject=var "Self", volume=1, oneShotClip=var "Alt Sound", finishedEvent=(none))
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Invincible Pause
+  }
+
+  state Recycle {
+    SetBoolValue(boolVariable=var "Activated", boolValue=false, everyFrame=false)
+    RecycleSelf()
+  }
+
+  state Geo Mega Fling? {
+    BoolTest(boolVariable=var "Geo Mega Fling", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Geo Spawn Speed Min", floatValue=30, everyFrame=false)
+    SetFloatValue(floatVariable=var "Geo Spawn Speed Max", floatValue=45, everyFrame=false)
+    SetFloatValue(floatVariable=var "Geo Spawn Angle Min", floatValue=65, everyFrame=false)
+    SetFloatValue(floatVariable=var "Geo Spawn Angle Max", floatValue=115, everyFrame=false)
+    on FINISHED → Spawn Geo
+  }
+
+  state Find KILLED To {
+    StringCompare(stringVariable=var "Send KILLED to", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    FindGameObject(objectName=var "Send KILLED to", withTag="Untagged", store=var "KILLED GameObject")
+    on FINISHED → Initiate
+  }
+
+  state Death FX Dung {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_death_sword (resources.assets), pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Corpse Instance", delivery=SendMessage, options=1, functionCall=flashDung())
+    CreateObject(gameObject=Death Puff Dung, spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    CreateObject(gameObject=Death Wave Infected (sharedassets32.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=2, y=2, z=(unset), everyFrame=false, lateUpdate=false)
+    FlingObjectsFromGlobalPool(gameObject=Spatter Brown (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=75, spawnMax=80, speedMin=20, speedMax=25, angleMin=0, angleMax=100, originVariationX=2, originVariationY=2, FSM="", FSMEvent="")
+    on FINISHED → Inf Freeze?
+  }
+
+  state Damage FX Ghost {
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="DAMAGE FLASH", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=dream_damage (resources.assets), pitchMin=0.75, pitchMax=1.25, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Self", delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on RIGHT → Ghost Right
+    on LEFT → Ghost Left
+    on UP → Ghost Up
+    on DOWN → Ghost Down
+  }
+
+  state Ghost Right {
+    SpawnObjectFromGlobalPool(gameObject=Ghost Hit Pt (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(0, 0, -22.5), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=-40, angleMax=40, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=-40, angleMax=40, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Ghost Up {
+    SpawnObjectFromGlobalPool(gameObject=Ghost Hit Pt (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(0, 0, 70), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=50, angleMax=130, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=50, angleMax=130, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Ghost Left {
+    SpawnObjectFromGlobalPool(gameObject=Ghost Hit Pt (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(0, 0, 160), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=140, angleMax=220, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=140, angleMax=220, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Ghost Down {
+    SpawnObjectFromGlobalPool(gameObject=Ghost Hit Pt (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(0, 0, -110), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=230, angleMax=310, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=230, angleMax=310, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Damage FX Uninfected {
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="DAMAGE FLASH", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Self", delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    FloatSwitch(floatVariable=var "Attack Direction", lessThan=[45, 135, 225, 360], sendEvent=[→"RIGHT", →"UP", →"LEFT", →"DOWN"], everyFrame=false)
+    on RIGHT → Uninfected Right
+    on LEFT → Uninfected Left
+    on UP → Uninfected Up
+    on DOWN → Uninfected Down
+  }
+
+  state Uninfected Right {
+    SpawnObjectFromGlobalPool(gameObject=Uninfected Hit Pt (sharedassets6.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(0, 0, -45), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=-40, angleMax=40, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=10, speedMax=35, angleMin=-40, angleMax=40, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Uninfected Up {
+    SpawnObjectFromGlobalPool(gameObject=Uninfected Hit Pt (sharedassets6.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(0, 0, 45), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=50, angleMax=130, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=10, speedMax=35, angleMin=50, angleMax=130, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Uninfected Left {
+    SpawnObjectFromGlobalPool(gameObject=Uninfected Hit Pt (sharedassets6.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(0, 0, -225), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=140, angleMax=220, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=10, speedMax=35, angleMin=140, angleMax=220, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Uninfected Down {
+    SpawnObjectFromGlobalPool(gameObject=Uninfected Hit Pt (sharedassets6.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(0, 0, 225), storeObject=var "")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=20, speedMax=35, angleMin=230, angleMax=310, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    FlingObjectsFromGlobalPool(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=10, speedMax=35, angleMin=230, angleMax=310, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Decrement Health
+  }
+
+  state Death FX Uninfected {
+    CreateObject(gameObject=Uninfected Death Pt (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    SpawnRandomObjectsV2(gameObject=Slash Effect Ghost1 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=8, spawnMax=8, speedMin=2, speedMax=35, angleMin=0, angleMax=360, originVariationX=0, originVariationY=0)
+    SpawnRandomObjectsV2(gameObject=Slash Effect Ghost2 (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=2, spawnMax=3, speedMin=2, speedMax=35, angleMin=0, angleMax=360, originVariationX=0, originVariationY=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_death_sword (resources.assets), pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=enemy_damage (resources.assets), pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Corpse Instance", delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    CreateObject(gameObject=White Wave (sharedassets6.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "Hit Effect", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Hit Effect", vector=(unset), x=1.25, y=1.25, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Inf Shake?
+  }
+
+  state GeoDropUp Glass {
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="equippedCharm_24", falseBool="brokenCharm_24", isTrue=(none), isFalse=→"FINISHED")
+    ConvertIntToFloat(intVariable=var "Geo Small", floatVariable=var "Geo Float", everyFrame=false)
+    FloatMultiply(floatVariable=var "Geo Float", multiplyBy=0.2, everyFrame=false)
+    ConvertFloatToInt(floatVariable=var "Geo Float", intVariable=var "Geo Small Extra", rounding=RoundUp, everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Geo Medium", floatVariable=var "Geo Float", everyFrame=false)
+    FloatMultiply(floatVariable=var "Geo Float", multiplyBy=0.2, everyFrame=false)
+    ConvertFloatToInt(floatVariable=var "Geo Float", intVariable=var "Geo Med Extra", rounding=RoundUp, everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Geo Large", floatVariable=var "Geo Float", everyFrame=false)
+    FloatMultiply(floatVariable=var "Geo Float", multiplyBy=0.2, everyFrame=false)
+    ConvertFloatToInt(floatVariable=var "Geo Float", intVariable=var "Geo Large Extra", rounding=RoundUp, everyFrame=false)
+    FlingFlashingGeo(gameObject=Geo Small (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=var "Geo Small Extra", spawnMax=var "Geo Small Extra", speedMin=var "Geo Spawn Speed Min", speedMax=var "Geo Spawn Speed Max", angleMin=var "Geo Spawn Angle Min", angleMax=var "Geo Spawn Angle Max", originVariationX=0, originVariationY=0)
+    FlingFlashingGeo(gameObject=Geo Med (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=var "Geo Med Extra", spawnMax=var "Geo Med Extra", speedMin=var "Geo Spawn Speed Min", speedMax=var "Geo Spawn Speed Max", angleMin=var "Geo Spawn Angle Min", angleMax=var "Geo Spawn Angle Max", originVariationX=0, originVariationY=0)
+    FlingFlashingGeo(gameObject=Geo Large (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", spawnMin=var "Geo Large Extra", spawnMax=var "Geo Large Extra", speedMin=var "Geo Spawn Speed Min", speedMax=var "Geo Spawn Speed Max", angleMin=var "Geo Spawn Angle Min", angleMax=var "Geo Spawn Angle Max", originVariationX=0, originVariationY=0)
+    on FINISHED → Spawn Corpse
+  }
+
+  state Attack FX Sharp Shadow {
+    SetBoolValue(boolVariable=var "Freeze Moment", boolValue=true, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Sharp Shadow Impact (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    on FINISHED → Enemy Type
+  }
+
+  state Damage Override {
+    BoolTest(boolVariable=var "Damage Override", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetIntValue(intVariable=var "Attack Strength", intValue=1, everyFrame=false)
+    on FINISHED → Damage Zero?
+  }
+
+  state Colosseum Revive {
+    SetBoolValue(boolVariable=var "Activated", boolValue=false, everyFrame=false)
+    on FINISHED → Initiate
+  }
+
+  state Spell Vulnerable? {
+    IntCompare(integer1=var "Attack Type", integer2=2, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    GameObjectCompareTag(gameObject=var "Self", tag="Spell Vulnerable", trueEvent=→"SPELL OVERRIDE", falseEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    on FINISHED → Invincible Direction Choice
+    on SPELL OVERRIDE → Attack Type
+  }
+
+  state Centipede Spawner {
+    BoolTest(boolVariable=var "Centipede Spawner", isTrue=→"TRUE", isFalse=(none), everyFrame=false)
+    on FINISHED → Corpse Pause
+    on TRUE → Centipede Reset
+  }
+
+  state Centipede Reset {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CENTIPEDE DEATH", delay=0, everyFrame=false)
+    on FINISHED → Detecting
+  }
+
+  state Acid Skip {
+    BoolTest(boolVariable=var "Ignore Acid", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    StringCompare(stringVariable=var "Damager Tag", compareTo="Acid", equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Water Skip
+    on CANCEL → Pause Frame
+  }
+
+  state Water Skip {
+    BoolTest(boolVariable=var "Ignore Water", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    StringCompare(stringVariable=var "Damager Tag", compareTo="Water Surface", equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Damage Override
+    on CANCEL → Pause Frame
+  }
+
+  state Essence Chance {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasDreamNail", isTrue=(none), isFalse=→"FINISHED")
+    IntSwitch(intVariable=var "Enemy Type", compareTo=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], sendEvent=[→"INFECTED", →"UNINFECTED", →"FINISHED", →"FINISHED", →"FINISHED", →"LARGE INFECTED", →"FINISHED", →"FINISHED", →"FINISHED", →"FINISHED", →"FINISHED"], everyFrame=false)
+    GetPlayerDataBool(boolName="equippedCharm_30", storeValue=var "Equipped Dream Wielder")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="dreamOrbsSpent", storeValue=var "Spent Essence")
+    IntTestToBool(int1=var "Spent Essence", int2=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Has Pooled Essence", everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Equipped Dream Wielder", var "Has Pooled Essence"], sendEvent=→"POOLED W", storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Equipped Dream Wielder", var "Has Pooled Essence"], boolStates=[true, false], trueEvent=→"UNPOOLED W", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    IntCompare(integer1=var "Spent Essence", integer2=0, equal=→"UNPOOLED", lessThan=→"UNPOOLED", greaterThan=→"POOLED", everyFrame=false)
+    on FINISHED → Destroy
+    on POOLED → Pooled
+    on UNPOOLED → Unpooled
+    on UNPOOLED W → Unpooled W
+    on POOLED W → Pooled W
+  }
+
+  state Pooled {
+    RandomInt(min=1, max=60, storeResult=var "RanInt", inclusiveMax=true)
+    IntCompare(integer1=var "RanInt", integer2=1, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=dream_essence_corpse_get (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="dreamOrbs")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM ORB COLLECT", delay=0, everyFrame=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="dreamOrbsSpent", amount=var "Decrement")
+    on FINISHED → Destroy
+  }
+
+  state Unpooled {
+    RandomInt(min=1, max=300, storeResult=var "RanInt", inclusiveMax=true)
+    IntCompare(integer1=var "RanInt", integer2=1, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=dream_essence_corpse_get (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="dreamOrbs")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM ORB COLLECT", delay=0, everyFrame=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="dreamOrbsSpent", amount=var "Decrement")
+    on FINISHED → Destroy
+  }
+
+  state Pooled W {
+    RandomInt(min=1, max=40, storeResult=var "RanInt", inclusiveMax=true)
+    IntCompare(integer1=var "RanInt", integer2=1, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=dream_essence_corpse_get (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="dreamOrbs")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM ORB COLLECT", delay=0, everyFrame=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="dreamOrbsSpent", amount=var "Decrement")
+    on FINISHED → Destroy
+  }
+
+  state Unpooled W {
+    RandomInt(min=1, max=200, storeResult=var "RanInt", inclusiveMax=true)
+    IntCompare(integer1=var "RanInt", integer2=1, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=dream_essence_corpse_get (resources.assets), spawnPoint=var "Self", position=var "Effect Origin", rotation=(unset), storeObject=var "")
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="dreamOrbs")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM ORB COLLECT", delay=0, everyFrame=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="dreamOrbsSpent", amount=var "Decrement")
+    on FINISHED → Destroy
+  }
+
+  state Unset Special Death {
+    SetBoolValue(boolVariable=var "Special Death", boolValue=false, everyFrame=false)
+    on FINISHED → SemiPersistent?
+  }
+
+  var Corpse Fling Speed: float = 10
+  var Invulnerable Time: float = 0
+  var Enemy Type: int = 0
+  var Geo Large: int = 0
+  var Geo Medium: int = 0
+  var Geo Small: int = 0
+  var HP: int = 0
+  var Invincible Direction: int = 0
+  var Corpse Faces Right: bool = false
+  var Geo Mega Fling: bool = false
+  var Ignore Acid: bool = false
+  var Ignore Hazards: bool = false
+  var Ignore Water: bool = false
+  var ImmuneToKillAll: bool = false
+  var Invincible: bool = true
+  var Invincible Alt Sound: bool = false
+  var Invincible No Effect: bool = false
+  var Low Corpse Arc: bool = false
+  var Play Animation: bool = false
+  var Recycle: bool = false
+  var Rotate Corpse: bool = false
+  var SemiPersistent: bool = false
+  var Special Death: bool = false
+  var Animation: string = ""
+  var Death Broadcast Event: string = ""
+  var PlayerData Name: string = ""
+  var Send KILLED to: string = ""
+  var Corpse Spawn Point: vector3 = (0, 0, 0)
+  var Effect Origin: vector3 = (0, 0, 0)
+  var Battle Scene: gameObject = <null>
+  var Corpse: gameObject = <null>
+  var Send HIT to: gameObject = <null>
+  var Alt Sound: object = <null>
+  var Snapshot On Death: object = <null>
+
+  var Angle: float = 0
+  var Attack Direction: float = 0
+  var Attack Magnitude: float = 0
+  var Attack Multiplier: float = 0
+  var Attack Y: float = 0
+  var Chooser: float = 0
+  var Collider Height: float = 0
+  var Collider Origin X: float = 0
+  var Collider Origin Y: float = 0
+  var Collider Width: float = 0
+  var Corpse Arc Left: float = 120
+  var Corpse Arc Right: float = 60
+  var Damage Float: float = 0
+  var Damager X: float = 0
+  var Damager Y: float = 0
+  var Face Left Scale: float = 0
+  var Face Right Scale: float = 0
+  var Geo Float: float = 0
+  var Geo Spawn Angle Max: float = 100
+  var Geo Spawn Angle Min: float = 80
+  var Geo Spawn Speed Max: float = 30
+  var Geo Spawn Speed Min: float = 15
+  var Rotate Max: float = 0
+  var Rotate Min: float = 0
+  var Rotation: float = 0
+  var Scale Max: float = 0
+  var Scale Min: float = 0
+  var X Scale: float = 0
+  var Y Scale: float = 0
+  var Attack Strength: int = 0
+  var Attack Type: int = 0
+  var Battle Enemies: int = 0
+  var Current Spawned: int = 0
+  var Decrement: int = -1
+  var Essence Chance: int = 0
+  var Geo Large Extra: int = 0
+  var Geo Med Extra: int = 0
+  var Geo Small Extra: int = 0
+  var Hazard Type: int = 0
+  var Looper: int = 0
+  var MP Charge: int = 0
+  var PD Kills: int = 0
+  var RanInt: int = 0
+  var Spent Essence: int = 0
+  var Activated: bool = false
+  var Centipede Spawner: bool = false
+  var Circle Direction: bool = false
+  var Damage Override: bool = false
+  var Equipped Dream Wielder: bool = false
+  var Freeze Moment: bool = false
+  var Has Pooled Essence: bool = false
+  var Ignore Invuln: bool = false
+  var Spawned: bool = false
+  var bool test: bool = false
+  var spellBurn: bool = false
+  var Damager Tag: string = ""
+  var Map Zone: string = ""
+  var PD Killed Name: string = ""
+  var Spawner FSM: string = ""
+  var Tag: string = ""
+  var Block Spawn Pos: vector3 = (0, 0, 0)
+  var Midpoint: vector3 = (0, 0, 0)
+  var Audio Player: gameObject = <null>
+  var Camera: gameObject = <null>
+  var Corpse Instance: gameObject = <null>
+  var Damager: gameObject = <null>
+  var Geo Pool: gameObject = <null>
+  var Hero Object: gameObject = <null>
+  var Hit Effect: gameObject = <null>
+  var KILLED GameObject: gameObject = <null>
+  var Msg: gameObject = <null>
+  var Self: gameObject = <null>
+  var Spawner: gameObject = <null>
+}

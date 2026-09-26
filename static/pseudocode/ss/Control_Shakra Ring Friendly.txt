@@ -1,0 +1,168 @@
+# Control
+# 1 location(s):
+#   localpoolprefabs_assets_mapper.bundle / Shakra Ring Friendly
+
+fsm Control {
+  start Init
+
+  state Fly {
+    FaceAngleV2(gameObject=Self, angleOffset=0, worldSpace=false, everyFrame=true)
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"TERRAIN COLLIDE", storeCollider=var "", storeForce=(unset))
+    Collision2dEvent(gameObject=Self, collision=1, collideTag="", sendEvent=→"TERRAIN COLLIDE", storeCollider=var "", storeForce=(unset))  // disabled
+    Wait(time=2, finishEvent=→"RECYCLE", realTime=false)
+    DamageEnemyRespond(Target=var "Enemy Damager", DamagedEvent=→"DID DAMAGE", StoreEnemy=var "Damaged Enemy")
+    PlayParticleEmitterInState(gameObject=var "Pt Trail")
+    GetVelocity2dNotZero(gameObject=Self, vector=(unset), x=var "Velocity X", y=var "Velocity Y", space=0, everyFrame=true)
+    ClampSpeed(gameObject=Self, speedMin=var "Throw Speed", speedMax=var "Throw Speed", everyFrame=true)
+    on TERRAIN COLLIDE → Terrain Collide
+    on RECYCLE → Recycle
+    on DID DAMAGE → Hit Check
+    on TARGET HERO → Set Targeting Hero
+    on PARRIED → Deflect
+    on ENTERED WATER → Splash In
+    on HERO DAMAGED → Hero Rebound
+  }
+
+  state Terrain Collide {
+    PlayRandomAudioClipTable(Table=shakra_ring_bounce (sfxdynamic_assets_mapper.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    GetCollision2dInfo(gameObjectHit=var "", relativeVelocity=(unset), relativeSpeed=(unset), contactPoint=var "Contact Point", contactNormal=var "Contact Normal", shapeCount=(unset), physics2dMaterialName="")
+    SpawnObjectFromGlobalPool(gameObject=Nail Terrain Hit Effect (globalpoolprefabs_assets_all.bundle), spawnPoint=<null>, position=var "Contact Point", rotation=(unset), storeObject=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)  // disabled
+    CheckOutOfCamera(gameObject=Self, margin=10, outsideEvent=→"BREAK", insideEvent=(none), insideBool=false, outsideBool=false, everyFrame=false)
+    IntCompare(integer1=var "Terrain Bounces", integer2=0, equal=→"BREAK", lessThan=→"BREAK", greaterThan=(none), everyFrame=false)
+    IntAdd(intVariable=var "Terrain Bounces", add=-1, everyFrame=false)
+    GetVector3XYZ(vector3Variable=var "Contact Normal", storeX=var "Contact X", storeY=var "Contact Y", storeZ=(unset), everyFrame=false)
+    SetFloatSign(floatValue=var "Contact X", setPositive=false, everyFrame=false)
+    SetFloatSign(floatValue=var "Contact Y", setPositive=false, everyFrame=false)
+    FloatMultiply(floatVariable=var "Contact X", multiplyBy=2, everyFrame=false)
+    FloatMultiply(floatVariable=var "Contact Y", multiplyBy=2, everyFrame=false)
+    FloatMultiply(floatVariable=var "Contact X", multiplyBy=var "Velocity X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Contact Y", multiplyBy=var "Velocity Y", everyFrame=false)
+    FloatAdd(floatVariable=var "Velocity X", add=var "Contact X", everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Velocity Y", add=var "Contact Y", everyFrame=false, perSecond=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=var "Velocity Y", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Enemy Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hero Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on BREAK → Break
+    on FINISHED → Fly
+    on PARRIED → Deflect
+  }
+
+  state Recycle {
+    SetBoolValue(boolVariable=var "Targeting Hero", boolValue=false, everyFrame=false)
+    RecycleSelf()
+  }
+
+  state Init {
+    SetBoolValue(boolVariable=var "Targeting Hero", boolValue=false, everyFrame=false)
+    SetIntValue(intVariable=var "Hits", intValue=3, everyFrame=false)
+    SetIntValue(intVariable=var "Terrain Bounces", intValue=1, everyFrame=false)
+    ArrayClear(array=var "Targeted Enemies", resetValue=(unset var))
+    ArrayResize(array=var "Targeted Enemies", newSize=0, sizeOutOfRangeEvent=(none))
+    SetMeshRenderer(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Enemy Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hero Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Break Effects", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Fly
+    on TARGET HERO → Set Targeting Hero
+  }
+
+  state Try Target {
+    GetTrackTriggerClosestObject(ClosestTo=Self, TrackTrigger=var "Enemy Range", StoreObject=var "Next Enemy", ExcludedObject=var "Damaged Enemy")
+    GameObjectIsNull(gameObject=var "Next Enemy", isNull=→"NO TARGET", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    ArrayContains(array=var "Targeted Enemies", value=var "Next Enemy", index=(unset), isContained=(unset), isContainedEvent=→"NO TARGET", isNotContainedEvent=→"TARGET")
+    on NO TARGET → Untargeted Rebound
+    on TARGET → Targeted Rebound
+  }
+
+  state Register Enemy {
+    ArrayAdd(array=var "Targeted Enemies", value=var "Damaged Enemy")
+    on FINISHED → Try Target
+  }
+
+  state Hit Check {
+    IntCompare(integer1=var "Hits", integer2=0, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    IntAdd(intVariable=var "Hits", add=-1, everyFrame=false)
+    on CANCEL → Fly
+    on FINISHED → Register Enemy
+  }
+
+  state Untargeted Rebound {
+    GetVelocityAsAngle(gameObject=Self, storeAngle=var "Angle", everyFrame=false)
+    FloatAddRandom(floatVariable=var "Angle", addMin=150, addMax=220)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Targeted Rebound {
+    GetAngleToTarget2D(gameObject=Self, target=var "Next Enemy", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Angle", addMin=-10, addMax=10)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Break {
+    SetBoolValue(boolVariable=var "Targeting Hero", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Enemy Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Break Effects", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Recycle
+  }
+
+  state Set Targeting Hero {
+    SetBoolValue(boolVariable=var "Targeting Hero", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Enemy Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hero Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Deflect {
+    ActivateGameObject(gameObject=var "Hero Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetVelocityAsAngle(gameObject=Self, storeAngle=var "Angle", everyFrame=false)
+    RandomFloatEither(value1=15, value2=-15, storeResult=var "Deflect Angle")
+    FloatAdd(floatVariable=var "Angle", add=var "Deflect Angle", everyFrame=false, perSecond=false)
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Splash In {
+    SetIntValue(intVariable=var "Terrain Bounces", intValue=0, everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Hero Rebound {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Angle", addMin=-15, addMax=15)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Throw Speed", everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  var Angle: float = 0
+  var Contact X: float = 0
+  var Contact Y: float = 0
+  var Deflect Angle: float = 0
+  var Speed: float = 50
+  var Velocity X: float = 0
+  var Velocity Y: float = 0
+  var Throw Speed: float = 55
+  var Hits: int = 0
+  var Terrain Bounces: int = 0
+  var Targeting Hero: bool = false
+  var Contact Normal: vector3 = (0, 0, 0)
+  var Contact Point: vector3 = (0, 0, 0)
+  var Enemy Range: gameObject = Shakra Ring Friendly/Enemy Range
+  var Damaged Enemy: gameObject = <null>
+  var Next Enemy: gameObject = <null>
+  var Terrain Detector: gameObject = Shakra Ring Friendly/Terrain Detector
+  var Enemy Damager: gameObject = Shakra Ring Friendly/Enemy Damager
+  var Pt Trail: gameObject = Shakra Ring Friendly/Pt Trail
+  var Break Effects: gameObject = Shakra Ring Friendly/Break Effects
+  var Hero Damager: gameObject = Shakra Ring Friendly/Hero Damager
+  var Targeted Enemies: array = var "Targeted Enemies"
+}

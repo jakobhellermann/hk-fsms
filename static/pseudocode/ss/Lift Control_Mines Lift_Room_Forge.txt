@@ -1,0 +1,223 @@
+# Lift Control
+# 1 location(s):
+#   Room_Forge / Mines Lift
+
+fsm Lift Control {
+  start Wait Persistent
+
+  state Start Unlocked {
+    CallMethodProper(gameObject=var "Pressure Plate", behaviour="SimpleButton", methodName="SetLocked", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero Y", float2=var "Hero Mid Y", tolerance=0, equal=(none), lessThan=→"START DOWN", greaterThan=→"START UP", everyFrame=false)
+    on START UP → Start Up
+    on START DOWN → Start Down
+  }
+
+  state Start Up {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Top Start Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Up Inactive
+  }
+
+  state Up {
+    SetBoolValue(boolVariable=var "Is Down", boolValue=false, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Y", float2=var "Hero Mid Y", tolerance=0, equal=(none), lessThan=→"TOUCHED", greaterThan=(none), everyFrame=true)
+    on TOUCHED → Bob
+  }
+
+  state Start Down {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Bot Start Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Down Inactive
+  }
+
+  state Down {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Y", float2=var "Hero Mid Y", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TOUCHED", everyFrame=true)
+    on TOUCHED → Bob
+  }
+
+  state Bob {
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="set_IsActive", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=dock_lift_activate (sfxstatic_assets_areadocks.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    iTweenMoveBy(gameObject=var "Sprites Folder", id="", vector=(0, -0.06, 0), time=0.15, delay=0, speed=(unset), easeType=13, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    iTweenMoveBy(gameObject=var "Sprites Folder", id="", vector=(0, 0.06, 0), time=0.15, delay=0.15, speed=(unset), easeType=12, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Up or Down?
+  }
+
+  state Up or Down? {
+    CallMethodProper(gameObject=var "Pressure Plate", behaviour="SimpleButton", methodName="SetLocked", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="set_IsActive", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Is Down", isTrue=→"MOVE UP", isFalse=→"MOVE DOWN", everyFrame=false)
+    on MOVE UP → Move Up
+    on MOVE DOWN → Move Down
+  }
+
+  state Move Up {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, WaitForEndOfClip=true, finishedEvent=(none))
+    AudioPlayInState(gameObject=var "Extra Audio Loop", volume=(unset))
+    MoveLiftChain(goUp=false, target=var "Chain R", everyFrame=false)
+    MoveLiftChain(goUp=true, target=var "Chain L", everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MOVING UP", delay=0, everyFrame=false)  // disabled
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=var "Speed", z=(unset), space=1, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Top Start Y", tolerance=0, equal=→"DEST REACHED", lessThan=(none), greaterThan=→"DEST REACHED", everyFrame=true)
+    ActivateGameObject(gameObject=var "z Active While Moving", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on DEST REACHED → Reached Top
+    on RETOUCHED → Flip Dir
+  }
+
+  state Reached Top {
+    CallMethodProper(gameObject=var "Pressure Plate", behaviour="SimpleButton", methodName="SetLocked", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="set_IsActive", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    StopLiftChain(target=var "Chain L", everyFrame=false)
+    StopLiftChain(target=var "Chain R", everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor Distant V2 (audioobjects_assets_all.bundle), spawnPoint=var "Self", audioClip=dock_lift_arrive (sfxstatic_assets_areadocks.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Top Start Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP MOVING", delay=0, everyFrame=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    iTweenMoveBy(gameObject=var "Sprites Folder", id="", vector=(0, -0.06, 0), time=0.15, delay=0.15, speed=(unset), easeType=13, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    iTweenMoveBy(gameObject=var "Sprites Folder", id="", vector=(0, 0.06, 0), time=0.15, delay=0, speed=(unset), easeType=12, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Up Inactive
+  }
+
+  state Move Down {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, WaitForEndOfClip=true, finishedEvent=(none))
+    AudioPlayInState(gameObject=var "Extra Audio Loop", volume=(unset))
+    MoveLiftChain(goUp=true, target=var "Chain R", everyFrame=false)
+    MoveLiftChain(goUp=false, target=var "Chain L", everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MOVING DOWN", delay=0, everyFrame=false)  // disabled
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=var "Speed Down", z=(unset), space=1, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Bot Start Y", tolerance=0, equal=→"DEST REACHED", lessThan=→"DEST REACHED", greaterThan=(none), everyFrame=true)
+    ActivateGameObject(gameObject=var "z Active While Moving", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on DEST REACHED → Reached Bot
+    on SEND COLLIDE → Move Up
+    on RETOUCHED → Flip Dir
+  }
+
+  state Reached Bot {
+    CallMethodProper(gameObject=var "Pressure Plate", behaviour="SimpleButton", methodName="SetLocked", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="set_IsActive", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    StopLiftChain(target=var "Chain L", everyFrame=false)
+    StopLiftChain(target=var "Chain R", everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor Distant V2 (audioobjects_assets_all.bundle), spawnPoint=var "Self", audioClip=dock_lift_arrive (sfxstatic_assets_areadocks.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Bot Start Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP MOVING", delay=0, everyFrame=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    iTweenMoveBy(gameObject=var "Sprites Folder", id="", vector=(0, -0.06, 0), time=0.15, delay=0, speed=(unset), easeType=13, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    iTweenMoveBy(gameObject=var "Sprites Folder", id="", vector=(0, 0.06, 0), time=0.15, delay=0.15, speed=(unset), easeType=12, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Down Inactive
+  }
+
+  state Pause {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Init
+  }
+
+  state Start Locked? {
+    BoolTest(boolVariable=var "Starts Locked", isTrue=(none), isFalse=→"FALSE", everyFrame=false)
+    BoolTest(boolVariable=var "Activated", isTrue=→"FALSE", isFalse=→"TRUE", everyFrame=false)
+    on FALSE → Start Unlocked
+    on TRUE → Locked
+  }
+
+  state Locked {
+    CallMethodProper(gameObject=var "Pressure Plate", behaviour="SimpleButton", methodName="SetLocked", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    on UNLOCK → Unlock
+    on TOUCHED → Locked Bob
+  }
+
+  state Unlock {
+    CallMethodProper(gameObject=var "Pressure Plate", behaviour="SimpleButton", methodName="SetLocked", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Unlock Wait For Touch", isTrue=(none), isFalse=→"END", everyFrame=false)
+    on END → Bob
+    on TOUCHED → Bob
+  }
+
+  state Locked Bob {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=dock_lift_activate (sfxstatic_assets_areadocks.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    iTweenMoveBy(gameObject=var "Sprites Folder", id="", vector=(0, -0.06, 0), time=0.15, delay=0, speed=(unset), easeType=13, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    iTweenMoveBy(gameObject=var "Sprites Folder", id="", vector=(0, 0.06, 0), time=0.15, delay=0.15, speed=(unset), easeType=12, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Locked
+    on UNLOCK → Unlock
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetParent(gameObject=var "Chain L", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Chain R", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindChild(gameObject=Self, childName="sprites", storeResult=var "Sprites Folder")
+    FindChild(gameObject=var "Sprites Folder", childName="cog1", storeResult=var "Cog 1")
+    FindChild(gameObject=var "Sprites Folder", childName="cog2", storeResult=var "Cog 2")
+    SetFloatValue(floatVariable=var "Speed Down", floatValue=var "Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed Down", multiplyBy=-1, everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Extra Audio Loop")
+    SetParent(gameObject=var "Extra Audio Loop", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroPlatformStick", methodName="set_IsActive", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Start Locked?
+  }
+
+  state Wait Persistent {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Pause
+  }
+
+  state Down Inactive {
+    SetBoolValue(boolVariable=var "Is Down", boolValue=true, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Y", float2=var "Hero Mid Y", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=true)
+    CheckTrackTriggerCountV2(Target=var "Reset Range", Count=0, Test=LessThanOrEqual, EveryFrame=true, SetBool=(unset), SuccessEvent=→"FINISHED", FailEvent=(none))
+    on CANCEL → Bob
+    on FINISHED → Down
+  }
+
+  state Up Inactive {
+    SetBoolValue(boolVariable=var "Is Down", boolValue=false, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Y", float2=var "Hero Mid Y", tolerance=0, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=true)
+    CheckTrackTriggerCountV2(Target=var "Reset Range", Count=0, Test=LessThanOrEqual, EveryFrame=true, SetBool=(unset), SuccessEvent=→"FINISHED", FailEvent=(none))
+    on CANCEL → Bob
+    on FINISHED → Up
+  }
+
+  state Flip Dir {
+    BoolFlip(boolVariable=var "Is Down")
+    StopLiftChain(target=var "Chain L", everyFrame=false)
+    StopLiftChain(target=var "Chain R", everyFrame=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=dock_lift_arrive (sfxstatic_assets_areadocks.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP MOVING", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    on FINISHED → Bob
+  }
+
+  var Bot Start Y: float = 6.02
+  var Hero Mid Y: float = 26.75
+  var Speed: float = 8
+  var Top Start Y: float = 31.006
+  var Starts Locked: bool = false
+  var Unlock Wait For Touch: bool = false
+  var Pressure Plate: gameObject = <null>
+  var z Active While Moving: gameObject = <null>
+
+  var Hero Y: float = 0
+  var Self Y: float = 8
+  var Speed Down: float = 39.02
+  var Is Down: bool = false
+  var Activated: bool = false
+  var Chain L: gameObject = Mines Lift/BG Chain L
+  var Chain R: gameObject = Mines Lift/BG Chain R
+  var Cog 1: gameObject = <null>
+  var Cog 2: gameObject = <null>
+  var Reset Range: gameObject = Mines Lift/No Clamber Region
+  var Self: gameObject = <null>
+  var Sprites Folder: gameObject = <null>
+  var Extra Audio Loop: gameObject = <null>
+}

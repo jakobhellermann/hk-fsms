@@ -1,0 +1,219 @@
+# Control
+# 1 location(s):
+#   Bone_East_14b / Spine Floater (3)
+
+fsm Control {
+  start Init
+  on SPINES COMPLETE → Peaceful  // from any state
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Alt Spawn Location", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Alt Pos?
+  }
+
+  state Idle {
+    IdleBuzzV2(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=2.5, accelerationMax=20, roamingRangeX=3, roamingRangeY=1, manualStartPos=var "Start Pos")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)  // disabled
+    CompareHP(enemy=var "Self", integer2=0, equal=→"FINAL", lessThan=→"FINAL", greaterThan=(none), everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Antic
+    on TOOK DAMAGE → Antic
+    on FINAL → Final Antic
+    on SING → Antic
+  }
+
+  state Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=true, limitFps=0)
+    DecelerateV2(gameObject=Self, deceleration=0.88, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(var "Spines"), sendEvent="ANTIC", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"NEXT", realTime=false)
+    CompareHP(enemy=var "Self", integer2=0, equal=→"FINAL", lessThan=→"FINAL", greaterThan=(none), everyFrame=true)
+    AudioStop(gameObject=Self, fadeTime=0)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=spine_floater_spit_antic (sfxstatic_assets_areawilds.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    on NEXT → Fire
+    on FINAL → Final Antic
+  }
+
+  state Fire {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=spine_floater_spit (sfxstatic_assets_areawilds.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spine Spawn")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    IdleBuzzV2(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=2.5, accelerationMax=20, roamingRangeX=3, roamingRangeY=1, manualStartPos=(unset))
+    ActivateGameObject(gameObject=var "Radial Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Fire Cooldown
+    on SING → Sing
+  }
+
+  state Restock Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.88, brakeOnExit=false)
+    on FINISHED → Restock
+  }
+
+  state Restock {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=spine_floater_reload (sfxstatic_assets_areawilds.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spine Spawn")
+    on FINISHED → Spine Choice
+  }
+
+  state Peaceful {
+    IdleBuzzV2(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=2.5, accelerationMax=20, roamingRangeX=3, roamingRangeY=1, manualStartPos=var "Start Pos")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    CompareHP(enemy=var "Self", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Idle
+  }
+
+  state Fire Cooldown {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=var "", WaitForEndOfClip=false, finishedEvent=(none))
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    CompareHP(enemy=var "Self", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Restock Antic
+  }
+
+  state Final Antic {
+    AudioStop(gameObject=Self, fadeTime=0)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=spine_floater_about_to_explode (sfxstatic_assets_areawilds.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    ObjectJitter(gameObject=Self, x=0.15, y=0.15, z=(unset), allowMovement=false, limitFps=0)
+    DecelerateV2(gameObject=Self, deceleration=0.88, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(var "Spines"), sendEvent="ANTIC", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"NEXT", realTime=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlashingWhite())
+    PlayParticleEmitter(gameObject=var "Pt Wispy Web", emit=0, resetIfPlaying=false)
+    on NEXT → Explode
+  }
+
+  state Explode {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=spine_floater_explode (sfxstatic_assets_areawilds.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spine Spawn")
+    ActivateGameObject(gameObject=var "Radial Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Radial Burst", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    InstaDeath(target=Self, direction=90)
+  }
+
+  state Spine Complete {
+    SendEvent(eventTarget=Self, sendEvent=→"SPINES COMPLETE", delay=0, everyFrame=false)
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=spine_floater_sing_loop (sfxdynamic_assets_areawilds.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Restock Antic
+  }
+
+  state Spine Choice {
+    SendRandomEventV4(events=[→"CROSS", →"BISHOP", →"FAN SIDE", →"FAN TOP"], weights=[0.25, 0.25, 0.25, 0.25], eventMax=[2, 2, 1, 1], missedMax=[3, 3, 4, 4], activeBool=(unset))
+    on CROSS → Cross
+    on BISHOP → Bishop
+    on FAN SIDE → Fan Side
+    on FAN TOP → Fan Top
+  }
+
+  state Cross {
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=90, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=180, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=270, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Spine Complete
+  }
+
+  state Bishop {
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=45, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=135, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=225, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=315, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Spine Complete
+  }
+
+  state Fan Side {
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=45, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=135, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=225, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=315, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=180, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Spine Complete
+  }
+
+  state Fan Top {
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=45, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=135, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=225, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=315, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=90, space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Spine Floater Spine (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Spines", position=(unset), rotation=(unset), storeObject=var "Spawned Spine")
+    SetParent(gameObject=var "Spawned Spine", parent=var "Spines", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Spawned Spine", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=270, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Spine Complete
+  }
+
+  state Set Start Pos {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    on FINISHED → Spine Choice
+  }
+
+  state Alt Pos? {
+    SendRandomEvent(events=[(none), →"FINISHED"], weights=[0.5, 0.5], delay=0)
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Alt Spawn Location", xOffset=0, yOffset=0, everyFrame=false)
+    on FINISHED → Set Start Pos
+  }
+
+  var Start Pos: vector3 = (0, 0, 0)
+  var Pt Wispy Web: gameObject = Spine Floater (3)/Pt Wispy Web
+  var Radial Burst: gameObject = Spine Floater (3)/Burst
+  var Self: gameObject = Spine Floater (3)
+  var Spawned Spine: gameObject = <null>
+  var Spines: gameObject = Spine Floater (3)/Spines
+  var Alt Spawn Location: gameObject = Spine Floater (3)/Alt Spawn Location
+  var Audio Loop Voice: gameObject = Spine Floater (3)/Audio Loop Voice
+}

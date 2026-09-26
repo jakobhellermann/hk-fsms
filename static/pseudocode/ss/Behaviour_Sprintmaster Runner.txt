@@ -1,0 +1,718 @@
+# Behaviour
+# 1 location(s):
+#   Sprintmaster_Cave / Race Group/Sprintmaster Runner
+
+fsm Behaviour {
+  start Init
+  on RACE RESET → Reset  // from any state
+  on DISABLE → Reset Tools State  // from any state
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Just Reset", boolValue=false, everyFrame=false)
+    SetColliderV2(Target=Self, SetActive=false, EveryFrame=false, ResetOnExit=false)
+    ActivateGameObject(gameObject=var "Leading Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.5, MaxReactDelay=1.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Turn To Hero?
+    on SING → Sing
+    on STARTLE → Startle
+  }
+
+  state Start Line {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    ActivateGameObject(gameObject=var "Race Active Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Race Inactive Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Leading Camlock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Was Track Active", boolValue=var "Is Track Active", everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Track Active", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="WasInSceneRace", value=true)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="STOP", delay=0, everyFrame=false)  // disabled
+    SetColliderV2(Target=Self, SetActive=true, EveryFrame=false, ResetOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="SplineRunner", methodName="PositionAtStart", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Start Position", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GetPosition2D(gameObject=Self, vector=var "Target Pos", x=var "Target Pos X", y=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=2.2, float2=var "X Scale", operation=Multiply, storeResult=var "X Scale", everyFrame=false)
+    FloatOperator(float1=var "Target Pos X", float2=var "X Scale", operation=Add, storeResult=var "Target Pos X", everyFrame=false)
+    SetVector2XY(vector2Variable=var "Target Pos", vector2Value=(unset), x=var "Target Pos X", y=(unset), everyFrame=false)
+    PositionColliderOnGroundV2(Target=var "Hero", GroundPos=var "Target Pos")
+    MatchScaleSign(Target=var "Hero", MatchTo=var "Self", EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RefreshFacing", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sprintmaster Start")
+    GetSilk(StoreAmount=var "Add Silk")
+    TakeSilk(target=var "Hero", amount=var "Add Silk")
+    GetPlayerDataVariable(VariableName="silkRegenMax", StoreValue=var "Add Silk")
+    AddSilk(target=var "Hero", amount=var "Add Silk", playHeroEffect=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Sound?
+  }
+
+  state Go! {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=SM_start_line_take_off (sfxdynamic_assets_sprintmaster.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on RUNNER END → Runner End
+    on HERO END → Hero Win
+    on DISQUALIFIED → Catch Hero
+  }
+
+  sequence state Runner Win {
+    AudioStopV2(gameObject=var "Music Loop Source", fadeTime=0, cancelOnEarlyExit=false)
+    AudioPlaySimple(gameObject=var "Music End Source", volume=1, oneShotClip=<null>)
+    SetBoolValue(boolVariable=var "Is Track Active", boolValue=false, everyFrame=false)
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=true)
+    FreezeMomentV2(FreezeMomentType=RaceWinSlow, WaitForFinish=true)
+    HeroRelinquishControlDynamic()
+    Wait(time=0.5, finishEvent=(none), realTime=true)
+    on FINISHED → Fade Down 2
+  }
+
+  state Init {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=var "Start Scale", xScale=(unset), yScale=(unset), zScale=(unset), space=1, everyFrame=false)
+    ActivateGameObject(gameObject=var "Leading Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateAllChildren(gameObject=var "Tracks Parent", activate=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Completed All?
+  }
+
+  state Active {
+    ActivateGameObject(gameObject=var "Race Active Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Race Inactive Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PositionColliderOnGroundV2(Target=Self, GroundPos=(unset))
+    on FINISHED → Restart Jog
+  }
+
+  state Offered? {
+    PlayerDataBoolTest(boolName="WasInSceneRace", isTrue=→"FORFEITED", isFalse=(none))
+    BoolTest(boolVariable=var "Did Hero Cancel", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Did Hero Lose", isTrue=→"RUNNER END", isFalse=(none), everyFrame=false)
+    CheckQuestStateV2(NotTrackedEvent=(none), IncompleteEvent=(none), CompletedEvent=→"EXTRA", Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    GetPlayerDataVariable(VariableName="SprintMasterCurrentRace", StoreValue=var "Current Track Index")
+    GetBitmaskAtIndex(ReadMask=var "Value", Index=var "Current Track Index", StoreValue=(unset), TrueEvent=→"TRUE", FalseEvent=→"FALSE")
+    on FALSE → Offer
+    on TRUE → Reoffer
+    on FORFEITED → Forefeited Retry
+    on CANCEL → Cancel Retry
+    on EXTRA → Offer Extra
+  }
+
+  state Offer {
+    SetBitmaskAtIndex(ReadMask=var "Value", Index=var "Current Track Index", SetValue=true, WriteMask=var "Value")
+    IntOperator(integer1=var "Current Track Index", integer2=1, operation=Add, storeResult=var "Chooser", everyFrame=false)
+    FormatString(format="SPRINTMASTER_OFFER_{0}", variables=[var "Chooser"], storeResult=var "Dlg", everyFrame=false)
+    CheckQuestStateV2(NotTrackedEvent=(none), IncompleteEvent=→"ALREADY ACCEPTED", CompletedEvent=(none), Quest=Sprintmaster Pre (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    RunDialogue(Sheet="Wanderers", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Offer?
+    on ALREADY ACCEPTED → Accepted At Board
+  }
+
+  state Reoffer {
+    GetPlayerDataBool(boolName="SprintMasterExtraRaceWon", storeValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="SPRINTMASTER_REOFFER", trueString="SPRINTMASTER_REOFFER_FINAL", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Offer?
+  }
+
+  state Yes No {
+    HideNpcDialogueTitle(Target=Self)
+    SetPlayerDataBool(boolName="WasInSceneRace", value=false)
+    DialogueYesNoV2(TranslationSheet="Wanderers", TranslationKey="SPRINTMASTER_YESNO", UseCurrency=false, CurrencyCost=0, CurrencyType=None, ConsumeCurrency=false, WillGetItem=<null>, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Decline
+    on TRUE → Complete Pre Quest?
+  }
+
+  state Accept {
+    ShowNpcDialogueTitle(Target=Self)
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Array Track?
+  }
+
+  state Decline {
+    ShowNpcDialogueTitle(Target=Self)
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_DECLINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state End Dialogue {
+    BoolTest(boolVariable=var "Is Track Active", isTrue=→"RACING", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Track Active", boolValue=false, everyFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Restart To Stretch
+    on RACING → Fade Down 4
+  }
+
+  sequence state Fade Down {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    HideNpcDialogueTitle(Target=Self)
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="FADE VOICE", delay=0, everyFrame=false)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.7)
+    Wait(time=0.8, finishEvent=(none), realTime=false)
+    RunGarbageCollector(finishEvent=(none))
+    on FINISHED → Set Track
+  }
+
+  state Start Wait {
+    SetBoolValue(boolVariable=var "Get Speed Boost", boolValue=false, everyFrame=false)
+    on SPRINT COUNTDOWN FINAL → Final Wait
+    on SPRINT COUNTDOWN END → Start With Dash?
+  }
+
+  sequence state Fade Up {
+    Wait(time=1, finishEvent=(none), realTime=false)
+    SendEventToRegister(eventName="RACE ON FADE UP")
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Hero Start Line"), sendEvent="BEGIN", delay=0, everyFrame=false)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=0.7)
+    Wait(time=0.7, finishEvent=(none), realTime=false)
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SendEventToRegister(eventName="SPRINT COUNTDOWN START")
+    on FINISHED → Start Wait
+  }
+
+  sequence state Hero Win {
+    AudioStopV2(gameObject=var "Music Loop Source", fadeTime=0, cancelOnEarlyExit=false)
+    AudioPlaySimple(gameObject=var "Music End Source", volume=1, oneShotClip=<null>)
+    SetBoolValue(boolVariable=var "Is Track Active", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Hero Lose", boolValue=false, everyFrame=false)
+    SetPlayerDataBool(boolName="WasInSceneRace", value=false)
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=true)
+    FreezeMomentV2(FreezeMomentType=RaceWinSlow, WaitForFinish=true)
+    HeroRelinquishControlDynamic()
+    Wait(time=0.5, finishEvent=(none), realTime=true)
+    on FINISHED → Fade Down 2
+    on RUNNER END → Runner End A
+  }
+
+  state Retry {
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_RETRY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Yes No
+  }
+
+  state Forefeited Retry {
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_EXITED_RETURN", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Yes No
+  }
+
+  sequence state Fade Down 2 {
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.7)
+    Wait(time=0.8, finishEvent=(none), realTime=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="STOP", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="FSM CANCEL")
+    ControlNeedolin(target=var "Hero", isPlaying=false)
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StartAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    RunGarbageCollector(finishEvent=(none))
+    on FINISHED → Reposition
+    on RUNNER END → Runner End B
+  }
+
+  state Reposition {
+    SendEventToRegister(eventName="FSM CANCEL")
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StartAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=PlayIdle, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    RemoveHeroInputBlocker(Blocker=Self)
+    ActivateGameObject(gameObject=var "Race Active Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Race Inactive Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCurrentRaceTrack(Runner=Self, Track=<null>, GetReward=var "")
+    CallMethodProper(gameObject=var "Current Track", behaviour="SprintRaceController", methodName="EndInRace", parameters=[], storeResult=(unset var), EveryFrame=false)
+    GetParent(gameObject=var "Current Track", storeResult=var "Parent")
+    ActivateGameObject(gameObject=var "Parent", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PositionColliderOnGroundV2(Target=Self, GroundPos=var "Start Pos")
+    SetScale(gameObject=Self, vector=var "Start Scale", x=(unset), y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    GetPosition2D(gameObject=Self, vector=var "Target Pos", x=var "Target Pos X", y=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=-2.5, float2=var "X Scale", operation=Multiply, storeResult=var "X Scale", everyFrame=false)
+    FloatOperator(float1=var "Target Pos X", float2=var "X Scale", operation=Add, storeResult=var "Target Pos X", everyFrame=false)
+    SetVector2XY(vector2Variable=var "Target Pos", vector2Value=(unset), x=var "Target Pos X", y=(unset), everyFrame=false)
+    PositionColliderOnGroundV2(Target=var "Hero", GroundPos=var "Target Pos")
+    FaceObjectV3(ObjectA=var "Hero", ObjectB=var "Self", SpriteFacesRight=false, NewAnimationClip="", ResetFrame=false, PauseBetweenTurns=0, StoreDuration=(unset), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RefreshFacing", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CameraRepositionToHero()
+    SendEventToRegister(eventName="RACE OFF")
+    ToolsActiveStateControl(SetActiveState=Active)
+    BoolTest(boolVariable=var "Did Hero Lose", isTrue=→"LOST", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Was Disqualified", isTrue=→"DISQUALIFIED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Defeat Pose", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on LOST → Idle Anim
+    on DISQUALIFIED → Idle Anim
+    on FINISHED → Fade Up 2
+  }
+
+  sequence state Fade Up 2 {
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=0.7)
+    Wait(time=0.7, finishEvent=(none), realTime=false)
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=false)
+    BoolTest(boolVariable=var "Did Hero Lose", isTrue=→"LOST", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Was Disqualified", isTrue=→"DISQUALIFIED", isFalse=(none), everyFrame=false)
+    on LOST → Setup Convo Jog 2
+    on DISQUALIFIED → Setup Convo Jog 3
+    on FINISHED → Already Completed All?
+  }
+
+  state Win Pre Dlg {
+    SetNPCSpeakingAudioTable(Target=Self, Table=SM_talk_puffed (sfxdynamic_assets_sprintmaster.bundle))
+    NpcDialogueTitleSkipNextHide(Target=Self)
+    FormatString(format="SPRINTMASTER_HERO_WIN_PRE_{0}", variables=[var "Current Track Index"], storeResult=var "Dlg", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Reward
+  }
+
+  sequence state Give Reward {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    HideNpcDialogueTitle(Target=Self)
+    Wait(time=0.2, finishEvent=(none), realTime=false)
+    SavedItemGet(Item=var "Reward")
+    SetObjectValue(objectVariable=var "Reward", objectValue=<null>, everyFrame=false)
+    SetPlayerDataVariable(VariableName="SprintMasterCurrentRace", SetValue=var "Current Track Index")
+    QueueSaveGame()
+    Wait(time=1, finishEvent=(none), realTime=false)
+    on FINISHED → Was Extra?
+  }
+
+  state Win Post Dlg {
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_HERO_WIN_POST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 3
+  }
+
+  state Start With Dash? {
+    GetFsmBool(gameObject=Self, fsmName="Hero Start Line", variableName="Holding Dash", storeValue=var "Starting With Dash", everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Hero Start Line"), sendEvent="END", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Starting With Dash", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetStartWithDashKeepFacing", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on CANCEL → Wait for hero move
+    on FINISHED → Speed Boost?
+  }
+
+  state Reset {
+    SetBoolValue(boolVariable=var "Just Reset", boolValue=true, everyFrame=false)
+    AudioStopV2(gameObject=var "Music Loop Source", fadeTime=0, cancelOnEarlyExit=false)
+    SetBoolValue(boolVariable=var "Did Hero Lose", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Hero Cancel", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="SplineRunner", methodName="ResetRace", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Leading Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PositionColliderOnGroundV2(Target=Self, GroundPos=var "Start Pos")
+    SetScale(gameObject=Self, vector=var "Start Scale", x=(unset), y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetPlayerDataBool(boolName="WasInSceneRace", value=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    ToolsActiveStateControl(SetActiveState=Active)
+    on FINISHED → Reposition 2
+  }
+
+  sequence state Turn To Hero? {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Turn", AnimationCompleteEvent=(none))
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Setup Convo Jog
+  }
+
+  sequence state Fade Down 4 {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    HideNpcDialogueTitle(Target=Self)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.7)
+    Wait(time=0.8, finishEvent=(none), realTime=false)
+    RunGarbageCollector(finishEvent=(none))
+    on FINISHED → Reposition 2
+  }
+
+  state Reposition 2 {
+    SetBoolValue(boolVariable=var "Is Track Active", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Race Active Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Race Inactive Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCurrentRaceTrack(Runner=Self, Track=<null>, GetReward=var "")
+    CallMethodProper(gameObject=var "Current Track", behaviour="SprintRaceController", methodName="EndInRace", parameters=[], storeResult=(unset var), EveryFrame=false)
+    GetParent(gameObject=var "Current Track", storeResult=var "Parent")
+    ActivateGameObject(gameObject=var "Parent", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetColliderV2(Target=Self, SetActive=true, EveryFrame=false, ResetOnExit=false)
+    PositionColliderOnGroundV2(Target=Self, GroundPos=var "Start Pos")
+    SetColliderV2(Target=Self, SetActive=false, EveryFrame=false, ResetOnExit=false)
+    SetScale(gameObject=Self, vector=var "Start Scale", x=(unset), y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    BoolTest(boolVariable=var "Just Reset", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=var "Target Pos", x=var "Target Pos X", y=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=-2.5, float2=var "X Scale", operation=Multiply, storeResult=var "X Scale", everyFrame=false)
+    FloatOperator(float1=var "Target Pos X", float2=var "X Scale", operation=Add, storeResult=var "Target Pos X", everyFrame=false)
+    SetVector2XY(vector2Variable=var "Target Pos", vector2Value=(unset), x=var "Target Pos X", y=(unset), everyFrame=false)
+    PositionColliderOnGroundV2(Target=var "Hero", GroundPos=var "Target Pos")
+    FaceObjectV3(ObjectA=var "Hero", ObjectB=var "Self", SpriteFacesRight=false, NewAnimationClip="", ResetFrame=false, PauseBetweenTurns=0, StoreDuration=(unset), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RefreshFacing", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CameraRepositionToHero()
+    SendEventToRegister(eventName="RACE OFF")
+    ToolsActiveStateControl(SetActiveState=Active)
+    on CANCEL → Restart Jog
+    on FINISHED → Fade Up 4
+  }
+
+  sequence state Fade Up 4 {
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=0.7)
+    Wait(time=0.7, finishEvent=(none), realTime=false)
+    on FINISHED → End Dialogue
+  }
+
+  state Sing {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="STOP", delay=0, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.6, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=SM_sing (sfxdynamic_assets_sprintmaster.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=RemoveNeedolinText())
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Restart Jog
+  }
+
+  state Set Track {
+    SetCurrentRaceTrack(Runner=Self, Track=var "Current Track", GetReward=var "Reward")
+    SendEventToRegister(eventName="RACE ON")
+    ToolsActiveStateControl(SetActiveState=Disabled)
+    SetBoolValue(boolVariable=var "Did Hero Cancel", boolValue=false, everyFrame=false)
+    on FINISHED → Start Line
+  }
+
+  sequence state End Dialogue 3 {
+    SetNPCSpeakingAudioTable(Target=Self, Table=SM_talk (sfxdynamic_assets_sprintmaster.bundle))
+    ActivateGameObject(gameObject=var "Audio Loop Voice", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    ObjectCompare(objectVariable=var "Reward", compareTo=<null>, equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SavedItemGet(Item=var "Reward")
+    SetObjectValue(objectVariable=var "Reward", objectValue=<null>, everyFrame=false)
+    on FINISHED → Restart To Stretch
+  }
+
+  state Was Extra? {
+    ShowNpcDialogueTitle(Target=Self)
+    CheckQuestStateV2(NotTrackedEvent=→"FALSE", IncompleteEvent=→"FALSE", CompletedEvent=→"TRUE", Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on FALSE → Win Post Dlg
+    on TRUE → Win Extra Post
+  }
+
+  state Completed All? {
+    SetBoolValue(boolVariable=var "Completed All", boolValue=false, everyFrame=false)
+    ArrayLength(array=var "Tracks", length=var "Track Count", everyFrame=false)
+    GetPlayerDataVariable(VariableName="SprintMasterCurrentRace", StoreValue=var "Current Track Index")
+    IntCompare(integer1=var "Current Track Index", integer2=var "Track Count", equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Completed All", boolValue=true, everyFrame=false)
+    on FINISHED → Active
+  }
+
+  state Win Post Dlg Last {
+    SetBoolValue(boolVariable=var "Completed All", boolValue=true, everyFrame=false)
+    SetNPCSpeakingAudioTable(Target=Self, Table=SM_talk_puffed (sfxdynamic_assets_sprintmaster.bundle))
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_HERO_WIN_POST_LAST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest End
+  }
+
+  state Already Completed All? {
+    ActivateGameObject(gameObject=var "Audio Loop Voice", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    IntAddV2(intVariable=var "Current Track Index", add=1, everyFrame=false)
+    PlayerDataVariableTest(VariableName="SprintMasterExtraRaceWon", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=(none))
+    CheckQuestStateV2(NotTrackedEvent=(none), IncompleteEvent=(none), CompletedEvent=→"EXTRA", Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    BoolTest(boolVariable=var "Completed All", isTrue=→"TRUE", isFalse=(none), everyFrame=false)
+    ArrayLength(array=var "Tracks", length=var "Track Count", everyFrame=false)
+    IntCompare(integer1=var "Current Track Index", integer2=var "Track Count", equal=→"LAST", lessThan=(none), greaterThan=→"LAST", everyFrame=false)
+    on TRUE → Win Repeat Dlg
+    on FINISHED → Win Pre Dlg
+    on EXTRA → Win Extra Pre
+    on LAST → Win Post Dlg Last
+  }
+
+  state Win Repeat Dlg {
+    SetNPCSpeakingAudioTable(Target=Self, Table=SM_talk_puffed (sfxdynamic_assets_sprintmaster.bundle))
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_HERO_WIN_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 3
+  }
+
+  state Quest Offer? {
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=→"CANCEL", CompletedEvent=(none), Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    HideNpcDialogueTitle(Target=Self)
+    QuestYesNo(Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle), YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on CANCEL → Yes No
+    on FALSE → Decline
+    on TRUE → Accept
+  }
+
+  sequence state Quest End {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    HideNpcDialogueTitle(Target=Self)
+    GetQuestReward(StoreReward=var "Reward", Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    EndQuest(ConsumeCurrency=false, Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="RESTART", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Win After Wish
+  }
+
+  state Accept Short {
+    ConvertBoolToString(boolVariable=var "Is Track Active", stringVariable=var "Dlg", falseString="SPRINTMASTER_ACCEPT_SHORT", trueString="SPRINTMASTER_ACCEPT_RETRY", everyFrame=false)
+    ShowNpcDialogueTitle(Target=Self)
+    RunDialogue(Sheet="Wanderers", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Array Track?
+  }
+
+  state Wait for hero move {
+    SetBoolValue(boolVariable=var "Was Disqualified", boolValue=false, everyFrame=false)
+    AudioPlaySimple(gameObject=var "Music Loop Source", volume=1, oneShotClip=<null>)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    SetColliderV2(Target=Self, SetActive=true, EveryFrame=false, ResetOnExit=true)
+    CallMethodProper(gameObject=Self, behaviour="SplineRunner", methodName="StartRunning", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Starting With Dash", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=var "Hero X Pos Start", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=var "Hero X Pos", y=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X Pos", float2=var "Hero X Pos Start", tolerance=0.001, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=true)
+    ListenForAttackV2(EventTarget=Self, WasPressed=→"FINISHED", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=true)
+    ListenForJumpV2(eventTarget=Self, wasPressed=→"FINISHED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=false, queueBool=(unset), activeBool=(unset), stateEntryOnly=false, delayBeforeActive=0)
+    on FINISHED → Go!
+    on RUNNER END → Hero Did Nothing
+  }
+
+  sequence state Sound? {
+    BoolTest(boolVariable=var "Was Track Active", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayAudioEvent(audioClip=SM_race_track_setup_2d (sfxstatic_assets_sprintmaster.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=4.5, finishEvent=(none), realTime=false)
+    on FINISHED → Fade Up
+  }
+
+  sequence state Runner End A {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=SM_race_defeat (sfxdynamic_assets_sprintmaster.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Defeat Race", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    HeroRelinquishControlDynamic()
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Fade Down 2
+  }
+
+  sequence state Runner End B {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=SM_race_defeat (sfxdynamic_assets_sprintmaster.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Defeat Race", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Reposition
+  }
+
+  state Offer Extra {
+    PlayerDataBoolTest(boolName="SprintMasterExtraRaceWon", isTrue=→"CANCEL", isFalse=(none))
+    PlayerDataBoolTest(boolName="SprintMasterExtraRaceAvailable", isTrue=(none), isFalse=→"REPEAT")
+    GetPlayerDataVariable(VariableName="SprintMasterExtraRaceDlg", StoreValue=var "Test")
+    SetPlayerDataVariable(VariableName="SprintMasterExtraRaceDlg", SetValue=true)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="SPRINTMASTER_EXTRA_MEET", trueString="SPRINTMASTER_EXTRA_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Reoffer
+    on REPEAT → After Wish Repeat
+    on CONVO_END → Yes No
+  }
+
+  state Array Track? {
+    CheckQuestStateV2(NotTrackedEvent=(none), IncompleteEvent=(none), CompletedEvent=→"EXTRA", Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    GetPlayerDataVariable(VariableName="SprintMasterCurrentRace", StoreValue=var "Current Track Index")
+    ArrayLength(array=var "Tracks", length=var "Track Count", everyFrame=false)
+    IntOperator(integer1=var "Track Count", integer2=1, operation=Subtract, storeResult=var "Max Track Index", everyFrame=false)
+    IntClamp(intVariable=var "Current Track Index", minValue=0, maxValue=var "Max Track Index", everyFrame=false)
+    ArrayGet(array=var "Tracks", index=var "Current Track Index", storeValue=var "Current Track", everyFrame=false, indexOutOfRange=(none))
+    on EXTRA → Extra Track
+    on FINISHED → Fade Down
+  }
+
+  state Extra Track {
+    SetGameObject(variable=var "Current Track", gameObject=var "Extra Track", everyFrame=false)
+    on FINISHED → Fade Down
+  }
+
+  state Win Extra Pre {
+    SetNPCSpeakingAudioTable(Target=Self, Table=SM_talk_puffed (sfxdynamic_assets_sprintmaster.bundle))
+    NpcDialogueTitleSkipNextHide(Target=Self)
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_EXTRA_WIN_PRE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Reward
+  }
+
+  state Win Extra Post {
+    SetPlayerDataVariable(VariableName="SprintMasterExtraRaceWon", SetValue=true)
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_EXTRA_WIN_POST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 3
+  }
+
+  sequence state Win After Wish {
+    Wait(time=0.7, finishEvent=(none), realTime=false)
+    RemoveHeroInputBlocker(Blocker=Self)
+    ShowNpcDialogueTitle(Target=Self)
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_HERO_WIN_AFTER_WISH", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 3
+  }
+
+  state Reset Tools State {
+    ToolsActiveStateControl(SetActiveState=Active)
+  }
+
+  sequence state Catch Hero {
+    SetBoolValue(boolVariable=var "Was Disqualified", boolValue=true, everyFrame=false)
+    AudioStopV2(gameObject=var "Music Loop Source", fadeTime=0, cancelOnEarlyExit=false)
+    AudioPlaySimple(gameObject=var "Music End Source", volume=1, oneShotClip=<null>)
+    SetBoolValue(boolVariable=var "Is Track Active", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Hero Lose", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="WasInSceneRace", value=false)
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=true)
+    AddHeroInputBlocker(Blocker=Self)
+    HeroRelinquishControlDynamic()
+    on FINISHED → Fade Down 2
+  }
+
+  state Disqualified Dlg {
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_WRONG_GATE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 3
+  }
+
+  state Idle Anim {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="RESTART", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Jog")  // disabled
+    on FINISHED → Fade Up 2
+  }
+
+  sequence state Final Wait {
+    SetBoolValue(boolVariable=var "Get Speed Boost", boolValue=false, everyFrame=false)
+    GetFsmBool(gameObject=Self, fsmName="Hero Start Line", variableName="Holding Dash", storeValue=var "Was Holding", everyFrame=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    GetFsmBool(gameObject=Self, fsmName="Hero Start Line", variableName="Holding Dash", storeValue=var "Is Holding", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Was Holding", var "Is Holding"], boolStates=[false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Get Speed Boost", everyFrame=false)
+    on SPRINT COUNTDOWN END → Start With Dash?
+  }
+
+  state Speed Boost? {
+    BoolTest(boolVariable=var "Get Speed Boost", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Hero", audioClipTable=Attack Heavy Hornet Voice (herodynamic_assets_all.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=true)
+    PlayAudioEvent(audioClip=sprintmaster_hornet_starting_burst_extra (sfxstatic_assets_sprintmaster.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoSpriteFlash(Target=var "Hero", FlashMethod="flashFocusHeal", IsRepeating=false, CancelOnExit=false)
+    SetFsmFloat(gameObject=var "Hero", fsmName="Sprint", variableName="Add Speed", setValue=25, everyFrame=false)
+    CallMethodProper(gameObject=var "MainCamera", behaviour="CameraController", methodName="ScreenFlashPerfectDash", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Wait for hero move
+  }
+
+  state After Wish Repeat {
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_HERO_WIN_AFTER_WISH_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Runner End {
+    SetPlayerDataBool(boolName="WasInSceneRace", value=false)
+    SetBoolValue(boolVariable=var "Did Hero Lose", boolValue=true, everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="WIN RACE", delay=0, everyFrame=false)
+    on HERO END → Runner Win
+    on DISQUALIFIED → Catch Hero
+  }
+
+  state Accepted At Board {
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_ALREADY_ACCEPTED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Offer?
+  }
+
+  state Complete Pre Quest? {
+    CheckQuestStateV2(NotTrackedEvent=→"FINISHED", IncompleteEvent=(none), CompletedEvent=→"FINISHED", Quest=Sprintmaster Pre (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    BeginQuest(Quest=Sprintmaster Race (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on FINISHED → Accept Short
+  }
+
+  state Cancel Retry {
+    SetBoolValue(boolVariable=var "Did Hero Cancel", boolValue=false, everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key="SPRINTMASTER_EXITED_BY_BUG", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Yes No
+  }
+
+  state Startle {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="STOP", delay=0, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=SM_race_hit (sfxdynamic_assets_sprintmaster.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Restart Jog
+  }
+
+  state Setup Convo Jog {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Jog")
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    SetRandomAudioClipFromTable(Table=SM_idle_jog_loop (sfxdynamic_assets_sprintmaster.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=false, delay=0)
+    SetAudioClip(gameObject=Self, audioClip=sprintmaster_dial_light_jog_on_spot_loop (sfxstatic_assets_areaaqueduct.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Offered?
+  }
+
+  state Restart Jog {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="RESTART", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Restart To Stretch {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="RESTART TO STRETCH", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Setup Convo Jog 2 {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Jog")
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    SetRandomAudioClipFromTable(Table=SM_idle_jog_loop (sfxdynamic_assets_sprintmaster.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=false, delay=0)
+    SetAudioClip(gameObject=Self, audioClip=sprintmaster_dial_light_jog_on_spot_loop (sfxstatic_assets_areaaqueduct.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Retry
+  }
+
+  state Setup Convo Jog 3 {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Idle Anim"), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Jog")
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    SetRandomAudioClipFromTable(Table=SM_idle_jog_loop (sfxdynamic_assets_sprintmaster.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=false, delay=0)
+    SetAudioClip(gameObject=Self, audioClip=sprintmaster_dial_light_jog_on_spot_loop (sfxstatic_assets_areaaqueduct.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Disqualified Dlg
+  }
+
+  state Hero Did Nothing {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Runner End
+  }
+
+  var Extra Track: gameObject = Race Group/Tracks/Track Extra/Track Extra Race Control
+  var Leading Camlock: gameObject = Race Group/Leading Camlock
+  var Race Active Folder: gameObject = Race Group/sprintmaster_race_starting_line
+  var Race Inactive Folder: gameObject = Race Group/Sprintmaster Race Inactive Folder
+  var Tracks Parent: gameObject = Race Group/Tracks
+  var Tracks: array = var "Tracks"
+
+  var X Scale: float = 0
+  var Target Pos X: float = 0
+  var Hero X Pos: float = 0
+  var Hero X Pos Start: float = 0
+  var Add Silk: int = 0
+  var Current Track Index: int = 0
+  var Value: int = 0
+  var Chooser: int = 0
+  var Track Count: int = 0
+  var Max Track Index: int = 0
+  var Completed All: bool = false
+  var Did Hero Cancel: bool = false
+  var Did Hero Lose: bool = false
+  var Get Speed Boost: bool = false
+  var Is Holding: bool = false
+  var Is Track Active: bool = false
+  var Just Reset: bool = false
+  var Starting With Dash: bool = false
+  var Test: bool = false
+  var Was Disqualified: bool = false
+  var Was Holding: bool = false
+  var Was Track Active: bool = false
+  var Dlg: string = ""
+  var Target Pos: vector2 = (0, 0)
+  var Start Pos: vector2 = (0, 0)
+  var Start Scale: vector3 = (0, 0, 0)
+  var Current Track: gameObject = <null>
+  var Music Loop Source: gameObject = Race Group/Sprintmaster Runner/Race Music Loop
+  var Parent: gameObject = <null>
+  var Self: gameObject = <null>
+  var Music End Source: gameObject = Race Group/Sprintmaster Runner/Race End Sound
+  var Audio Loop Voice: gameObject = Race Group/Sprintmaster Runner/Audio Loop Voice
+  var Reward: object = <null>
+}

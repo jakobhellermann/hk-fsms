@@ -1,0 +1,230 @@
+# blue_health_display
+# 1 location(s):
+#   localpoolprefabs_assets_shared.bundle / Blue Health
+
+// uses template: blue_health_display_v2
+fsm blue_health_display {
+  start Init
+  on HERO HEALED FULL → Health Reset  // from any state
+  on REMOVE BLUE HEALTH → Health Reset  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetScale(gameObject=Self, vector=(unset), x=0.7135, y=0.7135, z=(unset), everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=-2, space=1, everyFrame=false, lateUpdate=false)
+    FindChild(gameObject=var "Self", childName="Frost Idle Effect", storeResult=var "Frost Idle Effect")
+    ActivateGameObject(gameObject=var "Frost Idle Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Frost Antic Effect", storeResult=var "Frost Antic Effect")
+    FindChild(gameObject=var "Self", childName="Frost Break Effect", storeResult=var "Frost Break Effect")
+    ActivateGameObject(gameObject=var "Frost Break Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Poison_health_burst effects", storeResult=var "Poison Effect")
+    ActivateGameObject(gameObject=var "Poison Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="JitterSelf", methodName="StopJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Starting Idle?
+  }
+
+  state Starting Idle? {
+    CallMethodProper(gameObject=Self, behaviour="BlueHealth", methodName="CheckPoison", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="BlueHealth", methodName="MarkActive", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetPoisonTintOverride(Target=var "Sprite", IsPoison=var "Is Poison")
+    SetMeshRenderer(gameObject=var "Sprite", active=true)
+    StartGameplayTimer(Duration=3, Target=Self)
+    ActivateGameObject(gameObject=var "Poison Effect", activate=var "Is Poison", recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Start Idle", isTrue=→"IDLE", isFalse=→"APPEAR", everyFrame=false)
+    Tk2dPlayFrame(gameObject=var "Sprite", frame=0)
+    on IDLE → Idle Enter
+    on APPEAR → Appear
+  }
+
+  state Idle {
+    IntSwitchToArray(Value=var "Level", From=[0, 1, 2], To=[var "Idle Anims Level 1", var "Idle Anims Level 2", var "Idle Anims Level 3"], StoreValue=var "Anims Current", EveryFrame=false)
+    Tk2dPlayRandomAnimationWithEvents(gameObject=var "Sprite", clipNames=var "Anims Current", animationTriggerEvent=(none), animationCompleteEvent=(none), animationInterruptedEvent=(none), replayOnChanged=false)
+    Tk2dPlayFrame(gameObject=var "Sprite", frame=0)
+    CallMethodProper(gameObject=var "Frost Antic Effect", behaviour="PlayParticleEffects", methodName="StopParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CheckGameplayTimer(Target=Self, TrueEvent=(none), FalseEvent=(none), StoreValue=var "Timer Ended", EveryFrame=true)
+    BoolAllTrue(boolVariables=[var "Is Poison", var "Timer Ended"], sendEvent=→"POISON END", storeResult=(unset), everyFrame=true)
+    EnableFsmSelf(SetEnabled=var "Is Poison")
+    on HERO DAMAGED → Pause
+    on FROST UPDATE HEALTH → Idle Enter
+    on HEALTH UPDATE → Pause
+    on POISON END → Purple End
+    on PURPLE HEALTH ADJUST → Purple Ended Adjust
+    on PURPLE HEALTH CHECK → Purple Health Check
+  }
+
+  state Destroy Self {
+    DestroySelf(detachChildren=false)
+  }
+
+  state Break? {
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Current HP")
+    IntCompare(integer1=var "Health Number", integer2=var "Current HP", equal=(none), lessThan=→"FULL", greaterThan=(none), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="JitterSelf", methodName="StopJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Frost Idle Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Frost Antic Effect", behaviour="PlayParticleEffects", methodName="StopParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Frost Break Effect", activate=var "Queue Frost Break", recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Queue Frost Break", boolValue=false, everyFrame=false)
+    on FULL → Idle Enter
+    on FINISHED → Purple Break?
+  }
+
+  state Appear {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Blue Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Enter
+    on HERO DAMAGED → Break?
+    on PURPLE HEALTH ADJUST → Purple Ended Adjust
+  }
+
+  state Health Reset {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Blue Break Fast", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Destroy Self
+  }
+
+  state Pause {
+    SetBoolValue(boolVariable=var "Skip Send Update", boolValue=true, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Break?
+  }
+
+  state Is Frosted? {
+    SetBoolValue(boolVariable=var "Queue Frost Break", boolValue=false, everyFrame=false)
+    GetHeroCState(VariableName="isFrosted", StoreValue=var "Is Hero Frosted", EveryFrame=false)
+    BoolTest(boolVariable=var "Is Hero Frosted", isTrue=→"TRUE", isFalse=(none), everyFrame=false)
+    on TRUE → Frosted
+    on FINISHED → Check Blue Health Level
+  }
+
+  state Frosted {
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"LAST", lessThan=(none), greaterThan=(none), everyFrame=false)
+    on FINISHED → Check Blue Health Level
+    on LAST → Frosted Antic Idle
+  }
+
+  state Frosted Antic Idle {
+    CallMethodProper(gameObject=var "Frost Antic Effect", behaviour="PlayParticleEffects", methodName="PlayParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Queue Frost Break", boolValue=true, everyFrame=false)
+    ObjectJitterLocal(gameObject=Self, x=0.05, y=0.05, z=(unset), resetPosOnStateExit=true, limitFps=30)
+    DoSpriteFlash(Target=var "Sprite", FlashMethod="FlashingFrostAntic", IsRepeating=true, CancelOnExit=true)
+    CheckGameplayTimer(Target=Self, TrueEvent=(none), FalseEvent=(none), StoreValue=var "Timer Ended", EveryFrame=true)
+    BoolAllTrue(boolVariables=[var "Is Poison", var "Timer Ended"], sendEvent=→"POISON END", storeResult=(unset), everyFrame=true)
+    on FROST UPDATE HEALTH → Idle Enter
+    on HERO HEALED → Idle Enter
+    on HERO DAMAGED → Pause
+    on HEALTH UPDATE → Pause
+    on POISON END → Purple End
+    on PURPLE HEALTH ADJUST → Purple Ended Adjust
+    on PURPLE HEALTH CHECK → Purple Health Check
+  }
+
+  state Idle Enter {
+    ActivateGameObject(gameObject=var "Frost Idle Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Is Poison", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="JitterSelf", methodName="StartJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Is Frosted?
+  }
+
+  state Wait {
+    SetMeshRenderer(gameObject=var "Sprite", active=false)
+    Wait(time=1.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Destroy Self
+  }
+
+  state Purple End {
+    SetStaticVariable(variableName="PurpleHealthAdjustFrom", setValue=var "Health Number", sceneTransitionsLimit=1)
+    SetIntValue(intVariable=var "Health Number", intValue=9999, everyFrame=false)
+    DecrementPlayerDataInt(gameObject=var "GameManager", intName="healthBlue")
+    on FINISHED → Pause
+  }
+
+  state Purple Ended Adjust {
+    GetStaticVariable(variableName="PurpleHealthAdjustFrom", storeValue=var "PurpleHealthAdjustFrom")
+    IntCompare(integer1=var "Health Number", integer2=var "PurpleHealthAdjustFrom", equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    IntSubtract(intVariable=var "Health Number", subtract=1, everyFrame=false, perSecond=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Pos X", y=(unset), z=(unset), space=1, everyFrame=false)
+    FloatSubtract(floatVariable=var "Pos X", subtract=0.94, everyFrame=false, perSecond=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Pos X", y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle Enter
+  }
+
+  state Send Purple Adjust? {
+    CallMethodProper(gameObject=Self, behaviour="BlueHealth", methodName="MarkInactive", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Is Poison", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventToRegisterV2(EventName="PURPLE HEALTH ADJUST", ExcludeTarget=Self)
+    on FINISHED → Wait
+  }
+
+  state Purple Break? {
+    CallMethodProper(gameObject=Self, behaviour="BlueHealth", methodName="RemovePoison", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Is Poison", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Hornet Poison Blast (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    CallMethodProper(gameObject=var "Hero", behaviour="SpriteFlash", methodName="flashHealPoison", parameters=[], storeResult=(unset var), EveryFrame=false)
+    AnimatorPlay(gameObject=var "Poison Effect", stateName="poison_health_burst_effects", layer=0, normalizedTime=1, everyFrame=false)
+    on FINISHED → Break Sound?
+  }
+
+  state Blue Break {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Blue Break", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Send Purple Adjust?
+  }
+
+  state Purple Health Check {
+    BoolTest(boolVariable=var "Is Poison", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SetPlayerDataVariable(VariableName="damagedPurple", SetValue=true)
+    on FINISHED → Idle Enter
+  }
+
+  state Check Blue Health Level {
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Chooser")
+    SetIntValue(intVariable=var "Level", intValue=2, everyFrame=false)
+    GetConstantsValue(variableName="BLUE_HEALTH_FINAL", storeValue=var "ChooserB")
+    IntCompare(integer1=var "Chooser", integer2=var "ChooserB", equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetIntValue(intVariable=var "Level", intValue=1, everyFrame=false)
+    GetConstantsValue(variableName="BLUE_HEALTH_MID", storeValue=var "ChooserB")
+    IntCompare(integer1=var "Chooser", integer2=var "ChooserB", equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetIntValue(intVariable=var "Level", intValue=0, everyFrame=false)
+    on FINISHED → Send Update?
+  }
+
+  state Send Update? {
+    BoolTest(boolVariable=var "Skip Send Update", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    GetConstantsValue(variableName="BLUE_HEALTH_MID", storeValue=var "ChooserB")  // disabled
+    IntCompare(integer1=var "Chooser", integer2=var "ChooserB", equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)  // disabled
+    SendEventToRegisterV2(EventName="BLUE HEALTH UPDATE", ExcludeTarget=Self)  // disabled
+    SetBoolValue(boolVariable=var "Skip Send Update", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Break Sound? {
+    IsRefillSoundSuppressed(trueEvent=→"FINISHED", falseEvent=(none), storeValue=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=ui_lifeblood_break (sfxstatic_assets_shared.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Blue Break
+  }
+
+  var Health Number: int = 0
+  var Sprite: gameObject = Blue Health/Sprite
+
+  var Pos X: float = 0
+  var Chooser: int = 0
+  var Current HP: int = 0
+  var PurpleHealthAdjustFrom: int = 0
+  var Level: int = 0
+  var ChooserB: int = 0
+  var Start Idle: bool = false
+  var Is Hero Frosted: bool = false
+  var Queue Frost Break: bool = false
+  var Is Poison: bool = false
+  var Timer Ended: bool = false
+  var Skip Send Update: bool = false
+  var Self: gameObject = <null>
+  var Frost Antic Effect: gameObject = <null>
+  var Frost Break Effect: gameObject = <null>
+  var Frost Idle Effect: gameObject = <null>
+  var Poison Effect: gameObject = <null>
+  var Idle Anims Level 1: array = var "Idle Anims Level 1"
+  var Idle Anims Level 2: array = var "Idle Anims Level 2"
+  var Idle Anims Level 3: array = var "Idle Anims Level 3"
+  var Anims Current: array = var "Anims Current"
+}

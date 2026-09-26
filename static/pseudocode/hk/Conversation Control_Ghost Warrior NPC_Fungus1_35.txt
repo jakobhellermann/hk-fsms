@@ -1,0 +1,401 @@
+# Conversation Control
+# 1 location(s):
+#   Fungus1_35 / Ghost Warrior NPC
+
+fsm Conversation Control {
+  start Pause
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+  on GHOST DEFEAT → Idle  // from any state
+
+  state Idle {
+    on CONVO START → Hero Look
+    on DREAMNAIL → Defeated?
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindGameObject(objectName="", withTag="Player", store=var "Player")
+    GetPlayerDataInt(gameObject=var "GameManager", intName=var "PD Int Name", storeValue=var "PD Int")
+    IntCompare(integer1=var "PD Int", integer2=2, equal=→"INERT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasDreamNail", isTrue=(none), isFalse=→"INERT")
+    FindGameObject(objectName="Warrior", withTag="Untagged", store=var "Warrior Folder")
+    FindGameObject(objectName="Inspect Region Ghost", withTag="Untagged", store=var "Inspect Region")
+    SetCollider(gameObject=var "Inspect Region", active=false)
+    BuildString(stringParts=[var "Ghost Name", "_encountered"], separator="", addToEnd=true, storeResult=var "Encountered Bool", everyFrame=false)
+    on FINISHED → Set Convos
+    on INERT → Inert
+  }
+
+  state End {
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Hero Look {
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Player", animLibName="", clipName="LookUp")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    on FINISHED → Box Up
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP DREAM", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue=var "Title Convo", everyFrame=false)
+    on FINISHED → Convo Choice
+  }
+
+  state Talk {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName=var "Encountered Bool", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Talk Convo", "Ghosts"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Anim End {
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Player", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    AudioStop(gameObject=Self)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM GATE CLOSE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Attack Pt", emit=0)
+    ActivateGameObject(gameObject=var "Warp", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FIGHT START", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN", delay=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Idle Pt")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="OUT OF RANGE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO CANCEL", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="GHOST FIGHT START", delay=0, everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=Silent (resources.assets), transitionTime=1)
+    BoolTest(boolVariable=var "Galien", isTrue=→"GALIEN", isFalse=→"FINISHED", everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Music
+    on GALIEN → Galien Pause
+  }
+
+  state Convo Choice {
+    GetPlayerDataInt(gameObject=var "GameManager", intName=var "PD Int Name", storeValue=var "PD Int")
+    IntCompare(integer1=var "PD Int", integer2=1, equal=→"DEFEATED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "Encountered Bool", isTrue=→"REPEAT", isFalse=(none))
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REPEAT", isFalse=→"TALK", everyFrame=false)
+    on TALK → Talk
+    on REPEAT → Repeat
+    on DEFEATED → Defeated
+  }
+
+  state Repeat {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Repeat Convo", "Ghosts"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Set Convos {
+    BuildString(stringParts=[var "Ghost Name", "_TALK"], separator="", addToEnd=true, storeResult=var "Talk Convo", everyFrame=false)
+    BuildString(stringParts=[var "Ghost Name", "_REPEAT"], separator="", addToEnd=true, storeResult=var "Repeat Convo", everyFrame=false)
+    BuildString(stringParts=[var "Ghost Name", "_CHALLENGE"], separator="", addToEnd=true, storeResult=var "Challenge Convo", everyFrame=false)
+    BuildString(stringParts=[var "Ghost Name", "_DEFEAT"], separator="", addToEnd=true, storeResult=var "Defeat Convo", everyFrame=false)
+    BuildString(stringParts=["GH_", var "Ghost Name", "_C"], separator="", addToEnd=true, storeResult=var "Title Convo", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="backerCredits", isTrue=→"FINISHED", isFalse=(none))
+    BuildString(stringParts=["GH_", var "Ghost Name", "_NC"], separator="", addToEnd=true, storeResult=var "Title Convo", everyFrame=false)
+    on FINISHED → Wounded?
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Inert {
+    AudioStop(gameObject=Self)
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FIGHT START", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Idle Pt", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Box Down 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)  // disabled
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up YN
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=0, everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["GHOST_CHALLENGE", "Prompts"], storeResult=(unset var))
+    on NO → Anim End 2
+    on YES → Box Down Yes
+  }
+
+  state Box Down No {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    on FINISHED → End
+  }
+
+  state Anim End 2 {
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Player", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down No
+  }
+
+  state Box Down Yes {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    on FINISHED → Ready
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP DREAM", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Challenge
+  }
+
+  state Challenge {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Challenge Convo", "Ghosts"], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    on CONVO_FINISH → Box Down 3
+  }
+
+  state Box Down 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ready
+  }
+
+  state Start Fight {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=boss_explode_clean (resources.assets), pitchMin=1.15, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    AudioStop(gameObject=Self)
+    ActivateAllChildren(gameObject=var "Warrior Folder", activate=true)
+    CreateObject(gameObject=dream_area_effect (sharedassets6.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)  // disabled
+    AudioStop(gameObject=Self)
+  }
+
+  state Hero Damaged {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    on FINISHED → Wounded?
+  }
+
+  state Defeated {
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Defeat Convo", "Ghosts"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 4
+  }
+
+  state Box Down 4 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Vanish Glow
+  }
+
+  state Vanish Glow {
+    ActivateGameObject(gameObject=var "Vanish Glow", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_dialogue_death_initial_white (sharedassets46.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="NPC CONTROL OFF", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Vanish Start Pt", emit=0)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    StopParticleEmitter(gameObject=var "Idle Pt")
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Wounded"), sendEvent="DOWN", delay=0, everyFrame=false)
+    on FINISHED → Anim End 3
+  }
+
+  state Vanish Burst {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_dialogue_death_explode (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wounded", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Vanish Burst Pt", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Warp", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Vanish Burst Pt", emit=0)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    DestroyObject(gameObject=var "Vanish Start Pt", delay=0, detachChildren=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM NAIL HUD", delay=0, everyFrame=false)
+    on FINISHED → Vanish Get Start
+  }
+
+  state Vanish Get Start {
+    GetPosition(gameObject=var "Player", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_absorb (sharedassets46.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    Vector3AddXYZ(vector3Variable=var "Hero Pos", addX=(unset), addY=-0.5, addZ=(unset), everyFrame=false, perSecond=false)
+    SetPosition(gameObject=var "Vanish Get Pt", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Vanish Get Pt", emit=0)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Vanish Get
+  }
+
+  state Anim End 3 {
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Player", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Vanish Burst
+  }
+
+  state Vanish Get {
+    SendMessage(gameObject=var "Player", delivery=SendMessage, options=1, functionCall=FlashingSuperDash())
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Vanisher Stop
+  }
+
+  state Vanisher Stop {
+    StopParticleEmitter(gameObject=var "Vanish Get Pt")
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get
+  }
+
+  state Get {
+    AudioStop(gameObject=var "Self")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_absorb_final_impact (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    SendMessage(gameObject=var "Player", delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "White Flash", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Attack Pt", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Attack Pt", emit=0)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="dreamOrbs", amount=var "Dream Orbs")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM ORB COLLECT", delay=0, everyFrame=false)
+    on FINISHED → Collected
+  }
+
+  state Collected {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SetPlayerDataInt(intName=var "PD Int Name", value=2)
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FIGHT START", delay=0, everyFrame=false)
+    on FINISHED → Allow Inspect
+  }
+
+  state Galien Hammer {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="READY", delay=0, everyFrame=false)
+    Wait(time=4.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Music
+  }
+
+  state Galien Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=dream_enter_pt_2 (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Galien Hammer
+  }
+
+  state Wounded? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName=var "PD Int Name", storeValue=var "Current State")
+    IntCompare(integer1=var "Current State", integer2=1, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    ActivateGameObject(gameObject=var "Wounded", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Sprite", delivery=SendMessage, options=1, functionCall=FlashingGhostWounded())
+    on FINISHED → Idle
+  }
+
+  state Allow Inspect {
+    SetCollider(gameObject=var "Inspect Region", active=true)
+    BoolTest(boolVariable=var "Dreamnail Kill", isTrue=→"END DREAMNAIL KILL", isFalse=(none), everyFrame=false)
+    on END DREAMNAIL KILL → End DN Kill
+    on FINISHED → End DN Kill
+  }
+
+  state To Fight {
+    SpawnObjectFromGlobalPool(gameObject=Dream Impact (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    on FINISHED → Ready
+  }
+
+  state Defeated? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName=var "PD Int Name", storeValue=var "PD Int")
+    IntCompare(integer1=var "PD Int", integer2=1, equal=→"DEFEATED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    on DEFEATED → To Defeat
+    on FINISHED → To Fight
+  }
+
+  state To Defeat {
+    SpawnObjectFromGlobalPool(gameObject=Dream Impact (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    SetFsmBool(gameObject=var "Hero", fsmName="Dream Nail", variableName="Dream Convo", setValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Player", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Dreamnail Kill", boolValue=true, everyFrame=false)
+    on FINISHED → Vanish Glow
+  }
+
+  state End DN Kill {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    CallMethodProper(gameObject=var "Player", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Player", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+  }
+
+  state Music {
+    StringCompare(stringVariable=var "Ghost Name", compareTo="NOEYES", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=Normal (resources.assets), transitionTime=0)
+    ApplyMusicCue(musicCue=DreamFight (sharedassets161.assets), delayTime=0, transitionTime=0)
+    on FINISHED → Start Fight
+  }
+
+  var Dream Orbs: int = 200
+  var Galien: bool = false
+  var Hero Looks Up: bool = true
+  var Ghost Name: string = "NOEYES"
+  var PD Int Name: string = "noEyesDefeated"
+
+  var Current State: int = 0
+  var PD Int: int = 0
+  var Dreamnail Kill: bool = false
+  var Spoken: bool = false
+  var Challenge Convo: string = ""
+  var Defeat Convo: string = ""
+  var Encountered Bool: string = "NOEYES"
+  var Repeat Convo: string = ""
+  var Talk Convo: string = ""
+  var Title Convo: string = ""
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Area Title: gameObject = <null>
+  var Attack Pt: gameObject = Ghost Warrior NPC/Attack Pt
+  var Idle Pt: gameObject = Ghost Warrior NPC/Idle Pt
+  var Inspect Region: gameObject = <null>
+  var Player: gameObject = <null>
+  var Self: gameObject = <null>
+  var Sound Player: gameObject = <null>
+  var Sprite: gameObject = Ghost Warrior NPC/Character Sprite
+  var Vanish Burst Pt: gameObject = Ghost Warrior NPC/Vanish Burst Pt
+  var Vanish Get Pt: gameObject = Ghost Warrior NPC/Vanish Get Pt
+  var Vanish Glow: gameObject = Ghost Warrior NPC/Vanish Glow
+  var Vanish Start Pt: gameObject = Ghost Warrior NPC/Vanish Start Pt
+  var Warp: gameObject = Ghost Warrior NPC/Warp
+  var Warrior Folder: gameObject = <null>
+  var White Flash: gameObject = Ghost Warrior NPC/White Flash
+  var Wounded: gameObject = Ghost Warrior NPC/Wounded
+}

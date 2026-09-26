@@ -1,0 +1,155 @@
+# Control
+# 1 location(s):
+#   Song_19_entrance / Scales Plat (4)/Arm
+
+fsm Control {
+  start Init
+  on TINK L → Tink L  // from any state
+  on TILT L → Set L  // from any state
+  on TILT R → Set R  // from any state
+  on TINK R → Tink R  // from any state
+  on DO LOCK → Do Lock  // from any state
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Plat L")
+    FindNamedChild(gameObject=Self, storeResult=var "Plat R")
+    FindNamedChild(gameObject=Self, storeResult=var "Art")
+    SetBoolValue(boolVariable=var "Silent Motion", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Start L", isTrue=→"TINK L", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Start R", isTrue=→"TINK R", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Silent Motion", boolValue=false, everyFrame=false)
+    on TILT L → Set L
+    on TILT R → Set R
+  }
+
+  state Set L {
+    BoolTest(boolVariable=var "Tilted L", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Tilted L", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Tilted R", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tilt Crt", floatValue=var "Tilt", everyFrame=false)
+    on FINISHED → Pause
+    on CANCEL → Idle
+  }
+
+  state Set R {
+    BoolTest(boolVariable=var "Tilted R", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Tilted R", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Tilted L", boolValue=false, everyFrame=false)
+    FloatOperator(float1=var "Tilt", float2=-1, operation=Multiply, storeResult=var "Tilt Crt", everyFrame=false)
+    on FINISHED → Pause
+    on CANCEL → Idle
+  }
+
+  state Pause {
+    PlayAudioEvent(audioClip=scales_plat_move_separate_pt_1 (sfxstatic_assets_areasong.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Shake
+  }
+
+  state Shake {
+    ObjectJitter(gameObject=var "Art", x=0.1, y=0.1, z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.45, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Start Rotation
+  }
+
+  state Tilt {
+    FloatOperator(float1=var "Tilt Crt", float2=1.15, operation=Multiply, storeResult=var "Tilt Overshoot", everyFrame=false)
+    AnimateRotationTo(gameObject=Self, fromValue=var "Tilt Start", toValue=var "Tilt Overshoot", worldSpace=false, negativeSpace=false, time=0.2, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Settle Sfx
+  }
+
+  state Settle {
+    SetBoolValue(boolVariable=var "Silent Motion", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Plat L"), sendEvent="READY", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Plat R"), sendEvent="READY", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tilt Start", floatValue=var "Tilt Crt", everyFrame=false)
+    AnimateRotationTo(gameObject=Self, fromValue=var "Tilt Overshoot", toValue=var "Tilt Crt", worldSpace=false, negativeSpace=false, time=0.2, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Set
+  }
+
+  state Tink R {
+    BoolTest(boolVariable=var "Tilted R", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Tilted R", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Tilted L", boolValue=false, everyFrame=false)
+    FloatOperator(float1=var "Tilt", float2=-1, operation=Multiply, storeResult=var "Tilt Crt", everyFrame=false)
+    on FINISHED → Get Start Rotation
+    on CANCEL → Idle
+  }
+
+  state Tink L {
+    BoolTest(boolVariable=var "Tilted L", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Tilted R", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Tilted L", boolValue=true, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tilt Crt", floatValue=var "Tilt", everyFrame=false)
+    on FINISHED → Get Start Rotation
+    on CANCEL → Idle
+  }
+
+  state Do Lock {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent=var "Lock Event", delay=0, everyFrame=false)
+    on LOCK L → Lock L
+    on LOCK M → Lock M
+    on LOCK R → Lock R
+  }
+
+  state Lock L {
+    SetFloatValue(floatVariable=var "Tilt Crt", floatValue=var "Tilt", everyFrame=false)
+    on FINISHED → Locked
+  }
+
+  state Locked {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tilt Crt", space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Plat L"), sendEvent="LOCK", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Plat R"), sendEvent="LOCK", delay=0, everyFrame=false)
+    FinishFSM()
+  }
+
+  state Lock R {
+    SetFloatValue(floatVariable=var "Tilt Crt", floatValue=var "Tilt", everyFrame=false)
+    FloatOperator(float1=var "Tilt", float2=-1, operation=Multiply, storeResult=var "Tilt Crt", everyFrame=false)
+    on FINISHED → Locked
+  }
+
+  state Lock M {
+    SetFloatValue(floatVariable=var "Tilt Crt", floatValue=0, everyFrame=false)
+    on FINISHED → Locked
+  }
+
+  state Get Start Rotation {
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tilt Start", space=0, everyFrame=false)
+    FloatCompare(float1=var "Tilt Start", float2=180, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FloatMultiply(floatVariable=var "Tilt Start", multiplyBy=-1, everyFrame=false)  // disabled
+    FloatAdd(floatVariable=var "Tilt Start", add=-360, everyFrame=false, perSecond=false)
+    on FINISHED → Tilt
+  }
+
+  state Set {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tilt Crt", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  state Settle Sfx {
+    BoolTest(boolVariable=var "Silent Motion", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayAudioEvent(audioClip=scales_plat_move_separate_pt_2 (sfxstatic_assets_areasong.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Settle
+  }
+
+  var Tilt: float = 29
+  var Start R: bool = true
+  var Start L: bool = false
+  var Lock Event: string = "LOCK L"
+
+  var Tilt Crt: float = 0
+  var Tilt Start: float = 0
+  var Tilt Overshoot: float = 0
+  var Tilted L: bool = false
+  var Tilted R: bool = false
+  var Silent Motion: bool = false
+  var Art: gameObject = <null>
+  var Plat L: gameObject = <null>
+  var Plat R: gameObject = <null>
+}

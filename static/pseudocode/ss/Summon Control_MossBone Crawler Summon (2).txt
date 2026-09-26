@@ -1,0 +1,175 @@
+# Summon Control
+# 1 location(s):
+#   Weave_03 / Boss Scene/MossBone Crawler Summon (2)
+
+fsm Summon Control {
+  start Init
+  on EXTRACT → Extract  // from any state
+  on ZERO HP → Corpse Away  // from any state
+  on CRUSH → Crush Death  // from any state
+  on BOSS BATTLE END → Corpse Away  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Antic Dust", storeResult=var "Antic Dust")
+    FindChild(gameObject=Self, childName="Antic Rocks", storeResult=var "Antic Rocks")
+    GetOwner(storeGameObject=var "Self")
+    GetHero(storeResult=var "Hero")
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Spawn Y", space=1, everyFrame=false)
+    EnableFSM(gameObject=Self, fsmName="Noise Reaction", enable=false, resetOnExit=false)
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    SetPosition2d(gameObject=Self, vector=(unset), x=-100, y=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on SPAWN → Spawn Pause
+  }
+
+  state Position {
+    RandomFloatEither(value1=var "SpawnX 1", value2=var "SpawnX 2", storeResult=var "Spawn X")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Spawn X", y=var "Spawn Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetHP(target=Self, hp=10)
+    on FINISHED → Antic
+    on BOSS KILL → Die
+  }
+
+  state Antic {
+    PlayParticleEmitterInState(gameObject=var "Antic Dust")
+    PlayParticleEmitterInState(gameObject=var "Antic Rocks")
+    Wait(time=0.75, finishEvent=→"NEXT", realTime=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor 2D (audioobjects_assets_all.bundle), spawnPoint=var "Self", audioClips=[platform_dirt_fall_1 (sfxstatic_assets_areabone.bundle), platform_dirt_fall_2 (sfxstatic_assets_areabone.bundle), platform_dirt_fall_3 (sfxstatic_assets_areabone.bundle)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on NEXT → Fall
+    on BOSS KILL → Die
+  }
+
+  state Fall {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="SummonFall")
+    SetMeshRenderer(gameObject=Self, active=true)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Bounce
+    on BOSS KILL → Corpse Away
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="SummonLand", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    on FINISHED → Move
+    on BOSS KILL → Corpse Away
+  }
+
+  state Move {
+    EnableFSM(gameObject=Self, fsmName="Noise Reaction", enable=true, resetOnExit=true)
+    StartCrawler(Target=Self, ScheduleTurn=false)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on BOSS KILL → Corpse Away
+  }
+
+  state Die {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on FINISHED → Dormant
+  }
+
+  state Corpse Away {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetFsmBool(gameObject=var "Mother", fsmName="Control", variableName="Spawned", setValue=false, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=mossbone_crawler_death (sfxdynamicpatch_assets_areatutorial.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    StopCrawler(Target=Self, WaitForTurn=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Air")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Death Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Death Speed", multiplyBy=5, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Death Speed", y=20, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    on FINISHED → Die
+  }
+
+  state Bounce {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="SummonBounce", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=mossbone_crawler_death_land (sfxdynamicpatch_assets_areatutorial.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor 2D (audioobjects_assets_all.bundle), spawnPoint=var "Self", audioClips=[stalactite_rock_impact_1 (sfxstatic_assets_areabone.bundle), stalactite_rock_impact_2 (sfxstatic_assets_areabone.bundle), stalactite_rock_impact_3 (sfxstatic_assets_areabone.bundle)], weights=[1, 1, 1], pitchMin=1.15, pitchMax=1.25, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → BounceUp
+    on BOSS KILL → Corpse Away
+  }
+
+  state BounceUp {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="SummonFall")
+    RandomFloat(min=9, max=12, storeResult=(unset))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=9, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → BounceFall
+    on BOSS KILL → Corpse Away
+  }
+
+  state BounceFall {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on BOSS KILL → Corpse Away
+    on LAND → Land
+  }
+
+  state Spawn Pause {
+    WaitRandom(timeMin=0, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Position
+  }
+
+  state Extract {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    StopCrawler(Target=Self, WaitForTurn=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Extract")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Rotation", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Offset", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Rotation", multiplyBy=-90, everyFrame=false)
+    FloatMultiply(floatVariable=var "Offset", multiplyBy=0.25, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    FindChild(gameObject=var "Hero", childName="Tool Effects/Extract Point", storeResult=var "Extract Point")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Extract Point", xOffset=var "Offset", yOffset=0, zOffset=(unset), overrideZ=0.003, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlashingMossExtract())
+    on EXTRACT FINISH → Extract End
+  }
+
+  state Extract End {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Corpse Away
+  }
+
+  state Crush Death {
+    PlayAudioEvent(audioClip=enemy_damage_old (sfxstatic_assets_areabellshared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetFsmBool(gameObject=var "Mother", fsmName="Control", variableName="Spawned", setValue=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    StopCrawler(Target=Self, WaitForTurn=false)
+    on FINISHED → Die
+  }
+
+  var SpawnX 1: float = 11.47
+  var SpawnX 2: float = 11.47
+  var Mother: gameObject = <null>
+
+  var Death Speed: float = 0
+  var Spawn X: float = 0
+  var Kill Angle: float = 0
+  var Offset: float = 0
+  var Rotation: float = 0
+  var Z Pos: float = 0
+  var Spawn Y: float = 0
+  var Antic Dust: gameObject = <null>
+  var Antic Rocks: gameObject = <null>
+  var Self: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Extract Point: gameObject = <null>
+  var Audio Loop Voice: gameObject = Boss Scene/MossBone Crawler Summon (2)/Audio Loop Voice
+}

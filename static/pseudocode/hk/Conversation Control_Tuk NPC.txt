@@ -1,0 +1,252 @@
+# Conversation Control
+# 1 location(s):
+#   Waterways_03 / Alive_Tuk/Tuk NPC
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    AudioPlaySimple(gameObject=var "Rummage Audio", volume=0.5, oneShotClip=<null>)
+    on CONVO START → Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetLanguageString(sheetName="Prices", convName="TUK_RANCIDEGG_MIN", storeValue=var "Price Min String")
+    GetLanguageString(sheetName="Prices", convName="TUK_RANCIDEGG_MAX", storeValue=var "Price Max String")
+    ConvertStringToInt(stringVariable=var "Price Min String", intVariable=var "Egg Price Min", everyFrame=false)
+    ConvertStringToInt(stringVariable=var "Price Max String", intVariable=var "Egg Price Max", everyFrame=false)
+    FindChild(gameObject=Self, childName="Egg Spawn", storeResult=var "Egg Spawn")
+    FindChild(gameObject=Self, childName="Rummage Audio", storeResult=var "Rummage Audio")
+    on FINISHED → Idle
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Give Egg", isTrue=→"EGG", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+    on EGG → Give Pause
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo Choice
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk End")
+    AudioStop(gameObject=var "Voice Player")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Meet {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="tukMet", value=true)
+    RandomInt(min=var "Egg Price Min", max=var "Egg Price Max", storeResult=var "Egg Price", inclusiveMax=true)
+    SetPlayerDataInt(intName="tukEggPrice", value=var "Egg Price")
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_INTRO", "Minor NPC"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Tuk_talk_02 (sharedassets351.assets), Tuk_talk_03 (sharedassets351.assets), Tuk_talk_04 (sharedassets351.assets), Tuk_talk_05 (sharedassets351.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Anim {
+    AudioStop(gameObject=Self)
+    AudioStop(gameObject=var "Rummage Audio")
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk")
+    on FINISHED → Title
+  }
+
+  state Convo Choice {
+    SetBoolValue(boolVariable=var "Give Egg", boolValue=false, everyFrame=false)
+    GetPlayerDataBool(boolName="tukDungEgg", storeValue=var "Dung Egg Given")
+    GetPlayerDataBool(boolName="equippedCharm_10", storeValue=var "Dung Equipped")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="rancidEggs", storeValue=var "Eggs Held")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="tukMet", isTrue=(none), isFalse=→"MEET")
+    BoolTestMulti(boolVariables=[var "Dung Egg Given", var "Dung Equipped"], boolStates=[false, true], trueEvent=→"DUNG", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    IntCompare(integer1=var "Eggs Held", integer2=80, equal=→"MAX", lessThan=(none), greaterThan=→"MAX", everyFrame=false)
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REPEAT", isFalse=(none), everyFrame=false)
+    on MEET → Meet
+    on REPEAT → Repeat
+    on FINISHED → Greet
+    on DUNG → Dung
+    on MAX → Egg Max
+  }
+
+  state Box Down 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)  // disabled
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up YN
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="tukEggPrice", storeValue=var "Egg Price")
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=var "Egg Price", everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_RANCIDEGG", "Prompts"], storeResult=(unset var))
+    on NO → YN Down
+    on YES → Geo Pause
+  }
+
+  state YN Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up 2
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Enough Geo?
+  }
+
+  state Enough Geo? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="geo", storeValue=var "Geo")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Tuk_talk_02 (sharedassets351.assets), Tuk_talk_03 (sharedassets351.assets), Tuk_talk_04 (sharedassets351.assets), Tuk_talk_05 (sharedassets351.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    IntCompare(integer1=var "Geo", integer2=var "Egg Price", equal=→"ENOUGH", lessThan=→"NOT ENOUGH", greaterThan=→"ENOUGH", everyFrame=false)
+    on ENOUGH → Refuse
+    on NOT ENOUGH → Not Enough
+  }
+
+  state Geo Pause {
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    RandomInt(min=var "Egg Price Min", max=var "Egg Price Max", storeResult=var "Egg Price", inclusiveMax=true)
+    SetPlayerDataInt(intName="tukEggPrice", value=var "Egg Price")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_visited("Tuk, and bought a Rancid Egg"))
+    on FINISHED → Box Up 3
+  }
+
+  state Refuse {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_DECLINE", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Not Enough {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_NOTENOUGH", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Buy Msg {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_BUY", "Minor NPC"], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Give Egg", boolValue=true, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Tuk_talk_02 (sharedassets351.assets), Tuk_talk_03 (sharedassets351.assets), Tuk_talk_04 (sharedassets351.assets), Tuk_talk_05 (sharedassets351.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Box Up 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Buy Msg
+  }
+
+  state Give Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetCollider(gameObject=Self, active=false)
+    on FINISHED → Give Start
+  }
+
+  state Give Start {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="ThrowToIdle")
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Give
+  }
+
+  state Give {
+    CreateObject(gameObject=Shiny Item NP (sharedassets351.assets), spawnPoint=var "Egg Spawn", position=(unset), rotation=(unset), storeObject=var "Shiny Item", networkInstantiate=false, networkGroup=0)
+    SetPosition(gameObject=var "Shiny Item", vector=(unset), x=(unset), y=(unset), z=0, space=0, everyFrame=false, lateUpdate=false)
+    SetFsmInt(gameObject=var "Shiny Item", fsmName="Shiny Control", variableName="Trinket Num", setValue=11, everyFrame=false)
+    SetFsmBool(gameObject=var "Shiny Item", fsmName="Shiny Control", variableName="Fling L", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Shiny Item", fsmName="Shiny Control", variableName="Fling On Start", setValue=true, everyFrame=false)
+    on SHINY PICKED UP → Give Reset
+  }
+
+  state Give Reset {
+    SetCollider(gameObject=Self, active=true)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Repeat {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_REPEAT", "Minor NPC"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Tuk_talk_02 (sharedassets351.assets), Tuk_talk_03 (sharedassets351.assets), Tuk_talk_04 (sharedassets351.assets), Tuk_talk_05 (sharedassets351.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Greet {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_GREET", "Minor NPC"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Tuk_talk_02 (sharedassets351.assets), Tuk_talk_03 (sharedassets351.assets), Tuk_talk_04 (sharedassets351.assets), Tuk_talk_05 (sharedassets351.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Dung {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="tukDungEgg", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_DUNG", "Minor NPC"], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Give Egg", boolValue=true, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Tuk_talk_02 (sharedassets351.assets), Tuk_talk_03 (sharedassets351.assets), Tuk_talk_04 (sharedassets351.assets), Tuk_talk_05 (sharedassets351.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Egg Max {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["TUK_EGGMAX", "Minor NPC"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Tuk_talk_02 (sharedassets351.assets), Tuk_talk_03 (sharedassets351.assets), Tuk_talk_04 (sharedassets351.assets), Tuk_talk_05 (sharedassets351.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Title {
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="TUK_C", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="backerCredits", isTrue=→"FINISHED", isFalse=(none))
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="TUK_NC", everyFrame=false)
+    on FINISHED → Box Up
+  }
+
+  var Got Map Bool: string = "mapCrossroads"
+
+  var Egg Price: int = 0
+  var Egg Price Max: int = 0
+  var Egg Price Min: int = 0
+  var Eggs Held: int = 0
+  var Geo: int = 0
+  var Map Cost: int = 0
+  var Dung Egg Given: bool = false
+  var Dung Equipped: bool = false
+  var Give Egg: bool = false
+  var Spoken: bool = false
+  var Price Max String: string = ""
+  var Price Min String: string = ""
+  var Area Title: gameObject = <null>
+  var Egg Spawn: gameObject = <null>
+  var Rummage Audio: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shiny Item: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

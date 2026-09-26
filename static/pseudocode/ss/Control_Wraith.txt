@@ -1,0 +1,470 @@
+# Control
+# 2 location(s):
+#   localpoolprefabs_assets_areadustmaze.bundle / Wraith
+#   Dust_Maze_01 / Wraith
+
+fsm Control {
+  start Init
+  on ZERO HP → Ungrab  // from any state
+
+  state Init {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    RandomlyFlipScale(gameObject=Self)
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Wraith Nodes")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Wraith Nodes Occupied")
+    ActivateGameObject(gameObject=var "Pt Idle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    IdleBuzzV3(gameObject=Self, waitMin=1, waitMax=2, speedMax=3, accelerationMin=5, accelerationMax=10, roamingRangeX=0.25, roamingRangeY=0.5, manualStartPos=(unset))
+    AudioPlaySimple(gameObject=var "Audio Loop Fly", volume=0, oneShotClip=<null>)
+    FadeAudio(gameObject=var "Audio Loop Fly", startVolume=(unset), endVolume=0.4, time=1)
+    SetLayer(gameObject=Self, layer=Interactive Object(19))
+    SetLayer(gameObject=var "Collider Idle", layer=Interactive Object(19))
+    on ALERT → Startle Start
+    on WRAITH CALL → Nearby?
+    on SUMMON → Summon
+    on HORNET COCOON PLACED → Cocoon Idle
+    on TOOK DAMAGE → Startle Start
+  }
+
+  state Startle Start {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=wraith_notice_hero_scream (sfxstatic_assets_areadustmaze.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetAudioVolume(gameObject=var "Audio Loop Fly", volume=1, everyFrame=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetLayer(gameObject=var "Collider Idle", layer=Enemies(11))
+    on FINISHED → Startle Scream
+  }
+
+  state Startle Scream {
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    SendEventToRegister(eventName="WRAITH CALL")  // disabled
+    PlayParticleEmitterInState(gameObject=var "Pt Roar")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    FadeAudio(gameObject=var "Audio Loop Fly", startVolume=(unset), endVolume=1, time=0.4)
+    on FINISHED → Start Chase
+  }
+
+  state Grab {
+    PlayAudioEvent(audioClip=wraith_damage_2 (sfxstatic_assets_areadustmaze.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=grab_damage (sfxstatic_assets_areamemory.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventToRegister(eventName="WRAITH GRAB")
+    AudioStop(gameObject=var "Audio Loop Fly", fadeTime=0)
+    AudioPlaySimple(gameObject=var "Audio Loop Suck", volume=1, oneShotClip=<null>)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="WOUND START", delay=0, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Grab")
+    SetPositionToObject(gameObject=Self, targetObject=var "Hero", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterChildren(gameObject=var "Grab Effects", resetTimeIfPlaying=false, stopOnStateExit=false)
+    SetIntValue(intVariable=var "Sucks", intValue=3, everyFrame=false)
+    SetVelocityAsAngle(gameObject=var "Hero", angle=var "Angle", speed=35, everyFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 15), x=(unset), y=(unset), everyFrame=false)  // disabled
+    DecelerateV2(gameObject=var "Hero", deceleration=0.9, brakeOnExit=true)
+    SetBoolValue(boolVariable=var "Grabbing", boolValue=true, everyFrame=false)
+    on FINISHED → Any Silk?
+  }
+
+  state Suck {
+    PlayAudioEvent(audioClip=wraith_silk_suck_end (sfxstatic_assets_areadustmaze.bundle), pitchMin=1.15, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    IntCompare(integer1=var "Sucks", integer2=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=false)
+    ActivateGameObject(gameObject=var "Burst Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPlayerDataInt(intName="silk", storeValue=var "Silk")
+    IntCompare(integer1=var "Silk", integer2=0, equal=→"END", lessThan=(none), greaterThan=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeSilk", parameters=[1], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.45, finishEvent=→"REPEAT", realTime=false)
+    IntAdd(intVariable=var "Sucks", add=-1, everyFrame=false)
+    on END → Strike Away
+    on REPEAT → Suck
+  }
+
+  state Any Silk? {
+    GetPlayerDataInt(intName="silk", storeValue=var "Silk")
+    IntCompare(integer1=var "Silk", integer2=0, equal=→"END", lessThan=(none), greaterThan=(none), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="SpriteFlash", methodName="FlashingWhite", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Strands", emit=0, resetIfPlaying=false)
+    AddUsingSilk(Amount=1, UsingType=Drain, DidAddTracker=var "Is Sucking Silk")
+    on FINISHED → Suck
+    on END → No Silk
+  }
+
+  state Strike Away {
+    RemoveUsingSilk(Amount=1, UsingType=Drain, DidAddTracker=var "Is Sucking Silk")
+    StopParticleEmitter(gameObject=var "Pt Strands")
+    PlayAudioEvent(audioClip=wraith_death (sfxstatic_assets_areadustmaze.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlaySimple(gameObject=var "Audio Loop Fly", volume=1, oneShotClip=<null>)
+    AudioStop(gameObject=var "Audio Loop Suck", fadeTime=0)
+    SetBoolValue(boolVariable=var "Grabbing", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Scream Hit")
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    CallMethodProper(gameObject=Self, behaviour="SpriteFlash", methodName="CancelFlash", parameters=[], storeResult=(unset var), EveryFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Translate", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Translate", multiplyBy=-1, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Translate", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="HERO GRAB END", delay=0, everyFrame=false)
+    on FINISHED → Hero Facing
+  }
+
+  state Start Chase {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=9, speedMax=8, acceleration=0.2, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=6, acceleration=0.2, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Chase
+    on TOOK DAMAGE → Chase
+    on SING → Sing
+  }
+
+  state Hero Facing {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"L", leftEvent=→"R", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    on L → Hero L
+    on R → Hero R
+  }
+
+  state Hero L {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Damage Hero
+  }
+
+  state Hero R {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Damage Hero
+  }
+
+  state Damage Hero {
+    DamageHeroDirectly(damager=Self, damageAmount=1, spikeHazard=false, sinkHazard=false)
+    PlayParticleEmitter(gameObject=var "Pt StrandBurst", emit=0, resetIfPlaying=false)
+    on FINISHED → Dmg Pause
+  }
+
+  state Dmg Pause {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Charge Cooldown
+    on TOOK DAMAGE → Chase
+  }
+
+  state Sliced {
+    ActivateGameObject(gameObject=var "Pt Antic", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Strands")
+    ActivateGameObject(gameObject=var "Pt Idle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=wraith_death (sfxstatic_assets_areadustmaze.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=ghost_dialogue_death_explode (sfxstatic_assets_areamemory.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=wraith_notice_hero_scream (sfxstatic_assets_areadustmaze.bundle), pitchMin=1.2, pitchMax=1.3, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStop(gameObject=var "Audio Loop Fly", fadeTime=0)
+    AudioStop(gameObject=var "Audio Loop Suck", fadeTime=0)
+    ActivateGameObject(gameObject=var "Pt Antic", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="FreezeMoment", parameters=[6], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Scream Hit")
+    Wait(time=0.08, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Slice Effect")
+    SetScale(gameObject=var "Slice Effect", vector=(unset), x=1.5, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    RandomFloat(min=-5, max=5, storeResult=var "Rotation")
+    SetRotation(gameObject=var "Slice Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=Slash Impact R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Slice Effect")
+    SetScale(gameObject=var "Slice Effect", vector=(unset), x=2, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    RandomFloat(min=-5, max=5, storeResult=var "Rotation")
+    SetRotation(gameObject=var "Slice Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    SpawnObjectFromGlobalPool(gameObject=standard_health_hit (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Slice Effect")
+    RandomFloat(min=-5, max=5, storeResult=var "Rotation")
+    SetRotation(gameObject=var "Slice Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Collider Charge", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Collider Idle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Tear
+  }
+
+  state Tear {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Break", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Pt Break", emit=0, resetIfPlaying=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    on FINISHED → Gone
+  }
+
+  state Gone {
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Glow", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "No Respawn", isTrue=→"DIE", isFalse=→"WAIT", everyFrame=false)
+    GameObjectIsNull(gameObject=var "Parent", isNull=→"WAIT", isNotNull=(none), storeResult=(unset), everyFrame=false)  // disabled
+    on WAIT → Try New Node
+    on DIE → Die
+  }
+
+  state Reactivate {
+    ActivateGameObject(gameObject=var "Alert Range", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Collider Idle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Fly", volume=1, oneShotClip=<null>)
+    ActivateGameObject(gameObject=var "Pt Idle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Glow", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Nearby? {
+    GetDistance(gameObject=Self, target=var "MainCamera", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=40, tolerance=0, equal=→"ALERT", lessThan=→"ALERT", greaterThan=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on ALERT → Startle Start 2
+  }
+
+  state Startle Start 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ReceivedDamage(Target=Self, collideTag="", sendEvent=→"DAMAGED", sendEventHeavy=(none), sendEventSpikes=(none), sendEventLava=(none), sendEventLightning=(none), storeGameObject=var "", ignoreAcid=false, ignoreLava=false, ignoreWater=false, ignoreHunterWeapon=false, ignoreTraps=true, ignoreNail=false, ignoreSpikes=false, storeDamageDealt=(unset), storeDirection=(unset), storeMagnitudeMultiplier=(unset), firstHitOnly=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetLayer(gameObject=var "Collider Idle", layer=Enemies(11))
+    on FINISHED → Startle Scream 2
+  }
+
+  state Startle Scream 2 {
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=10)  // disabled
+    ReceivedDamage(Target=Self, collideTag="", sendEvent=→"DAMAGED", sendEventHeavy=(none), sendEventSpikes=(none), sendEventLava=(none), sendEventLightning=(none), storeGameObject=var "", ignoreAcid=false, ignoreLava=false, ignoreWater=false, ignoreHunterWeapon=false, ignoreTraps=true, ignoreNail=false, ignoreSpikes=false, storeDamageDealt=(unset), storeDirection=(unset), storeMagnitudeMultiplier=(unset), firstHitOnly=false)
+    on FINISHED → Start Chase
+  }
+
+  state Summoned? {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    GameObjectIsNull(gameObject=var "Parent", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Summoned", boolValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Summon {
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=true)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetLayer(gameObject=var "Collider Idle", layer=Enemies(11))
+    on FINISHED → Start Chase
+  }
+
+  state Cam Wait {
+    TranslateRandom(gameObject=Self, translateMin=(-3, -1.5, 0), translateMax=(3, 1.5, 0), space=1)
+    GetDistance(gameObject=Self, target=var "MainCamera", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=43, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    on FINISHED → Reactivate
+  }
+
+  state Chase {
+    FaceDirection(gameObject=Self, spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)  // disabled
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    RandomFloat(min=-2, max=2, storeResult=var "Height")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=7.5, speedMax=6, acceleration=0.2, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Charge Antic 1
+    on WRAITH GRAB → Grab Cooloff
+    on SING → Sing
+  }
+
+  state Charge Antic 1 {
+    PlayAudioEventRandom(audioClips=[wraith_antic_short_scream_1 (sfxstatic_assets_areadustmaze.bundle), wraith_antic_short_scream_2 (sfxstatic_assets_areadustmaze.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayParticleEmitter(gameObject=var "Pt Antic", emit=0, resetIfPlaying=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=-15, position=(0, 0, 0), spread=0, everyFrame=false)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=9, speedMax=6, acceleration=0.2, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    ClampAngleByScale(gameObject=Self, space=0, angleVariable=var "Angle", positiveMinValue=-40, positiveMaxValue=40, negativeMinValue=140, negativeMaxValue=220, everyFrame=false)
+    on FINISHED → Charge Antic 2
+  }
+
+  state Charge Antic 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Charge
+  }
+
+  state Charge {
+    PlayAudioEvent(audioClip=wraith_dash_to_hero (sfxstatic_assets_areadustmaze.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=50, everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.97, brakeOnExit=false)
+    FaceAngleV3(GameObject=Self, AngleOffset=0, WorldSpace=true, SpriteFacesRight=false, EveryFrame=false, skipOnEnter=false)
+    ActivateGameObject(gameObject=var "Collider Idle", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Collider Charge", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Charge End
+    on GRAB → Set Facing
+  }
+
+  state Charge End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Charge Cooldown
+  }
+
+  state Charge Cooldown {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    RandomFloat(min=-2, max=2, storeResult=var "Height")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=9, speedMax=8, acceleration=0.2, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Chase
+    on SING → Sing
+  }
+
+  state No Silk {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Strike Away
+  }
+
+  state Ungrab {
+    SetIsDead(target=Self, setValue=true)
+    BoolTest(boolVariable=var "Grabbing", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    RemoveUsingSilk(Amount=1, UsingType=Drain, DidAddTracker=var "Is Sucking Silk")
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="HERO GRAB END", delay=0, everyFrame=false)
+    DamageHeroDirectly(damager=Self, damageAmount=1, spikeHazard=false, sinkHazard=false)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    SetBoolValue(boolVariable=var "Grabbing", boolValue=false, everyFrame=false)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    ActivateGameObject(gameObject=var "Alert Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStop(gameObject=var "Audio Loop Fly", fadeTime=0)
+    on FINISHED → Sliced
+  }
+
+  state Cocoon Idle {
+    SetBoolValue(boolVariable=var "No Respawn", boolValue=true, everyFrame=false)
+    FindGameObject(objectName="", withTag="Hornet Cocoon", store=var "Cocoon")
+    RandomFloatEither(value1=-0.75, value2=0.75, storeResult=var "Distance")
+    SetPositionToObject(gameObject=Self, targetObject=var "Cocoon", xOffset=var "Distance", yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Cocoon", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cocoon Grab")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    PlayParticleEmitterInState(gameObject=var "Pt Cocoon")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on ALERT → Startle Start
+    on TOOK DAMAGE → Startle Start
+  }
+
+  state Die {
+  }
+
+  state Grab Cooloff {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    RandomFloat(min=-2, max=2, storeResult=var "Height")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=9, speedMax=8, acceleration=0.2, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Chase
+  }
+
+  state Try New Node {
+    GetChildCount(gameObject=var "Wraith Nodes", storeResult=var "Nodes Remaining")
+    IntCompare(integer1=var "Nodes Remaining", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    GetRandomChild(gameObject=var "Wraith Nodes", storeResult=var "Next Node")
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Next Node", xOffset=0, yOffset=0, everyFrame=false)
+    SetParent(gameObject=var "Current Node", parent=var "Wraith Nodes", resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Next Node", parent=var "Wraith Nodes Occupied", resetLocalPosition=false, resetLocalRotation=false)
+    SetGameObject(variable=var "Current Node", gameObject=var "Next Node", everyFrame=false)
+    on CANCEL → Use Start Pos
+    on FINISHED → Respawn Pause
+  }
+
+  state Use Start Pos {
+    SetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Respawn Pause
+  }
+
+  state Respawn Pause {
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Cam Wait
+  }
+
+  state Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=wraith_sing (sfxdynamic_assets_areadustmaze.bundle), noThreadEffects=false, noPuppetString=true, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Restart Chase
+  }
+
+  state Restart Chase {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    on FINISHED → Chase
+  }
+
+  state Set Facing {
+    GetSceneDimensions(StoreWidth=var "Scene Middle", StoreHeight=(unset))
+    FloatDivide(floatVariable=var "Scene Middle", divideBy=2, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=0, functionCall=FaceRight())
+    CheckXPosition(gameObject=var "Hero", compareTo=var "Scene Middle", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"FINISHED", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=0, functionCall=FaceLeft())
+    on FINISHED → Grab
+  }
+
+  var Translate: float = 0
+  var Rotation: float = 0
+  var Z Pos: float = 0
+  var Distance: float = 0
+  var Height: float = 0
+  var Angle: float = 0
+  var Scene Middle: float = 0
+  var Sucks: int = 0
+  var Silk: int = 0
+  var Nodes Remaining: int = 0
+  var Summoned: bool = false
+  var Grabbing: bool = false
+  var No Respawn: bool = false
+  var Is Sucking Silk: bool = false
+  var Start Pos: vector3 = (0, 0, 0)
+  var Collider Charge: gameObject = Wraith/Collider Charge
+  var Collider Idle: gameObject = Wraith/Collider Idle
+  var Grab Effects: gameObject = Wraith/Grab Effects
+  var Parent: gameObject = <null>
+  var Pt Break: gameObject = Wraith/Pt Break
+  var Pt Roar: gameObject = Wraith/Pt Roar
+  var Pt StrandBurst: gameObject = Wraith/Pt StrandBurst
+  var Pt Strands: gameObject = Wraith/Pt Strands
+  var Self: gameObject = Wraith
+  var Slice Effect: gameObject = <null>
+  var Pt Antic: gameObject = Wraith/Pt Antic
+  var Cocoon: gameObject = <null>
+  var Pt Cocoon: gameObject = Wraith/Pt Cocoon
+  var Audio Loop Fly: gameObject = Wraith/Audio Loop Fly
+  var Audio Loop Suck: gameObject = Wraith/Audio Loop Suck
+  var Burst Anim: gameObject = Wraith/Burst Anim
+  var Wraith Nodes: gameObject = <null>
+  var Next Node: gameObject = <null>
+  var Alert Range: gameObject = Wraith/Alert Range
+  var Current Node: gameObject = <null>
+  var Wraith Nodes Occupied: gameObject = <null>
+  var Pt Idle: gameObject = Wraith/Pt Idle
+  var Glow: gameObject = Wraith/Idle Glow (5)
+  var Audio Loop Voice: gameObject = Wraith/Audio Loop Voice
+}

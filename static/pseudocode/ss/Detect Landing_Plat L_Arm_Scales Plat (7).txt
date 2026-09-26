@@ -1,0 +1,149 @@
+# Detect Landing
+# 1 location(s):
+#   Song_19_entrance / Scales Plat (7)/Arm/Plat L
+
+// uses template: scale_plat_detect_landing
+fsm Detect Landing {
+  start Init
+  on LOCK → Lock Shift  // from any state
+  on READY → Arrive  // from any state
+
+  state Init {
+    GetPosition(gameObject=var "Art", vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Art")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Follow")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Land")
+    GetParent(gameObject=Self, storeResult=var "Arm")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Collision2dEventLayer(collision=OnCollisionEnter2D, collideTag="", collideLayer=Player(9), sendEvent=→"COLLIDE", storeCollider=var "Collider", storeForce=(unset), contactPoint=(unset), contactNormal=var "Normal")
+    SetPosition(gameObject=var "Art", vector=(unset), x=0, y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=var "Art", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=1, everyFrame=false, lateUpdate=false)
+    on COLLIDE → Check
+    on TEST → Down
+    on TINK UP → Send
+  }
+
+  state Check {
+    GetVector3XYZ(vector3Variable=var "Normal", storeX=(unset), storeY=var "Normal Y", storeZ=(unset), everyFrame=false)
+    FloatCompare(float1=var "Normal Y", float2=-1, tolerance=0.01, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Collider", aboveEvent=(none), belowEvent=(none), rightEvent=→"R", leftEvent=→"L", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"L", delay=0, everyFrame=false)
+    on FINISHED → Idle
+    on L → Tilt Self L
+    on R → Tilt Self R
+  }
+
+  state Down {
+    PlayRandomAudioClipTable(Table=metal_creak (sfxdynamic_assets_areasong.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetPosition(gameObject=var "Art", vector=(unset), x=(unset), y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    AnimatePositionToV2(GameObject=var "Art", ToValue=(0, -0.15, 0), ToX=(unset), ToY=(unset), ToZ=(unset), LocalSpace=true, time=0.075, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    Collision2dEventLayer(collision=OnCollisionExit2D, collideTag="", collideLayer=Player(9), sendEvent=→"LEAVE", storeCollider=var "Collider", storeForce=(unset), contactPoint=(unset), contactNormal=var "Normal")
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatOperator(float1=var "Self X", float2=var "Hero X", operation=Subtract, storeResult=var "Tilt", everyFrame=true)
+    FloatMultiply(floatVariable=var "Tilt", multiplyBy=var "Tilt Factor", everyFrame=true)
+    SetRotationTimer(gameObject=var "Art", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tilt", time=0.1, space=1)
+    on LEAVE → Set Rotation
+  }
+
+  state Up {
+    PlayRandomAudioClipTable(Table=metal_creak (sfxdynamic_assets_areasong.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AnimatePositionToV2(GameObject=var "Art", ToValue=(0, 0, 0), ToX=(unset), ToY=(unset), ToZ=(unset), LocalSpace=true, time=0.15, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Collision2dEventLayer(collision=OnCollisionEnter2D, collideTag="", collideLayer=Player(9), sendEvent=→"COLLIDE", storeCollider=var "Collider", storeForce=(unset), contactPoint=(unset), contactNormal=var "Normal")
+    EaseFloat(fromValue=var "Start Rotation", toValue=0, floatVariable=var "Rotation", time=0.25, speed=(unset), delay=(unset), easeType=25, reverse=false, finishEvent=(none), realTime=false)
+    SetRotation(gameObject=var "Art", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=1, everyFrame=true, lateUpdate=false)
+    on FINISHED → Idle
+    on COLLIDE → Check
+  }
+
+  state Tilt Self L {
+    SetFloatValue(floatVariable=var "Angle", floatValue=3.5, everyFrame=false)
+    on FINISHED → Get Dir
+  }
+
+  state Tilt Self R {
+    SetFloatValue(floatVariable=var "Angle", floatValue=-3.5, everyFrame=false)
+    on FINISHED → Get Dir
+  }
+
+  state Send {
+    SendEventByName(eventTarget=GameObject(var "Arm"), sendEvent=var "Tink Event", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Set Rotation {
+    GetRotation(gameObject=var "Art", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Start Rotation", space=1, everyFrame=false)
+    FloatCompare(float1=var "Start Rotation", float2=180, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FloatAdd(floatVariable=var "Start Rotation", add=-360, everyFrame=false, perSecond=false)
+    on FINISHED → Up
+  }
+
+  state Lock Shift {
+    BoolTest(boolVariable=var "Lock Shift", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ActivateGameObject(gameObject=var "Nut Orig", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Nut Locked", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Lock Pos X", y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  state Arrive {
+    PlayParticleEmitter(gameObject=var "Pt Land", emit=0, resetIfPlaying=false)  // disabled
+    on FINISHED → Idle
+  }
+
+  state Send Land Event? {
+    GetFsmBool(gameObject=var "Arm", fsmName="Control", variableName="Tilted L", storeValue=var "Tilted L", everyFrame=false)
+    GetFsmBool(gameObject=var "Arm", fsmName="Control", variableName="Tilted R", storeValue=var "Tilted R", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Sending L", var "Tilted L"], boolStates=[true, true], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Sending R", var "Tilted R"], boolStates=[true, true], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Arm"), sendEvent=var "Land Event", delay=0, everyFrame=false)
+    on FINISHED → Down
+  }
+
+  state Get Dir {
+    StringCompare(stringVariable=var "Land Event", compareTo="TILT R", equalEvent=→"R", notEqualEvent=→"L", storeResult=(unset), everyFrame=false)
+    on L → Sending L
+    on R → Sending R
+  }
+
+  state Sending L {
+    SetBoolValue(boolVariable=var "Sending L", boolValue=true, everyFrame=false)
+    on FINISHED → Send Land Event?
+  }
+
+  state Sending R {
+    SetBoolValue(boolVariable=var "Sending R", boolValue=true, everyFrame=false)
+    on FINISHED → Send Land Event?
+  }
+
+  var Lock Pos X: float = -6.57
+  var Tilt Factor: float = 1
+  var Lock Shift: bool = true
+  var Land Event: string = "TILT L"
+  var Tink Event: string = "TINK R"
+  var Nut Orig: gameObject = Scales Plat (7)/Arm/Art/GameObject/nut orig
+  var Nut Locked: gameObject = Scales Plat (7)/Arm/Art/GameObject/nut lock
+
+  var Angle: float = 0
+  var Hero X: float = 0
+  var Normal Y: float = 0
+  var Rotation: float = 0
+  var Self X: float = 0
+  var Start Rotation: float = 0
+  var Tilt: float = 0
+  var Sending L: bool = false
+  var Sending R: bool = false
+  var Tilted L: bool = false
+  var Tilted R: bool = false
+  var Start Pos: vector3 = (0, 0, 0)
+  var Normal: vector3 = (0, 0, 0)
+  var Art: gameObject = <null>
+  var Collider: gameObject = <null>
+  var Arm: gameObject = <null>
+  var Plat L: gameObject = <null>
+  var Pt Follow: gameObject = <null>
+  var Pt Land: gameObject = <null>
+}

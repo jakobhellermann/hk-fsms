@@ -1,0 +1,154 @@
+# Detect Landing
+# 1 location(s):
+#   Dust_03 / cage_mid_wide_sway (1)/Plat Collider
+
+// component disabled: this FSM does not run until something enables it
+// uses template: sway_plat_collider
+fsm Detect Landing {
+  start Init
+  on READY → Idle  // from any state
+  on SWAY PLAT STOP → Stop  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindChild(gameObject=var "Parent", childName="Plat Dust", storeResult=var "Plat Dust")
+    FindChild(gameObject=var "Parent", childName="Water Drips", storeResult=var "Water Drips")
+    FindChild(gameObject=var "Parent", childName="Art Parent", storeResult=var "Art Parent")
+    FindChild(gameObject=var "Art Parent", childName="Art", storeResult=var "Art")
+    FindChild(gameObject=var "Art", childName="plat", storeResult=var "Plat Art")
+    GetPosition(gameObject=var "Plat Art", vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    GetPosition(gameObject=var "Art Parent", vector=var "Art World Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    BoolTest(boolVariable=var "Start Inactive", isTrue=→"SWAY PLAT STOP", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Collision2dEventLayer(collision=OnCollisionEnter2D, collideTag="", collideLayer=Player(9), sendEvent=→"COLLIDE", storeCollider=var "Collider", storeForce=(unset), contactPoint=(unset), contactNormal=var "Normal")
+    SetPosition(gameObject=var "Plat Art", vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=var "Plat Art", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=1, everyFrame=false, lateUpdate=false)
+    on COLLIDE → Check
+    on TINK LEFT → Tink L
+    on TINK RIGHT → Tink R
+    on TINK UP → Tink U
+    on TINK DOWN → Tink D
+    on HEAVY LANDING → Tink D
+  }
+
+  state Check {
+    GetVector3XYZ(vector3Variable=var "Normal", storeX=(unset), storeY=var "Normal Y", storeZ=(unset), everyFrame=false)
+    FloatCompare(float1=var "Normal Y", float2=-1, tolerance=0.01, equal=→"LAND", lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Idle
+    on LAND → Effects?
+  }
+
+  state Down {
+    PlayRandomAudioClipTable(Table=var "Land Audio Table", AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    PlayRandomAudioClipTable(Table=var "Land Audio Table 2", AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    SendEventByName(eventTarget=GameObject(var "Shake Notify"), sendEvent="SHAKE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Art"), sendEvent="LAND", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "Art Parent", vector=(unset), x=0, y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    AnimatePositionBy(gameObject=var "Art Parent", shiftBy=(0, -0.05, 0), time=0.075, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Collision2dEventLayer(collision=OnCollisionExit2D, collideTag="", collideLayer=Player(9), sendEvent=→"UNCOLLIDE", storeCollider=var "Collider", storeForce=(unset), contactPoint=(unset), contactNormal=var "Normal")
+    on FINISHED → Up
+  }
+
+  state Up {
+    AnimatePositionBy(gameObject=var "Art Parent", shiftBy=(0, 0.05, 0), time=0.15, speed=(unset), delay=(unset), easeType=14, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Collision2dEventLayer(collision=OnCollisionExit2D, collideTag="", collideLayer=Player(9), sendEvent=→"UNCOLLIDE", storeCollider=var "Collider", storeForce=(unset), contactPoint=(unset), contactNormal=var "Normal")
+    on FINISHED → On Plat
+    on UNCOLLIDE → Restart Sway
+  }
+
+  state On Plat {
+    Collision2dEventLayer(collision=OnCollisionExit2D, collideTag="", collideLayer=Player(9), sendEvent=→"UNCOLLIDE", storeCollider=var "Collider", storeForce=(unset), contactPoint=(unset), contactNormal=var "Normal")
+    on UNCOLLIDE → Restart Sway
+    on HEAVY LANDING → Tink D 2
+  }
+
+  state Restart Sway {
+    SendEventByName(eventTarget=GameObject(var "Art"), sendEvent="UNLAND", delay=0, everyFrame=false)
+    AnimatePositionTo(gameObject=var "Art Parent", toValue=var "Art World Pos", localSpace=true, time=0.1, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Tink L {
+    PlayRandomAudioClipTable(Table=var "Tink Audio Table", AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    SendEventByNameV3(eventTarget=GameObject(var "Shake Notify"), sendEvent="SHAKE", delay=0, everyFrame=false, activeBool=(unset))
+    SendEventByName(eventTarget=GameObject(var "Art"), sendEvent="TINK LEFT", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Plat Dust", emit=0, resetIfPlaying=false)
+    on FINISHED → Idle
+  }
+
+  state Tink R {
+    PlayRandomAudioClipTable(Table=var "Tink Audio Table", AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    SendEventByNameV3(eventTarget=GameObject(var "Shake Notify"), sendEvent="SHAKE", delay=0, everyFrame=false, activeBool=(unset))
+    SendEventByName(eventTarget=GameObject(var "Art"), sendEvent="TINK RIGHT", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Plat Dust", emit=0, resetIfPlaying=false)
+    on FINISHED → Idle
+  }
+
+  state Effects? {
+    CheckCurrentMapZoneEnum(MapZone=RED_CORAL_GORGE, trueEvent=→"CORAL", falseEvent=→"FINISHED", storeValue=(unset))
+    on CORAL → Coral Effects
+    on FINISHED → Reg Effects
+  }
+
+  state Reg Effects {
+    PlayParticleEmitter(gameObject=var "Plat Dust", emit=0, resetIfPlaying=false)
+    on FINISHED → Down
+  }
+
+  state Coral Effects {
+    PlayParticleEmitter(gameObject=var "Water Drips", emit=0, resetIfPlaying=false)
+    on FINISHED → Down
+  }
+
+  state Stop {
+    on SWAY PLAT START → Idle
+  }
+
+  state Tink U {
+    PlayRandomAudioClipTable(Table=var "Tink Audio Table", AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    SendEventByNameV3(eventTarget=GameObject(var "Shake Notify"), sendEvent="SHAKE", delay=0, everyFrame=false, activeBool=(unset))
+    SendEventByName(eventTarget=GameObject(var "Art"), sendEvent="TINK UP", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Plat Dust", emit=0, resetIfPlaying=false)
+    on FINISHED → Idle
+  }
+
+  state Tink D {
+    PlayRandomAudioClipTable(Table=var "Tink Audio Table", AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    SendEventByNameV3(eventTarget=GameObject(var "Shake Notify"), sendEvent="SHAKE", delay=0, everyFrame=false, activeBool=(unset))
+    SendEventByName(eventTarget=GameObject(var "Art"), sendEvent="TINK DOWN", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Plat Dust", emit=0, resetIfPlaying=false)
+    on FINISHED → Idle
+  }
+
+  state Tink D 2 {
+    PlayRandomAudioClipTable(Table=var "Tink Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventByNameV3(eventTarget=GameObject(var "Shake Notify"), sendEvent="SHAKE", delay=0, everyFrame=false, activeBool=(unset))
+    SendEventByName(eventTarget=GameObject(var "Art"), sendEvent="TINK DOWN", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Plat Dust", emit=0, resetIfPlaying=false)
+    on FINISHED → On Plat
+  }
+
+  var Start Inactive: bool = false
+  var Shake Notify: gameObject = <null>
+  var Land Audio Table: object = Cage Land (herodynamic_assets_all.bundle)
+  var Tink Audio Table: object = Cage Impact (herodynamic_assets_all.bundle)
+  var Land Audio Table 2: object = <null>
+
+  var Normal Y: float = 0
+  var Angle: float = 0
+  var Art World Y: float = 0
+  var Start Pos: vector3 = (0, 0, 0)
+  var Normal: vector3 = (0, 0, 0)
+  var Art World Pos: vector3 = (0, 0, 0)
+  var Plat Art: gameObject = <null>
+  var Collider: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Art: gameObject = <null>
+  var Art Parent: gameObject = <null>
+  var Plat Dust: gameObject = <null>
+  var Water Drips: gameObject = <null>
+}

@@ -1,0 +1,204 @@
+# Plant Turret
+# 3 location(s):
+#   Fungus1_11 / Plant Turret
+#   Fungus1_12 / Plant Turret
+#   Fungus1_29 / Plant Turret
+
+// component disabled: this FSM does not run until something enables it
+fsm Plant Turret {
+  start Initialise
+  on HIDE → Hide  // from any state
+
+  state Initialise {
+    GetOwner(storeGameObject=var "Self")
+    GetRotation(gameObject=Self, quaternion=(unset), vector=var "Start Angle", xAngle=(unset), yAngle=(unset), zAngle=(unset), space=0, everyFrame=false)
+    GetHero(storeResult=var "Hero")
+    SetParent(gameObject=var "Cover", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Under", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Self Rotation", space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=var "Self Rotation", everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=var "Self Rotation", everyFrame=false)
+    FloatAdd(floatVariable=var "Angle Min", add=40, everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Angle Max", add=140, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Angle Max", float2=360, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RIGHT", everyFrame=false)
+    on FINISHED → Check
+    on RIGHT → Check
+  }
+
+  state Check {
+    iTweenRotateTo(gameObject=Self, id="", transformRotation=var "", vectorRotation=var "Start Angle", time=0.5, delay=0, speed=(unset), easeType=easeInOutCirc, loopType=none, space=0, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle To Hero", everyFrame=true)
+    FloatAddV2(floatVariable=var "Angle To Hero", add=360, everyFrame=true, perSecond=false, fixedUpdate=false, activeBool=var "Facing Right")
+    GetPosition(gameObject=var "Hero", vector=var "Hero Position", x=var "Hero X", y=var "Hero Y", z=(unset), space=1, everyFrame=true)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=var "Self Y", z=(unset), space=1, everyFrame=true)
+    SetFloatValue(floatVariable=var "Raycast X", floatValue=var "Hero X", everyFrame=true)
+    SetFloatValue(floatVariable=var "Raycast Y", floatValue=var "Hero Y", everyFrame=true)
+    FloatSubtract(floatVariable=var "Raycast X", subtract=var "Self X", everyFrame=true, perSecond=false)
+    FloatSubtract(floatVariable=var "Raycast Y", subtract=var "Self Y", everyFrame=true, perSecond=false)
+    SetVector2XY(vector2Variable=var "Raycast Vector", vector2Value=(unset), x=var "Raycast X", y=var "Raycast Y", everyFrame=true)
+    SetVector2XY(vector2Variable=var "Hero Pos 2D", vector2Value=(unset), x=var "Hero X", y=var "Hero Y", everyFrame=true)
+    SetVector2XY(vector2Variable=var "Self Pos 2D", vector2Value=(unset), x=var "Self X", y=var "Self Y", everyFrame=true)
+    DistanceBetweenPoints2D(distanceResult=var "Distance", point1=var "Hero Pos 2D", point2=var "Self Pos 2D", everyFrame=true)
+    RayCast2d(fromGameObject=var "Self", fromPosition=(0, 0), direction=var "Raycast Vector", space=0, distance=var "Distance", minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "View Obscured", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=0, repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    SetBoolValue(boolVariable=var "Can See Hero", boolValue=var "View Obscured", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Can See Hero", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=var "Distance Max", tolerance=0, equalBool=(unset), lessThanBool=var "In Range", greaterThanBool=(unset), everyFrame=true)
+    FloatTestToBool(float1=var "Angle To Hero", float2=var "Angle Min", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Over Angle Min", everyFrame=true)
+    FloatTestToBool(float1=var "Angle To Hero", float2=var "Angle Max", tolerance=0, equalBool=(unset), lessThanBool=var "Under Angle Max", greaterThanBool=(unset), everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=var "Hide Distance", tolerance=0, equalBool=(unset), lessThanBool=var "Close", greaterThanBool=var "Not Close", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "Over Angle Min", var "Under Angle Max", var "In Range", var "Not Close"], sendEvent=→"SEE HERO", storeResult=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Close", var "Awake"], sendEvent=→"HIDE", storeResult=(unset), everyFrame=true)
+    on SEE HERO → Seen
+  }
+
+  state Seen {
+    BoolTest(boolVariable=var "Awake", isTrue=→"SHOOT", isFalse=→"WAKE", everyFrame=false)
+    on WAKE → Wake
+    on SHOOT → Shot Pause
+  }
+
+  state Wake {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=plant_turret_emerge (sharedassets140.assets))
+    PlayParticleEmitter(gameObject=var "Burst Grass", emit=0)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    SetBoolValue(boolVariable=var "Awake", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Anim
+  }
+
+  state Shot Pause {
+    LookAt2dGameObjectSmooth(gameObject=Self, targetObject=var "Hero", rotationOffset=90, speed=3, debug=false, debugLineColor=(0, 1, 0, 1))
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle To Hero", everyFrame=true)
+    FloatAddV2(floatVariable=var "Angle To Hero", add=360, everyFrame=true, perSecond=false, fixedUpdate=false, activeBool=var "Facing Right")
+    GetPosition(gameObject=var "Hero", vector=var "Hero Position", x=var "Hero X", y=var "Hero Y", z=(unset), space=1, everyFrame=true)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=var "Self Y", z=(unset), space=1, everyFrame=true)
+    SetFloatValue(floatVariable=var "Raycast X", floatValue=var "Hero X", everyFrame=true)
+    SetFloatValue(floatVariable=var "Raycast Y", floatValue=var "Hero Y", everyFrame=true)
+    FloatSubtract(floatVariable=var "Raycast X", subtract=var "Self X", everyFrame=true, perSecond=false)
+    FloatSubtract(floatVariable=var "Raycast Y", subtract=var "Self Y", everyFrame=true, perSecond=false)
+    SetVector2XY(vector2Variable=var "Raycast Vector", vector2Value=(unset), x=var "Raycast X", y=var "Raycast Y", everyFrame=true)
+    SetVector2XY(vector2Variable=var "Hero Pos 2D", vector2Value=(unset), x=var "Hero X", y=var "Hero Y", everyFrame=true)
+    SetVector2XY(vector2Variable=var "Self Pos 2D", vector2Value=(unset), x=var "Self X", y=var "Self Y", everyFrame=true)
+    DistanceBetweenPoints2D(distanceResult=var "Distance", point1=var "Hero Pos 2D", point2=var "Self Pos 2D", everyFrame=true)
+    RayCast2d(fromGameObject=var "Self", fromPosition=(0, 0), direction=var "Raycast Vector", space=0, distance=var "Distance", minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "View Obscured", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=0, repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    SetBoolValue(boolVariable=var "Can See Hero", boolValue=var "View Obscured", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Can See Hero", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=var "Distance Max", tolerance=0, equalBool=(unset), lessThanBool=var "In Range", greaterThanBool=(unset), everyFrame=true)
+    FloatTestToBool(float1=var "Angle To Hero", float2=var "Angle Min", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Over Angle Min", everyFrame=true)
+    FloatTestToBool(float1=var "Angle To Hero", float2=var "Angle Max", tolerance=0, equalBool=(unset), lessThanBool=var "Under Angle Max", greaterThanBool=(unset), everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=var "Hide Distance", tolerance=0, equal=(none), lessThan=→"HIDE", greaterThan=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Can See Hero", isTrue=(none), isFalse=→"RETURN", everyFrame=true)
+    BoolTest(boolVariable=var "Over Angle Min", isTrue=(none), isFalse=→"RETURN", everyFrame=true)
+    BoolTest(boolVariable=var "Under Angle Max", isTrue=(none), isFalse=→"RETURN", everyFrame=true)
+    BoolTest(boolVariable=var "In Range", isTrue=(none), isFalse=→"RETURN", everyFrame=true)
+    WaitRandom(timeMin=0.4, timeMax=0.6, finishEvent=→"SHOOT", realTime=false)
+    on RETURN → Return Pause
+    on SHOOT → Shoot Antic
+  }
+
+  state Return Pause {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle To Hero", everyFrame=true)
+    FloatAddV2(floatVariable=var "Angle To Hero", add=360, everyFrame=true, perSecond=false, fixedUpdate=false, activeBool=var "Facing Right")
+    GetPosition(gameObject=var "Hero", vector=var "Hero Position", x=var "Hero X", y=var "Hero Y", z=(unset), space=1, everyFrame=true)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=var "Self Y", z=(unset), space=1, everyFrame=true)
+    SetFloatValue(floatVariable=var "Raycast X", floatValue=var "Hero X", everyFrame=true)
+    SetFloatValue(floatVariable=var "Raycast Y", floatValue=var "Hero Y", everyFrame=true)
+    FloatSubtract(floatVariable=var "Raycast X", subtract=var "Self X", everyFrame=true, perSecond=false)
+    FloatSubtract(floatVariable=var "Raycast Y", subtract=var "Self Y", everyFrame=true, perSecond=false)
+    SetVector2XY(vector2Variable=var "Raycast Vector", vector2Value=(unset), x=var "Raycast X", y=var "Raycast Y", everyFrame=true)
+    SetVector2XY(vector2Variable=var "Hero Pos 2D", vector2Value=(unset), x=var "Hero X", y=var "Hero Y", everyFrame=true)
+    SetVector2XY(vector2Variable=var "Self Pos 2D", vector2Value=(unset), x=var "Self X", y=var "Self Y", everyFrame=true)
+    DistanceBetweenPoints2D(distanceResult=var "Distance", point1=var "Hero Pos 2D", point2=var "Self Pos 2D", everyFrame=true)
+    RayCast2d(fromGameObject=var "Self", fromPosition=(0, 0), direction=var "Raycast Vector", space=0, distance=var "Distance", minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "View Obscured", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=0, repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    SetBoolValue(boolVariable=var "Can See Hero", boolValue=var "View Obscured", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Can See Hero", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=var "Distance Max", tolerance=0, equalBool=(unset), lessThanBool=var "In Range", greaterThanBool=(unset), everyFrame=true)
+    FloatTestToBool(float1=var "Angle To Hero", float2=var "Angle Min", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Over Angle Min", everyFrame=true)
+    FloatTestToBool(float1=var "Angle To Hero", float2=var "Angle Max", tolerance=0, equalBool=(unset), lessThanBool=var "Under Angle Max", greaterThanBool=(unset), everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=var "Hide Distance", tolerance=0, equal=(none), lessThan=→"HIDE", greaterThan=(none), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "Over Angle Min", var "Under Angle Max", var "In Range"], sendEvent=→"SEE HERO", storeResult=(unset), everyFrame=true)
+    Wait(time=0.4, finishEvent=→"RETURN", realTime=false)
+    on SEE HERO → Seen
+    on RETURN → Check
+  }
+
+  state Hide {
+    iTweenRotateTo(gameObject=Self, id="", transformRotation=var "", vectorRotation=var "Start Angle", time=0.5, delay=0, speed=(unset), easeType=easeOutCirc, loopType=none, space=0, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hide")
+    SetBoolValue(boolVariable=var "Awake", boolValue=false, everyFrame=false)
+    on FINISHED → Check
+  }
+
+  state Shoot Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Shoot", animationTriggerEvent=→"SHOOT", animationCompleteEvent=(none))
+    LookAt2dGameObjectSmooth(gameObject=Self, targetObject=var "Hero", rotationOffset=90, speed=3, debug=false, debugLineColor=(0, 1, 0, 1))
+    on SHOOT → Fire
+  }
+
+  state Fire {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=plant_turret_spit (sharedassets140.assets))
+    LookAt2dGameObjectSmooth(gameObject=Self, targetObject=var "Hero", rotationOffset=90, speed=3, debug=false, debugLineColor=(0, 1, 0, 1))
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CreateObject(gameObject=Spike Ball (sharedassets140.assets), spawnPoint=var "Shot Spawn", position=(unset), rotation=(unset), storeObject=var "Shot Instance", networkInstantiate=false, networkGroup=0)
+    FireAtTarget(gameObject=var "Shot Instance", target=var "Hero", speed=12, position=(0, 0.4, 0), spread=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle Anim
+  }
+
+  state Idle Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.55, finishEvent=(none), realTime=false)
+    on FINISHED → Check
+  }
+
+  state Facing Right {
+    SetFloatValue(floatVariable=var "Angle Max Alt", floatValue=var "Angle Max", everyFrame=false)  // disabled
+    SetFloatValue(floatVariable=var "Angle Min Alt", floatValue=var "Angle Min", everyFrame=false)  // disabled
+    FloatSubtract(floatVariable=var "Angle Max Alt", subtract=360, everyFrame=false, perSecond=false)  // disabled
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=var "Angle Max Alt", everyFrame=false)  // disabled
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=var "Angle Min Alt", everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    on FINISHED → Check
+  }
+
+  var Distance Max: float = 12
+
+  var Angle Max: float = 0
+  var Angle Max Alt: float = 0
+  var Angle Min: float = 0
+  var Angle Min Alt: float = 0
+  var Angle To Hero: float = 0
+  var Distance: float = 0
+  var Hero X: float = 0
+  var Hero Y: float = 0
+  var Hide Distance: float = 5
+  var Raycast X: float = 0
+  var Raycast Y: float = 0
+  var Self Rotation: float = 0
+  var Self X: float = 0
+  var Self Y: float = 0
+  var Awake: bool = false
+  var Can See Hero: bool = false
+  var Close: bool = false
+  var Facing Right: bool = false
+  var In Range: bool = false
+  var Not Close: bool = false
+  var Over Angle Min: bool = false
+  var Under Angle Max: bool = false
+  var View Obscured: bool = false
+  var Hero Pos 2D: vector2 = (0, 0)
+  var Raycast Vector: vector2 = (0, 0)
+  var Self Pos 2D: vector2 = (0, 0)
+  var Hero Position: vector3 = (0, 0, 0)
+  var Rotate Vector: vector3 = (0, 0, 0)
+  var Start Angle: vector3 = (0, 0, 0)
+  var Burst Grass: gameObject = Plant Turret/Burst Grass
+  var Cover: gameObject = Plant Turret/Cover
+  var Hero: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shot Instance: gameObject = <null>
+  var Shot Spawn: gameObject = Plant Turret/Shot Spawn
+  var Spit Effect: gameObject = Plant Turret/Spit Effect
+  var Under: gameObject = Plant Turret/Under
+}

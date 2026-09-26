@@ -1,0 +1,193 @@
+# inspect
+# 26 location(s):
+#   Ruins1_30 / Shiny Item Stand/Inspect Region
+#   Ruins2_11 / Shiny Item CollectorMap/Inspect Region
+#   Fungus1_08 / Hunter Eyes/Shiny Item/Inspect Region
+#   Fungus1_08 / Hunter Entry/Shiny Item HunterMark/Inspect Region
+#   Fungus2_14 / Shiny Item Stand/Inspect Region
+#   Fungus2_20 / Shiny Item Stand/Inspect Region
+#   Fungus2_23 / Shiny Item Stand/Inspect Region
+#   Fungus3_39 / Shiny Item Stand/Inspect Region
+#   Cliffs_05 / Shiny Item Stand/Inspect Region
+#   RestingGrounds_10 / Shiny Item Stand/Inspect Region
+#   RestingGrounds_17 / Shiny Item Stand/Inspect Region
+#   Mines_11 / Shiny Item Stand/Inspect Region
+#   Mines_30 / Shiny Item Stand/Inspect Region
+#   Mines_34 / Shiny Item Stand/Inspect Region
+#   Mines_36 / Shiny Item Stand/Inspect Region
+#   Deepnest_32 / Shiny Item Stand/Inspect Region
+#   Deepnest_44 / Shiny Item Stand/Inspect Region
+#   Room_Wyrm / Shiny Item Stand/Inspect Region
+#   Abyss_17 / Shiny Item Stand/Inspect Region
+#   Abyss_20 / Shiny Item Stand/Inspect Region
+#   Room_Queen / Queen Item/Shiny Item RoyalCharm/Inspect Region
+#   Waterways_15 / Shiny Item Stand/Inspect Region
+#   White_Palace_09 / White Charm/Shiny Item RoyalCharm/Inspect Region
+#   Hive_05 / Shiny Item Stand/Inspect Region
+#   GG_Land_of_Storms / Shiny Item GG Storms/Inspect Region
+#   sharedassets351.assets / Shiny Item NP/Inspect Region
+
+// uses template: inspect
+fsm inspect {
+  start Pause
+  on HERO DAMAGED → Out Of Range  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=var "Self", storeResult=var "Parent")
+    FindChild(gameObject=var "Self", childName="Prompt Marker", storeResult=var "Prompt Marker")
+    SpawnObjectFromGlobalPool(gameObject=Arrow Prompt (resources.assets), spawnPoint=var "Prompt Marker", position=(unset), rotation=(unset), storeObject=var "Prompt")
+    SetParent(gameObject=var "Prompt", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetFsmString(gameObject=var "Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Inspect", everyFrame=false)
+    ActivateGameObject(gameObject=var "Prompt Marker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Out Of Range
+  }
+
+  state Out Of Range {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="", collideLayer="", sendEvent=→"IN RANGE", storeCollider=var "")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent=var "Exit Range Event", delay=0, everyFrame=false)
+    on IN RANGE → In Range
+  }
+
+  state In Range {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent=var "Enter Range Event", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Inspectable", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="UP", delay=0, everyFrame=false)
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="", collideLayer="", sendEvent=→"OUT OF RANGE", storeCollider=var "")
+    ListenForUp(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    on OUT OF RANGE → Out Of Range
+    on UP PRESSED → Can Inspect?
+    on CANCEL → Uninspectable Frame
+  }
+
+  state Cancel Frame {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Out Of Range
+  }
+
+  state Can Inspect? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanInspect", parameters=[], storeResult=var "Can Inspect")
+    BoolTest(boolVariable=var "Can Inspect", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Inspectable", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Take Control
+  }
+
+  state Check Proximity {
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Left Prox", floatValue=var "Self X", everyFrame=false)
+    FloatSubtract(floatVariable=var "Left Prox", subtract=var "Move To Offset", everyFrame=false, perSecond=false)
+    SetFloatValue(floatVariable=var "Right Prox", floatValue=var "Self X", everyFrame=false)
+    FloatAdd(floatVariable=var "Right Prox", add=var "Move To Offset", everyFrame=false, perSecond=false)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Self X", upperValue=var "Right Prox", boolVariable=(unset), trueEvent=→"MOVE RIGHT", falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Left Prox", upperValue=var "Self X", boolVariable=(unset), trueEvent=→"MOVE LEFT", falseEvent=(none), everyFrame=false)
+    GetScale(gameObject=var "Hero", vector=(unset), xScale=var "Hero X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Hero X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Facing Right", greaterThanBool=var "Hero Facing Left", everyFrame=false)
+    FloatTestToBool(float1=var "Hero X", float2=var "Self X", tolerance=0, equalBool=(unset), lessThanBool=var "Hero On Left", greaterThanBool=var "Hero On Right", everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Facing Right", var "Hero On Right"], sendEvent=→"TURN LEFT", storeResult=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Facing Left", var "Hero On Left"], sendEvent=→"TURN RIGHT", storeResult=(unset), everyFrame=false)
+    on MOVE RIGHT → Move Hero Right
+    on FINISHED → Hero Idle
+    on TURN LEFT → Turn Hero Left
+    on MOVE LEFT → Move Hero Left
+    on MOVE RIGHT → 
+    on TURN RIGHT → Turn Hero Right
+  }
+
+  state Move Hero Right {
+    SetScale(gameObject=var "Hero", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Right Prox", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    on FINISHED → Turn Hero Left
+  }
+
+  state Take Control {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    on FINISHED → Check Proximity
+  }
+
+  state Turn Hero Left {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hero Idle
+  }
+
+  state Move Hero Left {
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=-6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Left Prox", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Turn Hero Right
+  }
+
+  state Turn Hero Right {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hero Idle
+  }
+
+  state Start Inspect {
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="START INSPECT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="START INSPECT", delay=0, everyFrame=false)
+    on END INSPECT → Regain Control
+  }
+
+  state Regain Control {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Out Of Range
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Hero Idle {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    on FINISHED → Start Inspect
+  }
+
+  state Uninspectable Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Out Of Range
+  }
+
+  var Move To Offset: float = 0.25
+  var Inspectable: bool = true
+  var Enter Range Event: string = ""
+  var Exit Range Event: string = ""
+
+  var Hero X: float = 0
+  var Hero X Scale: float = 0
+  var Left Prox: float = 0
+  var Right Prox: float = 0
+  var Self X: float = 0
+  var Can Inspect: bool = false
+  var Hero Facing Left: bool = false
+  var Hero Facing Right: bool = false
+  var Hero On Left: bool = false
+  var Hero On Right: bool = false
+  var Parent: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Prompt Marker: gameObject = <null>
+  var Self: gameObject = <null>
+}

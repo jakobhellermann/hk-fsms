@@ -1,0 +1,699 @@
+# Control
+# 1 location(s):
+#   localpoolprefabs_assets_areahangareasong.bundle / Song Handmaiden
+
+fsm Control {
+  start Pause
+  on CALL → Called By Enemy  // from any state
+  on ZERO HP → Zero HP  // from any state
+  on HANDMAIDEN DIE → Die  // from any state
+
+  state Init {
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Main Z Pos")
+    SetParent(gameObject=var "Spear", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Spear", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindNamedChild(gameObject=var "Rest Threads", storeResult=var "Thread 1")
+    FindNamedChild(gameObject=var "Rest Threads", storeResult=var "Thread 2")
+    BoolTest(boolVariable=var "CalledByEnemy", isTrue=→"CALL", isFalse=(none), everyFrame=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Battle", equalEvent=→"BATTLE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    RandomlyFlipScale(gameObject=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest")
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetParent(gameObject=var "Rest Pivot", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=Self, parent=var "Rest Pivot", resetLocalPosition=false, resetLocalRotation=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    FloatCompare(float1=var "Z Pos", float2=-1, tolerance=0, equal=(none), lessThan=→"FG", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Z Pos", float2=1, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"BG", everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Main Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Rest
+    on FG → Set FG
+    on BG → Set BG
+    on BATTLE → Battle Ready
+  }
+
+  state Rest {
+    IdleBuzzV4(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=1, deceleration=10, accelerationMin=2, accelerationMax=5, roamingRangeX=0.05, roamingRangeY=0.5, manualStartPos=var "Start Pos")  // disabled
+    CheckAlertRange(alertRange=var "Wake Range", storeResult=(unset), InRangeEvent=→"WAKE", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    on WAKE → Silk?
+    on TOOK DAMAGE → Wake
+  }
+
+  state Silk? {
+    PlayerdataIntCompare(playerdataInt="silk", compareTo=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none))
+    on CANCEL → Silkless
+    on FINISHED → Wake
+  }
+
+  state Silkless {
+    IdleBuzzV4(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=1, deceleration=10, accelerationMin=2, accelerationMax=5, roamingRangeX=0.05, roamingRangeY=0.5, manualStartPos=var "Start Pos")  // disabled
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rest
+    on TOOK DAMAGE → Wake
+  }
+
+  state Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Wake", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToWake", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, -5), x=(unset), y=(unset), everyFrame=false)
+    SetParent(gameObject=Self, parent=var "Battle Wave", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Rest Pivot", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WAKE", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=song_handmaiden_notice_hero (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Startle
+  }
+
+  state Fly {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    CharacterAmbientLightLerp(Target=Self, EnableAmbientColor=true)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Fly Distance", speedMax=5, acceleration=0.4, targetsHeight=false, height=0, minAboveHero=3)
+    WaitRandom(timeMin=1, timeMax=2, finishEvent=→"SHIFT", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="SLASH", outOfRangeEvent="", everyFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Fly Wait", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=true)
+    FloatAdd(floatVariable=var "Suck Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatTestToBool(float1=var "Suck Timer", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Suck Ready", greaterThanBool=(unset), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Suck Start Range", storeResult=var "In Suck Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Fly Wait", var "In Suck Range", var "Suck Ready", var "Locked By Buddy"], boolStates=[true, true, true, false], trueEvent=→"SUCK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=20, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TELEPORT", everyFrame=true)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "In Vent", isTrue=→"VENT", isFalse=(none), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on SHIFT → Tele?
+    on SLASH → Slash Antic
+    on SUCK → Spin Antic
+    on TELEPORT → Tele Out Antic
+    on VENT → Tele Out Antic
+    on SING → Sing
+  }
+
+  state Set Distance {
+    RandomFloat(min=7, max=10, storeResult=var "Fly Distance")
+    on FINISHED → Fly
+  }
+
+  state Slash Antic {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=song_handmaiden_cry (sfxdynamic_assets_areasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slash Antic")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=2.5, acceleration=0.1, targetsHeight=false, height=0, minAboveHero=(unset))
+    PlayAudioEvent(audioClip=handmaiden_slash_antic (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 1
+  }
+
+  state Slash 1 {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Collider 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=handmaiden_slash_attacks (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 2
+  }
+
+  state Slash 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Collider 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 3
+  }
+
+  state Slash 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Slash 4
+  }
+
+  state Slash 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Collider 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=20, ySpeed=(unset), everyFrame=false)
+    on FINISHED → Slash 5
+  }
+
+  state Slash 5 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Collider 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash Recover
+  }
+
+  state Slash Recover {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Fly
+  }
+
+  state Select Target {
+    BoolTest(boolVariable=var "In Vent", isTrue=→"VENT", isFalse=(none), everyFrame=false)
+    IntAdd(intVariable=var "Tele Attempts", add=1, everyFrame=false)
+    GetRandomObject(withTag="Teleplane", storeResult=var "Teleplane", everyFrame=false)
+    GetColliderRange(gameObject=var "Teleplane", minX=var "X Min", maxX=var "X Max", minY=var "Y Min", maxY=var "Y Max", everyFrame=false)
+    RandomFloat(min=var "X Min", max=var "X Max", storeResult=var "Tele X")
+    RandomFloat(min=var "Y Min", max=var "Y Max", storeResult=var "Tele Y")
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=0.006, everyFrame=false)
+    SetVector2XY(vector2Variable=var "Tele Point 2D", vector2Value=(unset), x=var "Tele X", y=var "Tele Y", everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Tele Distance", point1=var "Teleport Point", point2=var "Hero Pos", ignoreX=false, ignoreY=true, ignoreZ=true, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance From Self", point1=var "Teleport Point", point2=var "Self Pos", ignoreX=false, ignoreY=false, ignoreZ=false, everyFrame=false)
+    FloatInRange(floatVariable=var "Tele Distance", lowerValue=var "Tele Distance Min", upperValue=var "Tele Distance Max", boolVariable=var "Far from hero", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Self", lowerValue=4, upperValue=99999, boolVariable=var "Far from self", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatTestToBool(float1=var "Tele X", float2=var "Hero X", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Aiming Right", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Aiming Right", var "Start Right"], boolStates=[false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Aim Fail R", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Aiming Right", var "Start Left"], boolStates=[true, true], trueEvent=(none), falseEvent=(none), storeResult=var "Aim Fail L", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Far from hero", var "Far from self", var "Aim Fail L", var "Aim Fail R"], boolStates=[true, true, false, false], trueEvent=→"TELEPORT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    IntCompare(integer1=var "Tele Attempts", integer2=50, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on TELEPORT → Tele Pos
+    on CANCEL → Cancel Frame
+    on FINISHED → Select Target Closest
+    on VENT → Hero In Vent
+  }
+
+  state Try Again! {
+    on FINISHED → Select Target
+  }
+
+  state Tele Out Antic {
+    AudioStop(gameObject=Self, fadeTime=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    DecelerateV2(gameObject=Self, deceleration=0.92, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, -12), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Rest Threads", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=handmaiden_teleport (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Tele Out
+  }
+
+  state Tele Out {
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Tele Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Tele Sprite", vector=(unset), x=0, y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Tele Sprite", animLibName="", clipName="Tele Out")
+    AnimatePositionBy(gameObject=var "Tele Sprite", shiftBy=(0, 24, 0), time=0.3, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Off Plane?
+  }
+
+  state Tele In {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ActivateGameObject(gameObject=var "Tele Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Tele Sprite", animLibName="", clipName="Tele In")
+    SetPosition(gameObject=var "Tele Sprite", vector=(unset), x=(unset), y=24, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    AnimatePositionTo(gameObject=var "Tele Sprite", toValue=(0, 0, 0), localSpace=true, time=0.3, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=song_handmaiden_cry (sfxdynamic_assets_areasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    on FINISHED → Tele In End
+  }
+
+  state Tele In End {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Tele Escape Range", storeResult=false, sendEvent="ESCAPE", outOfRangeEvent="", everyFrame=true)
+    SetBoolValue(boolVariable=var "Start Left", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Start Right", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tele Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.92, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, -6), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Rest Threads", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Main Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Did Roar?
+    on ESCAPE → Tele Out Antic
+  }
+
+  state Tele? {
+    SetIntValue(intVariable=var "Tele Attempts", intValue=0, everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=22, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TELEPORT", everyFrame=false)
+    SendRandomEventV4(events=[→"TELEPORT", →"FINISHED"], weights=[0.5, 0.5], eventMax=[1, 2], missedMax=[2, 1], activeBool=(unset))
+    on FINISHED → Set Distance
+    on TELEPORT → Tele Out Antic
+  }
+
+  state Startle {
+    SetVelocity2d(gameObject=Self, vector=(0, 12), x=(unset), y=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RandomFloat(min=1, max=3, storeResult=var "Suck Timer")
+    ActivateGameObject(gameObject=var "Rest Threads", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=song_handmaiden_cry (sfxdynamic_assets_areasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Start
+  }
+
+  state Spin Antic {
+    RandomBool(storeResult=var "Might Slash")
+    GetPlayerDataInt(intName="silk", storeValue=var "Silk")
+    IntTestToBool(int1=var "Silk", int2=3, equalBool=(unset), lessThanBool=var "Not Much Silk", greaterThanBool=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Not Much Silk", var "Might Slash"], sendEvent=→"TRY SLASH", storeResult=(unset), everyFrame=false)
+    IntCompare(integer1=var "Silk", integer2=2, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=2, acceleration=0.2, targetsHeight=false, height=0, minAboveHero=2)
+    SendEventToRegister(eventName="HANDMAIDEN SUCK START")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=song_handmaiden_cry (sfxdynamic_assets_areasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Spin 0
+    on TRY SLASH → Fly To Slash
+    on CANCEL → Fly
+  }
+
+  state Spin 0 {
+    AudioPlaySimple(gameObject=var "Suck Loop", volume=1, oneShotClip=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spin 0")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=7, acceleration=0.4, targetsHeight=false, height=0, minAboveHero=2)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="START SUCK", delay=0, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnTo Spin 0", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    BoolTest(boolVariable=var "In Vent", isTrue=→"NO SILK", isFalse=(none), everyFrame=true)
+    ShoveFromWall(gameObject=Self, shoveForce=25, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on NO SILK → Spin Cancel
+    on SUCK TICK → Spin 1
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    FindAlertRange(target=Self, storeResult=var "Wake Range", childName="Wake Range")
+    FindChild(gameObject=Self, childName="Wake Range", storeResult=var "Wake Range Obj")
+    SetParent(gameObject=var "Wake Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Respawner?
+  }
+
+  state Spin Cancel {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CharacterAmbientLightLerp(Target=Self, EnableAmbientColor=true)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    AudioStop(gameObject=var "Suck Loop", fadeTime=0)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP SUCK", delay=0, everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Spin 1 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spin 1")
+    CharacterAmbientLightLerp(Target=Self, EnableAmbientColor=false)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=7, acceleration=0.4, targetsHeight=false, height=0, minAboveHero=2)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnTo Spin 1", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    BoolTest(boolVariable=var "In Vent", isTrue=→"NO SILK", isFalse=(none), everyFrame=true)
+    ShoveFromWall(gameObject=Self, shoveForce=25, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on NO SILK → Silk Break
+    on SUCK TICK → Spin 2
+  }
+
+  state Spin 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spin 2")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=7, acceleration=0.4, targetsHeight=false, height=0, minAboveHero=2)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnTo Spin 2", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    BoolTest(boolVariable=var "In Vent", isTrue=→"NO SILK", isFalse=(none), everyFrame=true)
+    ShoveFromWall(gameObject=Self, shoveForce=25, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on NO SILK → Silk Break
+    on SUCK TICK → Spin Wind Down
+  }
+
+  state Spin End {
+    DistanceFly(gameObject=Self, target=var "Hero", distance=12, speedMax=9, acceleration=0.8, targetsHeight=false, height=0, minAboveHero=3)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP SUCK", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spin Finish", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=song_handmaiden_projectile_summon (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ShoveFromWall(gameObject=Self, shoveForce=25, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on FINISHED → Spear Cast Antic
+  }
+
+  state Silk Break {
+    PlayParticleEmitter(gameObject=var "Pt Break", emit=0, resetIfPlaying=false)
+    on FINISHED → Spin Cancel
+  }
+
+  state Set FG {
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    SetSpriteRendererColor(TintColor=(0, 0, 0, 1), Target=var "Thread 1")
+    SetSpriteRendererColor(TintColor=(0, 0, 0, 1), Target=var "Thread 2")
+    SetSpriteRendererColor(TintColor=(0, 0, 0, 1), Target=var "Tele Sprite")
+    on FINISHED → Off Plane
+  }
+
+  state Off Plane {
+    SetBoolValue(boolVariable=var "Off Plane", boolValue=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    CheckAlertRange(alertRange=var "Wake Range", storeResult=(unset), InRangeEvent=→"WAKE", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    Tk2dSpriteGetColor(gameObject=Self, color=var "Self Color", everyframe=false)
+    Tk2dSpriteSetColor(gameObject=var "Tele Sprite", color=var "Self Color", everyframe=false)
+    on WAKE → Quick Wake
+    on WAKE AWAY → Wake Away Pause
+    on WAKE 2 → Quick Wake
+    on WAKE 3 → Quick Wake
+  }
+
+  state Set BG {
+    Tk2dSpriteSetColor(gameObject=Self, color=(0.33088237, 0.33088237, 0.33088237, 1), everyframe=false)  // disabled
+    SetSpriteRendererColor(TintColor=(0.89705884, 0.89705884, 0.89705884, 1), Target=var "Thread 1")
+    SetSpriteRendererColor(TintColor=(0.8980392, 0.8980392, 0.8980392, 1), Target=var "Thread 2")
+    on FINISHED → Off Plane
+  }
+
+  state Start {
+    BoolTest(boolVariable=var "Off Plane", isTrue=→"TELEPORT", isFalse=(none), everyFrame=false)
+    on TELEPORT → Tele Out Antic
+    on FINISHED → Set Distance
+  }
+
+  state Off Plane? {
+    BoolTest(boolVariable=var "Off Plane", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Off Plane", boolValue=false, everyFrame=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetSpriteRendererColor(TintColor=(1, 1, 1, 1), Target=var "Thread 1")
+    SetSpriteRendererColor(TintColor=(1, 1, 1, 1), Target=var "Thread 2")
+    SetSpriteRendererColor(TintColor=(1, 1, 1, 1), Target=var "Tele Sprite")
+    on FINISHED → Select Target
+  }
+
+  state Burned? {
+    PlayerDataBoolTest(boolName="marionettesBurned", isTrue=→"BURN", isFalse=(none))
+    on FINISHED → Wake
+    on BURN → Burn Death
+  }
+
+  state Burn Death {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=-100, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    InstaDeath(target=Self, direction=0)
+  }
+
+  state Battle Ready {
+    BoolTest(boolVariable=var "Off Plane", isTrue=→"TELEPORT", isFalse=(none), everyFrame=false)
+    GetGrandParent(gameObject=Self, storeResult=var "Battle Wave")  // disabled
+    GetParent(gameObject=Self, storeResult=var "Battle Wave")
+    on BATTLE START → Burned?
+    on FINISHED → Burned?
+  }
+
+  state Cancel Frame {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIntValue(intVariable=var "Tele Attempts", intValue=0, everyFrame=false)
+    on FINISHED → Tele In
+  }
+
+  state Tele Pos {
+    Vector3AddXYZ(vector3Variable=var "Teleport Point", addX=0, addY=3, addZ=0, everyFrame=false, perSecond=false)
+    Vector3AddXYZ(vector3Variable=var "Teleport Point", addX=0, addY=0.5, addZ=0, everyFrame=false, perSecond=false)
+    SetPosition(gameObject=Self, vector=var "Teleport Point", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Tele In
+  }
+
+  state Called By Enemy {
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValue(boolVariable=var "Off Plane", boolValue=false, everyFrame=false)
+    SetPlayerDataBool(boolName="marionettesMet", value=true)
+    on FINISHED → Tele Out Antic
+  }
+
+  state Quick Wake {
+    SetParent(gameObject=Self, parent=var "Battle Wave", resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Rest Pivot", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WAKE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Tele Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=var "Wake Delay", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Off Plane?
+  }
+
+  state Did Roar? {
+    SetDamageHero(Target=Self, Enabled=true)
+    BoolTest(boolVariable=var "Did Roar", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Roar", boolValue=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"ROAR")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Set Distance
+    on ROAR → Roar
+  }
+
+  state Roar {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar Single", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Set Distance
+  }
+
+  state Wake Away Pause {
+    WaitRandom(timeMin=0.1, timeMax=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Tele Out Antic 2
+  }
+
+  state Tele Out Antic 2 {
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Rest Pivot", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    DecelerateV2(gameObject=Self, deceleration=0.92, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, -12), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Rest Threads", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=handmaiden_teleport (sfxstatic_assets_areasong.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Tele Out 2
+  }
+
+  state Tele Out 2 {
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Tele Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Tele Sprite", vector=(unset), x=0, y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Tele Sprite", animLibName="", clipName="Tele Out")
+    AnimatePositionBy(gameObject=var "Tele Sprite", shiftBy=(0, 24, 0), time=0.2, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Away
+  }
+
+  state Away {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Zero HP {
+    SendEventByName(eventTarget=GameObject(var "Spear"), sendEvent="HANDMAIDEN KILLED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName=var "Death Register Event")
+    BoolTest(boolVariable=var "Respawner", isTrue=→"RESPAWN", isFalse=(none), everyFrame=false)
+    on RESPAWN → Sim Death
+  }
+
+  state Fly To Slash {
+    Wait(time=1, finishEvent=→"CANCEL", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    CharacterAmbientLightLerp(Target=Self, EnableAmbientColor=true)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=4, speedMax=5, acceleration=0.4, targetsHeight=true, height=1, minAboveHero=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="SLASH", outOfRangeEvent="", everyFrame=true)
+    on SLASH → Slash Antic
+    on CANCEL → Fly
+  }
+
+  state Hero In Vent {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "In Vent", isTrue=(none), isFalse=→"TELEPORT", everyFrame=true)
+    ActivateGameObject(gameObject=var "Tele Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on TELEPORT → Reappear Pause
+  }
+
+  state Reappear Pause {
+    WaitRandom(timeMin=0, timeMax=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reappear
+  }
+
+  state Reappear {
+    ActivateGameObject(gameObject=var "Tele Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Select Target
+  }
+
+  state Die {
+    SetSpecialDeath(target=Self, hasSpecialDeath=false)
+    SendEventByName(eventTarget=GameObject(var "Spear"), sendEvent="HANDMAIDEN KILLED", delay=0, everyFrame=false)
+    InstaDeath(target=Self, direction=0)
+  }
+
+  state Spear Cast Antic {
+    SetBoolValue(boolVariable=var "Summoning Spear", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=song_handmaiden_cry (sfxdynamic_assets_areasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=-10, position=(0, 0, 0), spread=0, everyFrame=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    AudioStop(gameObject=var "Suck Loop", fadeTime=0)
+    SetPositionToObject2D(gameObject=var "Spear", targetObject=var "Spear Appear Point", xOffset=0, yOffset=0, everyFrame=true)
+    ActivateGameObject(gameObject=var "Spear", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Spear", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRotation(gameObject=var "Spear", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    MatchScaleSign(Target=var "Spear", MatchTo=var "Self", EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Spear", clipName="Spear Appear", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ShoveFromWall(gameObject=Self, shoveForce=25, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on FINISHED → Spear Fire
+  }
+
+  state Spin Wind Down {
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=5, acceleration=0.4, targetsHeight=false, height=0, minAboveHero=2)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnTo Spin 2", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    ShoveFromWall(gameObject=Self, shoveForce=25, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on FINISHED → Spin End
+  }
+
+  state Spear Fire {
+    SendEventByName(eventTarget=GameObject(var "Spear"), sendEvent="FIRE", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Summoning Spear", boolValue=false, everyFrame=false)
+    on FINISHED → Spear Fire Recover
+  }
+
+  state Spear Fire Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RandomFloat(min=1.5, max=2, storeResult=var "Suck Timer")
+    on FINISHED → Fly
+  }
+
+  state Sim Death {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetMeshRenderer(gameObject=Self, active=false)
+    AddHP(target=Self, amount=0, healToMax=true)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Tele Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP SUCK", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "Suck Loop", fadeTime=0)
+    on FINISHED → Respawn
+  }
+
+  state Respawner? {
+    BoolTest(boolVariable=var "Respawner", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetSpecialDeath(target=Self, hasSpecialDeath=true)
+    on FINISHED → Init
+  }
+
+  state Respawn {
+    on FINISHED → Reappear
+  }
+
+  state Select Target Closest {
+    BoolTest(boolVariable=var "In Vent", isTrue=→"VENT", isFalse=(none), everyFrame=false)
+    IntAdd(intVariable=var "Tele Attempts", add=1, everyFrame=false)
+    FindClosest(gameObject=var "Hero", withTag="Teleplane", ignoreOwner=true, mustBeVisible=false, storeObject=var "Teleplane", storeDistance=(unset), everyFrame=false)
+    GetRandomObject(withTag="Teleplane", storeResult=var "Teleplane", everyFrame=false)  // disabled
+    GetColliderRange(gameObject=var "Teleplane", minX=var "X Min", maxX=var "X Max", minY=var "Y Min", maxY=var "Y Max", everyFrame=false)
+    RandomFloat(min=var "X Min", max=var "X Max", storeResult=var "Tele X")
+    RandomFloat(min=var "Y Min", max=var "Y Max", storeResult=var "Tele Y")
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=0.006, everyFrame=false)
+    SetVector2XY(vector2Variable=var "Tele Point 2D", vector2Value=(unset), x=var "Tele X", y=var "Tele Y", everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Tele Distance", point1=var "Teleport Point", point2=var "Hero Pos", ignoreX=false, ignoreY=true, ignoreZ=true, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance From Self", point1=var "Teleport Point", point2=var "Self Pos", ignoreX=false, ignoreY=false, ignoreZ=false, everyFrame=false)
+    FloatInRange(floatVariable=var "Tele Distance", lowerValue=var "Tele Distance Min", upperValue=var "Tele Distance Max", boolVariable=var "Far from hero", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Self", lowerValue=4, upperValue=99999, boolVariable=var "Far from self", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatTestToBool(float1=var "Tele X", float2=var "Hero X", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Aiming Right", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Aiming Right", var "Start Right"], boolStates=[false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Aim Fail R", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Aiming Right", var "Start Left"], boolStates=[true, true], trueEvent=(none), falseEvent=(none), storeResult=var "Aim Fail L", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Far from hero", var "Far from self", var "Aim Fail L", var "Aim Fail R"], boolStates=[true, true, false, false], trueEvent=→"TELEPORT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    IntCompare(integer1=var "Tele Attempts", integer2=50, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on TELEPORT → Tele Pos
+    on FINISHED → Try Again!
+    on VENT → Hero In Vent
+  }
+
+  state Sing {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=song_handmaiden_voice_sing_loop (sfxdynamic_assets_areahangareasong.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fly
+  }
+
+  var Wake Delay: float = 0
+  var Respawner: bool = false
+  var Start Left: bool = false
+  var Start Right: bool = false
+  var Death Register Event: string = ""
+
+  var Distance: float = 9
+  var Slash Decel: float = 0.875
+  var Distance From Self: float = 0
+  var Tele Distance: float = 0
+  var Tele Distance Max: float = 14.5
+  var Tele Distance Min: float = 8.5
+  var Tele X: float = 0
+  var Tele Y: float = 0
+  var X Max: float = 0
+  var X Min: float = 0
+  var Y Max: float = 0
+  var Y Min: float = 0
+  var Suck Timer: float = 0
+  var Fly Distance: float = 0
+  var Z Pos: float = 0
+  var Main Z Pos: float = 0
+  var Hero X: float = 0
+  var Tele Attempts: int = 0
+  var Silk: int = 0
+  var Far from hero: bool = false
+  var Far from self: bool = false
+  var Fly Wait: bool = false
+  var Suck Ready: bool = false
+  var In Suck Range: bool = false
+  var Off Plane: bool = false
+  var Did Roar: bool = false
+  var Might Slash: bool = false
+  var Not Much Silk: bool = false
+  var In Vent: bool = false
+  var Locked By Buddy: bool = false
+  var Summoning Spear: bool = false
+  var Valid Side: bool = false
+  var Aiming Right: bool = false
+  var Aim Fail R: bool = false
+  var Aim Fail L: bool = false
+  var CalledByEnemy: bool = false
+  var Clip: string = ""
+  var Tele Point 2D: vector2 = (0, 0)
+  var Start Pos: vector3 = (0, 0, 0)
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Self Pos: vector3 = (0, 0, 0)
+  var Teleport Point: vector3 = (0, 0, 0)
+  var Self Color: color = (0, 0, 0, 1)
+  var Rest Threads: gameObject = Song Handmaiden/Rest Threads
+  var Self: gameObject = Song Handmaiden
+  var Slash Collider 1: gameObject = Song Handmaiden/Slash Collider 1
+  var Slash Collider 2: gameObject = Song Handmaiden/Slash Collider 2
+  var Slash Collider 3: gameObject = Song Handmaiden/Slash Collider 3
+  var Slash Collider 4: gameObject = Song Handmaiden/Slash Collider 4
+  var Tele Sprite: gameObject = Song Handmaiden/Tele Sprite
+  var Teleplane: gameObject = <null>
+  var Rest Pivot: gameObject = Song Handmaiden/Rest Pivot
+  var Pt Break: gameObject = Song Handmaiden/Pt Break
+  var Thread 1: gameObject = <null>
+  var Thread 2: gameObject = <null>
+  var Battle Wave: gameObject = <null>
+  var Suck Loop: gameObject = Song Handmaiden/Suck Loop
+  var Silk Sphere: gameObject = <null>
+  var Terrain Detector: gameObject = Song Handmaiden/Terrain Detector
+  var Wake Range Obj: gameObject = <null>
+  var Spear Appear Point: gameObject = Song Handmaiden/Spear Appear Point
+  var Spear: gameObject = Song Handmaiden/Spear
+  var Audio Loop Voice: gameObject = Song Handmaiden/Audio Loop Voice
+  var Wake Range: object = <null>
+}

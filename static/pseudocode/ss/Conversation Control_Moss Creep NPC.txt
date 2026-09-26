@@ -1,0 +1,487 @@
+# Conversation Control
+# 1 location(s):
+#   Mosstown_02c / moss_hut_set/NPC Scene/Moss Creep NPC
+
+fsm Conversation Control {
+  start Init
+  on RESET → Reset  // from any state
+
+  state Init {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindChild(gameObject=var "Parent", childName="moss pot_large/Pt Explode", storeResult=var "Pt Explode")
+    FindChild(gameObject=var "Parent", childName="moss pot_large/Pt Stir", storeResult=var "Pt Stir")
+    FindChild(gameObject=var "Parent", childName="moss pot_large/Pt Idle", storeResult=var "Pt Idle")
+    FindChild(gameObject=var "Pt Explode", childName="Slam Effect R", storeResult=var "Slam Effect")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Audio Loop Mix")
+    on FINISHED → Init Mutter
+  }
+
+  sequence state End {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.2, finishEvent=(none), realTime=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Begin Quest?
+  }
+
+  state Reoffer {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_REOFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Offer Quest
+  }
+
+  sequence state Offer Quest {
+    QuestYesNo(Quest=var "Quest 1", YesEvent=→"ACCEPT", NoEvent=→"REFUSE", ReturnHUDAfter=false)
+    on ACCEPT → Accept
+    on REFUSE → Refuse
+  }
+
+  state Accept {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Refuse {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_REFUSE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Can End Quest? {
+    SetObjectValue(objectVariable=var "Current Quest", objectValue=var "Quest 1", everyFrame=false)
+    CanEndQuest(CannotEndEvent=→"FAIL", CanEndEvent=→"SUCCESS", StoreValue=(unset), Quest=var "Current Quest")
+    on FAIL → Can't Complete
+    on SUCCESS → Can Complete
+  }
+
+  state Can't Complete {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_INPROGRESS", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Complete {
+    SetObjectValue(objectVariable=var "Give Reward Item", objectValue=var "Reward Item 1", everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_QUESTCOMPLETE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Reward 1
+  }
+
+  state Turn {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TurnToTalk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventByName(eventTarget=GameObject(var "Audio Loop Mix"), sendEvent="MIX STOP", delay=0, everyFrame=false)
+    PlayRandomAudioClipTable(Table=small_bell_movement_druid (sfxdynamic_assets_areamoss.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Choice
+  }
+
+  state Reset {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TurnToIdle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayParticleEmitterChildren(gameObject=var "Pt Idle", resetTimeIfPlaying=false, stopOnStateExit=false)
+    PlayRandomAudioClipTable(Table=small_bell_movement_druid (sfxdynamic_assets_areamoss.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Activate
+  }
+
+  sequence state Give Reward {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SetToolUnlocked(Tool=var "Give Reward Item", WaitForTutorialMsgEnd=true)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="LookUpEnd", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    on FINISHED → End
+  }
+
+  state Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=2, MaxReactDelay=2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=(none), ActiveOuter=→"TINK POT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)  // disabled
+    CheckTrackTriggerCount(target=var "Pot Trigger", count=0, test=MoreThan, everyFrame=true, successEvent=→"IN POT")
+    SetRandomAudioClipFromTable(Table=MD_mutter_loop (sfxdynamic_assets_areamoss.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=false, delay=0)
+    AudioPlayDelay(gameObject=var "Audio Loop Voice", volume=(unset), oneShotClip=<null>, delay=1)
+    on INTERACT → Turn
+    on IN POT → Reaction
+    on SING → Sing
+    on TINK POT → Reaction
+  }
+
+  state Reaction {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pot React", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Audio Loop Mix"), sendEvent="MIX STOP", delay=0, everyFrame=false)
+    PlayRandomAudioClipTable(Table=small_bell_movement_druid (sfxdynamic_assets_areamoss.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=MD_startle (sfxdynamic_assets_areamoss.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → End React
+  }
+
+  state End React {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Audio Loop Mix"), sendEvent="MIX START", delay=0, everyFrame=false)
+    on FINISHED → Idle Anim
+  }
+
+  state Idle Anim {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckTrackTriggerCount(target=var "Pot Trigger", count=0, test=Equal, everyFrame=true, successEvent=→"NOT IN POT")
+    on NOT IN POT → Activate
+  }
+
+  sequence state Reward 1 {
+    HideNpcDialogueTitle(Target=Self)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.4, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn Back", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Reward 2
+  }
+
+  state Reward 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle Fast", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventByName(eventTarget=GameObject(var "Audio Loop Mix"), sendEvent="MIX FAST", delay=0, everyFrame=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt Stir", resetTimeIfPlaying=false, stopOnStateExit=true)
+    StopParticleEmittersInChildren(gameObject=var "Pt Idle")
+    Wait(time=4, finishEvent=→"NEXT", realTime=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=MD_fast_stir (sfxdynamic_assets_areamoss.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on NEXT → Reward 3
+  }
+
+  state Reward 3 {
+    HideNpcDialogueTitle(Target=Self)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=MD_fast_stir_burst (sfxdynamic_assets_areamoss.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Burst", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventByName(eventTarget=GameObject(var "Audio Loop Mix"), sendEvent="MIX STOP", delay=0, everyFrame=false)
+    AudioPlaySimple(gameObject=var "Audio Loop TranceBell", volume=1, oneShotClip=<null>)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Roar To LookUp")
+    PlayParticleEmitterChildren(gameObject=var "Pt Explode", resetTimeIfPlaying=false, stopOnStateExit=false)
+    Wait(time=4, finishEvent=→"NEXT", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    ScreenFlash(flashColour=(0.7210381, 1, 0.47750863, 0.472))
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=acid_splash (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=grimm_explode_into_bats (sfxstatic_assets_areabellareamoss.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=explosion_4_wet_original (sfxstatic_assets_areamossareaswamp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on NEXT → Final? 1
+  }
+
+  sequence state Reward 4 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TurnToTalk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayRandomAudioClipTable(Table=small_bell_movement_druid (sfxdynamic_assets_areamoss.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Wait(time=0.75, finishEvent=(none), realTime=false)
+    ShowNpcDialogueTitle(Target=Self)
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_QUESTCOMPLETE_C", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Wish Granted
+  }
+
+  state Trade Check {
+    CheckIfToolUnlocked(Tool=Mosscreep Tool 2 (dataassets_assets_assets/dataassets/tools/toolitems.bundle), trueEvent=→"COMPLETE", falseEvent=(none), storeValue=(unset))
+    PlayerDataBoolTest(boolName="druidTradeIntro", isTrue=(none), isFalse=→"INTRO")
+    PlayerDataBoolTest(boolName="mossBerryValueListSet", isTrue=(none), isFalse=→"INTRO")
+    CollectableItemGetData(CollectedAmount=var "Berries Held", NeededAmount=0, IsCollected=(none), NotCollected=(none), ItemName="", Sprite=var "", Item=Mossberry (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    IntCompare(integer1=var "Berries Held", integer2=0, equal=→"NO BERRY", lessThan=→"NO BERRY", greaterThan=→"BERRY", everyFrame=false)
+    on INTRO → Trade Intro
+    on BERRY → Trade Offer
+    on NO BERRY → No Berries
+    on COMPLETE → Berries Complete
+  }
+
+  state Give Prompt {
+    QuestCompleteYesNo(Quest=var "Current Quest", ConsumeCurrency=true, YesEvent=→"SUCCESS", NoEvent=→"FAIL", ReturnHUDAfter=false)
+    on FAIL → Don't Give
+    on SUCCESS → Complete
+  }
+
+  state Choice {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    PlayerDataBoolTest(boolName="metDruid", isTrue=(none), isFalse=→"MEET")
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Black Thread World")
+    GetPlayerDataBool(boolName="druidAct3Intro", storeValue=var "Did Act 3 Intro")
+    BoolTestMulti(boolVariables=[var "Is Black Thread World", var "Did Act 3 Intro"], boolStates=[true, false], trueEvent=→"ACT3", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    GetQuestState(IsAccepted=var "Gourmand Quest Accepted", IsCompleted=var "Gourmand Quest Completed", Quest=Great Gourmand (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    CollectableItemGetDataV2(CollectedAmount=(unset), IsHoldingAny=var "Has Stew", NeededAmount=0, IsCollected=(none), NotCollected=(none), ItemName="", Sprite=var "", Item=Mossberry Stew (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    GetPlayerDataBool(boolName="GourmandGivenStew", storeValue=var "Had Stew")
+    BoolTestMulti(boolVariables=[var "Gourmand Quest Accepted", var "Gourmand Quest Completed", var "Has Stew", var "Had Stew"], boolStates=[true, false, false, false], trueEvent=→"INGREDIENT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckQuestState(NotTrackedEvent=→"UNPROMISED", TrackedEvent=→"PROMISED", CompletedEvent=→"COMPLETE", Quest=var "Quest 1")
+    on MEET → Meet
+    on PROMISED → Can End Quest?
+    on UNPROMISED → Reoffer
+    on COMPLETE → Trade Check
+    on INGREDIENT → Ingredient Convo
+    on ACT3 → Act 3 Intro
+    on TEST → Final Berry
+  }
+
+  state Meet {
+    GetPlayerDataBool(boolName="spinnerDefeated", storeValue=var "Spinner Defeated")
+    ConvertBoolToString(boolVariable=var "Spinner Defeated", stringVariable=var "Convo Key", falseString="MOSSCREEP_MEET", trueString="MOSSCREEP_MEET_ALT", everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key=var "Convo Key", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataBool(boolName="metDruid", value=true)
+    on CONVO_END → Meet Unpromised
+  }
+
+  state Meet Unpromised {
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=→"WISHWALL", CompletedEvent=(none), Quest=Mossberry Collection Pre (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_OFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Offer Quest
+    on WISHWALL → Meet Wishwall
+  }
+
+  state Don't Give {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_DONT_GIVE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  sequence state Reward 3a {
+    Wait(time=0.15, finishEvent=(none), realTime=false)
+    RunDialogueV4(CustomText="", Sheet="Bonebottom", Key="MOSSCREEP_QUESTCOMPLETE_B", TextColor=(unset), NpcVoiceTableOverride=MD_talk_dazed (sfxdynamic_assets_areamoss.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Comedown
+  }
+
+  sequence state Wish Granted {
+    HideNpcDialogueTitle(Target=Self)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.2, finishEvent=(none), realTime=false)
+    EndQuest(ConsumeCurrency=false, Quest=var "Current Quest")
+    on FINISHED → Reward 5
+  }
+
+  sequence state Reward 5 {
+    ShowNpcDialogueTitle(Target=Self)
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_QUESTCOMPLETE_D", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Reward
+  }
+
+  state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_bell_movement_druid (sfxdynamic_assets_areamoss.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1, MaxReactDelay=1, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SendEventByName(eventTarget=GameObject(var "Audio Loop Mix"), sendEvent="MIX STOP", delay=0, everyFrame=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=MD_sing (sfxdynamic_assets_areamoss.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    AudioPlayInState(gameObject=var "Audio Loop SingBell", volume=1)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Audio Loop Mix"), sendEvent="MIX START", delay=0, everyFrame=false)
+    on FINISHED → Idle Anim
+  }
+
+  state Activate {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(var "Audio Loop Mix"), sendEvent="MIX START", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Trade Intro {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_INTRO", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataBool(boolName="druidTradeIntro", value=true)
+    on CONVO_END → End
+  }
+
+  state Trade Offer {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_BERRY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Offer Answer
+  }
+
+  state No Berries {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_NOBERRY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  sequence state Offer Answer {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    DialogueYesNoItemV4(Prompt={Sheet="UI", Key="GIVE_ITEM_PROMPT"}, RequiredItem=Mossberry (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle), RequiredAmount=1, ShowCounter=false, ConsumeItem=true, TakeDisplay=Silent, WillGetItem=<null>, YesEvent=→"ACCEPT", NoEvent=→"REFUSE", ReturnHUDAfter=false)
+    on ACCEPT → Get Next Value
+    on REFUSE → Refuse Trade
+  }
+
+  state Refuse Trade {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_REFUSE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Get Next Value {
+    PlayerdataIntCompare(playerdataInt="druidMossBerriesSold", compareTo=3, equal=→"FINAL", lessThan=(none), greaterThan=→"FINAL")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetNextMossberryValue", parameters=[], storeResult=var "Berry Value", EveryFrame=false)
+    IntSwitch(intVariable=var "Berry Value", compareTo=[1, 2, 3], sendEvent=[(none), (none), (none)], everyFrame=false)
+    on 1 → Value Low
+    on 2 → Value Mid
+    on 3 → Value High
+    on FINAL → Final Berry
+  }
+
+  sequence state Pay Complete {
+    PlayerDataIntAdd(intName="druidMossBerriesSold", amount=1)
+    HideNpcDialogueTitle(Target=Self)
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AddGeo", parameters=[var "Rosary Reward"], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.65, finishEvent=(none), realTime=false)
+    SendEvent(eventTarget=Self, sendEvent=→"RESET", delay=0, everyFrame=false)
+  }
+
+  state Value Low {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_ACCEPT_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetIntValue(intVariable=var "Rosary Reward", intValue=var "Rosary Reward 1", everyFrame=false)
+    on CONVO_END → Pay Complete
+  }
+
+  state Value Mid {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_ACCEPT_2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetIntValue(intVariable=var "Rosary Reward", intValue=var "Rosary Reward 2", everyFrame=false)
+    on CONVO_END → Pay Complete
+  }
+
+  state Value High {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_ACCEPT_3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetIntValue(intVariable=var "Rosary Reward", intValue=var "Rosary Reward 3", everyFrame=false)
+    on CONVO_END → Pay Complete
+  }
+
+  state Final Berry {
+    SetBoolValue(boolVariable=var "Final Reward", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_FINAL_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Reward 1
+  }
+
+  state Final? 1 {
+    BoolTest(boolVariable=var "Final Reward", isTrue=→"FINAL", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Reward 3a
+    on FINAL → Reward F1
+  }
+
+  sequence state Reward F1 {
+    Wait(time=0.15, finishEvent=(none), realTime=false)
+    RunDialogueV4(CustomText="", Sheet="Bonebottom", Key="MOSSCREEP_TRADE_FINAL_2", TextColor=(unset), NpcVoiceTableOverride=MD_talk_dazed (sfxdynamic_assets_areamoss.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Comedown 2
+  }
+
+  sequence state Reward F2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TurnToTalk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayRandomAudioClipTable(Table=small_bell_movement_druid (sfxdynamic_assets_areamoss.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Wait(time=0.75, finishEvent=(none), realTime=false)
+    ShowNpcDialogueTitle(Target=Self)
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_TRADE_FINAL_3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Reward F
+  }
+
+  sequence state Give Reward F {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SetToolLocked(Tool=Mosscreep Tool 1 (dataassets_assets_assets/dataassets/tools/toolitems.bundle), ShowPopup=false)
+    SetToolUnlocked(Tool=Mosscreep Tool 2 (dataassets_assets_assets/dataassets/tools/toolitems.bundle), WaitForTutorialMsgEnd=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="LookUpEnd", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    on FINISHED → End
+  }
+
+  state Berries Complete {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Black Thread World")
+    ConvertBoolToString(boolVariable=var "Is Black Thread World", stringVariable=var "Convo Key", falseString="MOSSCREEP_COMPLETED", trueString="MOSSCREEP_COMPLETED_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Meet Wishwall {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_WISHWALL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Wishwall Set
+  }
+
+  state Wishwall Set {
+    SetBoolValue(boolVariable=var "Do Start Quest", boolValue=true, everyFrame=false)
+    on FINISHED → End
+  }
+
+  state Begin Quest? {
+    BoolTest(boolVariable=var "Do Start Quest", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Start Quest", boolValue=false, everyFrame=false)
+    BeginQuestV2(ShowPrompt=true, Quest=Mossberry Collection 1 (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on FINISHED → Give Ingredient?
+  }
+
+  state Do Reset {
+    SendEvent(eventTarget=Self, sendEvent=→"RESET", delay=0, everyFrame=false)
+  }
+
+  state Ingredient Convo {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_INGREDIENT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Do Give Ingredient", boolValue=true, everyFrame=false)
+    on CONVO_END → End
+  }
+
+  state Give Ingredient? {
+    BoolTest(boolVariable=var "Do Give Ingredient", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CollectableItemCollect(Amount=1, Item=Mossberry Stew (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    SetBoolValue(boolVariable=var "Do Give Ingredient", boolValue=false, everyFrame=false)
+    on FINISHED → Do Reset
+  }
+
+  state Act 3 Intro {
+    SetPlayerDataBool(boolName="druidAct3Intro", value=true)
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_MEET_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Can Complete {
+    RunDialogue(Sheet="Bonebottom", Key="MOSSCREEP_CANCOMPLETE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Prompt
+  }
+
+  sequence state Comedown {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.75, finishEvent=(none), realTime=false)
+    Tk2dStopAnimation(gameObject=Self)
+    AudioStopV2(gameObject=var "Audio Loop TranceBell", fadeTime=0.15, cancelOnEarlyExit=false)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    on FINISHED → Reward 4
+  }
+
+  sequence state Comedown 2 {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.75, finishEvent=(none), realTime=false)
+    Tk2dStopAnimation(gameObject=Self)
+    AudioStopV2(gameObject=var "Audio Loop TranceBell", fadeTime=0.15, cancelOnEarlyExit=false)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    on FINISHED → Reward F2
+  }
+
+  state Init Mutter {
+    SetRandomAudioClipFromTable(Table=MD_mutter_loop (sfxdynamic_assets_areamoss.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    RandomiseAudioPosition(gameObject=var "Audio Loop Voice", timeMin=0, timeMax=0)
+    on FINISHED → Idle
+  }
+
+  var Berries Held: int = 0
+  var Berry Value: int = 0
+  var Rosary Reward: int = 0
+  var Rosary Reward 1: int = 131
+  var Rosary Reward 2: int = 157
+  var Rosary Reward 3: int = 173
+  var Final Reward: bool = false
+  var Spinner Defeated: bool = false
+  var Do Start Quest: bool = false
+  var Gourmand Quest Accepted: bool = false
+  var Gourmand Quest Completed: bool = false
+  var Do Give Ingredient: bool = false
+  var Is Black Thread World: bool = false
+  var Did Act 3 Intro: bool = false
+  var Has Stew: bool = false
+  var Had Stew: bool = false
+  var Convo Key: string = ""
+  var Parent: gameObject = <null>
+  var Pot Trigger: gameObject = moss_hut_set/NPC Scene/Moss Creep NPC/Hero Detector Pot
+  var Pt Explode: gameObject = <null>
+  var Pt Idle: gameObject = <null>
+  var Pt Stir: gameObject = <null>
+  var Slam Effect: gameObject = <null>
+  var Audio Loop Mix: gameObject = <null>
+  var Audio Loop Voice: gameObject = moss_hut_set/NPC Scene/Moss Creep NPC/Audio Loop Voice
+  var Audio Loop SingBell: gameObject = moss_hut_set/NPC Scene/Moss Creep NPC/Audio Loop SingBell
+  var Audio Loop TranceBell: gameObject = moss_hut_set/NPC Scene/Moss Creep NPC/Audio Loop TranceBell
+  var Current Quest: object = Mossberry Collection 1 (dataassets_assets_assets/dataassets/questsystem/quests.bundle)
+  var Give Reward Item: object = <null>
+  var Quest 1: object = Mossberry Collection 1 (dataassets_assets_assets/dataassets/questsystem/quests.bundle)
+  var Reward Item 1: object = Mosscreep Tool 1 (dataassets_assets_assets/dataassets/tools/toolitems.bundle)
+}

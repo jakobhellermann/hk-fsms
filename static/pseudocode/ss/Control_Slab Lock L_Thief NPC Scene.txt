@@ -1,0 +1,204 @@
+# Control
+# 1 location(s):
+#   Slab_14 / Thief NPC Scene/Slab Lock L
+
+fsm Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Lock Scale Set
+  }
+
+  state Init {
+    BoolTest(boolVariable=var "Activated", isTrue=→"ACTIVATED", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+    on ACTIVATED → Activated
+  }
+
+  state Activated {
+    SetCollider(gameObject=var "CamLock", active=false, resetOnExit=false)
+    SendMessage(gameObject=var "Door", delivery=SendMessage, options=1, functionCall=Opened())
+    SendEventByName(eventTarget=GameObject(var "z_Gate"), sendEvent="ACTIVATE", delay=0, everyFrame=false)
+    MatchScaleSign(Target=var "Door", MatchTo=var "Self", EveryFrame=false)
+    FlipScale(gameObject=var "Door", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Rotation", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Rotation", multiplyBy=-90, everyFrame=false)
+    SetRotation(gameObject=var "Lock Sprite", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetCollider(gameObject=var "Partner Lock", active=false, resetOnExit=false)
+    SetSpriteRendererSprite(gameObject=var "Lock Sprite", sprite=var "Unlocked Sprite")
+  }
+
+  state Idle {
+    on INTERACT → Inspect
+  }
+
+  sequence state Has Key? {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    PlayerDataBoolTest(boolName=var "Required Key", isTrue=→"YES", isFalse=→"NO")
+    on YES → Map Bool To Key
+    on NO → Inspect End
+    on CONVO_END_FORCED → Inspect End
+  }
+
+  state Inspect {
+    RunDialogue(Sheet="Prompts", Key=var "Inspect Game Text", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=Top, OffsetY=0, Target=Self)
+    on CONVO_END → Has Key?
+    on CONVO_END_FORCED → Inspect End
+  }
+
+  state Inspect End {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Use Dialogue {
+    BuildString(stringParts=[var "Inspect Game Text", "_READY"], separator="", addToEnd=true, storeResult=var "Yes No Text", everyFrame=false)
+    DialogueYesNoItemV3(Prompt={Sheet="Prompts", Key=var "Yes No Text"}, RequiredItem=var "Key Item", RequiredAmount=1, ShowCounter=false, ConsumeItem=false, WillGetItem=<null>, YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on NO → Inspect End
+    on CONVO_END_FORCED → Inspect End
+    on YES → Set Anim
+  }
+
+  state Key Anim Start {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName=var "Key Anim Start")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on CONVO_END_FORCED → Inspect End
+    on FINISHED → Set PD Bool
+  }
+
+  state Set Anim {
+    SetStringValue(stringVariable=var "Key Anim Start", stringValue="Collect Stand 1", everyFrame=false)
+    SetStringValue(stringVariable=var "Key Anim End", stringValue="Collect Stand 3", everyFrame=false)
+    on FINISHED → Key Anim Start
+  }
+
+  state Unlock Flash {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=key_new_turn_unlock (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Unlock Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    on FINISHED → Key Anim End
+  }
+
+  state Unlock {
+    SetCollider(gameObject=var "Partner Lock", active=false, resetOnExit=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Rotation", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Rotation", multiplyBy=-90, everyFrame=false)
+    AnimateRotationTo(gameObject=var "Lock Sprite", fromValue=0, toValue=var "Rotation", worldSpace=false, negativeSpace=false, time=0.5, speed=(unset), delay=(unset), easeType=22, reverse=false, finishEvent=(none), realTime=false)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Unlock Finish
+  }
+
+  state Key Anim End {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName=var "Key Anim End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Wait(time=0.34, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Unlock
+  }
+
+  sequence state Open {
+    SetCollider(gameObject=var "CamLock", active=false, resetOnExit=false)
+    SendMessage(gameObject=var "Unlock Animator", delivery=SendMessage, options=1, functionCall=StartAnimation())
+    Wait(time=var "Unlock Delay", finishEvent=(none), realTime=false)
+    SendMessage(gameObject=var "Door", delivery=SendMessage, options=1, functionCall=Open())
+    SendEventByName(eventTarget=GameObject(var "z_Gate"), sendEvent="OPEN", delay=0, everyFrame=false)
+  }
+
+  state Check Scale {
+    MatchScaleSign(Target=var "Door", MatchTo=var "Self", EveryFrame=false)
+    FlipScale(gameObject=var "Door", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Open
+  }
+
+  state PD Check {
+    FindNamedChild(gameObject=Self, storeResult=var "CamLock")
+    StringCompare(stringVariable=var "PD Bool", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName=var "PD Bool", isTrue=→"ACTIVATED", isFalse=(none))
+    on FINISHED → Init
+    on ACTIVATED → Activated
+  }
+
+  state Set PD Bool {
+    StringCompare(stringVariable=var "PD Bool", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetPlayerDataBool(boolName=var "PD Bool", value=true)
+    on FINISHED → Unlock Flash
+  }
+
+  state Unlock Finish {
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetSpriteRendererSprite(gameObject=var "Lock Sprite", sprite=var "Unlocked Sprite")
+    on FINISHED → Check Scale
+  }
+
+  state Check Talk Pos {
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"R", negativeEvent=→"L", space=0)
+    on L → Talk Pos L
+    on R → Talk Pos R
+  }
+
+  state Talk Pos L {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=SetTalkPositionLeft())
+    on FINISHED → PD Check
+  }
+
+  state Talk Pos R {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=SetTalkPositionRight())
+    on FINISHED → PD Check
+  }
+
+  state Lock Scale Set {
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=(none), negativeEvent=→"FINISHED", space=0)
+    SetSpriteValue(Variable=var "Unlocked Sprite", SetValue=jail_gate_lock_backing_0001_1_left_shad (atlases_assets_assets/sprites/_atlases/jail.spriteatlas.bundle), EveryFrame=false)
+    on FINISHED → Check Talk Pos
+  }
+
+  state Map Bool To Key {
+    StringSwitch(stringVariable=var "Required Key", compareTo=["HasSlabKeyA", "HasSlabKeyB", "HasSlabKeyC"], sendEvent=[→"A", →"B", →"C"], everyFrame=false)
+    on A → Key A
+    on B → Key B
+    on C → Key C
+    on FINISHED → Use Dialogue
+  }
+
+  state Key A {
+    SetObjectValue(objectVariable=var "Key Item", objectValue=Slab Key A (dataassets_assets_assets/dataassets/collectables/fakecollectables.bundle), everyFrame=false)
+    on FINISHED → Use Dialogue
+  }
+
+  state Key B {
+    SetObjectValue(objectVariable=var "Key Item", objectValue=Slab Key B (dataassets_assets_assets/dataassets/collectables/fakecollectables.bundle), everyFrame=false)
+    on FINISHED → Use Dialogue
+  }
+
+  state Key C {
+    SetObjectValue(objectVariable=var "Key Item", objectValue=Slab Key C (dataassets_assets_assets/dataassets/collectables/fakecollectables.bundle), everyFrame=false)
+    on FINISHED → Use Dialogue
+  }
+
+  var Unlock Delay: float = 0
+  var Inspect Game Text: string = "SLAB_LOCK_A"
+  var Required Key: string = "HasSlabKeyA"
+  var PD Bool: string = ""
+  var Door: gameObject = Jail Gate Door
+  var Partner Lock: gameObject = Thief NPC Scene/Slab Lock R
+  var z_Gate: gameObject = <null>
+  var Unlock Animator: gameObject = <null>
+
+  var Rotation: float = 0
+  var Activated: bool = false
+  var Yes No Text: string = ""
+  var Key Anim Start: string = ""
+  var Key Anim End: string = ""
+  var Lock Sprite: gameObject = Thief NPC Scene/Slab Lock L/jail_gate_lock_backing_0001_1
+  var Unlock Flash: gameObject = Thief NPC Scene/Slab Lock L/Unlock Flash
+  var Self: gameObject = Thief NPC Scene/Slab Lock L
+  var CamLock: gameObject = <null>
+  var Unlocked Sprite: object = jail_gate_lock_backing_0001_1_slotted (atlases_assets_assets/sprites/_atlases/jail.spriteatlas.bundle)
+  var Key Item: object = <null>
+}

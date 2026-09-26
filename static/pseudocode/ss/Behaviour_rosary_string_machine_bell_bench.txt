@@ -1,0 +1,151 @@
+# Behaviour
+# 7 location(s):
+#   Bellway_03 / bell_bench/rosary_string_machine
+#   Bellway_Peak / bell_bench/rosary_string_machine
+#   Bone_01c / bell_bench/rosary_string_machine
+#   Bone_East_15 / bell_bench/rosary_string_machine
+#   Coral_02 / bell_bench/rosary_string_machine
+#   Shellwood_01b / bell_bench/rosary_string_machine
+#   Shellwood_08c / bell_bench/rosary_string_machine
+
+fsm Behaviour {
+  start Init Wait
+
+  state Inert {
+    BoolTest(boolVariable=var "Raise", isTrue=(none), isFalse=→"DOWN", everyFrame=true)
+    on DOWN → Lower
+    on INTERACT → Confirm
+  }
+
+  state Confirm {
+    GetCostFromReference(Reference=var "Cost Reference", StoreValue=var "Cost")
+    DialogueYesNoV2(TranslationSheet="Fast Travel", TranslationKey="PAY_TOLL_MSG", UseCurrency=true, CurrencyCost=var "Cost", CurrencyType=var "Currency Type", ConsumeCurrency=false, WillGetItem=var "Collectable Item", YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on YES → Start Sequence
+    on NO → End Interaction
+    on CONVO_END_FORCED → End Interaction
+  }
+
+  state End Interaction {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Inert
+  }
+
+  state Wait For Currency Counter {
+    SendMessageV2(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl(), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect Stand 1", animationTriggerEvent=(none), animationCompleteEvent=(none))  // disabled
+    TakeCurrency(CurrencyType=var "Currency Type", Amount=var "Cost")
+    RespondToCurrencyCounterEvents(CurrencyType=var "Currency Type", StateEvent=StartTake, Response=→"FINISHED")
+    on FINISHED → Fill Start
+  }
+
+  state Taking Currency {
+    RespondToCurrencyCounterEvents(CurrencyType=var "Currency Type", StateEvent=Stopped, Response=→"FINISHED")
+    SetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=var "Dish", vector=(unset), x=(unset), y=-0.05, z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    iTweenMoveTo(gameObject=var "Dish", id="", transformPosition=var "", vectorPosition=var "Dish Start Position", time=0.1, delay=0, speed=(unset), space=1, easeType=21, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"TICK", realTime=false, stopOnExit=true, loopDontFinish=false)
+    on TICK → Taking Currency
+    on FINISHED → Take End
+  }
+
+  state Take End {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect Stand 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Fill End
+  }
+
+  state Init Wait {
+    on START DOWN → Start Down
+    on START UP → Start Up
+  }
+
+  state Start Sequence {
+    GetPosition(gameObject=var "Dish", vector=var "Dish Start Position", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    on FINISHED → Wait For Currency Counter
+  }
+
+  state Give Object {
+    SpawnObjectFromGlobalPool(gameObject=Collectable Item Pickup Instant (localpoolprefabs_assets_currency.bundle), spawnPoint=var "Pickup Fire Point", position=(unset), rotation=(unset), storeObject=var "Spawned Pickup")  // disabled
+    RandomVector2(Start=(3, 5), End=(5, 7), StoreResult=var "Fire Vector", EveryFrame=false)  // disabled
+    TransformVector2(Transform=var "Pickup Fire Point", Transformation=1, Vector=var "Fire Vector", StoreResult=var "Fire Vector", EveryFrame=false)  // disabled
+    SetVelocity2d(gameObject=var "Spawned Pickup", vector=var "Fire Vector", x=(unset), y=(unset), everyFrame=false)  // disabled
+    SetCollectablePickupItem(Target=var "Spawned Pickup", Item=var "Collectable Item")  // disabled
+    ActivateGameObject(gameObject=bell_bench/rosary_string_machine/Active/toll_machine_shot, activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)  // disabled
+    CollectableItemCollect(Amount=1, Item=var "Collectable Item")
+    on FINISHED → Re Enable
+  }
+
+  state Start Down {
+    AnimatorPlay(gameObject=Self, stateName="Lower", layer=0, normalizedTime=1, everyFrame=false)
+    on FINISHED → Lower
+  }
+
+  sequence state Start Up {
+    AnimatorPlay(gameObject=Self, stateName="Raise", layer=0, normalizedTime=1, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    StopParticleEmittersInChildrenV2(Target=Self, StopBehaviour=0)
+    on FINISHED → Raised
+  }
+
+  state Lower {
+    BoolTest(boolVariable=var "Raise", isTrue=→"UP", isFalse=(none), everyFrame=true)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    AnimatorPlay(gameObject=Self, stateName="Lower", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    FadeAudio(gameObject=var "Long Audio", startVolume=1, endVolume=0, time=0.2)
+    on UP → Raise Wait
+  }
+
+  state Raise {
+    PlayAudioEvent(audioClip=rosary_string_maker_arrive (sfxstatic_assets_currency.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatorPlayStateWait(target=Self, stateName="Raise", finishEvent=→"FINISHED")
+    on FINISHED → Raised
+  }
+
+  state Raised {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Inert
+  }
+
+  state Fill End {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=var "Is Hero Left", selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Is Hero Left", stringVariable=var "Fill End Anim", falseString="Fill End R", trueString="Fill End L", everyFrame=false)
+    AnimatorPlayStateWait(target=Self, stateName=var "Fill End Anim", finishEvent=→"FINISHED")
+    on FINISHED → Give Object
+  }
+
+  state Fill Start {
+    AnimatorPlay(gameObject=Self, stateName="Fill", layer=0, normalizedTime=0, everyFrame=false)
+    on FINISHED → Taking Currency
+  }
+
+  state Raise Wait {
+    PlayAudioEvent(audioClip=rosary_string_maker_coming_up (sfxstatic_assets_currency.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Long Audio")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on DOWN → Lower
+    on FINISHED → Raise
+  }
+
+  sequence state Re Enable {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    SendMessageV2(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl(), everyFrame=false)
+    on FINISHED → Inert
+  }
+
+  var Collectable Item: object = Rosary_Set_Small (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle)
+  var Cost Reference: object = <null>
+
+  var Cost: int = 100
+  var Is Hero Left: bool = false
+  var Raise: bool = false
+  var Fill End Anim: string = ""
+  var Fire Vector: vector2 = (0, 0)
+  var Dish Start Position: vector3 = (0, 0, 0)
+  var Dish: gameObject = bell_bench/rosary_string_machine/Active/rosary_string_machine_dish
+  var Pickup Fire Point: gameObject = bell_bench/rosary_string_machine/Pickup Fire Point
+  var Spawned Pickup: gameObject = <null>
+  var Long Audio: gameObject = <null>
+  var Currency Type: enum = CurrencyType(0)
+}

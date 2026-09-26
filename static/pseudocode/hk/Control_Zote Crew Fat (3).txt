@@ -1,0 +1,268 @@
+# Control
+# 2 location(s):
+#   GG_Mighty_Zote / Battle Control/Fat Zotes/Zote Crew Fat (3)
+#   GG_Mighty_Zote / Battle Control/Fat Zotes/Zote Crew Fat (2)
+
+fsm Control {
+  start Init
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Pt Land", storeResult=var "Pt Land")
+    FindChild(gameObject=Self, childName="Pt Run", storeResult=var "Pt Run")
+    FindChild(gameObject=Self, childName="Bonker", storeResult=var "Bonker")
+    FindChild(gameObject=Self, childName="Attack Voice", storeResult=var "Attack Voice")
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Pt Fall", storeResult=var "Pt Fall")
+    FindChild(gameObject=Self, childName="Spawn Lines", storeResult=var "Spawn Lines")
+    GetHP(target=Self, storeValue=var "HP")
+    on FINISHED → Dormant
+  }
+
+  state Tumble Out {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fat Jump")
+    RandomFloat(min=0, max=0, storeResult=var "Angle")  // disabled
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=20, everyFrame=false)  // disabled
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=false, pauseBetweenTurns=false, pauseTime=0)  // disabled
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Prev X Speed", y=(unset), space=0, everyFrame=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=→"LAND", leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=→"LAND", leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetFloatValue(floatVariable=var "Prev X Speed", floatValue=var "X Speed", everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), space=0, everyFrame=true)
+    on LAND → Grav
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fat Idle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    WaitRandom(timeMin=var "Idle Time Min", timeMax=var "Idle Time Max", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Dr
+  }
+
+  state Jump L {
+    RandomFloat(min=-20, max=-10, storeResult=var "Jump X")
+    RandomFloat(min=var "Jump Force Min", max=var "Jump Force Max", storeResult=var "Jump Y")
+    SetScale(gameObject=Self, vector=(unset), x=1.2, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    FloatCompare(float1=var "Jump X", float2=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1.2, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Jump Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fat Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hornet_jump (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Jump Launch
+  }
+
+  state Jump Launch {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fat Jump")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=var "Jump Y", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[Zote_floor_fall_01 (sharedassets399.assets), Zote_floor_fall_02 (sharedassets399.assets), Zote_floor_fall_03 (sharedassets399.assets)], weights=[1, 1, 1], pitchMin=0.8, pitchMax=0.8)
+    on FINISHED → Extra Frame
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fat Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=false_knight_land (sharedassets32.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[Zote_battle_leap_01 (sharedassets32.assets), Zote_battle_leap_02 (sharedassets32.assets), Zote_battle_leap_03 (sharedassets32.assets)], weights=[1, 1, 1], pitchMin=0.8, pitchMax=0.8)
+    on FINISHED → Idle
+  }
+
+  state Death {
+    SetParent(gameObject=Self, parent=var "Dormant Warriors", resetLocalPosition=false, resetLocalRotation=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Zote_Stun_02 (sharedassets481.assets), pitchMin=0.8, pitchMax=0.8, volume=1, delay=0, storePlayer=<null>)
+    SpawnObjectFromGlobalPool(gameObject=Zote Crew Death (sharedassets481.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    FloatAdd(floatVariable=var "Deaths", add=1, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Deaths", minValue=1, maxValue=25, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    NextFrameEvent(sendEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Bonker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Run")
+    SendEventToRegister(eventName="ZOTE WARRIOR KILLED")
+    on FINISHED → Death Reset
+  }
+
+  state Death Reset {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=0, y=99, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dormant
+  }
+
+  state Multiply {
+    FloatOperator(float1=var "Deaths", float2=0.1, operation=Multiply, storeResult=var "Multiplier", everyFrame=false)
+    FloatOperator(float1=var "Deaths", float2=0.065, operation=Multiply, storeResult=var "Multiplier Low", everyFrame=false)
+    FloatOperator(float1=var "Deaths", float2=0.25, operation=Multiply, storeResult=var "Multiplier High", everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=1, operation=Add, storeResult=var "Multiplier", everyFrame=false)
+    FloatOperator(float1=var "Multiplier High", float2=1, operation=Add, storeResult=var "Multiplier High", everyFrame=false)
+    FloatOperator(float1=var "Multiplier Low", float2=1, operation=Add, storeResult=var "Multiplier Low", everyFrame=false)
+    FloatClamp(floatVariable=var "Multiplier", minValue=1, maxValue=20, everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=1, operation=Multiply, storeResult=var "Gravity", everyFrame=false)
+    FloatOperator(float1=var "Multiplier Low", float2=25, operation=Multiply, storeResult=var "Hit Up Force", everyFrame=false)
+    FloatOperator(float1=1, float2=var "Multiplier", operation=Divide, storeResult=var "Idle Time Max", everyFrame=false)
+    FloatOperator(float1=0.5, float2=var "Multiplier", operation=Divide, storeResult=var "Idle Time Min", everyFrame=false)
+    FloatOperator(float1=var "Multiplier Low", float2=35, operation=Multiply, storeResult=var "Jump Force Max", everyFrame=false)
+    FloatOperator(float1=var "Multiplier Low", float2=35, operation=Multiply, storeResult=var "Jump Force Min", everyFrame=false)
+    FloatOperator(float1=var "Multiplier High", float2=0.2, operation=Multiply, storeResult=var "Run Accel", everyFrame=false)
+    FloatOperator(float1=1, float2=6, operation=Multiply, storeResult=var "Run Time Max", everyFrame=false)
+    FloatOperator(float1=1, float2=3, operation=Multiply, storeResult=var "Run Time Min", everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=9, operation=Multiply, storeResult=var "Run Speed", everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=0.2, operation=Multiply, storeResult=var "Run Accel", everyFrame=false)
+    FloatOperator(float1=1.25, float2=var "Multiplier", operation=Divide, storeResult=var "Tripped Time Max", everyFrame=false)
+    FloatOperator(float1=0.75, float2=var "Multiplier", operation=Divide, storeResult=var "Tripped Time Min", everyFrame=false)
+    FloatOperator(float1=var "Multiplier", float2=15, operation=Multiply, storeResult=var "Wall Hit Force", everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Activate {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetIsDead(target=Self, setValue=false)
+    SetHP(target=Self, hp=var "HP")
+    SetDamageHeroAmount(target=Self, damageDealt=var "Damage")
+    AudioStop(gameObject=var "Rumble Player")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=col_cage_open (sharedassets32.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Spawn Lines", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    on FINISHED → Tumble Out
+  }
+
+  state Set Damage {
+    FloatInRange(floatVariable=var "Deaths", lowerValue=0, upperValue=10, boolVariable=(unset), trueEvent=→"DMG 1", falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Deaths", lowerValue=0, upperValue=20, boolVariable=(unset), trueEvent=→"DMG 2", falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Deaths", lowerValue=0, upperValue=24, boolVariable=(unset), trueEvent=→"DMG 3", falseEvent=(none), everyFrame=false)
+    on DMG 1 → Dmg 1
+    on DMG 2 → Dmg 2
+    on FINISHED → Dmg 3
+  }
+
+  state Grav {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    on FINISHED → Land Waves
+  }
+
+  state Dmg 1 {
+    SetIntValue(intVariable=var "Damage", intValue=1, everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Dmg 2 {
+    SetIntValue(intVariable=var "Damage", intValue=2, everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Dmg 3 {
+    SetIntValue(intVariable=var "Damage", intValue=3, everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Dmg 4 {
+    SetIntValue(intVariable=var "Damage", intValue=4, everyFrame=false)
+    on FINISHED → Spawn Antic
+  }
+
+  state Land Waves {
+    SpawnObjectFromGlobalPool(gameObject=Shockwave Wave Short (sharedassets481.assets), spawnPoint=var "Self", position=(1, 0, 0), rotation=(unset), storeObject=var "Shockwave")
+    SetFsmInt(gameObject=var "Shockwave", fsmName="Spawn", variableName="Damage", setValue=var "Damage", everyFrame=false)
+    SetPosition(gameObject=var "Shockwave", vector=(unset), x=(unset), y=var "Shockwave Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Shockwave", vector=(unset), x=var "Landwave Height", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFsmBool(gameObject=var "Shockwave", fsmName="shockwave", variableName="Facing Right", setValue=true, everyFrame=false)
+    SetFsmFloat(gameObject=var "Shockwave", fsmName="shockwave", variableName="Speed", setValue=var "Landwave Speed", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Shockwave Wave Short (sharedassets481.assets), spawnPoint=var "Self", position=(-1.5, 0, 0), rotation=(unset), storeObject=var "Shockwave")
+    SetFsmInt(gameObject=var "Shockwave", fsmName="Spawn", variableName="Damage", setValue=var "Damage", everyFrame=false)
+    SetPosition(gameObject=var "Shockwave", vector=(unset), x=(unset), y=var "Shockwave Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Shockwave", vector=(unset), x=var "Landwave Height", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFsmBool(gameObject=var "Shockwave", fsmName="shockwave", variableName="Facing Right", setValue=false, everyFrame=false)
+    SetFsmFloat(gameObject=var "Shockwave", fsmName="shockwave", variableName="Speed", setValue=var "Landwave Speed", everyFrame=false)
+    on FINISHED → Land
+  }
+
+  state Dormant {
+    on SPAWN → Multiply
+  }
+
+  state Spawn Antic {
+    RandomFloat(min=91.54, max=114.56, storeResult=var "X Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=21.5, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0)
+    PlayParticleEmitterInState(gameObject=var "Pt Fall")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=misc_rumble_loop (sharedassets101.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Rumble Player")
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Activate
+  }
+
+  state Dr {
+    GetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Pos", float2=103.96, tolerance=0, equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    on L → Jump L
+    on R → Jump R
+  }
+
+  state Jump R {
+    RandomFloat(min=10, max=20, storeResult=var "Jump X")
+    RandomFloat(min=var "Jump Force Min", max=var "Jump Force Max", storeResult=var "Jump Y")
+    SetScale(gameObject=Self, vector=(unset), x=1.2, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    FloatCompare(float1=var "Jump X", float2=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1.2, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Extra Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Air
+  }
+
+  var Deaths: float = 0
+  var Dormant Warriors: gameObject = Battle Control/Dormant Warriors
+
+  var Angle: float = 0
+  var Gravity: float = 0
+  var Hit Up Force: float = 25
+  var Idle Time Max: float = 1
+  var Idle Time Min: float = 0.5
+  var Jump Force Max: float = 30
+  var Jump Force Min: float = 20
+  var Jump X: float = 0
+  var Jump Y: float = 0
+  var Landwave Height: float = 1.4
+  var Landwave Speed: float = 12
+  var Multiplier: float = 0
+  var Multiplier High: float = 0
+  var Multiplier Low: float = 0
+  var Prev X Speed: float = 0
+  var Run Accel: float = 0.2
+  var Run Speed: float = 9
+  var Run Time Max: float = 6
+  var Run Time Min: float = 3
+  var Shockwave Y: float = 5
+  var Tripped Time Max: float = 0
+  var Tripped Time Min: float = 0.75
+  var Wall Hit Force: float = 15
+  var X Pos: float = 0
+  var X Speed: float = 0
+  var Ct Attack: int = 0
+  var Ct Jump: int = 0
+  var Damage: int = 1
+  var HP: int = 300
+  var Will Fall: bool = false
+  var Attack Voice: gameObject = <null>
+  var Bonker: gameObject = <null>
+  var Pt Fall: gameObject = <null>
+  var Pt Land: gameObject = <null>
+  var Pt Run: gameObject = <null>
+  var Rumble Player: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shockwave: gameObject = <null>
+  var Spawn Lines: gameObject = <null>
+}

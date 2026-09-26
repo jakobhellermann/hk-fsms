@@ -1,0 +1,279 @@
+# Control
+# 1 location(s):
+#   resources.assets / Weaverling
+
+fsm Control {
+  start Init
+  on DISAPPEAR → Disappear  // from any state
+  on CHARM EQUIP CHECK → Despawn  // from any state
+  on WARP → Warp Out Anim  // from any state
+  on DREAMGATE OUT → Despawn  // from any state
+  on ALL CHARMS END → Despawn  // from any state
+
+  state Init {
+    RandomFloat(min=0.0031, max=0.0039, storeResult=var "zPos")
+    RandomFloat(min=1, max=1, storeResult=var "Scale")
+    FloatOperator(float1=var "Scale", float2=-1, operation=Multiply, storeResult=var "Neg Scale", everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=var "Scale", y=var "Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "zPos", space=0, everyFrame=false, lateUpdate=false)
+    GetOwner(storeGameObject=var "Self")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Launch")
+    on FINISHED → Sprintmaster
+  }
+
+  state Spawn {
+    FlingObject(flungObject=Self, speedMin=14, speedMax=18, angleMin=70, angleMax=110)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Spawn Air
+  }
+
+  state Spawn Air {
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Land
+  }
+
+  state Run {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Run Speed", y=(unset), everyFrame=true)
+    WaitRandom(timeMin=0.8, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=1, distance=0.6, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL R", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=3, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(-1, 0), space=1, distance=0.6, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL L", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=3, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToRun", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on FINISHED → Enemy Launch?
+    on WALL R → Climb R
+    on WALL L → Climb L
+  }
+
+  state Jump? {
+    SendRandomEvent(events=[(none), →"RUN"], weights=[0.5, 0.5], delay=0)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=0.75, minDepth=(unset), maxDepth=(unset), hitEvent=→"JUMP", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on JUMP → Jump Launch
+    on RUN → Run Dir
+    on FINISHED → Run Dir
+  }
+
+  state Jump Launch {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[spider_buddy_jump_1, spider_buddy_jump_2, spider_buddy_jump_3], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1.1)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Hero X", float2=var "Self X", operation=Subtract, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=-6, tolerance=0, equal=(none), lessThan=→"L", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"R", everyFrame=false)
+    FlingObject(flungObject=Self, speedMin=12, speedMax=17, angleMin=65, angleMax=115)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Jump Air
+    on L → Jump L
+    on R → Jump R
+  }
+
+  state Jump Air {
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToRun", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    on LAND → Run Dir
+  }
+
+  state Wall Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Jump?
+  }
+
+  state Run Dir {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Hero X", float2=var "Self X", operation=Subtract, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=-5, tolerance=0, equal=(none), lessThan=→"L", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=5, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"R", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="atBench", isTrue=→"BENCH", isFalse=(none))
+    SendRandomEvent(events=[→"L", →"R"], weights=[1, 1], delay=0)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on L → Run L
+    on R → Run R
+    on BENCH → Bench Start
+  }
+
+  state Run L {
+    RandomFloat(min=-10, max=-6, storeResult=var "Run Speed")
+    FloatMultiply(floatVariable=var "Run Speed", multiplyBy=var "Speed Multiplier", everyFrame=false)
+    on FINISHED → Run
+  }
+
+  state Run R {
+    RandomFloat(min=6, max=10, storeResult=var "Run Speed")
+    FloatMultiply(floatVariable=var "Run Speed", multiplyBy=var "Speed Multiplier", everyFrame=false)
+    on FINISHED → Run
+  }
+
+  state Climb R {
+    SetBoolValue(boolVariable=var "On Wall", boolValue=true, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=var "Neg Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Climb")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Hero X", float2=var "Self X", operation=Subtract, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=4, tolerance=0, equal=→"JUMP", lessThan=→"JUMP", greaterThan=(none), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 8), x=(unset), y=(unset), everyFrame=true)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=1, distance=0.6, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "On Wall", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2d(fromGameObject=Self, fromPosition=(0, -0.375), direction=(1, 0), space=1, distance=0.6, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "On Wall", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=0.6, minDepth=(unset), maxDepth=(unset), hitEvent=→"JUMP L", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=2, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    BoolTest(boolVariable=var "On Wall", isTrue=(none), isFalse=→"JUMP R", everyFrame=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on JUMP → Wall Frame
+    on JUMP L → To Jump L
+    on JUMP R → To Jump R
+  }
+
+  state Jump L {
+    FlingObject(flungObject=Self, speedMin=12, speedMax=17, angleMin=135, angleMax=150)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Jump Air
+  }
+
+  state Jump R {
+    FlingObject(flungObject=Self, speedMin=12, speedMax=17, angleMin=45, angleMax=60)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Jump Air
+  }
+
+  state Climb L {
+    SetBoolValue(boolVariable=var "On Wall", boolValue=true, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=var "Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Climb")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Hero X", float2=var "Self X", operation=Subtract, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=-4, tolerance=0, equal=→"JUMP", lessThan=(none), greaterThan=→"JUMP", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 8), x=(unset), y=(unset), everyFrame=true)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=1, distance=0.6, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "On Wall", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2d(fromGameObject=Self, fromPosition=(0, -0.375), direction=(-1, 0), space=1, distance=0.6, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "On Wall", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=0.6, minDepth=(unset), maxDepth=(unset), hitEvent=→"JUMP R", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=2, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    BoolTest(boolVariable=var "On Wall", isTrue=(none), isFalse=→"JUMP L", everyFrame=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on JUMP → Wall Frame
+    on JUMP L → To Jump L
+    on JUMP R → To Jump R
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Run Dir
+  }
+
+  state Disappear {
+  }
+
+  state To Jump L {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="ClimbToRun")
+    on FINISHED → Jump L
+  }
+
+  state To Jump R {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="ClimbToRun")
+    on FINISHED → Jump R
+  }
+
+  state Warp {
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Launch")
+    SetPosition(gameObject=Self, vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    RandomFloat(min=0.0031, max=0.0039, storeResult=var "zPos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "zPos", space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 4), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Spawn Air
+  }
+
+  state Despawn {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leave", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Recycle
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Warp Out Anim {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leave", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Warp
+  }
+
+  state Bench Start {
+    WaitRandom(timeMin=0.4, timeMax=0.8, finishEvent=→"END", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    RandomInt(min=0, max=4, storeResult=var "Bench Turns", inclusiveMax=false)
+    AudioStop(gameObject=Self)  // disabled
+    on END → Turn?
+    on BENCHREST END → Run Dir
+  }
+
+  state Turn? {
+    IntCompare(integer1=var "Bench Turns", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"TURN", everyFrame=false)
+    on TURN → Turn
+    on FINISHED → Sleep
+  }
+
+  state Turn {
+    WaitRandom(timeMin=0.4, timeMax=0.85, finishEvent=→"END", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Turn")
+    IntAdd(intVariable=var "Bench Turns", add=-1, everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on END → Turn?
+    on BENCHREST END → Run Dir
+  }
+
+  state Sleep {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sleep")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="atBench", isTrue=(none), isFalse=→"WAKE")
+    on WAKE → Wake
+    on BENCHREST END → Wake
+  }
+
+  state Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Run Dir
+  }
+
+  state Enemy Launch? {
+    WeaverlingEnemyList+GetEnemyTarget(listHolder=var "Enemy List", storeTarget=var "Target")
+    GameObjectIsNull(gameObject=var "Target", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    LineCast2d(fromGameObject=Self, fromPosition=(unset), toGameObject=var "Target", toPosition=(unset), minDepth=(unset), maxDepth=(unset), hitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SendRandomEvent(events=[→"LAUNCH", →"FINISHED"], weights=[0.5, 0.5], delay=0)
+    on FINISHED → Jump?
+    on LAUNCH → Launch
+  }
+
+  state Launch {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[spider_buddy_jump_1, spider_buddy_jump_2, spider_buddy_jump_3], weights=[1, 1, 1], pitchMin=1.2, pitchMax=1.35)
+    GetAngleToTarget2D(gameObject=Self, target=var "Target", offsetX=0, offsetY=1, storeAngle=var "Angle", everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=22, everyFrame=false)
+    on FINISHED → Jump Air
+  }
+
+  state Sprintmaster {
+    SetFloatValue(floatVariable=var "Speed Multiplier", floatValue=1, everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_37", isTrue=(none), isFalse=→"FINISHED")
+    SetFloatValue(floatVariable=var "Speed Multiplier", floatValue=1.5, everyFrame=false)
+    on FINISHED → Spawn
+  }
+
+  var Angle: float = 0
+  var Distance: float = 0
+  var Hero X: float = 0
+  var Neg Scale: float = 0
+  var Run Speed: float = 0
+  var Scale: float = 0
+  var Self X: float = 0
+  var Speed Multiplier: float = 0
+  var zPos: float = 0
+  var Bench Turns: int = 0
+  var On Wall: bool = false
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Enemy List: gameObject = Weaverling/Enemy List
+  var Self: gameObject = <null>
+  var Target: gameObject = <null>
+}

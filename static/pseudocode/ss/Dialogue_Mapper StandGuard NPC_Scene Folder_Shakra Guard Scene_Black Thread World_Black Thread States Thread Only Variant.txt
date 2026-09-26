@@ -1,0 +1,179 @@
+# Dialogue
+# 1 location(s):
+#   Greymoor_08 / Black Thread States Thread Only Variant/Black Thread World/Shakra Guard Scene/Scene Folder/Mapper StandGuard NPC
+
+fsm Dialogue {
+  start Pause
+  on CLOSE SHOP WINDOW → Reset  // from any state
+  on END CONVO → End Convo  // from any state
+  on HERO DAMAGED → Hero Damage Cancel  // from any state
+
+  state Shop Up {
+    GetProperty(targetProperty=ShopOwner.ShopObject on Black Thread States Thread Only Variant/Black Thread World/Shakra Guard Scene/Scene Folder/Mapper StandGuard NPC@ShopOwner, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Shop Object"), sendEvent="SHOP UP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk Listen")
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on SHOP CLOSED → Stand Up
+    on SHOP NO STOCK → Stand Up
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Idle Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  sequence state Reset {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Guard Idle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on INTERACT → Meet?
+    on DID TAUNT POSHANKA → Ring Greet Pause
+  }
+
+  state To Shop {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Conversing", boolValue=false, everyFrame=false)
+    on FINISHED → Shop Up
+  }
+
+  state Meet? {
+    SetBoolValue(boolVariable=var "Conversing", boolValue=true, everyFrame=false)
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Guard To Talk", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="MAPPER")
+    PlayerDataBoolTest(boolName="mapperConvo_Act3Intro", isTrue=(none), isFalse=→"MEET")
+    GetPlayerDataVariable(VariableName="HasWhiteFlower", StoreValue=var "Has White Flower")
+    GetPlayerDataVariable(VariableName="mapperConvo_WhiteFlower", StoreValue=var "Did White Flower Convo")
+    BoolTestMulti(boolVariables=[var "Has White Flower", var "Did White Flower Convo"], boolStates=[true, false], trueEvent=→"WHITE FLOWER", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    GetPlayerDataInt(intName="mapperLocationAct3", storeValue=var "Mapper Location")  // disabled
+    IntTestToBool(int1=var "Mapper Location", int2=2, equalBool=(unset), lessThanBool=var "Mapper In Shellwood", greaterThanBool=var "Mapper In Greymoor", everyFrame=false)  // disabled
+    GetPlayerDataBool(boolName="mapperConvo_Act3Shellwood", storeValue=var "Did Convo Shellwood")  // disabled
+    GetPlayerDataBool(boolName="mapperConvo_Act3Greymoor", storeValue=var "Did Convo Greymoor")  // disabled
+    BoolTestMulti(boolVariables=[var "Mapper In Shellwood", var "Did Convo Shellwood"], boolStates=[true, false], trueEvent=→"SHELLWOOD", falseEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    BoolTestMulti(boolVariables=[var "Mapper In Greymoor", var "Did Convo Greymoor"], boolStates=[true, false], trueEvent=→"GREYMOOR", falseEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    on MEET → Act 3 Meet
+    on FINISHED → Pre-Repeat
+    on WHITE FLOWER → White Flower
+  }
+
+  state Stand Up {
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk To Guard Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    SetBoolValue(boolVariable=var "Conversing", boolValue=false, everyFrame=false)
+    on FINISHED → Reset
+  }
+
+  state Shop has stock? {
+    ShopHasStock(Target=Self, trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Stand Up
+    on TRUE → To Shop
+  }
+
+  state End Convo {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    SendEventToRegister(eventName="CLOSE SHOP WINDOW INACTIVE")
+    on FINISHED → Idle
+  }
+
+  state Hero Damage Cancel {
+    BoolTest(boolVariable=var "Attacking", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendEventToRegister(eventName="CLOSE SHOP WINDOW INACTIVE")
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → End Convo
+  }
+
+  state Act 3 Meet {
+    SetPlayerDataBool(boolName="mapperConvo_Act3Intro", value=true)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_MEET_GUARD_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → White Flower Check
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_GUARD_REPEAT_ACT3", OverrideContinue=var "Will Play No Stock Dialogue", PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Shop has stock?
+  }
+
+  state White Flower {
+    SetPlayerDataBool(boolName="mapperConvo_WhiteFlower", value=true)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_WHITE_FLOWER_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Convo
+  }
+
+  state White Flower Check {
+    PlayerDataVariableTest(VariableName="HasWhiteFlower", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    SetPlayerDataBool(boolName="mapperConvo_WhiteFlower", value=true)
+    on FINISHED → End Convo
+  }
+
+  state Pre-Repeat {
+    SetBoolValue(boolVariable=var "Will Play No Stock Dialogue", boolValue=false, everyFrame=false)
+    ShopHasStock(Target=Self, trueEvent=→"FINISHED", falseEvent=(none), storeValue=(unset))
+    PlayerDataBoolTest(boolName="mapperConvo_Act3NoStock", isTrue=→"FINISHED", isFalse=(none))
+    SetBoolValue(boolVariable=var "Will Play No Stock Dialogue", boolValue=true, everyFrame=false)
+    on FINISHED → Repeat
+  }
+
+  state Ring Greet 1 {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="END ANIM", delay=0, everyFrame=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ring Shout", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_battle_poshanka (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Ring Greet 2
+  }
+
+  state Ring Greet 2 {
+    PlayAudioEvent(audioClip=shakra_entrance_shing (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Ring Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ring Greet 3
+  }
+
+  sequence state Ring Greet 3 {
+    SetScale(gameObject=Self, vector=(unset), x=var "Idle Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Ring Shout EndToGuard", AnimationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Black Thread States Thread Only Variant/Black Thread World/Shakra Guard Scene/Scene Folder/Mapper StandGuard NPC@HeroPerformanceSingReaction, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Guard Idle")
+    on FINISHED → Idle
+  }
+
+  state Ring Greet Pause {
+    GetDistanceV2(gameObject=Self, target=var "Hero", targetOffsetX=0, targetOffsetY=0, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=15, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    Wait(time=0.4, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Black Thread States Thread Only Variant/Black Thread World/Shakra Guard Scene/Scene Folder/Mapper StandGuard NPC@HeroPerformanceSingReaction, everyFrame=false)
+    on FINISHED → Ring Greet 1
+    on CANCEL → Idle
+  }
+
+  var Shop Camlock: gameObject = Black Thread States Thread Only Variant/Black Thread World/Shakra Guard Scene/Scene Folder/Mapper StandGuard NPC/CameraLockArea Shop
+
+  var Idle Scale: float = 0
+  var Distance: float = 0
+  var Mapper Location: int = 0
+  var Attacking: bool = false
+  var Conversing: bool = false
+  var Did Convo Greymoor: bool = false
+  var Did Convo Shellwood: bool = false
+  var Has White Flower: bool = false
+  var Mapper In Greymoor: bool = false
+  var Mapper In Shellwood: bool = false
+  var Did White Flower Convo: bool = false
+  var Will Play No Stock Dialogue: bool = false
+  var Shop Object: gameObject = <null>
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Black Thread World/Shakra Guard Scene/Scene Folder/Mapper StandGuard NPC/Audio Loop Voice
+  var Ring Flash: gameObject = Black Thread States Thread Only Variant/Black Thread World/Shakra Guard Scene/Scene Folder/Mapper StandGuard NPC/Ring Flash
+}

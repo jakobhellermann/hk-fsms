@@ -1,0 +1,164 @@
+# Inspect
+# 1 location(s):
+#   Mines_31 / Super Dash Get/Inspect Region
+
+fsm Inspect {
+  start Pause
+  on HERO DAMAGED → Out Of Range  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=var "Self", storeResult=var "Parent")
+    FindChild(gameObject=var "Self", childName="Prompt Marker", storeResult=var "Prompt Marker")
+    FindChild(gameObject=var "Parent", childName="White Flash", storeResult=var "White Flash")
+    FindChild(gameObject=var "Parent", childName="White Wave", storeResult=var "White Wave")
+    CreateObject(gameObject=Arrow Prompt (resources.assets), spawnPoint=var "Prompt Marker", position=(unset), rotation=(unset), storeObject=var "Prompt", networkInstantiate=false, networkGroup=0)
+    SetParent(gameObject=var "Prompt", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetFsmString(gameObject=var "Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Inspect", everyFrame=false)
+    DestroyObject(gameObject=var "Prompt Marker", delay=0, detachChildren=false)
+    on FINISHED → Out Of Range
+  }
+
+  state Out Of Range {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="", collideLayer="", sendEvent=→"IN RANGE", storeCollider=var "")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent=var "Exit Range Event", delay=0, everyFrame=false)
+    on IN RANGE → In Range
+  }
+
+  state In Range {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent=var "Enter Range Event", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Inspectable", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="UP", delay=0, everyFrame=false)
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="", collideLayer="", sendEvent=→"OUT OF RANGE", storeCollider=var "")
+    ListenForUp(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    on OUT OF RANGE → Out Of Range
+    on UP PRESSED → Can Inspect?
+    on CANCEL → Uninspectable Frame
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Range
+  }
+
+  state Can Inspect? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanInspect", parameters=[], storeResult=var "Can Inspect")
+    BoolTest(boolVariable=var "Can Inspect", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Inspectable", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Take Control
+  }
+
+  state Take Control {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    on FINISHED → Move To
+  }
+
+  state Regain Control {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Uninspectable Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Out Of Range
+  }
+
+  state Move To {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "To X", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=8, y=(unset), everyFrame=false)
+    on FINISHED → Collect 1
+  }
+
+  state Collect 1 {
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=0, everyFrame=false)
+    SetPosition(gameObject=var "Hero", vector=(unset), x=var "To X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect SD 1")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Blast
+  }
+
+  state Blast {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=break_wall_after_tutorial_area (sharedassets6.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=explosion_1 (sharedassets236.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=crystal_break_1 (resources.assets), pitchMin=0.8, pitchMax=0.8, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SUPERDASH BLAST", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MANTIS FLOOR FINISH", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Wave", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Hero Back
+  }
+
+  state Hero Back {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    iTweenMoveBy(gameObject=var "Hero", id="", vector=(-5, 0, 0), time=0.58, delay=0, speed=(unset), easeType=easeOutCubic, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect SD 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fall
+  }
+
+  state Fall {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Airborne")
+    Tk2dPlayFrame(gameObject=var "Hero", frame=6)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Y", float2=var "Knight Ground Y", tolerance=0.1, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Land
+  }
+
+  state Land {
+    SetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Knight Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect SD 4")
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Prompt
+  }
+
+  state Prompt {
+    SetPlayerDataBool(boolName="hasSuperDash", value=true)
+    SetPlayerDataBool(boolName="corn_minesLeft", value=true)
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="brettaState")
+    CreateObject(gameObject=UI Msg Get Item (sharedassets6.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "UI Msg", networkInstantiate=false, networkGroup=0)  // disabled
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=superdash_prompt (sharedassets270.assets))
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Super Dash", everyFrame=false)
+    on GET ITEM MSG END → Get Up Anim
+  }
+
+  state Get Up Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="GetUpToIdle")
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Regain Control
+  }
+
+  var Inspectable: bool = true
+  var Enter Range Event: string = ""
+  var Exit Range Event: string = ""
+
+  var Hero X: float = 0
+  var Hero Y: float = 0
+  var Knight Ground Y: float = 6.405624
+  var To X: float = 243.82
+  var Can Inspect: bool = false
+  var Parent: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Prompt Marker: gameObject = <null>
+  var Self: gameObject = <null>
+  var UI Msg: gameObject = <null>
+  var White Flash: gameObject = <null>
+  var White Wave: gameObject = <null>
+}

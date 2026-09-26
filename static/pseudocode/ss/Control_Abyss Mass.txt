@@ -1,0 +1,217 @@
+# Control
+# 1 location(s):
+#   Bone_Steel_Servant / Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass
+
+fsm Control {
+  start Init
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Scene Control")
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    GetHP(target=Self, storeValue=var "HP")
+    MultiplyIntByFloat(integer=var "HP", multiplyFloat=0.8, storeResult=var "P2 HP", everyFrame=false, forceRoundUp=false)
+    MultiplyIntByFloat(integer=var "HP", multiplyFloat=0.4, storeResult=var "P3 HP", everyFrame=false, forceRoundUp=false)
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    on WAKE → Wake
+  }
+
+  state Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Roar
+  }
+
+  state Roar {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Black Thread Enemy Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=gg_shadelord_roar (sfxstatic_assets_areabone.bundle), pitchMin=1.2, pitchMax=1.2, volume=0.65, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hero_void_scream_spell (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=0.9, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlaySimple(gameObject=Self, volume=(unset), oneShotClip=<null>)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="ABYSS_MASS")
+    on FINISHED → Start Battle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    IdleBuzzV4(gameObject=Self, waitMin=0.25, waitMax=0.75, speedMax=8, deceleration=0.75, accelerationMin=50, accelerationMax=100, roamingRangeX=1, roamingRangeY=1, manualStartPos=(unset))
+    Wait(time=var "Idle Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Action
+  }
+
+  state Start Battle {
+    SendMessage(gameObject=var "Battle Scene", delivery=SendMessage, options=1, functionCall=StartBattle())
+    SendEventByNameUpwards(Target=Self, EventName="BATTLE START")
+    on FINISHED → P2?
+  }
+
+  state Action {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"DASH", delay=0, everyFrame=false)  // disabled
+    CheckAlertRange(alertRange=var "Battle Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"DASH", OutOfRangeDelay=0, everyFrame=false)
+    SendRandomEventV4(events=[→"DASH", →"ATTACK"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on DASH → Dash Dir
+    on ATTACK → Attack Type
+  }
+
+  state Attack Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    Wait(time=var "Attack Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Attack End
+  }
+
+  state Attack End {
+    ActivateGameObject(gameObject=var "Abyss Whip Attack", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Abyss Ball Attack", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Attack Type {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=var "In Close Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    SendRandomEventV4(events=[→"SHOT", →"WHIP", →"BALL", →"VOMIT"], weights=[1, 1, 1, 1], eventMax=[1, 1, 2, 2], missedMax=[4, 4, 2, 2], activeBool=var "In Close Range")
+    SendRandomEventV4(events=[→"SHOT", →"VOMIT"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on SHOT → Shot
+    on WHIP → Whip
+    on BALL → Ball
+    on VOMIT → Vomit
+  }
+
+  state Whip {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    SetRotation(gameObject=var "Abyss Whip Attack", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Angle", space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Abyss Whip Attack", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Attack Time", floatValue=1.6, everyFrame=false)
+    on FINISHED → Attack Anim
+  }
+
+  state Shot {
+    ActivateGameObject(gameObject=var "Abyss Shot Attack", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Attack Time", floatValue=1.6, everyFrame=false)
+    on FINISHED → Attack Anim
+  }
+
+  state test {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Black Thread Enemy Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Ball {
+    ActivateGameObject(gameObject=var "Abyss Ball Attack", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Attack Time", floatValue=2, everyFrame=false)
+    on FINISHED → Attack Anim
+  }
+
+  state Vomit {
+    ActivateGameObject(gameObject=var "Abyss Heavy Vomit Attack", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Attack Time", floatValue=1.6, everyFrame=false)
+    on FINISHED → Attack Anim
+  }
+
+  state Dash Dir {
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=var "Target X", y=(unset), space=0, everyFrame=false)
+    CheckXPosition(gameObject=Self, compareTo=22, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"R", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    CheckXPosition(gameObject=Self, compareTo=28, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"L", greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    SendRandomEventV4(events=[→"L", →"R"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on L → Dash L
+    on R → Dash R
+  }
+
+  state Dash L {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    FloatAddRandom(floatVariable=var "Target X", addMin=-13, addMax=-7.5)
+    on FINISHED → Set Dash Pos
+  }
+
+  state Dash R {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    FloatAddRandom(floatVariable=var "Target X", addMin=7.5, addMax=13)
+    on FINISHED → Set Dash Pos
+  }
+
+  state Set Dash Pos {
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=(unset), y=var "Self Y", space=0, everyFrame=false)
+    RandomFloat(min=6, max=11, storeResult=var "Target Y")
+    FloatOperator(float1=var "Self Y", float2=var "Target Y", operation=Subtract, storeResult=var "Tilt", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Tilt", multiplyBy=var "Scale X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Tilt", multiplyBy=6, everyFrame=false)
+    on FINISHED → Dash Antic
+  }
+
+  state Dash Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetRecoilFreeze(target=Self, freeze=true)
+    CancelRecoil(target=Self)
+    on FINISHED → Dash To
+  }
+
+  state Dash To {
+    SetCollider(gameObject=Self, active=false, resetOnExit=true)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=hero_shade_dash_sharp (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hero_shade_dash_2 (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimateRigidBody2DPositionToV2(GameObject=Self, ToValue=(unset), ToX=var "Target X", ToY=var "Target Y", time=0.4, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tilt", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dash End
+  }
+
+  state Dash End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetRecoilFreeze(target=Self, freeze=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  state Death {
+    SetParent(gameObject=var "Death Effects", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Death Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state P2? {
+    CompareHP(enemy=var "Self", integer2=var "P2 HP", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=0.75, everyFrame=false)
+    on FINISHED → P3
+  }
+
+  state P3 {
+    CompareHP(enemy=var "Self", integer2=var "P3 HP", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=0.5, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Battle Scene: gameObject = Steel Servant Scene/Battle Scene
+  var Battle Range: object = Steel Servant Scene/Battle Range@AlertRange
+
+  var Angle: float = 0
+  var Attack Time: float = 1.75
+  var Target X: float = 0
+  var Target Y: float = 0
+  var Self Y: float = 0
+  var Tilt: float = 0
+  var Scale X: float = 0
+  var Idle Time: float = 1
+  var HP: int = 0
+  var P2 HP: int = 0
+  var P3 HP: int = 0
+  var In Close Range: bool = false
+  var Scene Control: gameObject = <null>
+  var Black Thread Enemy Effect: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass/Black Thread Enemy Effect
+  var Abyss Shot Attack: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass/Abyss Shot Attack
+  var Abyss Whip Attack: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass/Abyss Whip Attack
+  var Abyss Heavy Vomit Attack: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass/Abyss Heavy Vomit Attack
+  var Abyss Ball Attack: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass/Abyss Ball Attack
+  var Terrain Detector: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass/Terrain Detector
+  var Dash Collider: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass/Dash Collider
+  var Death Effects: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass/Death Effects
+  var Self: gameObject = Steel Servant Scene/Battle Scene/Wave 1/Abyss Mass
+}

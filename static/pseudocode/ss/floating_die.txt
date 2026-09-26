@@ -1,0 +1,157 @@
+# floating_die
+# 3 location(s):
+#   Coral_33 / Black Thread States/Normal World/Dice Game Control/Dice Game/Dice/Die Octagon
+#   Coral_33 / Black Thread States/Normal World/Dice Game Control/Dice Game/Dice/Die Diamond
+#   Coral_33 / Black Thread States/Normal World/Dice Game Control/Dice Game/Dice/Die Triangle
+
+// uses template: floating_die
+fsm floating_die {
+  start Init
+  on MASTER → Master  // from any state
+  on SUB → To Master  // from any state
+  on RESET → Reset  // from any state
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Bouncer")
+    FindNamedChild(gameObject=Self, storeResult=var "Magnet Effect")
+    ActivateGameObject(gameObject=var "Bouncer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetTag(gameObject=Self, tag="Untagged")
+    SetTag(gameObject=var "Bouncer", tag="Untagged")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    GetPosition2D(gameObject=var "Parent Folder", vector=(unset), x=(unset), y=var "Y Pos", space=0, everyFrame=false)
+    RandomFloat(min=0.32, max=1.1, storeResult=var "Float Height")
+    FloatAdd(floatVariable=var "Float Height", add=var "Y Pos", everyFrame=false, perSecond=false)
+    FloatOperator(float1=var "Y Pos", float2=0.42, operation=Add, storeResult=var "Cluster Float Y", everyFrame=false)
+    on FINISHED → Thrown
+  }
+
+  state Thrown {
+    SetFloatValue(floatVariable=var "Speed", floatValue=1, everyFrame=false)
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=true)
+    FloatCompare(float1=var "Speed", float2=0, tolerance=0.1, equal=→"FLOAT", lessThan=(none), greaterThan=(none), everyFrame=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartBounce())
+    Wait(time=1.25, finishEvent=→"FLOAT", realTime=false)
+    SetAngularDrag2d(gameObject=Self, angularDrag=0.5, everyFrame=false)
+    on FLOAT → Float Pause
+  }
+
+  state Start Float {
+    PlayAudioEvent(audioClip=dicegame_start_floating_in_air (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    ActivateGameObject(gameObject=var "Bouncer", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=-400, max=400, storeResult=var "Angular Velocity")
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.025, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Float Up
+  }
+
+  state Float Up {
+    CheckYPosition(gameObject=Self, compareTo=var "Float Height", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"OVER", everyFrame=true, space=0, activeBool=(unset))
+    AccelerateToY(gameObject=Self, accelerationFactor=0.035, targetSpeed=1)
+    GetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=true)
+    FloatClamp(floatVariable=var "Angular Velocity", minValue=-1000, maxValue=1000, everyFrame=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=true)
+    on OVER → Float Down
+  }
+
+  state Float Down {
+    CheckYPosition(gameObject=Self, compareTo=var "Float Height", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"UNDER", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    AccelerateToY(gameObject=Self, accelerationFactor=0.035, targetSpeed=-1)
+    GetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=true)
+    FloatClamp(floatVariable=var "Angular Velocity", minValue=-1000, maxValue=1000, everyFrame=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=true)
+    on UNDER → Float Up
+  }
+
+  state Float Pause {
+    WaitRandom(timeMin=0.2, timeMax=0.35, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Start Float
+  }
+
+  state Master {
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)  // disabled
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopBounce())
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Bouncer", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Magnet Effect", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Start Master Float
+  }
+
+  state To Master {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopBounce())
+    ActivateGameObject(gameObject=var "Bouncer", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ChaseObjectV2(gameObject=Self, target=var "Master", speedMax=20, accelerationForce=var "Accel", offsetX=0, offsetY=0)
+    EaseFloat(fromValue=0, toValue=500, floatVariable=var "Accel", time=2, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    Collision2dEventLayer(collision=OnCollisionStay2D, collideTag="Target", collideLayer=(unset), sendEvent=→"CONNECT", storeCollider=var "Connector", storeForce=(unset), contactPoint=(unset), contactNormal=(unset))
+    ActivateGameObject(gameObject=var "Magnet Effect", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on CONNECT → Connect
+  }
+
+  state Connect {
+    PlayAudioEvent(audioClip=dicegame_start_floating_finish_join (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetParent(gameObject=Self, parent=var "Master", resetLocalPosition=false, resetLocalRotation=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Bouncer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Start Master Float {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)  // disabled
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="MID DRIFT", delay=0, everyFrame=false)
+    SetAngularDrag2d(gameObject=Self, angularDrag=5, everyFrame=false)
+    on FINISHED → Float Up M
+  }
+
+  state Reset {
+    SetParent(gameObject=Self, parent=var "Parent Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0.75)
+    ActivateGameObject(gameObject=var "Bouncer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    ActivateGameObjectDelay(gameObject=Self, activate=false, resetOnExit=false, delay=0.05)
+    ActivateGameObject(gameObject=var "Magnet Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Float Up M {
+    CheckYPosition(gameObject=Self, compareTo=var "Cluster Float Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"OVER", everyFrame=true, space=0, activeBool=(unset))
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Speed", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Speed", minValue=-1000, maxValue=-0.5, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Speed", everyFrame=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.035, targetSpeed=1)
+    GetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=true)
+    FloatClamp(floatVariable=var "Angular Velocity", minValue=-500, maxValue=500, everyFrame=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=true)
+    on OVER → Float Down M
+  }
+
+  state Float Down M {
+    CheckYPosition(gameObject=Self, compareTo=var "Cluster Float Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"UNDER", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Speed", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Speed", minValue=0.5, maxValue=1000, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Speed", everyFrame=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.035, targetSpeed=-1)
+    GetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=true)
+    FloatClamp(floatVariable=var "Angular Velocity", minValue=-500, maxValue=500, everyFrame=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=var "Angular Velocity", everyFrame=true)
+    on UNDER → Float Up M
+  }
+
+  var Parent Folder: gameObject = Black Thread States/Normal World/Dice Game Control/Dice Game/Dice
+
+  var Speed: float = 0
+  var Float Height: float = 0
+  var Angular Velocity: float = 0
+  var Y Pos: float = 0
+  var Accel: float = 0
+  var Cluster Float Y: float = 0
+  var Bouncer: gameObject = <null>
+  var Connector: gameObject = <null>
+  var Master: gameObject = <null>
+  var Magnet Effect: gameObject = <null>
+}

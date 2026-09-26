@@ -1,0 +1,692 @@
+# Control
+# 1 location(s):
+#   Shadow_18 / Battle Scene/Boss Summon Crew/Swamp Muckman Tall A
+
+fsm Control {
+  start Pause
+  on ZERO HP → Die  // from any state
+  on HIT MOSS PLAT → Through Moss Plat  // from any state
+
+  state Init {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    GetGravity2dScale(gameObject=Self, storeGravity=var "Gravity Scale", everyFrame=false)
+    BoolTest(boolVariable=var "Battler", isTrue=→"BATTLER", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Summon Crew", isTrue=→"SUMMON CREW", isFalse=(none), everyFrame=false)
+    on FINISHED → Get Node
+    on BATTLER → Battler Wait
+    on SUMMON CREW → Summon Crew Wait
+  }
+
+  state Hidden G {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Ambush Range", storeResult=false, sendEvent="AMBUSH", outOfRangeEvent="", everyFrame=true)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    on AMBUSH → Dig Out G 1
+  }
+
+  state Dig Out G 1 {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig Out", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    PlayParticleEmitterInState(gameObject=var "Pt DigEmerge")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ST_yell (sfxdynamic_assets_areaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Dig Out G 2
+  }
+
+  state Dig Out G 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    on FINISHED → Set Evade Hops
+  }
+
+  state Set Evade Hops {
+    RandomInt(min=0, max=2, storeResult=var "Hops", inclusiveMax=true, noRepeat=false)
+    SetBoolValue(boolVariable=var "Attacked", boolValue=false, everyFrame=false)
+    on FINISHED → Evade Dir
+  }
+
+  state Evade Dir {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "X Distance", everyFrame=true)
+    IntCompareToBool(integer1=var "Hops", integer2=1, equalBool=(unset), lessThanBool=var "Hopped Enough", greaterThanBool=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Attacked", var "Hopped Enough"], boolStates=[true, true], trueEvent=→"B", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=var "Jump Distance", tolerance=0, equal=→"B", lessThan=→"B", greaterThan=→"F", everyFrame=false)
+    on F → Evade F
+    on B → Evade B
+  }
+
+  state Evade F {
+    SetFloatValue(floatVariable=var "Dir Multiplier", floatValue=1, everyFrame=false)
+    on FINISHED → Hop Launch
+  }
+
+  state Hop Launch {
+    PlayAudioEventRandom(audioClips=[swamp_muckman_jump_1 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_jump_2 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_jump_3 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_jump_4 (sfxstatic_assets_areaswamp.bundle)], pitchMin=0.75, pitchMax=0.75, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hop")
+    RayCast2dV2(fromGameObject=Self, fromPosition=(-1, 0), direction=(0, 1), space=0, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"ROOF", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(1, 0), direction=(0, 1), space=0, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"ROOF", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RandomFloat(min=8, max=12, storeResult=var "X Speed")
+    FloatMultiply(floatVariable=var "X Speed", multiplyBy=var "Dir Multiplier", everyFrame=false)
+    RandomFloat(min=20, max=28, storeResult=var "Y Speed")
+    SetVelocityByScale(gameObject=Self, speed=var "X Speed", ySpeed=var "Y Speed", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Hop Rise
+    on ROOF → Short Hop
+  }
+
+  state Evade B {
+    SetFloatValue(floatVariable=var "Dir Multiplier", floatValue=-1, everyFrame=false)
+    on FINISHED → Hop Launch
+  }
+
+  state Hop Rise {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=var "Touching Wall R", bottomHit=(unset), leftHit=var "Touching Wall L", topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Near to Ground", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Soft Terrain(25)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetVelocityByScale(gameObject=Self, speed=var "X Speed", ySpeed=(unset), everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=0.1, tolerance=0, equal=(none), lessThan=→"FALL", greaterThan=(none), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Touching Wall L", var "Near to Ground"], boolStates=[true, false], trueEvent=→"WALL L", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Touching Wall R", var "Near to Ground"], boolStates=[true, false], trueEvent=→"WALL R", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on LAND → Hop Land
+    on FALL → Attack?
+    on WALL L → Wall L
+    on WALL R → Wall R
+  }
+
+  state Hop Land {
+    IntAdd(intVariable=var "Hops", add=-1, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hop Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayAudioEventRandom(audioClips=[swamp_muckman_land_1 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_land_2 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_land_3 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_land_4 (sfxstatic_assets_areaswamp.bundle)], pitchMin=0.75, pitchMax=0.75, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Soft Terrain(25), sendEvent=→"SPLASH", storeCollider=var "")
+    on FINISHED → Hop To Sing?
+    on SPLASH → Splash In
+  }
+
+  state Attack? {
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Attacked", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=→"ATTACK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Soft Terrain(25)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"ATTACK", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    IntCompareToBool(integer1=var "Hops", integer2=1, equalBool=(unset), lessThanBool=var "Hopped Enough", greaterThanBool=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "In Attack Range", var "Hopped Enough", var "Attacked"], boolStates=[true, true, false], trueEvent=→"ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Dive In?
+    on ATTACK → 
+  }
+
+  state Hop Fall {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=var "Touching Wall R", bottomHit=(unset), leftHit=var "Touching Wall L", topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Near to Ground", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Soft Terrain(25)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Soft Terrain(25), sendEvent=→"SPLASH", storeCollider=var "")
+    BoolTestMulti(boolVariables=[var "Touching Wall L", var "Near to Ground"], boolStates=[true, false], trueEvent=→"WALL L", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Touching Wall R", var "Near to Ground"], boolStates=[true, false], trueEvent=→"WALL R", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    on LAND → Hop Land
+    on WALL L → Wall L
+    on WALL R → Wall R
+    on SPLASH → Splash In
+  }
+
+  state Wall Bounce {
+    PlayAudioEventRandom(audioClips=[swamp_muckman_land_1 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_land_2 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_land_3 (sfxstatic_assets_areaswamp.bundle), swamp_muckman_land_4 (sfxstatic_assets_areaswamp.bundle)], pitchMin=0.75, pitchMax=0.75, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Bounce", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Wall Launch
+    on DIVE → Dive Antic
+  }
+
+  state Wall R {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=5, y=(unset), everyFrame=false)
+    SetFloatValue(floatVariable=var "Launch Translate", floatValue=-0.25, everyFrame=false)
+    on FINISHED → Wall Bounce
+  }
+
+  state Wall L {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-5, y=(unset), everyFrame=false)
+    SetFloatValue(floatVariable=var "Launch Translate", floatValue=0.25, everyFrame=false)
+    on FINISHED → Wall Bounce
+  }
+
+  state Wall Launch {
+    SetFloatValue(floatVariable=var "X Speed", floatValue=8, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=var "X Speed", ySpeed=20, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity Scale")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hop")
+    Translate(gameObject=Self, vector=(unset), x=var "Launch Translate", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetBoolValue(boolVariable=var "Touching Wall L", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Touching Wall R", boolValue=false, everyFrame=false)
+    on FINISHED → Hop Rise
+  }
+
+  state Dive In? {
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Water Below", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Soft Terrain(25)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Water Below", var "Battler"], boolStates=[true, false], trueEvent=→"DIVE", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    IntCompareToBool(integer1=var "Hops", integer2=1, equalBool=(unset), lessThanBool=var "Hopped Enough", greaterThanBool=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Hopped Enough"], boolStates=[true], trueEvent=→"DIVE", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Hop Fall
+    on DIVE → Dive Antic
+  }
+
+  state Dive Launch {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dive")
+    SetVelocityByScale(gameObject=Self, speed=5, ySpeed=10, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity Scale")
+    on FINISHED → Dive Air
+  }
+
+  state Dive Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Soft Terrain(25), sendEvent=→"SPLASH", storeCollider=var "")
+    on LAND → Dig In 1
+    on SPLASH → Splash In
+  }
+
+  state Dig In 1 {
+    RayCast2dV2(fromGameObject=Self, fromPosition=(1, 0), direction=(0, -1), space=0, distance=2.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Check 1", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(-1, 0), direction=(0, -1), space=0, distance=2.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Check 2", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Ground Check 1", var "Ground Check 2"], boolStates=[true, true], trueEvent=(none), falseEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig In", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    PlayParticleEmitterInState(gameObject=var "Pt DigEmerge")
+    PlayAudioEvent(audioClip=swamp_muckman_dive_under (sfxstatic_assets_areaswamp.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Dig In 2
+    on CANCEL → Dig In Cancel
+  }
+
+  state Dig In 2 {
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitterInState(gameObject=var "Pt DigEmerge")
+    on FINISHED → Teleport Pause
+  }
+
+  state Teleport Pause {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetParent(gameObject=var "My Node", parent=var "Node Folder", resetLocalPosition=false, resetLocalRotation=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    BoolTest(boolVariable=var "Battler", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    on FINISHED → Refil HP?
+  }
+
+  state Hidden W {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Ambush Range Wall", storeResult=false, sendEvent="AMBUSH", outOfRangeEvent="", everyFrame=true)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on AMBUSH → Dig Out W 1
+  }
+
+  state Dig Out W 1 {
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig Out Wall", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ST_yell (sfxdynamic_assets_areaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Dig Out W 2
+  }
+
+  state Dig Out W 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Dig Out W End
+  }
+
+  state Dig Out W End {
+    RandomInt(min=0, max=0, storeResult=var "Hops", inclusiveMax=true, noRepeat=false)
+    SetBoolValue(boolVariable=var "Attacked", boolValue=false, everyFrame=false)
+    on FINISHED → Wall Bounce
+  }
+
+  state Splash In {
+    PlayAudioEvent(audioClip=enemy_splash_in_water (sfxstatic_assets_water.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SpawnObjectFromGlobalPool(gameObject=Splash Effect Med (localpoolprefabs_assets_water.bundle), spawnPoint=var "Self", position=(0, -1.25, 0), rotation=(unset), storeObject=var "")
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Teleport Pause
+  }
+
+  state Get Node {
+    GetRandomChild(gameObject=var "Node Folder", storeResult=var "My Node")
+    SetParent(gameObject=var "My Node", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetPosition2D(gameObject=var "My Node", vector=var "Spawn Point", x=(unset), y=(unset), space=0, everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.5, 0.5], delay=0)  // disabled
+    FindNamedChild(gameObject=var "My Node", storeResult=var "Alt Point")  // disabled
+    GetPosition2D(gameObject=var "Alt Point", vector=var "Spawn Point", x=(unset), y=(unset), space=0, everyFrame=false)  // disabled
+    on FINISHED → Node Check
+  }
+
+  state Node Check {
+    SetPosition2D(GameObject=Self, Vector=var "Spawn Point", X=0, Y=0, Space=0, EveryFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"WATER", delay=0.1, everyFrame=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=6, minDepth=(unset), maxDepth=(unset), hitEvent=→"WATER", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Terrain Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Soft Terrain(25)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(-1, 0), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL L", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Terrain Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL R", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Terrain Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    on WALL L → Stick to Wall L
+    on WALL R → Stick to Wall R
+    on FINISHED → Stick To Floor
+    on WATER → Hide Underwater
+  }
+
+  state Stick to Wall L {
+    SetPosition2D(GameObject=Self, Vector=var "Terrain Point", X=0, Y=0, Space=0, EveryFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Translate(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Hidden W
+  }
+
+  state Stick to Wall R {
+    SetPosition2D(GameObject=Self, Vector=var "Terrain Point", X=0, Y=0, Space=0, EveryFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Translate(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Hidden W
+  }
+
+  state Stick To Floor {
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Terrain Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetPosition2D(GameObject=Self, Vector=var "Terrain Point", X=0, Y=0, Space=0, EveryFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=1.22, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Hidden G
+  }
+
+  state Die {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetParent(gameObject=var "My Node", parent=var "Node Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    BoolTest(boolVariable=var "Summon Crew", isTrue=→"SUMMON CREW", isFalse=(none), everyFrame=false)
+    on FINISHED → Pick New Node
+    on SUMMON CREW → Summon Crew Wait
+  }
+
+  state Respawn {
+    SetPosition2D(GameObject=Self, Vector=var "Spawn Point", X=0, Y=0, Space=0, EveryFrame=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(-1, 0), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL L", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Wall Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL R", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Wall Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Stick To Floor
+    on WALL L → Stick to Wall L
+    on WALL R → Stick to Wall R
+  }
+
+  state Pick New Node {
+    GetRandomChild(gameObject=var "Node Folder", storeResult=var "My Node")
+    SetParent(gameObject=var "My Node", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetPosition2D(gameObject=var "My Node", vector=var "Spawn Point", x=(unset), y=(unset), space=0, everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.5, 0.5], delay=0)
+    FindNamedChild(gameObject=var "My Node", storeResult=var "Alt Point")
+    GetPosition2D(gameObject=var "Alt Point", vector=var "Spawn Point", x=(unset), y=(unset), space=0, everyFrame=false)
+    on FINISHED → Respawn
+  }
+
+  state Refil HP? {
+    BoolTest(boolVariable=var "Battler", isTrue=→"BATTLER", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Summon Crew", isTrue=→"SUMMON CREW", isFalse=(none), everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.5, 0.5], delay=0)
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Get Node
+    on BATTLER → Lurking
+    on SUMMON CREW → Summon Crew Wait
+  }
+
+  state Dive Antic {
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ST_yell (sfxdynamic_assets_areaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dive Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEventRandom(audioClips=[swamp_muckman_turn_to_dive_under (sfxstatic_assets_areaswamp.bundle)], pitchMin=0.75, pitchMax=0.75, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Battle Dive
+  }
+
+  state Dig In Cancel {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hop Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Evade Dir
+  }
+
+  state Short Hop {
+    RandomFloat(min=8, max=12, storeResult=var "X Speed")
+    FloatMultiply(floatVariable=var "X Speed", multiplyBy=var "Dir Multiplier", everyFrame=false)
+    RandomFloat(min=18, max=18, storeResult=var "Y Speed")
+    SetVelocityByScale(gameObject=Self, speed=var "X Speed", ySpeed=var "Y Speed", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Hop Rise
+  }
+
+  state Set Lure {
+    SetFloatValue(floatVariable=var "Jump Distance", floatValue=13, everyFrame=false)
+    on FINISHED → Hidden G
+  }
+
+  state Through Moss Plat {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dive")
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-0.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Splash In
+  }
+
+  state Battler Wait {
+    GetGrandParent(gameObject=Self, storeResult=var "Battle Scene")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Water Spawn X Min")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Water Spawn X Max")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Scene Extent X Min")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Scene Extent X Max")
+    GetPosition2D(gameObject=var "Water Spawn X Min", vector=(unset), x=var "Spawn X Min", y=var "Spawn Y", space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Water Spawn X Max", vector=(unset), x=var "Spawn X Max", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Scene Extent X Min", vector=(unset), x=var "Scene X Min", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Scene Extent X Max", vector=(unset), x=var "Scene X Max", y=(unset), space=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="StartConstrainX", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="SetXMin", parameters=[var "Scene X Min"], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="SetXMax", parameters=[var "Scene X Max"], storeResult=(unset var), EveryFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SetPosition2D(GameObject=Self, Vector=(unset), X=(unset), Y=var "Spawn Y", Space=0, EveryFrame=false)
+    on BATTLE START → Battle Start
+  }
+
+  state Water Pos {
+    FloatClamp(floatVariable=var "Spawn X", minValue=var "Spawn X Min", maxValue=var "Spawn X Max", everyFrame=false)  // disabled
+    SetPosition2D(GameObject=Self, Vector=(unset), X=var "Spawn X", Y=var "Spawn Y", Space=0, EveryFrame=false)
+    on FINISHED → Water Antic
+  }
+
+  state Spawn Pos {
+    WaitRandom(timeMin=0, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Water Pos 1
+  }
+
+  state Water Antic {
+    PlayParticleEmitterInState(gameObject=var "Pt WaterAntic")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=swamp_muckman_water_emerge_antic (sfxstatic_assets_areaswamp.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Water Exit
+  }
+
+  state Water Exit {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ST_yell (sfxdynamic_assets_areaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    PlayAudioEvent(audioClip=swamp_muckman_water_enter_option (sfxstatic_assets_areaswamp.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SpawnObjectFromGlobalPool(gameObject=Splash Effect Med (localpoolprefabs_assets_water.bundle), spawnPoint=var "Self", position=(0, -0.75, 0), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hop")
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetBoxColliderTrigger(gameObject=Self, trigger=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    RandomFloat(min=42, max=42, storeResult=var "Jump Distance")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Jump Distance", everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=-0.1, tolerance=0, equal=(none), lessThan=→"FALL", greaterThan=(none), everyFrame=true)
+    on FALL → Flutter Start
+  }
+
+  state Lurking {
+    WaitRandom(timeMin=1, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spawn Pos
+  }
+
+  state Battle Dive {
+    BoolNoneTrue(boolVariables=[var "Battler", var "Summon Crew"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SetBoxColliderTrigger(gameObject=Self, trigger=true)
+    on FINISHED → Dive Launch
+  }
+
+  state Battle Start {
+    WaitRandom(timeMin=0, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Water Antic
+  }
+
+  state Flutter {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetBoxColliderTrigger(gameObject=Self, trigger=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.6, targetSpeed=6)
+    ChaseObjectGround(gameObject=Self, target=var "Hero", xOffset=0, speedMax=9, acceleration=0.6, animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0, snapTo=false, snapSpeedOnly=false, onlyOnStateEntry=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "X Distance", everyFrame=true)
+    FloatTestToBool(float1=var "X Distance", float2=10, tolerance=0, equalBool=(unset), lessThanBool=var "In Attack Range", greaterThanBool=(unset), everyFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Attack Ready", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "In Attack Range", var "Attack Ready"], sendEvent=(none), storeResult=(unset), everyFrame=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on FINISHED → Attack Range?
+    on ATTACK → Attack Antic
+  }
+
+  state Flutter End {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity Scale")
+    on FINISHED → Hop Fall
+  }
+
+  state Flutter Start {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Flutter
+  }
+
+  state Attack Range? {
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "X Distance", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=10, tolerance=0, equal=→"ATTACK", lessThan=→"ATTACK", greaterThan=→"FALL", everyFrame=false)
+    on ATTACK → Attack Antic
+    on FALL → Flutter End
+  }
+
+  state Attack Antic {
+    PlayAudioEvent(audioClip=swamp_muckman_antic (sfxstatic_assets_areaswamp.bundle), pitchMin=0.65, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.88, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetIntValue(intVariable=var "Throws", intValue=3, everyFrame=false)
+    on FINISHED → Throw
+  }
+
+  state Throw {
+    PlayRandomAudioClipTable(Table=ST_yell_short (sfxdynamic_assets_areaswamp.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity Scale")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlingObjectsFromGlobalPool(gameObject=Swamp Stake Projectile (localpoolprefabs_assets_areaswamp.bundle), spawnPoint=var "Stake Point", position=(unset), spawnMin=1, spawnMax=1, speedMin=30, speedMax=30, angleMin=260, angleMax=280, originVariationX=0.2, originVariationY=0, FSM="Control", FSMEvent="THROW")
+    SetVelocityByScale(gameObject=Self, speed=6, ySpeed=6, everyFrame=false)
+    on FINISHED → Throw Check
+  }
+
+  state Throw Check {
+    IntAdd(intVariable=var "Throws", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Throws", integer2=0, equal=→"END", lessThan=→"END", greaterThan=→"ATTACK AGAIN", everyFrame=false)
+    on ATTACK AGAIN → Throw
+    on FINISHED → Attack End
+  }
+
+  state Attack End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack End")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity Scale")
+    on FINISHED → Hop Fall
+  }
+
+  state Hide Underwater {
+    SetPosition2D(GameObject=Self, Vector=var "Terrain Point", X=0, Y=0, Space=0, EveryFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    Trigger2dEvent(gameObject=var "My Node", trigger=0, collideTag="", sendEvent=→"AMBUSH", storeCollider=var "Test - Colliding Object")  // disabled
+    FindAlertRange(target=var "My Node", storeResult=var "Wake Range", childName="Wake Range")
+    CheckAlertRange(alertRange=var "Wake Range", storeResult=(unset), InRangeEvent=→"AMBUSH", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    on AMBUSH → Water Antic Q
+  }
+
+  state Water Antic Q {
+    PlayParticleEmitterInState(gameObject=var "Pt WaterAntic")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=swamp_muckman_water_emerge_antic (sfxstatic_assets_areaswamp.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Water Exit Q
+  }
+
+  state Water Exit Q {
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ST_yell (sfxdynamic_assets_areaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    PlayAudioEvent(audioClip=swamp_muckman_water_enter_option (sfxstatic_assets_areaswamp.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SpawnObjectFromGlobalPool(gameObject=Splash Effect Med (localpoolprefabs_assets_water.bundle), spawnPoint=var "Self", position=(0, -0.75, 0), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hop")
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetBoxColliderTrigger(gameObject=Self, trigger=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    RandomFloat(min=35, max=35, storeResult=var "Jump Distance")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Jump Distance", everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=-0.1, tolerance=0, equal=(none), lessThan=→"FALL", greaterThan=(none), everyFrame=true)
+    on FALL → Flutter Start
+  }
+
+  state Water Pos 1 {
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=var "Emerge X Min", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=var "Emerge X Max", y=(unset), space=0, everyFrame=false)
+    SendRandomEventV4(events=[→"L", →"R"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on L → Water L
+    on R → Water R
+  }
+
+  state Water L {
+    FloatAdd(floatVariable=var "Emerge X Min", add=-15, everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Emerge X Max", add=-5, everyFrame=false, perSecond=false)
+    on FINISHED → In Range?
+  }
+
+  state Water R {
+    FloatAdd(floatVariable=var "Emerge X Min", add=5, everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Emerge X Max", add=15, everyFrame=false, perSecond=false)
+    on FINISHED → In Range?
+  }
+
+  state In Range? {
+    RandomFloat(min=var "Emerge X Min", max=var "Emerge X Max", storeResult=var "Spawn X")
+    FloatInRange(floatVariable=var "Spawn X", lowerValue=var "Spawn X Min", upperValue=var "Scene X Max", boolVariable=(unset), trueEvent=→"FINISHED", falseEvent=→"RETRY", everyFrame=false)
+    on FINISHED → Water Pos
+    on RETRY → Retry Frame
+  }
+
+  state Retry Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Water Pos 1
+  }
+
+  state Summon Crew Wait {
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    GetGrandParent(gameObject=Self, storeResult=var "Battle Scene")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Water Spawn X Min")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Water Spawn X Max")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Scene Extent X Min")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Scene Extent X Max")
+    GetPosition2D(gameObject=var "Water Spawn X Min", vector=(unset), x=var "Spawn X Min", y=var "Spawn Y", space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Water Spawn X Max", vector=(unset), x=var "Spawn X Max", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Scene Extent X Min", vector=(unset), x=var "Scene X Min", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Scene Extent X Max", vector=(unset), x=var "Scene X Max", y=(unset), space=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="StartConstrainX", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="SetXMin", parameters=[var "Scene X Min"], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="SetXMax", parameters=[var "Scene X Max"], storeResult=(unset var), EveryFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SetPosition2D(GameObject=Self, Vector=(unset), X=(unset), Y=var "Spawn Y", Space=0, EveryFrame=false)
+    on BATTLE START → Battle Start
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=ST_sing (sfxdynamic_assets_areaswamp.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on SING DURATION END → Evade Dir
+  }
+
+  state Hop To Sing? {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    on SING → Sing
+    on FINISHED → Evade Dir
+  }
+
+  var Battler: bool = false
+  var Node Folder: gameObject = <null>
+
+  var X Distance: float = 0
+  var Y Speed: float = 0
+  var X Speed: float = 0
+  var Dir Multiplier: float = 0
+  var Gravity Scale: float = 0
+  var Launch Translate: float = 0
+  var Jump Distance: float = 10
+  var Spawn X Min: float = 0
+  var Spawn Y: float = 0
+  var Spawn X Max: float = 0
+  var Spawn X: float = 0
+  var Scene X Min: float = 0
+  var Scene X Max: float = 0
+  var Emerge X Min: float = 0
+  var Emerge X Max: float = 0
+  var Hops: int = 0
+  var Throws: int = 0
+  var In Attack Range: bool = false
+  var Attacked: bool = false
+  var Hopped Enough: bool = false
+  var Ground Check 1: bool = false
+  var Ground Check 2: bool = false
+  var Touching Wall R: bool = false
+  var Touching Wall L: bool = false
+  var Near to Ground: bool = false
+  var Water Below: bool = false
+  var Attack Ready: bool = false
+  var Summon Crew: bool = false
+  var Spawn Point: vector2 = (0, 0)
+  var Terrain Point: vector2 = (0, 0)
+  var Wall Point: vector2 = (0, 0)
+  var Self: gameObject = Battle Scene/Boss Summon Crew/Swamp Muckman Tall A
+  var Alt Point: gameObject = <null>
+  var My Node: gameObject = <null>
+  var Pt DigEmerge: gameObject = Battle Scene/Boss Summon Crew/Swamp Muckman Tall A/Pt DigEmerge
+  var Battle Scene: gameObject = <null>
+  var Water Spawn X Min: gameObject = <null>
+  var Water Spawn X Max: gameObject = <null>
+  var Pt WaterAntic: gameObject = Battle Scene/Boss Summon Crew/Swamp Muckman Tall A/Pt WaterAntic
+  var Scene Extent X Min: gameObject = <null>
+  var Scene Extent X Max: gameObject = <null>
+  var Stake Point: gameObject = Battle Scene/Boss Summon Crew/Swamp Muckman Tall A/Stake Point
+  var Test - Colliding Object: gameObject = <null>
+  var Audio Loop Voice: gameObject = Battle Scene/Boss Summon Crew/Swamp Muckman Tall A/Audio Loop Voice
+  var Wake Range: object = <null>
+}

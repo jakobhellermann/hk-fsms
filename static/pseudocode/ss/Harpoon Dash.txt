@@ -1,0 +1,1078 @@
+# Harpoon Dash
+# 1 location(s):
+#   heroloading_assets_all.bundle / Hero_Hornet
+
+// uses template: hornet_harpoon_dash
+fsm Harpoon Dash {
+  start Init
+  on HERO DAMAGED → Cancel All  // from any state
+  on LEAVING SCENE → Cancel All  // from any state
+  on FSM CANCEL → Cancel All  // from any state
+  on SPRINT CANCEL → Cancel All  // from any state
+  on BOUNCE CANCEL → Cancel All  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Effects", storeResult=var "Effects Folder")
+    FindChild(gameObject=var "Effects Folder", childName="Hornet_harpoon_dash", storeResult=var "Dash Effect")
+    FindChild(gameObject=var "Effects Folder", childName="Hornet_harpoon_throw_effect", storeResult=var "Throw Effect")
+    FindChild(gameObject=var "Effects Folder", childName="Hornet_harpoon_grab_effect", storeResult=var "Grab Effect")
+    FindChild(gameObject=var "Effects Folder", childName="Harpoon Needle", storeResult=var "Needle")
+    FindChild(gameObject=var "Needle", childName="Harpoon Tinker", storeResult=var "Harpoon Tinker")
+    FindChild(gameObject=Self, childName="Attacks/Harpoon Damager", storeResult=var "Harpoon Damager")
+    FindChild(gameObject=Self, childName="Attacks/Harpoon Dash Damager", storeResult=var "Dash Damager")
+    FindChild(gameObject=Self, childName="Attacks/Harpoon Breaker", storeResult=var "Harpoon Breaker")
+    FindChild(gameObject=Self, childName="Attacks/Harpoon Breaker Extend", storeResult=var "Harpoon Breaker Extend")
+    FindChild(gameObject=Self, childName="Effects/Harpoon Needle/Thread", storeResult=var "Thread")
+    FindGameObject(objectName="", withTag="CameraTarget", store=var "CamTarget")
+    GetOwner(storeGameObject=var "Self")
+    FindNamedChild(gameObject=Self, storeResult=var "Centre")
+    on FINISHED → Idle
+  }
+
+  state Cancel All {
+    BoolTest(boolVariable=var "Queued Move", isTrue=→"DO MOVE", isFalse=(none), everyFrame=false)
+    SendMessage(gameObject=var "CamTarget", delivery=SendMessage, options=1, functionCall=SetHarpooning(false))
+    SetScale(gameObject=var "Needle", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Grab Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Dash Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Will Restore Anim", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Restore Anim", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Unset Nail Charge
+    on DO MOVE → Take Control
+  }
+
+  state Regain Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartHarpoonDashCooldown())
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetFloatValue(floatVariable=var "Return Idle Wait", floatValue=0.2, everyFrame=false)
+    on FINISHED → Unset Nail Charge
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Will Restore Anim", boolValue=false, everyFrame=false)
+    ResetRecordedDamageHero()
+    SendMessageV2(gameObject=var "Enemy", delivery=SendMessage, options=1, functionCall=HookCancel(), everyFrame=false)
+    SetGameObject(variable=var "Enemy", gameObject=<null>, everyFrame=false)
+    SendMessageV2(gameObject=var "Casted Object", delivery=SendMessage, options=1, functionCall=HookCancel(), everyFrame=false)
+    SetGameObject(variable=var "Casted Object", gameObject=<null>, everyFrame=false)
+    FloatAdd(floatVariable=var "Cooldown Timer", add=-1, everyFrame=true, perSecond=true)  // disabled
+    SetFloatValue(floatVariable=var "Return Idle Wait", floatValue=0, everyFrame=false)
+    on DO MOVE → Can Do?
+    on DO MOVE FIXED → Set Fixed
+  }
+
+  state Take Control {
+    DebugLogConsole(logLevel=0, text="Harpoon Dash Starting", sendToUnityLog=true)  // disabled
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=CancelAttack, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetGameObject(variable=var "Enemy", gameObject=<null>, everyFrame=false)
+    SetBoolValue(boolVariable=var "Queued Move", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Restore Anim", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["wallSliding"], storeResult=var "Wallsliding", EveryFrame=false)
+    SetHeroCState(VariableName="recoiling", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    SetBoolValue(boolVariable=var "Allowed Nail Charge", boolValue=true, everyFrame=false)  // disabled
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControlNotVelocity())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetBoolValue(boolVariable=var "Locked Gravity", boolValue=true, everyFrame=false)
+    HeroLockState(heroLockStates=6, mode=Add, setOppositeOnExit=false)
+    TakeSilk(target=Self, amount=1)
+    on FINISHED → Flip?
+  }
+
+  state Antic {
+    SetBoolValue(boolVariable=var "Jump Queued", boolValue=false, everyFrame=false)
+    PlayRandomAudioClipTableV2(Table=Attack Normal Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Harpoon Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ClampVelocity2D(gameObject=Self, xMin=-20, xMax=20, yMin=-10, yMax=5, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.975, decelerationY=0.875, brakeOnExit=true)
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=false)  // disabled
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hornet_needle_dash (sfxstatic_assets_shared.bundle))
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hornet_needle_dash (vibrationstatic_assets_vibrationdataasset.bundle), motors=All, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    SetBoolValue(boolVariable=var "Fixed Direction", boolValue=false, everyFrame=false)
+    SendEventToRegister(eventName="THROWING HARPOON")
+    on FINISHED → Dir
+  }
+
+  state Throw {
+    SetBoolValue(boolVariable=var "Will Restore Anim", boolValue=false, everyFrame=false)
+    SetPositionToObject(gameObject=var "Harpoon Breaker", targetObject=var "Needle", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    SetPositionToObject(gameObject=var "Harpoon Breaker Extend", targetObject=var "Needle", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    GetAngleToTarget2D(gameObject=var "Harpoon Breaker", target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Breaker Angle", pause=0, everyFrame=false)  // disabled
+    SetRotation(gameObject=var "Harpoon Breaker", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Breaker Angle", space=1, everyFrame=false, lateUpdate=false)  // disabled
+    GetDistance(gameObject=var "Harpoon Breaker", target=var "Hero", storeResult=var "Breaker Distance", everyFrame=false)
+    SetScale(gameObject=var "Harpoon Breaker", vector=(unset), x=var "Breaker Distance", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Harpoon Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Throw Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Thread", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Harpoon Breaker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Harpoon Breaker Extend", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SendMessageDelay(gameObject=var "CamTarget", delivery=SendMessage, options=0, functionCall=SetHarpooning(true), delay=0.075)
+    on FINISHED → Freeze Needle
+  }
+
+  state Dash {
+    HeroControllerMethods(method=RelinquishControlNotVelocity, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroBoxControlV2(setOnExit=Normal, heroBoxState=Harpoon)
+    SendMessage(gameObject=var "CamTarget", delivery=SendMessage, options=1, functionCall=SetHarpooning(true))
+    SendMessageOnExit(gameObject=var "CamTarget", delivery=SendMessage, options=1, functionCall=SetHarpooning(false))
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"FINISHED", bottomHitEvent=(none), leftHitEvent=→"FINISHED", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)  // disabled
+    SetVelocityAsAngle(gameObject=Self, angle=var "Travel Angle", speed=var "Dash Speed", everyFrame=true)
+    Wait(time=0.1, finishEvent=→"END", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Harpoon Dash")
+    ActivateGameObject(gameObject=var "Dash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Needle", storeResult=var "Needle Distance", everyFrame=true)
+    FloatCompare(float1=var "Needle Distance", float2=1, tolerance=0, equal=→"CATCH", lessThan=→"CATCH", greaterThan=(none), everyFrame=true)  // disabled
+    FloatTestToBool(float1=var "Needle Distance", float2=1, tolerance=0, equalBool=(unset), lessThanBool=var "At Needle", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "At Needle", var "Hit Enemy"], sendEvent=→"CATCH", storeResult=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Dash Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DamageEnemyRespond(Target=var "Dash Damager", DamagedEvent=→"HIT ENEMY", StoreEnemy=var "Enemy")
+    Trigger2dEventV2(gameObject=var "Dash Damager", trigger=0, collideTag="Harpoon Ring", collideLayer=Interactive Object(19), sendEvent=→"RING", storeCollider=var "Casted Object")  // disabled
+    Trigger2dEventV2(gameObject=var "Dash Damager", trigger=0, collideTag="Coral Crust Wall", collideLayer=Attack(17), sendEvent=→"CRUST WALL", storeCollider=var "Casted Object")
+    AllowMantle()
+    SetBoolValueV2(boolVariable=var "Harpoon Dashing", boolValue=true, setOppositeOnExit=true, everyFrame=false)
+    ClampVelocity2D(gameObject=Self, xMin=(unset), xMax=(unset), yMin=-5, yMax=5, everyFrame=true)
+    on END → Hit Enemy?
+    on HIT ENEMY → Enemy Bounce
+    on CATCH → To Needle
+    on RING → Dashing Catch
+    on CRUST WALL → Crust Wall
+    on BOUNCE TINKED → Enemy Bounce
+  }
+
+  state Catch {
+    HeroBoxControlV2(setOnExit=Normal, heroBoxState=Harpoon)
+    ActivateGameObject(gameObject=var "Dash Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=var "Jump Queued", activeBool=(unset), stateEntryOnly=false)
+    DecelerateV2(gameObject=Self, deceleration=0.75, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Harpoon Catch", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Grab Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetScale(gameObject=var "Needle", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    AllowMantle()
+    SetBoolValueV2(boolVariable=var "Harpoon Dashing", boolValue=true, setOppositeOnExit=true, everyFrame=false)
+    ClampVelocity2D(gameObject=Self, xMin=(unset), xMax=(unset), yMin=-5, yMax=5, everyFrame=true)
+    SetBoolValue(boolVariable=var "Locked Gravity", boolValue=false, everyFrame=false)
+    HeroLockState(heroLockStates=6, mode=Remove, setOppositeOnExit=false)
+    on FINISHED → Wall Slide?
+  }
+
+  state Dir {
+    SetBoolValue(boolVariable=var "Hit Enemy", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Hit Something", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Hit Wall", boolValue=false, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → Ring Check L
+    on R → Ring Check R
+  }
+
+  state Left {
+    SetGameObject(variable=var "Tink Candidate", gameObject=<null>, everyFrame=false)
+    SetDamageEnemyDirection(target=var "Dash Damager", damageDirection=180)
+    SetDamageEnemyDirection(target=var "Harpoon Damager", damageDirection=180)
+    SetFloatValue(floatVariable=var "Travel Angle", floatValue=180, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 1", direction=(-1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"HIT ENEMY", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Enemy", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Enemies(11)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 2", direction=(-1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"HIT ENEMY", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Enemy", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Enemies(11)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 3", direction=(-1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"HIT ENEMY", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Enemy", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Enemies(11)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 2", direction=(-1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Tink Candidate", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Attack(17)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    HasComponent(gameObject=var "Tink Candidate", component="TinkEffect", removeOnExit=false, trueEvent=→"HIT TINK", falseEvent=(none), store=(unset), everyFrame=false)
+    RayCastHeroBlocker(FromGameObject=Self, FromPosition=(0, -0.5), Direction=(-1, 0), Space=1, Distance=9, HitEvent=→"HIT WALL", NoHitEvent=(none), StoreDidHit=(unset), StoreHitObject=var "", StoreHitPoint=var "Collision Point", StoreHitNormal=(unset), StoreHitDistance=(unset), StoreDistance=(unset), RepeatInterval=1, DebugColor=(1, 0.92156863, 0.015686275, 1), Debug=false)
+    RayCastHeroBlocker(FromGameObject=Self, FromPosition=(0, -0.5), Direction=(-1, 0), Space=1, Distance=9, HitEvent=→"HIT WALL", NoHitEvent=(none), StoreDidHit=(unset), StoreHitObject=var "", StoreHitPoint=var "Collision Point", StoreHitNormal=(unset), StoreHitDistance=(unset), StoreDistance=(unset), RepeatInterval=1, DebugColor=(1, 0.92156863, 0.015686275, 1), Debug=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Air Needle L
+    on HIT WALL → Wall Needle L
+    on HIT ENEMY → Enemy Needle L
+    on HIT TINK → Tink Needle L
+  }
+
+  state Right {
+    SetGameObject(variable=var "Tink Candidate", gameObject=<null>, everyFrame=false)
+    SetDamageEnemyDirection(target=var "Dash Damager", damageDirection=0)
+    SetDamageEnemyDirection(target=var "Harpoon Damager", damageDirection=0)
+    SetFloatValue(floatVariable=var "Travel Angle", floatValue=0, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 1", direction=(1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"HIT ENEMY", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Enemy", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Enemies(11)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 2", direction=(1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"HIT ENEMY", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Enemy", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Enemies(11)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 3", direction=(1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"HIT ENEMY", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Enemy", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Enemies(11)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 2", direction=(1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Tink Candidate", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Attack(17)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    HasComponent(gameObject=var "Tink Candidate", component="TinkEffect", removeOnExit=false, trueEvent=→"HIT TINK", falseEvent=(none), store=(unset), everyFrame=false)
+    RayCastHeroBlocker(FromGameObject=Self, FromPosition=(0, -0.5), Direction=(1, 0), Space=1, Distance=9, HitEvent=→"HIT WALL", NoHitEvent=(none), StoreDidHit=(unset), StoreHitObject=var "", StoreHitPoint=var "Collision Point", StoreHitNormal=(unset), StoreHitDistance=(unset), StoreDistance=(unset), RepeatInterval=1, DebugColor=(1, 0.92156863, 0.015686275, 1), Debug=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Air Needle R
+    on HIT WALL → Wall Needle R
+    on HIT ENEMY → Enemy Needle R
+    on HIT TINK → Tink Needle R
+  }
+
+  state Air Needle L {
+    SetPosition(gameObject=var "Needle", vector=(unset), x=0, y=0, z=-0.001, space=1, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Needle", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Translate(gameObject=var "Needle", vector=(unset), x=-9.25, y=-0.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Suspend
+  }
+
+  state Freeze Needle {
+    CallMethodProper(gameObject=var "Needle", behaviour="KeepWorldPosition", methodName="SetStay", parameters=[true], storeResult=(unset var), EveryFrame=false)  // disabled
+    SetParent(gameObject=var "Needle", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Enemy Still Alive?
+  }
+
+  state Air Needle R {
+    SetPosition(gameObject=var "Needle", vector=(unset), x=0, y=0, z=-0.001, space=1, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Needle", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Translate(gameObject=var "Needle", vector=(unset), x=9.25, y=-0.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Suspend
+  }
+
+  state Wall Needle L {
+    SetPosition(gameObject=var "Needle", vector=(unset), x=(unset), y=-0.5, z=-0.001, space=1, everyFrame=false, lateUpdate=false)
+    GetVector2XY(vector2Variable=var "Collision Point", storeX=var "Needle X", storeY=(unset), everyFrame=false)
+    SetPosition(gameObject=var "Needle", vector=(unset), x=var "Needle X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValue(boolVariable=var "Hit Something", boolValue=true, everyFrame=false)
+    on FINISHED → Hit Wall
+  }
+
+  state Wall Needle R {
+    SetPosition(gameObject=var "Needle", vector=(unset), x=(unset), y=-0.5, z=-0.001, space=1, everyFrame=false, lateUpdate=false)
+    GetVector2XY(vector2Variable=var "Collision Point", storeX=var "Needle X", storeY=(unset), everyFrame=false)
+    SetPosition(gameObject=var "Needle", vector=(unset), x=var "Needle X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValue(boolVariable=var "Hit Something", boolValue=true, everyFrame=false)
+    on FINISHED → Hit Wall
+  }
+
+  state Flip? {
+    BoolTest(boolVariable=var "Wallsliding", isTrue=→"WALL", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Fixed Direction", isTrue=→"WALL", isFalse=(none), everyFrame=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"R", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"L", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on L → Face L
+    on R → Face R
+    on FINISHED → Kick Up?
+    on WALL → Wall Flip
+  }
+
+  state Face L {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Kick Up?
+  }
+
+  state Face R {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Kick Up?
+  }
+
+  state Enemy Needle L {
+    SetGameObject(variable=var "Enemy", gameObject=var "Casted Object", everyFrame=false)
+    SetBoolValue(boolVariable=var "Hit Enemy", boolValue=true, everyFrame=false)
+    GetVector2XY(vector2Variable=var "Collision Point", storeX=var "Needle X", storeY=var "Needle Y", everyFrame=false)
+    SetPosition(gameObject=var "Needle", vector=(unset), x=var "Needle X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=var "Needle", vector=(unset), x=(unset), y=-0.5, z=-0.001, space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SendMessageV2(gameObject=var "Casted Object", delivery=SendMessage, options=1, functionCall=HookStart(), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Casted Object"), sendEvent="HARPOON HOOKED", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Casted Object"), sendEvent="HARPOONED", delay=0, everyFrame=false)
+    DoDamage(damager=var "Harpoon Damager", target=var "Casted Object")
+    SetBoolValue(boolVariable=var "Hit Something", boolValue=true, everyFrame=false)
+    on FINISHED → Suspend
+  }
+
+  state Hit Enemy? {
+    BoolTest(boolVariable=var "Hit Enemy", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Catch
+    on FINISHED → Do Enemy Damage
+  }
+
+  state Enemy Bounce {
+    CallMethodProper(gameObject=var "Dash Damager", behaviour="DeactivateNextFrame", methodName="DoDeactivateNextFrame", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventByNameUpwards(Target=var "Enemy", EventName="HARPOON DAMAGE")
+    HasComponent(gameObject=var "Enemy", component="HarpoonHook", removeOnExit=false, trueEvent=→"HOOK", falseEvent=(none), store=(unset), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Harpoon Catch", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Grab Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Bounce Up
+    on HOOK → Hook Bounce
+  }
+
+  state To Needle {
+    GetPosition(gameObject=var "Needle", vector=(unset), x=var "Needle X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Needle X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Hit Enemy?
+  }
+
+  state Enemy Needle R {
+    SetGameObject(variable=var "Enemy", gameObject=var "Casted Object", everyFrame=false)
+    SetBoolValue(boolVariable=var "Hit Enemy", boolValue=true, everyFrame=false)
+    GetVector2XY(vector2Variable=var "Collision Point", storeX=var "Needle X", storeY=var "Needle Y", everyFrame=false)
+    SetPosition(gameObject=var "Needle", vector=(unset), x=var "Needle X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=var "Needle", vector=(unset), x=(unset), y=-0.5, z=-0.001, space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SendMessageV2(gameObject=var "Casted Object", delivery=SendMessage, options=1, functionCall=HookStart(), everyFrame=false)
+    DoDamage(damager=var "Harpoon Damager", target=var "Casted Object")
+    SendEventByName(eventTarget=GameObject(var "Casted Object"), sendEvent="HARPOON HOOKED", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Casted Object"), sendEvent="HARPOONED", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Hit Something", boolValue=true, everyFrame=false)
+    on FINISHED → Suspend
+  }
+
+  state Hit Wall {
+    Tk2dPlayAnimation(gameObject=var "Needle", animLibName="", clipName="Harpoon Needle Wall Hit")
+    SpawnObjectFromGlobalPool(gameObject=Nail Terrain Hit Effect (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Needle", position=(unset), rotation=(unset), storeObject=var "")
+    Comment(comment="Nail Terrain Hit Effect Already Plays sword_terrain_temp sound effect on spawn")
+    PlayAudioEvent(audioClip=sword_terrain_temp (sfxstatic_assets_shared.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Needle", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Hit Wall", boolValue=true, everyFrame=false)
+    on FINISHED → Throw
+  }
+
+  state Suspend {
+    CallMethodProper(gameObject=var "Harpoon Damager", behaviour="DamageEnemies", methodName="EndDamage", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Needle", animLibName="", clipName="Harpoon Needle")
+    on FINISHED → Throw
+  }
+
+  state Did Hit? {
+    BoolTest(boolVariable=var "Hit Something", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Enemy Still Alive?
+    on FALSE → Pull Back
+  }
+
+  state Pull Back {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Needle", clipName="Harpoon Needle Return", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Catch Back
+  }
+
+  state Wall Slide? {
+    BoolTest(boolVariable=var "Hit Wall", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Anim To Idle
+    on FINISHED → Wallslide Cancel
+  }
+
+  state Anim To Idle {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())
+    on FINISHED → Jump Queue Check
+  }
+
+  state Anim Reg {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Jump Queue Check
+  }
+
+  state Enemy Still Alive? {
+    BoolTest(boolVariable=var "Hit Enemy", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    GetHP(target=var "Enemy", storeValue=var "Enemy HP")
+    IntCompare(integer1=var "Enemy HP", integer2=0, equal=→"TRUE", lessThan=→"TRUE", greaterThan=→"TRUE", everyFrame=false)
+    on TRUE → Dash To Enemy
+    on FALSE → Pull Back
+    on CANCEL → Dash
+  }
+
+  state Catch Back {
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Harpoon Catch Back", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Grab Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValue(boolVariable=var "Locked Gravity", boolValue=false, everyFrame=false)
+    HeroLockState(heroLockStates=6, mode=Remove, setOppositeOnExit=false)
+    on FINISHED → Anim To Idle
+  }
+
+  state Do Enemy Damage {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SendMessageV2(gameObject=var "Enemy", delivery=SendMessage, options=1, functionCall=HookEnd(), everyFrame=false)
+    DoDamage(damager=var "Dash Damager", target=var "Enemy")
+    SendEventByName(eventTarget=GameObject(var "Casted Object"), sendEvent="HARPOONED", delay=0, everyFrame=false)
+    HeroStealEnemyCurrency(Enemy=var "Enemy")
+    on FINISHED → Enemy Bounce
+  }
+
+  state Cancel Other Moves {
+    SetBoolValue(boolVariable=var "Queued Move", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+  }
+
+  state Wall Flip {
+    SetVelocityByScale(gameObject=Self, speed=8, ySpeed=(unset), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FlipSprite", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=hero_wall_jump (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hornet_wall_land (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hero_wall_jump (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    on FINISHED → Kick Up?
+  }
+
+  state Dash To Enemy {
+    HeroBoxControlV2(setOnExit=Normal, heroBoxState=Harpoon)
+    SendMessage(gameObject=var "CamTarget", delivery=SendMessage, options=1, functionCall=SetHarpooning(true))
+    SendMessageOnExit(gameObject=var "CamTarget", delivery=SendMessage, options=1, functionCall=SetHarpooning(false))
+    SetDamageHeroAndRecord(Target=var "Enemy", Enabled=false)
+    GetParent(gameObject=var "Enemy", storeResult=var "Enemy Parent")
+    SendEventByName(eventTarget=GameObject(var "Enemy"), sendEvent="HARPOON HOOKED", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Enemy Parent"), sendEvent="HARPOON HOOKED", delay=0, everyFrame=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"FINISHED", bottomHitEvent=(none), leftHitEvent=→"FINISHED", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)  // disabled
+    SetVelocityAsAngle(gameObject=Self, angle=var "Travel Angle", speed=var "Dash Speed", everyFrame=true)  // disabled
+    FireAtTarget(gameObject=Self, target=var "Needle", speed=var "Dash Speed", position=(0, 0.6, 0), spread=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Harpoon Dash")
+    Wait(time=0.1, finishEvent=→"END", realTime=false)
+    ActivateGameObject(gameObject=var "Dash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Needle", storeResult=var "Needle Distance", everyFrame=true)
+    FloatCompare(float1=var "Needle Distance", float2=1, tolerance=0, equal=→"CATCH", lessThan=→"CATCH", greaterThan=(none), everyFrame=true)  // disabled
+    FloatTestToBool(float1=var "Needle Distance", float2=1, tolerance=0, equalBool=(unset), lessThanBool=var "At Needle", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "At Needle", var "Hit Enemy"], sendEvent=→"CATCH", storeResult=(unset), everyFrame=true)
+    DamageEnemyRespond(Target=var "Dash Damager", DamagedEvent=→"HIT ENEMY", StoreEnemy=var "Enemy")
+    Trigger2dEventV2(gameObject=var "Dash Damager", trigger=0, collideTag="Harpoon Ring", collideLayer=Interactive Object(19), sendEvent=→"RING", storeCollider=var "Casted Object")  // disabled
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"FINISHED", bottomHitEvent=(none), leftHitEvent=→"FINISHED", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)  // disabled
+    SetVelocityAsAngle(gameObject=Self, angle=var "Travel Angle", speed=var "Dash Speed", everyFrame=true)
+    Wait(time=0.1, finishEvent=→"END", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Harpoon Dash")
+    ActivateGameObject(gameObject=var "Dash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Needle", storeResult=var "Needle Distance", everyFrame=true)
+    FloatCompare(float1=var "Needle Distance", float2=1, tolerance=0, equal=→"CATCH", lessThan=→"CATCH", greaterThan=(none), everyFrame=true)  // disabled
+    FloatTestToBool(float1=var "Needle Distance", float2=1, tolerance=0, equalBool=(unset), lessThanBool=var "At Needle", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "At Needle", var "Hit Enemy"], sendEvent=→"CATCH", storeResult=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Dash Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DamageEnemyRespond(Target=var "Dash Damager", DamagedEvent=→"HIT ENEMY", StoreEnemy=var "Enemy")
+    Trigger2dEventV2(gameObject=var "Dash Damager", trigger=0, collideTag="Harpoon Ring", collideLayer=Interactive Object(19), sendEvent=→"RING", storeCollider=var "Casted Object")  // disabled
+    Trigger2dEventV2(gameObject=var "Dash Damager", trigger=0, collideTag="Coral Crust Wall", collideLayer=Attack(17), sendEvent=→"CRUST WALL", storeCollider=var "Casted Object")
+    AllowMantle()
+    SetBoolValueV2(boolVariable=var "Harpoon Dashing", boolValue=true, setOppositeOnExit=true, everyFrame=false)
+    on END → Hit Enemy?
+    on HIT ENEMY → Tag Enemy Steal
+    on CATCH → To Needle
+    on RING → Dashing Catch
+    on CRUST WALL → Crust Wall
+  }
+
+  state Hook Bounce {
+    SendMessageV2(gameObject=var "Enemy", delivery=SendMessage, options=1, functionCall=HookEnd(), everyFrame=false)
+    SendMessage(gameObject=var "CamTarget", delivery=SendMessage, options=0, functionCall=ShorterDetach())
+    ActivateGameObject(gameObject=var "Dash Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Enemy", xOffset=0, yOffset=1.5, zOffset=(unset), overrideZ=0.006, everyFrame=false)  // disabled
+    GetPosition2d(gameObject=var "Enemy", vector_2d=var "Enemy Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    Vector2Add(vector2Variable=var "Enemy Pos", addVector=(0, 1.5), everyFrame=false, perSecond=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    AnimateRigidBody2DPositionTo(GameObject=Self, ToValue=var "Enemy Pos", time=0.1, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDownSpikeBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Harpoon Catch", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Grab Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Hook Bounce End
+  }
+
+  state Bounce Type {
+    RayCast2dV2(fromGameObject=var "Centre", fromPosition=(0, 1.5), direction=(-1, 0), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"RECOIL", noHitEvent=→"UP", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on UP → Bounce Up
+    on RECOIL → Bounce Recoil
+  }
+
+  state Bounce Recoil {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithHarpoonBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Anim Reg
+  }
+
+  state Bounce Up {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithHarpoonBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Anim Reg
+  }
+
+  state Ring Check L {
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 1", direction=(-1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Hit 1", storeHitObject=var "Casted Object", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Enemies(11), Interactive Object(19)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 2", direction=(-1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Hit 2", storeHitObject=var "Casted Object", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Enemies(11), Interactive Object(19)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 3", direction=(-1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Hit 3", storeHitObject=var "Casted Object", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Enemies(11), Interactive Object(19)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)  // disabled
+    BoolNoneTrue(boolVariables=[var "Hit 1", var "Hit 2", var "Hit 3"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=false)  // disabled
+    GetLayer(gameObject=var "Casted Object", storeResult=var "Object Layer", everyFrame=false)  // disabled
+    IntCompare(integer1=var "Object Layer", integer2=11, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)  // disabled
+    GetTag(gameObject=var "Casted Object", storeResult=var "Object Tag", everyFrame=false)  // disabled
+    StringCompare(stringVariable=var "Object Tag", compareTo="Harpoon Ring", equalEvent=→"RING", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    StringCompare(stringVariable=var "Object Tag", compareTo="Bounce Pod", equalEvent=→"BOUNCE POD", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    HasComponent(gameObject=var "Casted Object", component="BouncePod", removeOnExit=false, trueEvent=→"BOUNCE POD", falseEvent=(none), store=(unset), everyFrame=false)  // disabled
+    MatchScaleSign(Target=var "Needle", MatchTo=var "Self", EveryFrame=false)
+    SetDamageEnemyDirection(target=var "Dash Damager", damageDirection=180)
+    SetDamageEnemyDirection(target=var "Harpoon Damager", damageDirection=180)
+    SetFloatValue(floatVariable=var "Travel Angle", floatValue=180, everyFrame=false)
+    SetGameObject(variable=var "Tink Candidate", gameObject=<null>, everyFrame=false)
+    HarpoonDashRayCheck(Hero=Self, Direction=-1, StoreHitObject=var "Casted Object", StoreHitPoint=var "Collision Point", NoHitEvent=→"FINISHED", TerrainEvent=→"HIT WALL", EnemyEvent=→"HIT ENEMY", RingEvent=→"RING", BouncePodEvent=→"BOUNCE POD", TinkEvent=→"HIT TINK")
+    on FINISHED → Air Needle L
+    on RING → Ring Connect L
+    on BOUNCE POD → Enemy Needle L
+    on HIT ENEMY → Enemy Needle L
+    on HIT WALL → Wall Needle L
+    on HIT TINK → Tink Needle L
+  }
+
+  state Ring Connect L {
+    SetGameObject(variable=var "Ring", gameObject=var "Casted Object", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="CONNECT L", delay=0, everyFrame=false)
+    on FINISHED → Thread?
+  }
+
+  state Ring Throw {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Harpoon Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Throw Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Harpoon Thread Ring", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    ActivateAllChildren(gameObject=var "Harpoon Thread Ring", activate=true)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hornet Grab Point", offsetX=0, offsetY=0, storeAngle=var "Ring Travel Angle", pause=0, everyFrame=true)
+    SetRotation(gameObject=var "Harpoon Thread Ring", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Ring Travel Angle", space=0, everyFrame=true, lateUpdate=false)
+    on FINISHED → Ring Dash
+  }
+
+  state Ring Dash {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hornet Grab Point", offsetX=0, offsetY=0, storeAngle=var "Ring Travel Angle", pause=0, everyFrame=true)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Ring Travel Angle", speed=var "Dash Speed", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Harpoon Dash")
+    ActivateGameObject(gameObject=var "Dash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hornet Grab Point", storeResult=var "Needle Distance", everyFrame=true)
+    FloatCompare(float1=var "Needle Distance", float2=1.25, tolerance=0, equal=(none), lessThan=→"CATCH", greaterThan=(none), everyFrame=true)
+    CheckPassedTarget(Self=Self, Target=var "Hornet Grab Point", IsActive=true, DefaultFacingRight=false, DistancePast=0, StoreResult=(unset), PassedEvent=→"CATCH", NotPassedEvent=(none), EveryFrame=true)
+    on CATCH → Grab Anim
+  }
+
+  state Ring Grab {
+    SetBoolValue(boolVariable=var "Drop Queued", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=var "CamTarget", delivery=SendMessage, options=0, functionCall=EndFallStick())
+    SetBoolValue(boolVariable=var "Jump Queued", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Attack Queued", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Hornet Grab Point", xOffset=0, yOffset=0, everyFrame=true)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="GRAB", delay=0, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=var "Jump Queued", activeBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), queueBool=var "Drop Queued", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=var "Jump Queued", activeBool=(unset), stateEntryOnly=false)
+    ListenForAttackV2(EventTarget=Self, WasPressed=(none), WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=var "Attack Queued", DelayBeforeActive=0, IsActive=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=ResetAirMoves())
+    on FINISHED → Jump Cancel Window
+  }
+
+  state Ring Grabbing {
+    SetBoolValue(boolVariable=var "Is Not Rail Slider", boolValue=var "Is Rail Slider", everyFrame=false)
+    BoolFlip(boolVariable=var "Is Not Rail Slider")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignToBool(Value=var "Scale X", StoreIsPositive=var "Facing L", EveryFrame=false)
+    SetBoolValue(boolVariable=var "Facing R", boolValue=var "Facing L", everyFrame=false)
+    BoolFlip(boolVariable=var "Facing R")
+    ListenForUp(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Up Is Pressed", pressedTimer=(unset), activeBool=var "Is Not Rail Slider", stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Down Is Pressed", queueBool=(unset), pressedTimer=(unset), activeBool=var "Is Not Rail Slider", stateEntryOnly=false)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"JUMP", isNotPressed=(none), queueBool=(unset), activeBool=var "Jump Queued", stateEntryOnly=false)
+    ListenForAttackV2(EventTarget=Self, WasPressed=→"ATTACK", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=true)
+    ListenForAttackV2(EventTarget=Self, WasPressed=(none), WasReleased=(none), IsPressed=→"ATTACK", IsNotPressed=(none), queueBool=var "Attack Queued", DelayBeforeActive=0, IsActive=true)
+    ListenForLeft(eventTarget=Self, wasPressed=→"TURN", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=var "Facing R", stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=→"TURN", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=var "Facing L", stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Left Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Right Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    BoolTestMulti(boolVariables=[var "Left Is Pressed", var "Right Is Pressed", var "Facing L"], boolStates=[true, false, false], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Left Is Pressed", var "Right Is Pressed", var "Facing R"], boolStates=[false, true, false], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=(unset))
+    SetPositionToObject2DLateUpdate(GameObject=Self, TargetObject=var "Hornet Grab Point", XOffset=0, YOffset=0)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"FORCE DISCONNECT", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Up Is Pressed", var "Down Is Pressed", var "Left Is Pressed", var "Right Is Pressed", var "Is Not Rail Slider"], boolStates=[true, false, false, false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Increment Up Timer", everyFrame=true)
+    SetBoolValue(boolVariable=var "Up Is Not Pressed", boolValue=var "Increment Up Timer", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Up Is Not Pressed", everyFrame=true)
+    SetFloatValueV2(floatVariable=var "Look Up Timer", floatValue=0, everyFrame=true, activeBool=var "Up Is Not Pressed")
+    FloatAddV2(floatVariable=var "Look Up Timer", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "Increment Up Timer")
+    FloatCompare(float1=var "Look Up Timer", float2=var "Look Time", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"LOOK UP", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Up Is Pressed", var "Down Is Pressed", var "Left Is Pressed", var "Right Is Pressed", var "Is Not Rail Slider"], boolStates=[false, true, false, false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Increment Down Timer", everyFrame=true)
+    SetBoolValue(boolVariable=var "Down Is Not Pressed", boolValue=var "Increment Down Timer", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Down Is Not Pressed", everyFrame=true)
+    SetFloatValueV2(floatVariable=var "Look Down Timer", floatValue=0, everyFrame=true, activeBool=var "Down Is Not Pressed")
+    FloatAddV2(floatVariable=var "Look Down Timer", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "Increment Down Timer")
+    FloatCompare(float1=var "Look Down Timer", float2=var "Look Time", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"LOOK DOWN", everyFrame=true)
+    ListenForRsUp(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"LOOK UP RS", isNotPressed=(none), isPressedBool=(unset), activeBool=var "Is Not Rail Slider")
+    ListenForRsDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"LOOK DOWN RS", isNotPressed=(none), isPressedBool=(unset), activeBool=var "Is Not Rail Slider")
+    on JUMP → Ring Jump Antic
+    on ATTACK → Ring Attack
+    on RING DROP IMPACT → Ring Drop Impact
+    on FORCE DISCONNECT → Force Disconnect
+    on TURN → Ring Turn
+    on HARPOON CANCEL → Harpoon Ring Cancel
+    on LOOK UP → Look Up
+    on LOOK DOWN → Look Down
+    on LOOK UP RS → Look Up Rs
+    on LOOK DOWN RS → Look Down Rs
+  }
+
+  state Ring Drop {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ClearActionsInputState", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-1.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="DROP", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, -0.25), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Ring End
+  }
+
+  state Ring Jump Antic {
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"DROP", isNotPressed=(none), isPressedBool=(unset), queueBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ring Eject", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithFlipJump", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Hornet Grab Point", xOffset=0, yOffset=0, everyFrame=true)
+    on FINISHED → Ring Jump
+    on FORCE DISCONNECT → Force Disconnect
+    on DROP → Ring Drop
+  }
+
+  state Ring Jump {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=1.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendMessage(gameObject=var "CamTarget", delivery=SendMessage, options=0, functionCall=EndFallStick())
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="EJECT", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=hero_wall_jump (sfxstatic_assets_shared.bundle), pitchMin=1.1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hero_wall_jump (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    on FINISHED → Ring End
+  }
+
+  state Ring Check R {
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 1", direction=(1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Hit 1", storeHitObject=var "Casted Object", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Enemies(11), Interactive Object(19)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 2", direction=(1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Hit 2", storeHitObject=var "Casted Object", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Enemies(11), Interactive Object(19)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=var "Ray Origin 3", direction=(1, 0), space=1, distance=10.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Hit 3", storeHitObject=var "Casted Object", storeHitPoint=var "Collision Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Enemies(11), Interactive Object(19)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)  // disabled
+    BoolNoneTrue(boolVariables=[var "Hit 1", var "Hit 2", var "Hit 3"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=false)  // disabled
+    GetLayer(gameObject=var "Casted Object", storeResult=var "Object Layer", everyFrame=false)  // disabled
+    IntCompare(integer1=var "Object Layer", integer2=11, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)  // disabled
+    GetTag(gameObject=var "Casted Object", storeResult=var "Object Tag", everyFrame=false)  // disabled
+    StringCompare(stringVariable=var "Object Tag", compareTo="Harpoon Ring", equalEvent=→"RING", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    StringCompare(stringVariable=var "Object Tag", compareTo="Bounce Pod", equalEvent=→"BOUNCE POD", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    HasComponent(gameObject=var "Casted Object", component="BouncePod", removeOnExit=false, trueEvent=→"BOUNCE POD", falseEvent=(none), store=(unset), everyFrame=false)  // disabled
+    MatchScaleSign(Target=var "Needle", MatchTo=var "Self", EveryFrame=false)
+    SetDamageEnemyDirection(target=var "Dash Damager", damageDirection=0)
+    SetDamageEnemyDirection(target=var "Harpoon Damager", damageDirection=0)
+    SetFloatValue(floatVariable=var "Travel Angle", floatValue=0, everyFrame=false)
+    SetGameObject(variable=var "Tink Candidate", gameObject=<null>, everyFrame=false)
+    HarpoonDashRayCheck(Hero=Self, Direction=1, StoreHitObject=var "Casted Object", StoreHitPoint=var "Collision Point", NoHitEvent=→"FINISHED", TerrainEvent=→"HIT WALL", EnemyEvent=→"HIT ENEMY", RingEvent=→"RING", BouncePodEvent=→"BOUNCE POD", TinkEvent=→"HIT TINK")
+    on FINISHED → Air Needle R
+    on RING → Ring Connect R
+    on BOUNCE POD → Enemy Needle R
+    on HIT ENEMY → Enemy Needle R
+    on HIT WALL → Wall Needle R
+    on HIT TINK → Tink Needle R
+  }
+
+  state Ring Connect R {
+    SetGameObject(variable=var "Ring", gameObject=var "Casted Object", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="CONNECT R", delay=0, everyFrame=false)
+    on FINISHED → Thread?
+  }
+
+  state Jump Cancel Window {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"JUMP", isNotPressed=(none), queueBool=(unset), activeBool=var "Jump Queued", stateEntryOnly=true)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=false, activeBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"DROP", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), queueBool=var "Drop Queued", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForAttackV2(EventTarget=Self, WasPressed=(none), WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=var "Attack Queued", DelayBeforeActive=0, IsActive=true)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=(unset))
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Hornet Grab Point", xOffset=0, yOffset=0, everyFrame=true)
+    on FINISHED → Ring Grabbing
+    on JUMP → Ring Jump Antic
+    on HARPOON CANCEL → Harpoon Ring Cancel
+  }
+
+  state Ring End {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartHarpoonDashCooldownShort())  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=ResetAirMoves())
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)  // disabled
+    on FINISHED → Unset Nail Charge
+  }
+
+  state Ring Attack {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-1.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="DROP", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, -0.25), x=(unset), y=(unset), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Ring End
+  }
+
+  state Thread? {
+    FindNamedChild(gameObject=var "Ring", storeResult=var "Ring Parent")
+    FindNamedChild(gameObject=var "Ring Parent", storeResult=var "Hornet Grab Point")
+    GetDistance(gameObject=Self, target=var "Hornet Grab Point", storeResult=var "Distance", everyFrame=false)
+    SetGameObject(variable=var "Harpoon Thread Ring", gameObject=<null>, everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=5, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Harpoon Thread Ring (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(0, 0, -0.001), rotation=(unset), storeObject=var "Harpoon Thread Ring")
+    on FINISHED → Ring Throw
+  }
+
+  state Ring Drop Impact {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ring Drop Impact", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetFloatValue(floatVariable=var "Look Up Timer", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Look Down Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Ring Grabbing
+  }
+
+  state Queued D Jump {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithDoubleJump())
+    on FINISHED → Regain Control
+  }
+
+  state Jump Queue Check {
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"JUMP", isNotPressed=(none), queueBool=var "Jump Queued", activeBool=var "Jump Queued", stateEntryOnly=true)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Harpoon Dash End
+    on JUMP → Jump Type
+  }
+
+  state Jump Type {
+    PlayerDataBoolTest(boolName="hasBrolly", isTrue=(none), isFalse=→"FINISHED")
+    PlayerDataBoolTest(boolName="hasDoubleJump", isTrue=→"D JUMP", isFalse=→"BROLLY")
+    on BROLLY → Queued Brolly
+    on D JUMP → Queued D Jump
+    on FINISHED → Regain Control
+  }
+
+  state Queued Brolly {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithDoubleJump())
+    on FINISHED → Regain Control
+  }
+
+  state Grab Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ring Grab Hornet")
+    GetFsmBool(gameObject=var "Ring", fsmName="Control", variableName="Rail Slider", storeValue=var "Is Rail Slider", everyFrame=false)
+    BoolTest(boolVariable=var "Is Rail Slider", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ring Grab Rail")
+    on FINISHED → Ring Grab
+  }
+
+  state Force Disconnect {
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="EJECT", delay=0, everyFrame=false)
+    on FINISHED → Ring End
+  }
+
+  state Harpoon Dash End {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartHarpoonDashCooldown())
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)  // disabled
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="HarpoonDashEnd", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetFloatValue(floatVariable=var "Return Idle Wait", floatValue=0.2, everyFrame=false)
+    on FINISHED → Unset Nail Charge
+  }
+
+  state Wallslide Cancel {
+    HeroControllerMethods(method=TryFsmCancelToWallSlide, parameters=[], everyFrame=false, storeValue=(unset var), isTrue=(none), isFalse=→"CANCEL")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=TryFsmCancelToWallSlide())  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Unset Nail Charge
+    on CANCEL → Anim To Idle
+  }
+
+  state B Pod R {
+    SetGameObject(variable=var "Enemy", gameObject=var "Casted Object", everyFrame=false)
+    on FINISHED → Enemy Needle R
+  }
+
+  state B Pod L {
+    SetGameObject(variable=var "Enemy", gameObject=var "Casted Object", everyFrame=false)
+    on FINISHED → Enemy Needle L
+  }
+
+  state Ring Turn {
+    BoolTest(boolVariable=var "Is Rail Slider", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlipSprite())
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ring Turn")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEventRandom(audioClips=[hornet_misc_foley_move_1 (herosfxstatic_assets_all.bundle), hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="TURN", delay=0, everyFrame=false)
+    SetPositionToObject2DLateUpdate(GameObject=Self, TargetObject=var "Hornet Grab Point", XOffset=0, YOffset=0)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    on FINISHED → Ring Grabbing
+    on JUMP → Ring Jump Antic
+    on CANCEL → Turn Cancel
+    on FORCE DISCONNECT → Force Disconnect
+  }
+
+  state Kick Up? {
+    GetHeroCState(VariableName="onGround", StoreValue=var "On Ground", EveryFrame=false)
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.25, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Antic
+  }
+
+  state Turn Cancel {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetPositionToObject2DLateUpdate(GameObject=Self, TargetObject=var "Hornet Grab Point", XOffset=0, YOffset=0)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    on FINISHED → Ring Grabbing
+    on JUMP → Ring Jump Antic
+  }
+
+  state Set Fixed {
+    SetBoolValue(boolVariable=var "Fixed Direction", boolValue=true, everyFrame=false)
+    on FINISHED → Take Control
+  }
+
+  state Harpoon Ring Cancel {
+    PlayerdataIntCompare(playerdataInt="silk", compareTo=1, equal=(none), lessThan=→"CANCEL", greaterThan=(none))
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Ring"), sendEvent="DROP", delay=0, everyFrame=false)
+    on CANCEL → Ring Grabbing
+    on FINISHED → Take Control
+  }
+
+  state Tink Needle L {
+    SetGameObject(variable=var "Tink Candidate", gameObject=var "Casted Object", everyFrame=false)
+    SetDamageEnemyDirection(target=var "Harpoon Tinker", damageDirection=180)
+    ActivateGameObject(gameObject=var "Harpoon Tinker", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetVector2XY(vector2Variable=var "Collision Point", storeX=var "Needle X", storeY=var "Needle Y", everyFrame=false)
+    SetPosition(gameObject=var "Needle", vector=(unset), x=var "Needle X", y=var "Needle Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValue(boolVariable=var "Hit Something", boolValue=true, everyFrame=false)
+    on FINISHED → Suspend
+  }
+
+  state Tink Needle R {
+    SetGameObject(variable=var "Tink Candidate", gameObject=var "Casted Object", everyFrame=false)
+    SetDamageEnemyDirection(target=var "Harpoon Tinker", damageDirection=0)
+    ActivateGameObject(gameObject=var "Harpoon Tinker", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetVector2XY(vector2Variable=var "Collision Point", storeX=var "Needle X", storeY=var "Needle Y", everyFrame=false)
+    SetPosition(gameObject=var "Needle", vector=(unset), x=var "Needle X", y=var "Needle Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValue(boolVariable=var "Hit Something", boolValue=true, everyFrame=false)
+    on FINISHED → Suspend
+  }
+
+  state Tink Bounce? {
+    GameObjectIsNull(gameObject=var "Tink Candidate", isNull=→"FALSE", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    HasComponent(gameObject=var "Tink Candidate", component="NonBouncer", removeOnExit=false, trueEvent=→"FALSE", falseEvent=(none), store=(unset), everyFrame=false)
+    GetLayer(gameObject=var "Tink Candidate", storeResult=var "Tink Layer", everyFrame=false)
+    IntCompare(integer1=var "Tink Layer", integer2=11, equal=→"TRUE", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Tink Layer", integer2=17, equal=→"TRUE", lessThan=→"FALSE", greaterThan=→"FALSE", everyFrame=false)
+    on TRUE → Enemy Bounce
+    on FALSE → Catch
+  }
+
+  state Dashing Catch {
+    LineCast2d(fromGameObject=var "Hero", fromPosition=(unset), toGameObject=var "Casted Object", toPosition=(unset), minDepth=0, maxDepth=0, hitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetGameObject(variable=var "Ring", gameObject=var "Casted Object", everyFrame=false)
+    FindNamedChild(gameObject=var "Ring", storeResult=var "Ring Parent")
+    FindNamedChild(gameObject=var "Ring Parent", storeResult=var "Hornet Grab Point")
+    ActivateGameObject(gameObject=var "Dash Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValueV2(boolVariable=var "Harpoon Dashing", boolValue=false, setOppositeOnExit=false, everyFrame=false)
+    on FINISHED → Grab Anim
+    on CANCEL → Catch
+  }
+
+  state Crust Wall {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Harpoon Catch", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Needle", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Enemy Bounce
+  }
+
+  state Can Do? {
+    HeroControllerMethods(method=CanTryHarpoonDash, parameters=[], everyFrame=false, storeValue=(unset var), isTrue=(none), isFalse=→"FINISHED")
+    GetPlayerDataVariable(VariableName="silk", StoreValue=var "Current Silk")
+    IntCompare(integer1=var "Current Silk", integer2=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    SendEventToRegister(eventName="BIND FAILED NOT ENOUGH")
+    on CANCEL → Cancel Other Moves
+    on FINISHED → Idle
+  }
+
+  state Look Up {
+    SetHeroCStateDelay(VariableName="lookingUp", Value=true, Delay=0.85, SetOppositeOnExit=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ring Look Up")
+    SetPositionToObject2DLateUpdate(GameObject=Self, TargetObject=var "Hornet Grab Point", XOffset=0, YOffset=0)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetBoolValueAtTime(BoolVariable=var "Can End", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    ListenForUp(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Up Is Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForRsUp(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Rs Up Is Pressed", activeBool=(unset))
+    BoolAnyTrue(boolVariables=[var "Up Is Pressed", var "Rs Up Is Pressed"], sendEvent=(none), storeResult=var "Any Up Is Pressed", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Any Up Is Pressed", var "Can End"], boolStates=[false, true], trueEvent=→"END", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=(unset))
+    on END → Look Up End
+    on JUMP → Ring Jump Antic
+    on ATTACK → Ring Attack
+    on RING DROP IMPACT → Ring Drop Impact
+    on FORCE DISCONNECT → Force Disconnect
+    on HARPOON CANCEL → Harpoon Ring Cancel
+  }
+
+  state Look Up End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ring Look Up End")
+    on FINISHED → Ring Grabbing
+  }
+
+  state Look Down {
+    SetHeroCStateDelay(VariableName="lookingDown", Value=true, Delay=0.85, SetOppositeOnExit=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ring Look Down")
+    SetPositionToObject2DLateUpdate(GameObject=Self, TargetObject=var "Hornet Grab Point", XOffset=0, YOffset=0)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetBoolValueAtTime(BoolVariable=var "Can End", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Down Is Pressed", queueBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForRsDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Rs Down Is Pressed", activeBool=(unset))
+    BoolAnyTrue(boolVariables=[var "Down Is Pressed", var "Rs Down Is Pressed"], sendEvent=(none), storeResult=var "Any Up Is Pressed", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Any Up Is Pressed", var "Can End"], boolStates=[false, true], trueEvent=→"END", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=(unset))
+    on END → Look Down End
+    on JUMP → Ring Jump Antic
+    on ATTACK → Ring Attack
+    on RING DROP IMPACT → Ring Drop Impact
+    on FORCE DISCONNECT → Force Disconnect
+    on HARPOON CANCEL → Harpoon Ring Cancel
+  }
+
+  state Look Down End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ring Look Down End")
+    on FINISHED → Ring Grabbing
+  }
+
+  state Hook Bounce End {
+    SetPosition2DV2(GameObject=Self, Vector=var "Enemy Pos", X=0, Y=0, Space=0, EveryFrame=false, active=true)
+    on FINISHED → Anim Reg
+  }
+
+  state Look Up Rs {
+    SetHeroCState(VariableName="lookingUp", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    on FINISHED → Look Up
+  }
+
+  state Look Down Rs {
+    SetHeroCState(VariableName="lookingDown", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    on FINISHED → Look Down
+  }
+
+  state Tag Enemy Steal {
+    HeroStealEnemyCurrency(Enemy=var "Enemy")
+    on FINISHED → Enemy Bounce
+  }
+
+  state Unset Nail Charge {
+    DebugLogConsole(logLevel=0, text="Harpoon Dash Ending", sendToUnityLog=true)  // disabled
+    BoolTest(boolVariable=var "Allowed Nail Charge", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Allowed Nail Charge", boolValue=false, everyFrame=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Unlock Gravity
+  }
+
+  state Wait {
+    Wait(time=var "Return Idle Wait", finishEvent=(none), realTime=false)
+    on FINISHED → Idle
+    on DO MOVE FIXED → Set Fixed
+  }
+
+  state Unlock Gravity {
+    DebugLogConsole(logLevel=0, text="Harpoon Dash Ending", sendToUnityLog=true)  // disabled
+    BoolTest(boolVariable=var "Locked Gravity", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Locked Gravity", boolValue=false, everyFrame=false)
+    HeroLockState(heroLockStates=6, mode=Remove, setOppositeOnExit=false)
+    on FINISHED → Wait
+  }
+
+  var Breaker Angle: float = 0
+  var Breaker Distance: float = 0
+  var Cooldown Timer: float = 0
+  var Dash Speed: float = 70
+  var Distance: float = 0
+  var Look Down Timer: float = 0
+  var Look Time: float = 0.25
+  var Look Up Timer: float = 0
+  var Needle Distance: float = 0
+  var Needle X: float = 0
+  var Needle Y: float = 0
+  var Ring Travel Angle: float = 0
+  var Scale X: float = 0
+  var Travel Angle: float = 0
+  var Return Idle Wait: float = 0
+  var Fall Clamp: float = 0
+  var Current Silk: int = 0
+  var Enemy HP: int = 0
+  var Object Layer: int = 0
+  var Tink Layer: int = 0
+  var At Needle: bool = false
+  var Hit Enemy: bool = false
+  var Hit Something: bool = false
+  var Hit Wall: bool = false
+  var Queued Move: bool = false
+  var Wallsliding: bool = false
+  var Hit 1: bool = false
+  var Hit 2: bool = false
+  var Hit 3: bool = false
+  var Drop Queued: bool = false
+  var Jump Queued: bool = false
+  var Attack Queued: bool = false
+  var Is Rail Slider: bool = false
+  var Facing L: bool = false
+  var Facing R: bool = false
+  var On Ground: bool = false
+  var Harpoon Dashing: bool = false
+  var Fixed Direction: bool = false
+  var Down Is Pressed: bool = false
+  var Up Is Pressed: bool = false
+  var Up Is Not Pressed: bool = false
+  var Down Is Not Pressed: bool = false
+  var Can End: bool = false
+  var Rs Up Is Pressed: bool = false
+  var Any Up Is Pressed: bool = false
+  var Rs Down Is Pressed: bool = false
+  var Is Not Rail Slider: bool = false
+  var Right Is Pressed: bool = false
+  var Left Is Pressed: bool = false
+  var Increment Up Timer: bool = false
+  var Increment Down Timer: bool = false
+  var Will Restore Anim: bool = false
+  var Allowed Nail Charge: bool = false
+  var Can Do Move: bool = false
+  var Locked Gravity: bool = false
+  var Object Tag: string = ""
+  var Collision Point: vector2 = (0, 0)
+  var Ray Origin 1: vector2 = (0, 0.85)
+  var Ray Origin 2: vector2 = (0, -0.85)
+  var Ray Origin 3: vector2 = (0, 0)
+  var Enemy Pos: vector2 = (0, 0)
+  var Dash Damager: gameObject = <null>
+  var Dash Effect: gameObject = <null>
+  var Effects Folder: gameObject = <null>
+  var Enemy: gameObject = <null>
+  var Grab Effect: gameObject = <null>
+  var Harpoon Damager: gameObject = <null>
+  var Needle: gameObject = <null>
+  var Self: gameObject = <null>
+  var Thread: gameObject = <null>
+  var Throw Effect: gameObject = <null>
+  var Centre: gameObject = <null>
+  var Harpoon Breaker: gameObject = <null>
+  var Harpoon Breaker Extend: gameObject = <null>
+  var Casted Object: gameObject = <null>
+  var Ring: gameObject = <null>
+  var Ring Parent: gameObject = <null>
+  var Hornet Grab Point: gameObject = <null>
+  var Harpoon Thread Ring: gameObject = <null>
+  var Tink Candidate: gameObject = <null>
+  var Harpoon Tinker: gameObject = <null>
+  var Enemy Parent: gameObject = <null>
+  var CamTarget: gameObject = <null>
+}

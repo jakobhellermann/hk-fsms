@@ -1,0 +1,157 @@
+# Control
+# 3 location(s):
+#   Dust_Maze_09_entrance / Silkfly Control/Silkfly Ambient
+#   Dust_Maze_09_entrance / Silkfly Control/Silkfly Ambient (1)
+#   Dust_Maze_09_entrance / Silkfly Control/Silkfly Ambient (2)
+
+fsm Control {
+  start Pause
+
+  state Idle {
+    IdleBuzzV3(gameObject=Self, waitMin=0.5, waitMax=1.5, speedMax=3, accelerationMin=5, accelerationMax=15, roamingRangeX=1, roamingRangeY=0.5, manualStartPos=var "Start Pos")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.25, MaxReactDelay=0.4, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=→"LEAVE", IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="LEAVE", outOfRangeEvent="", everyFrame=true)
+    on LEAVE → Leave Noise
+    on NEEDOLIN → Needolin Range?
+    on SILKFLY GROUP LEAVE → Leave Pause
+  }
+
+  state Pause {
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Leave Angle", space=0, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Dir Check
+  }
+
+  state Leave {
+    PlayAudioEvent(audioClip=focus_ready (herosfxstatic_assets_all.bundle), pitchMin=1.45, pitchMax=1.15, volume=0.6, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=var "X Accel", targetSpeed=var "X Speed")
+    AccelerateToY(gameObject=Self, accelerationFactor=var "Accel", targetSpeed=var "Y Speed")
+    Wait(time=8, finishEvent=→"FINISHED", realTime=false)
+    TiltBySpeed(gameObject=Self, tiltFactor=-6, tiltMax=10, rotationSpeed=5)
+    SendEventByName(eventTarget=GameObject(var "Leave Notify"), sendEvent="SILKFLY LEAVE", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="SILKFLY GROUP LEAVE")
+    on FINISHED → Deactivate
+  }
+
+  state Deactivate {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    AnimatorStopPlayback(gameObject=Self)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetSpriteRenderer(gameObject=Self, active=false)
+  }
+
+  state Dir Check {
+    FindNamedChild(gameObject=Self, storeResult=var "Custom Target")
+    GameObjectIsNull(gameObject=var "Custom Target", isNull=(none), isNotNull=→"CUSTOM", storeResult=(unset), everyFrame=false)
+    FloatCompare(float1=var "Leave Angle", float2=0, tolerance=0, equal=→"U", lessThan=→"UR", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Leave Angle", float2=180, tolerance=0, equal=→"UL", lessThan=→"UL", greaterThan=→"UR", everyFrame=false)
+    on U → Up
+    on UL → Up L
+    on UR → Up R
+    on CUSTOM → Custom
+  }
+
+  state Up {
+    RandomFloatEither(value1=-15, value2=15, storeResult=var "X Speed")
+    SetFloatValue(floatVariable=var "Y Speed", floatValue=15, everyFrame=false)
+    RandomFloat(min=0.075, max=0.25, storeResult=var "Accel")
+    RandomFloat(min=0.01, max=0.025, storeResult=var "X Accel")
+    on FINISHED → Randomise Scale
+  }
+
+  state Up R {
+    RandomFloatEither(value1=5, value2=15, storeResult=var "X Speed")
+    SetFloatValue(floatVariable=var "Y Speed", floatValue=10, everyFrame=false)
+    RandomFloat(min=0.075, max=0.25, storeResult=var "Accel")
+    RandomFloat(min=0.1, max=0.25, storeResult=var "X Accel")
+    on FINISHED → Randomise Scale
+  }
+
+  state Up L {
+    RandomFloatEither(value1=-15, value2=-30, storeResult=var "X Speed")
+    SetFloatValue(floatVariable=var "Y Speed", floatValue=10, everyFrame=false)
+    RandomFloat(min=0.075, max=0.25, storeResult=var "Accel")
+    RandomFloat(min=0.1, max=0.25, storeResult=var "X Accel")
+    on FINISHED → Randomise Scale
+  }
+
+  state Needolin Follow {
+    RandomFloatEither(value1=-15, value2=15, storeResult=var "X Speed")
+    SetFloatValue(floatVariable=var "Y Speed", floatValue=15, everyFrame=false)
+    RandomFloat(min=0.075, max=0.25, storeResult=var "Accel")
+    RandomFloat(min=0.01, max=0.025, storeResult=var "X Accel")
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=-3, max=3, storeResult=var "X Offset")
+    RandomFloat(min=3, max=4, storeResult=var "Y Offset")
+    Vector3AddXYZ(vector3Variable=var "Hero Pos", addX=var "X Offset", addY=var "Y Offset", addZ=0, everyFrame=false, perSecond=false)
+    IdleBuzzV3(gameObject=Self, waitMin=0.5, waitMax=1.5, speedMax=3, accelerationMin=15, accelerationMax=20, roamingRangeX=1, roamingRangeY=0.5, manualStartPos=var "Hero Pos")
+    TiltBySpeed(gameObject=Self, tiltFactor=-6, tiltMax=10, rotationSpeed=5)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.15, MaxReactDelay=0.25, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on END → Leave Noise
+  }
+
+  state Needolin Range? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Needolin Range", storeResult=false, sendEvent="FINISHED", outOfRangeEvent="CANCEL", everyFrame=true)
+    on CANCEL → Cancel Frame
+    on FINISHED → Needolin Follow
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Leave Pause {
+    WaitRandom(timeMin=0.3, timeMax=0.7, finishEvent=(none), realTime=false)
+    on FINISHED → Leave Noise
+  }
+
+  state Custom {
+    GetAngleToTarget2D(gameObject=Self, target=var "Custom Target", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    ConvertAngleToVector2(angle=var "Angle", storeVector=var "Move Vector", everyFrame=false)
+    GetVector2XY(vector2Variable=var "Move Vector", storeX=var "X Speed", storeY=var "Y Speed", everyFrame=false)
+    RandomFloat(min=8, max=12, storeResult=var "Multiplier")
+    FloatMultiply(floatVariable=var "X Speed", multiplyBy=var "Multiplier", everyFrame=false)
+    FloatMultiply(floatVariable=var "Y Speed", multiplyBy=var "Multiplier", everyFrame=false)
+    RandomFloat(min=0.1, max=0.2, storeResult=var "X Accel")
+    SetFloatValue(floatVariable=var "Accel", floatValue=var "X Accel", everyFrame=false)
+    on FINISHED → Randomise Scale
+  }
+
+  state Randomise Scale {
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Scale")
+    SetScale(gameObject=Self, vector=(unset), x=var "Scale", y=var "Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    RandomlyFlipScale(gameObject=Self)
+    on FINISHED → Idle
+  }
+
+  state Leave Noise {
+    BoolTest(boolVariable=var "No Leave Noise", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CreateNoise(From=Self, LocalOrigin=(unset), Radius=5)
+    on FINISHED → Leave
+  }
+
+  var No Leave Noise: bool = true
+  var Leave Notify: gameObject = <null>
+
+  var Accel: float = 0
+  var Leave Angle: float = 0
+  var X Accel: float = 0
+  var X Accel Max: float = 0
+  var X Accel Min: float = 0
+  var X Offset: float = 0
+  var X Speed: float = 0
+  var Y Offset: float = 0
+  var Y Speed: float = 0
+  var Angle: float = 0
+  var Multiplier: float = 0
+  var Scale: float = 0
+  var Activated: bool = false
+  var Move Vector: vector2 = (0, 0)
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Start Pos: vector3 = (0, 0, 0)
+  var Custom Target: gameObject = <null>
+}

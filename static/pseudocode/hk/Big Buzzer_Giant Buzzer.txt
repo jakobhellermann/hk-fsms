@@ -1,0 +1,222 @@
+# Big Buzzer
+# 1 location(s):
+#   Fungus1_20_v02 / _Enemies/Giant Buzzer
+
+fsm Big Buzzer {
+  start Init
+
+  state Init {
+    FindGameObject(objectName="", withTag="CameraParent", store=var "Camera")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    GetOwner(storeGameObject=var "Self")
+    FindGameObject(objectName="Marker R1", withTag="Untagged", store=var "Marker Roar")
+    FindGameObject(objectName="Marker R2", withTag="Untagged", store=var "Marker Lurk")
+    FindGameObject(objectName="Buzzer Range", withTag="Untagged", store=var "Alert Range")
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    FindChild(gameObject=Self, childName="Crunch SFX", storeResult=var "Crunch SFX")
+    on FINISHED → Hanging
+  }
+
+  state Unfurl {
+    DestroyObject(gameObject=var "Crunch SFX", delay=0, detachChildren=false)
+    TransitionToAudioSnapshot(snapshot=Action and Sub (resources.assets), transitionTime=2)
+    AudioStop(gameObject=Self)
+    SetAudioVolume(gameObject=Self, volume=0.25, everyFrame=false)
+    SetAudioClip(gameObject=Self, audioClip=big_buzzer_flying_loop (sharedassets32.assets))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Startle")
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    CreateObject(gameObject=Zote Buzzer Encounter (sharedassets148.assets), spawnPoint=var "Self", position=(-0.27, -0.85, 0.001), rotation=(unset), storeObject=var "Zote", networkInstantiate=false, networkGroup=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Intro Fly
+  }
+
+  state Intro Fly {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    ChaseObject(gameObject=Self, target=var "Marker Roar", speedMax=6, acceleration=0.3, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Intro Roar Antic
+  }
+
+  state Intro Roar Antic {
+    AudioStop(gameObject=Self)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    Wait(time=0.332, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Intro Roar
+  }
+
+  state Intro Roar {
+    SetFsmGameObject(gameObject=var "Hero", fsmName="Roar Lock", variableName="Roar Object", setValue=var "Self", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR ENTER", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=big_buzzer_scream (sharedassets32.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(-1.49, -1.61, 0), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="BigShake", delay=0, everyFrame=false)
+    SpawnBloodTime(delay=0.1, spawnPoint=var "Self", position=(-1.49, -1.61, 0), spawnMin=2, spawnMax=3, speedMin=10, speedMax=18, angleMin=140, angleMax=250, colorOverride=(unset))
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Roar End
+  }
+
+  state Idle {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=13, speedMax=6, acceleration=var "Accel", targetsHeight=true, height=5)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn Fly", resetFrame=false, everyFrame=true)
+    GetFsmBool(gameObject=var "Alert Range", fsmName="", variableName="In Alert Range", storeValue=var "In Range", everyFrame=true)
+    BoolTest(boolVariable=var "In Range", isTrue=(none), isFalse=→"OUT OF RANGE", everyFrame=true)
+    RandomFloat(min=0.15, max=0.22, storeResult=var "Accel")
+    WaitRandom(timeMin=3, timeMax=4, finishEvent=→"ATTACK", realTime=false)
+    on OUT OF RANGE → Lurk
+    on ATTACK → Choose Attack
+  }
+
+  state Lurk {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    ChaseObject(gameObject=Self, target=var "Marker Lurk", speedMax=6, acceleration=var "Accel", targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn Fly", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    GetFsmBool(gameObject=var "Alert Range", fsmName="", variableName="In Alert Range", storeValue=var "In Range", everyFrame=true)
+    BoolTest(boolVariable=var "In Range", isTrue=→"IN RANGE", isFalse=(none), everyFrame=true)
+    RandomFloat(min=0.15, max=0.22, storeResult=var "Accel")
+    on IN RANGE → Idle
+  }
+
+  state Choose Attack {
+    RandomFloat(min=0, max=100, storeResult=var "Chooser")
+    FloatCompare(float1=var "Chooser", float2=75, tolerance=0, equal=→"SUMMON", lessThan=→"SWOOP", greaterThan=→"SUMMON", everyFrame=false)
+    on SWOOP → Swoop Antic
+    on SUMMON → Summon Antic
+  }
+
+  state Swoop Antic {
+    IntCompare(integer1=var "Swoops in A Row", integer2=3, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    IntAdd(intVariable=var "Swoops in A Row", add=1, everyFrame=false)
+    SetIntValue(intVariable=var "Summons In A Row", intValue=0, everyFrame=false)
+    AudioStop(gameObject=Self)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Face Right", leftBool=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Swoop Antic")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Swoop Direction
+    on CANCEL → Summon Antic
+  }
+
+  state Swoop L {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Swoop")
+    CreateObject(gameObject=Dash Burst (sharedassets32.assets), spawnPoint=var "Self", position=(-0.03, -0.19, -0.02), rotation=(0, 0, 47), storeObject=var "", networkInstantiate=false, networkGroup=0)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-20, y=(unset), everyFrame=false)
+    iTweenMoveBy(gameObject=Self, id="", vector=var "Swoop Vector", time=0.8, delay=0, speed=(unset), easeType=easeOutCubic, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Swoop Rise
+  }
+
+  state Swoop Direction {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=big_buzzer_swoop (sharedassets32.assets), pitchMin=1, pitchMax=0.9, volume=1.1, delay=0, storePlayer=<null>)
+    SetBoolValue(boolVariable=var "Swooping", boolValue=true, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Swoop Target", floatValue=var "Swoop Height", everyFrame=false)
+    FloatSubtract(floatVariable=var "Swoop Target", subtract=var "Self Y", everyFrame=false, perSecond=false)
+    SetVector3XYZ(vector3Variable=var "Swoop Vector", vector3Value=(unset), x=0, y=var "Swoop Target", z=0, everyFrame=false)
+    BoolTest(boolVariable=var "Face Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on LEFT → Swoop L
+    on RIGHT → Swoop R
+  }
+
+  state Swoop R {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Swoop")
+    CreateObject(gameObject=Dash Burst (sharedassets32.assets), spawnPoint=var "Self", position=(-0.03, -0.19, -0.02), rotation=(0, 0, 128), storeObject=var "Dash Burst", networkInstantiate=false, networkGroup=0)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=20, y=(unset), everyFrame=false)
+    iTweenMoveBy(gameObject=Self, id="", vector=var "Swoop Vector", time=0.8, delay=0, speed=(unset), easeType=easeOutCubic, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Swoop Rise
+  }
+
+  state Swoop Rise {
+    iTweenMoveBy(gameObject=Self, id="", vector=(0, 3.5, 0), time=0.4, delay=0, speed=(unset), easeType=easeInOutQuad, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetBoolValue(boolVariable=var "Swooping", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Summon Antic {
+    IntCompare(integer1=var "Summons In A Row", integer2=2, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    IntAdd(intVariable=var "Summons In A Row", add=1, everyFrame=false)
+    SetIntValue(intVariable=var "Swoops in A Row", intValue=0, everyFrame=false)
+    AudioStop(gameObject=Self)
+    IntCompare(integer1=var "Summons", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    IntOperator(integer1=var "Summons", integer2=1, operation=Subtract, storeResult=var "Summons", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    Wait(time=0.332, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Dir
+    on CANCEL → Swoop Antic
+  }
+
+  state Check Dir {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=big_buzzer_scream (sharedassets32.assets), pitchMin=1, pitchMax=0.85, volume=1.1, delay=0, storePlayer=<null>)
+    FloatCompare(float1=var "X Scale", float2=0, tolerance=0, equal=→"RIGHT", lessThan=→"RIGHT", greaterThan=→"LEFT", everyFrame=false)
+    on LEFT → Roar Left
+    on RIGHT → Roar Right
+  }
+
+  state Roar Left {
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="BigShake", delay=0, everyFrame=false)
+    FlingObjectsFromGlobalPoolTime(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=(-1.49, -1.61, 0), frequency=0.1, spawnMin=2, spawnMax=3, speedMin=10, speedMax=18, angleMin=140, angleMax=250, originVariationX=0.2, originVariationY=0.2)
+    SpawnBloodTime(delay=0.1, spawnPoint=var "Self", position=(-1.49, -1.61, 0), spawnMin=2, spawnMax=3, speedMin=10, speedMax=18, angleMin=140, angleMax=250, colorOverride=(unset))
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(-1.49, -1.61, 0), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Summon
+  }
+
+  state Roar Right {
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="BigShake", delay=0, everyFrame=false)
+    SpawnBloodTime(delay=0.1, spawnPoint=var "Self", position=(1.49, -1.61, 0), spawnMin=2, spawnMax=3, speedMin=10, speedMax=18, angleMin=400, angleMax=290, colorOverride=(unset))
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(1.49, -1.61, 0), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Summon
+  }
+
+  state Summon {
+    CreateObject(gameObject=Buzzer Summon (sharedassets32.assets), spawnPoint=<null>, position=(55, 25, 17), rotation=(unset), storeObject=var "Buzzer Instance", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Buzzer Instance", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CreateObject(gameObject=Buzzer Summon (sharedassets32.assets), spawnPoint=<null>, position=(38, 25, 17), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Roar End
+  }
+
+  state Roar End {
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR EXIT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Roar Emitter"), sendEvent="END", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Hanging {
+    on TAKE DAMAGE → Unfurl
+  }
+
+  var Summons: int = 10
+
+  var Accel: float = 0
+  var Chooser: float = 0
+  var Self Y: float = 0
+  var Swoop Height: float = 14.3
+  var Swoop Target: float = 0
+  var X Scale: float = 0
+  var Summons In A Row: int = 0
+  var Swoops in A Row: int = 0
+  var Face Right: bool = false
+  var In Range: bool = false
+  var Swooping: bool = false
+  var Swoop Vector: vector3 = (0, 0, 0)
+  var Alert Range: gameObject = <null>
+  var Buzzer Instance: gameObject = <null>
+  var Camera: gameObject = <null>
+  var Crunch SFX: gameObject = <null>
+  var Dash Burst: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Marker Lurk: gameObject = <null>
+  var Marker Roar: gameObject = <null>
+  var Roar Emitter: gameObject = <null>
+  var Self: gameObject = <null>
+  var Zote: gameObject = <null>
+}

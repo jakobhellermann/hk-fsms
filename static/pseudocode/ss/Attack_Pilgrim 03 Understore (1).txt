@@ -1,0 +1,130 @@
+# Attack
+# 2 location(s):
+#   Under_03b / Pilgrim 03 Understore (1)
+#   Under_19 / Pilgrim 03 Understore (1)
+
+fsm Attack {
+  start Init
+
+  state Idle {
+    on ATTACK → Attack Antic
+    on TOOK DAMAGE → Distance Check
+  }
+
+  state Attack Antic {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=pilgrim_03_pounce (sfxstatic_assets_pilgrimslower.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    StopWalker(target=Self, everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Pilgrim_Groveller_Attack (sfxdynamic_assets_pilgrimslower.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Attack
+  }
+
+  state Attack {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Speed", floatValue=var "X Scale", everyFrame=false)
+    FloatMultiply(floatVariable=var "X Speed", multiplyBy=-16, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=var "X Speed", y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Wait For Land
+  }
+
+  state Skid {
+    TimeLimitSet(timeDelay=0.35, storeValue=var "Attack Time")
+    DecelerateXY(gameObject=Self, decelerationX=0.955, decelerationY=(unset), brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitterInState(gameObject=var "Pt Slide")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClips=[corpse_hit_1 (sfxstatic_assets_corpse.bundle), corpse_hit_2 (sfxstatic_assets_corpse.bundle), corpse_hit_3 (sfxstatic_assets_corpse.bundle)], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Skid Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=true)
+    AudioPlayInState(gameObject=var "Sweep Loop", volume=1)
+    RayCast2dV2(fromGameObject=var "Ray Pt Floor", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Face Hero
+    on CANCEL → Skid Cancel
+  }
+
+  state Return {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="pilgrim_behaviour"), sendEvent="ATTACK END", delay=0, everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)  // disabled
+    on FINISHED → Idle
+  }
+
+  state Wait For Land {
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Skid
+  }
+
+  state Face Hero {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Return
+  }
+
+  state Distance Check {
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=8, float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"CANCEL", everyFrame=false)
+    on FINISHED → Attack Antic
+    on CANCEL → Idle
+  }
+
+  state Init {
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Brush Idle", equalEvent=→"BRUSH", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on BRUSH → Brush Idle
+    on FINISHED → Idle
+  }
+
+  state Brush Idle {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DORMANT", delay=0, everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.1, None=(none), ActiveInner=→"ATTACK", ActiveOuter=→"ATTACK", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    AudioPlayInState(gameObject=var "Sweep Loop", volume=1)
+    StopWalker(target=Self, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Brush")
+    SetRandomAudioClipFromTable(Table=Pilgrim_Groveller_Idle (sfxdynamic_assets_pilgrimslower.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on ATTACK → Startle
+    on TOOK DAMAGE → Attack Antic
+  }
+
+  state Startle {
+    StopWalker(target=Self, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Startle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToStartle", resetFrame=true, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=pilgrim_03_pounce (sfxstatic_assets_pilgrimslower.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Pilgrim_Groveller_Attack (sfxdynamic_assets_pilgrimslower.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Startle End
+  }
+
+  state Skid Cancel {
+    ActivateGameObject(gameObject=var "Skid Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Face Hero
+  }
+
+  state Startle End {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=false)
+    on ATTACK → Attack
+    on FINISHED → Attack
+  }
+
+  var Attack Time: float = 0
+  var X Scale: float = 0
+  var X Speed: float = 0
+  var Distance: float = 0
+  var Clip: string = ""
+  var Self: gameObject = Pilgrim 03 Understore (1)
+  var Pt Slide: gameObject = Pilgrim 03 Understore (1)/Pt Slide
+  var Skid Collider: gameObject = Pilgrim 03 Understore (1)/Skid Collider
+  var Sweep Loop: gameObject = Pilgrim 03 Understore (1)/Sweep Loop
+  var Pt Smoke: gameObject = Pilgrim 03 Understore (1)/Pt Smoke
+  var Pt Brush: gameObject = Pilgrim 03 Understore (1)/Pt Brush
+  var Ray Pt Floor: gameObject = Pilgrim 03 Understore (1)/Ray Pt Floor
+  var Audio Loop Voice: gameObject = Pilgrim 03 Understore (1)/Audio Loop Voice
+}

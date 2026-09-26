@@ -1,0 +1,150 @@
+# Conversation Control
+# 1 location(s):
+#   Fungus3_49 / Mantis Grave/Inspect Region
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Item Get Effect", storeResult=var "Item Get Effect")
+    FindChild(gameObject=Self, childName="Mantis Ghost", storeResult=var "Mantis Ghost")
+    FindChild(gameObject=var "Mantis Ghost", childName="Character Sprite", storeResult=var "Chara Sprite")
+    FindChild(gameObject=var "Mantis Ghost", childName="Idle Pt", storeResult=var "Idle Pt")
+    FindGameObject(objectName="Flower Appear", withTag="Untagged", store=var "flower_white appear")
+    on FINISHED → Idle
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HORNET END CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Read
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")  // disabled
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Read {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["XUN_GRAVE_INSPECT", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")  // disabled
+    on FINISHED → Check
+  }
+
+  state Check {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="xunFlowerGiven", isTrue=→"GAVE FLOWER", isFalse=(none))
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="hasXunFlower", falseBool="xunFlowerBroken", isTrue=→"HAS FLOWER", isFalse=(none))
+    SendEvent(eventTarget=Self, sendEvent=→"NO FLOWER", delay=0, everyFrame=false)
+    on NO FLOWER → Box Up
+    on HAS FLOWER → Kneel
+    on GAVE FLOWER → Box Up 2
+  }
+
+  state Gave Flower {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["XUN_GRAVE_INSPECT2", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Kneel {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Dreamer Land")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Glow
+  }
+
+  state Flowers {
+    ActivateAllChildren(gameObject=var "flower_white appear", activate=true)
+    SetPlayerDataBool(boolName="xunFlowerGiven", value=true)
+    SetPlayerDataBool(boolName="hasXunFlower", value=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ghost Appear
+  }
+
+  state Get Up {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Talk Finish
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Gave Flower
+  }
+
+  state Glow {
+    ActivateGameObject(gameObject=var "Item Get Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Flowers
+  }
+
+  state Ghost Appear {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect Normal 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Mantis Ghost", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Mantis Ghost", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    PlayParticleEmitter(gameObject=var "Idle Pt", emit=0)
+    SendEventByName(eventTarget=GameObject(var "Mantis Ghost"), sendEvent="UP", delay=0, everyFrame=false)
+    on FINISHED → Look Up
+  }
+
+  state Look Up {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Bow
+  }
+
+  state Bow {
+    Tk2dPlayAnimation(gameObject=var "Chara Sprite", animLibName="", clipName="Bow")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ghost Down
+  }
+
+  state Ghost Down {
+    SendEventByName(eventTarget=GameObject(var "Mantis Ghost"), sendEvent="DOWN", delay=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Idle Pt")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Up
+  }
+
+  var Self X Scale: float = 0
+  var Elderbug State: int = 0
+  var History: int = 0
+  var Met Elderbug: bool = false
+  var Reintro Played: bool = false
+  var Visited Crossroads: bool = false
+  var mapCrossroads: bool = false
+  var Area Title: gameObject = <null>
+  var Chara Sprite: gameObject = <null>
+  var Idle Pt: gameObject = <null>
+  var Item Get Effect: gameObject = <null>
+  var Mantis Ghost: gameObject = <null>
+  var Self: gameObject = <null>
+  var Voice Player: gameObject = <null>
+  var flower_white appear: gameObject = <null>
+}

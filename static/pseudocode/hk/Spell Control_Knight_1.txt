@@ -1,0 +1,1235 @@
+# Spell Control
+# 1 location(s):
+#   resources.assets / Knight:1
+
+fsm Spell Control {
+  start Pause
+  on LEAVING SCENE → Cancel Some  // from any state
+  on FSM CANCEL → FSM Cancel  // from any state
+  on HERO DAMAGED → Reset Cam Zoom  // from any state
+  on ENTER QUAKE → Enter Quake  // from any state
+
+  state Inactive {
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Double", boolValue=false, everyFrame=false)
+    ListenForCast(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"ALREADY DOWN", isNotPressed=(none), activeBool=var "Didnt Hit Full HP", stateEntryOnly=true)
+    ListenForQuickCast(eventTarget=Self, wasPressed=→"QUICK CAST", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=false, everyFrame=false)
+    on BUTTON DOWN → Button Down
+    on ALREADY DOWN → Can Focus?
+    on QUICK CAST → Can Cast? QC
+  }
+
+  state Button Down {
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"BUTTON UP", activeBool=(unset), stateEntryOnly=false)
+    ListenForUp(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Pressed Up", stateEntryOnly=true)
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Pressed Down", stateEntryOnly=true)
+    Wait(time=var "Button Down Time", finishEvent=→"FOCUS START", realTime=false)
+    on BUTTON UP → Can Cast?
+    on FOCUS START → Can Focus?
+    on BUTTON DOWN → 
+  }
+
+  state Focus Start {
+    SetFloatValue(floatVariable=var "Grace Timer", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Refocusing", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", true], storeResult=(unset var))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", true], storeResult=(unset var))
+    VibrationPlayerPlay(target=var "Charge Audio")
+    AudioPlay(gameObject=var "Charge Audio", volume=1, oneShotClip=<null>, finishedEvent=(none))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP HERO EXIT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO FOCUS START", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS START", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Main Camera", vector=(unset), x=(unset), y=(unset), z=var "Camera Start Z", space=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Focus Start Anim")
+    SetVector3Value(vector3Variable=var "Focus Camera Zoom Current", vector3Value=var "Focus Camera Zoom", everyFrame=false)
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)
+    Wait(time=var "Focus Start Time", finishEvent=→"FINISHED", realTime=false)
+    on BUTTON UP → Focus Cancel
+    on FINISHED → Set Focus Speed
+    on LEFT GROUND → Focus Cancel
+  }
+
+  state Regain Control {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", false], storeResult=(unset var))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO FOCUS END", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "Charge Audio")
+    SetMeshRenderer(gameObject=var "Lines Anim", active=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    VibrationPlayerStop(target=var "Charge Audio")
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=false, everyFrame=false)
+    on FINISHED → Back In?
+  }
+
+  state Focus Cancel {
+    FadeAudio(gameObject=var "Charge Audio", startVolume=1, endVolume=0, time=0.33)
+    VibrationPlayerStop(target=var "Charge Audio")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", false], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS END", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Main Camera", vector=var "Camera Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Camera Pos", vector3Value=(unset), x=(unset), y=(unset), z=var "Camera Start Z", everyFrame=false)
+    iTweenMoveTo(gameObject=var "Main Camera", id="", transformPosition=var "", vectorPosition=var "Camera Pos", time=0.2, delay=0, speed=(unset), space=0, easeType=easeOutSine, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect End")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Focus End", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=false, everyFrame=false)
+    on ANIM END → Regain Control
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=true, everyFrame=false)
+    FindGameObject(objectName="", withTag="MainCamera", store=var "Main Camera")
+    FindChild(gameObject=Self, childName="Focus Effects", storeResult=var "Focus Effects")
+    FindChild(gameObject=var "Focus Effects", childName="Lines Anim", storeResult=var "Lines Anim")
+    FindChild(gameObject=var "Focus Effects", childName="Charge Audio", storeResult=var "Charge Audio")
+    FindChild(gameObject=var "Focus Effects", childName="Dust R", storeResult=var "Dust R")
+    FindChild(gameObject=var "Focus Effects", childName="Dust L", storeResult=var "Dust L")
+    FindChild(gameObject=var "Focus Effects", childName="Heal Anim", storeResult=var "Focus Burst Anim")
+    FindChild(gameObject=Self, childName="HeroBox", storeResult=var "Hero Box")
+    FindChild(gameObject=Self, childName="Effects", storeResult=var "Effects Folder")
+    FindChild(gameObject=Self, childName="Spells", storeResult=var "Spells Folder")
+    FindChild(gameObject=var "Spells Folder", childName="Q Charge", storeResult=var "Q Charge")
+    FindChild(gameObject=var "Spells Folder", childName="Q Trail", storeResult=var "Q Trail")
+    FindChild(gameObject=var "Spells Folder", childName="Q Slam", storeResult=var "Q Slam")
+    FindChild(gameObject=var "Spells Folder", childName="Q Slam Lines", storeResult=var "Q Slam Lines")
+    FindChild(gameObject=var "Spells Folder", childName="Q Slam 2", storeResult=var "Q Slam 2")
+    FindChild(gameObject=var "Spells Folder", childName="Q Trail 2", storeResult=var "Q Trail 2")
+    FindChild(gameObject=var "Spells Folder", childName="Q Flash Slam", storeResult=var "Q Flash Slam")
+    FindChild(gameObject=var "Spells Folder", childName="Q Flash Start", storeResult=var "Q Flash Start")
+    FindChild(gameObject=var "Spells Folder", childName="Q Mega", storeResult=var "Q Mega")
+    FindChild(gameObject=var "Spells Folder", childName="Q Pillar", storeResult=var "Q Pillar")
+    FindChild(gameObject=var "Spells Folder", childName="Scr Heads", storeResult=var "Scr Heads")
+    FindChild(gameObject=var "Spells Folder", childName="Scr Base", storeResult=var "Scr Base")
+    FindChild(gameObject=var "Effects Folder", childName="SD Sharp Flash", storeResult=var "SD Sharp Flash")
+    FindChild(gameObject=var "Effects Folder", childName="Dust Plume", storeResult=var "Dust Plume")
+    FindChild(gameObject=var "Effects Folder", childName="Burst Rocks", storeResult=var "Burst Rocks")
+    GetPosition(gameObject=var "Main Camera", vector=var "Camera Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    FindChild(gameObject=var "Spells Folder", childName="Scr Heads 2", storeResult=var "Scr Heads 2")
+    FindChild(gameObject=var "Spells Folder", childName="Scr Base 2", storeResult=var "Scr Base 2")
+    FindChild(gameObject=var "Spells Folder", childName="Q1 Pillar", storeResult=var "Q1 Pillar")
+    FindChild(gameObject=var "Spells Folder", childName="Q Fall Damage", storeResult=var "Q Fall Damage")
+    FindChild(gameObject=var "Spells Folder", childName="Q Orbs", storeResult=var "Q Orbs")
+    FindChild(gameObject=var "Spells Folder", childName="Q Orbs 2", storeResult=var "Q Orbs 2")
+    FindChild(gameObject=var "Spells Folder", childName="Scr Orbs", storeResult=var "Scr Orbs")
+    FindChild(gameObject=var "Spells Folder", childName="Scr Orbs 2", storeResult=var "Scr Orbs 2")
+    FindGameObject(objectName="", withTag="CameraTarget", store=var "Cam Target")
+    FindGameObject(objectName="", withTag="MainCamera", store=var "Main Camera")
+    on FINISHED → Inactive
+  }
+
+  state Focus {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "Start MP")
+    FloatAdd(floatVariable=var "Grace Timer", add=1, everyFrame=true, perSecond=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="PROMPT FOCUS END", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=true, everyFrame=false)
+    SetFloatValue(floatVariable=var "Focus Zoom Time", floatValue=var "Time Per MP Drain", everyFrame=false)
+    FloatMultiply(floatVariable=var "Focus Zoom Time", multiplyBy=100, everyFrame=false)
+    iTweenMoveBy(gameObject=var "Main Camera", id="", vector=var "Focus Camera Zoom Current", time=var "Focus Zoom Time", delay=0, speed=(unset), easeType=linear, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetMeshRenderer(gameObject=var "Lines Anim", active=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=60, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=60, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StartMPDrain", parameters=[var "Time Per MP Drain"], storeResult=(unset var))
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP", activeBool=(unset), stateEntryOnly=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=true, everyFrame=false)
+    on BUTTON UP → Grace Check
+    on LEFT GROUND → Grace Check
+    on FOCUS COMPLETED → Spore Cloud
+  }
+
+  state Can Focus? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="focusMP_amount", storeValue=var "Focus MP amount")
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="CanFocus", parameters=[], storeResult=var "Return Bool")
+    BoolTest(boolVariable=var "Return Bool", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Dream Focus", isTrue=→"DREAM", isFalse=(none), everyFrame=false)
+    IntCompare(integer1=var "MP", integer2=var "Focus MP amount", equal=→"FINISHED", lessThan=→"CANCEL", greaterThan=→"FINISHED", everyFrame=false)
+    on CANCEL → Cancel
+    on FINISHED → Start Slug Anim
+    on DREAM → Focus Start D
+  }
+
+  state Focus Heal {
+    SetFloatValue(floatVariable=var "Grace Timer", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Refocusing", boolValue=true, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=focus_health_heal, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayVibrationV2(vibrationDataAsset=focus_health_heal, motors=All, loopTime=(unset), loopAuto=false, tag="heroAction", stopOnStateExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SpawnObjectFromGlobalPool(gameObject=White Flash R, spawnPoint=var "Self", position=(0, 0, -0.21), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Focus Get")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Focus Burst Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="AddHealth", parameters=[var "Health Increase"], storeResult=(unset var))
+    GetPlayerDataInt(gameObject=var "GameManager", intName="health", storeValue=var "HP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="maxHealth", storeValue=var "Max HP")
+    SetVector3Value(vector3Variable=var "Focus Camera Zoom Current", vector3Value=(0, 0, 0), everyFrame=false)
+    Wait(time=0.2, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Full HP?
+  }
+
+  state Cancel Some {
+    BoolTest(boolVariable=var "Is In Dream Focus", isTrue=→"DREAM FOCUS END", isFalse=(none), everyFrame=false)
+    SendMessage(gameObject=var "Cam Target", delivery=SendMessage, options=1, functionCall=SetQuake(false))
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=false, everyFrame=false)
+    AudioStop(gameObject=var "Charge Audio")
+    VibrationPlayerStop(target=var "Charge Audio")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO FOCUS END", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "SlugWalk Audio")
+    ActivateGameObject(gameObject=var "Q Trail 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["spellQuake", false], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Spore Cooldown", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Scream 2 Zone", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", false], storeResult=(unset var))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", false], storeResult=(unset var))
+    ActivateGameObject(gameObject=var "Q Trail", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "Q Slam", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "Q Charge", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "Q Fall Damage", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "Focus Burst Anim", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Lines Anim", active=false)
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus2", setValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Can Cancel", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControlLeavingScene())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    BoolTest(boolVariable=var "Focusing", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="QUAKE FALL END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Roar Wave"), sendEvent="END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS END", delay=0, everyFrame=false)
+    on FINISHED → Reset Damage Mode
+    on DREAM FOCUS END → Dream Focus End
+  }
+
+  state Has Fireball? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="fireballLevel", storeValue=var "Spell Level")
+    IntCompare(integer1=var "Spell Level", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=→"CAST", everyFrame=false)
+    on CANCEL → Inactive
+    on CAST → Wallside?
+  }
+
+  state Fireball 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fireball1 Cast", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP HERO EXIT", delay=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=TakeMP(var "MP Cost"))
+    SpawnObjectFromGlobalPool(gameObject=Fireball Top, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Fireball Top")
+    SendEventByName(eventTarget=Self, sendEvent="FINISHED", delay=0, everyFrame=false)
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_fireball, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=Fireball)
+    on FINISHED → Fireball Recoil
+  }
+
+  state Focus Get Finish {
+    FadeAudio(gameObject=var "Charge Audio", startVolume=1, endVolume=0, time=0.33)
+    VibrationPlayerStop(target=var "Charge Audio")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", false], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS END", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Main Camera", vector=var "Camera Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Camera Pos", vector3Value=(unset), x=(unset), y=(unset), z=var "Camera Start Z", everyFrame=false)
+    iTweenMoveTo(gameObject=var "Main Camera", id="", transformPosition=var "", vectorPosition=var "Camera Pos", time=0.2, delay=0, speed=(unset), space=0, easeType=easeOutSine, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect End")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Focus Get Once", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=false, everyFrame=false)
+    Wait(time=0.23, finishEvent=→"ANIM END", realTime=false)
+    on ANIM END → Regain Control
+  }
+
+  state Fireball Recoil {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO CAST SPELL", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Self X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Fireball Recoil Current", floatValue=var "Fireball Recoil Distance", everyFrame=false)
+    FloatMultiply(floatVariable=var "Fireball Recoil Current", multiplyBy=var "Self X Scale", everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Fireball Recoil Vector", vector3Value=(unset), x=var "Fireball Recoil Current", y=0, z=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Fireball Recoil Current", multiplyBy=2, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Fireball Recoil Current", y=(unset), everyFrame=true)
+    iTweenMoveBy(gameObject=Self, id="", vector=var "Fireball Recoil Vector", time=0.5, delay=0, speed=(unset), easeType=easeOutSine, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)  // disabled
+    on ANIM END → Spell End
+  }
+
+  state Spell End {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Hero Gravity")
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=false, everyFrame=false)
+    on FINISHED → Inactive
+  }
+
+  state Fireball Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fireball Antic", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    GetButtonDown(buttonName="Cast", sendEvent=→"BUTTON DOWN", storeResult=(unset))  // disabled
+    ListenForCast(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)
+    on ANIM END → Level Check
+    on BUTTON DOWN → 
+  }
+
+  state Fireball 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fireball2 Cast", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP HERO EXIT", delay=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=TakeMP(var "MP Cost"))
+    SpawnObjectFromGlobalPool(gameObject=Fireball2 Top, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Fireball Top")
+    SendEventByName(eventTarget=Self, sendEvent="FINISHED", delay=0, everyFrame=false)
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_fireball, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=Fireball)
+    on FINISHED → Fireball Recoil
+  }
+
+  state Can Cast? {
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="CanCast", parameters=[], storeResult=var "Return Bool")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    IntCompare(integer1=var "MP", integer2=var "MP Cost", equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Return Bool", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Inactive
+    on FINISHED → Spell Choice
+  }
+
+  state Full HP? {
+    IntCompare(integer1=var "HP", integer2=var "Max HP", equal=→"CANCEL", lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="focusMP_amount", storeValue=var "Focus MP amount")
+    IntCompare(integer1=var "MP", integer2=var "Focus MP amount", equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    on FINISHED → Focus
+    on CANCEL → Set Full
+  }
+
+  state Back In? {
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"BUTTON DOWN", isNotPressed=→"FINISHED", activeBool=var "Didnt Hit Full HP", stateEntryOnly=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Inactive
+    on BUTTON DOWN → Can Focus?
+  }
+
+  state Held Down {
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"BUTTON UP", activeBool=(unset), stateEntryOnly=false)
+    Wait(time=var "Button Down Time", finishEvent=→"FOCUS START", realTime=false)
+    on BUTTON UP → Inactive
+    on FOCUS START → Can Focus?
+  }
+
+  state Spell Choice {
+    BoolTest(boolVariable=var "Pressed Up", isTrue=→"SCREAM", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Pressed Down", isTrue=→"QUAKE", isFalse=→"FIREBALL", everyFrame=false)
+    ListenForUp(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"SCREAM", isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)  // disabled
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"QUAKE", isNotPressed=→"FIREBALL", isPressedBool=(unset), stateEntryOnly=false)  // disabled
+    on FIREBALL → Has Fireball?
+    on QUAKE → Has Quake?
+    on SCREAM → Has Scream?
+  }
+
+  state Has Quake? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="quakeLevel", storeValue=var "Spell Level")
+    IntCompare(integer1=var "Spell Level", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=→"CAST", everyFrame=false)
+    on CANCEL → Has Fireball?
+    on CAST → On Ground?
+  }
+
+  state Quake Antic {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hero_quake_spell_prepare, finishedEvent=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=CancelParryInvuln())
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_quake_spell_prepare, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=QuakeStart)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Quake Antic Speed", everyFrame=true)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Charge", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayFrame(gameObject=var "Q Charge", frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quake Antic", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    DecelerateV2(gameObject=Self, deceleration=0.95)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    ListenForCast(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)
+    on ANIM END → Level Check 2
+    on BUTTON DOWN → 
+  }
+
+  state Quake1 Down {
+    ActivateGameObject(gameObject=var "Q Fall Damage", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Cam Target", delivery=SendMessage, options=1, functionCall=SetQuake(true))
+    ActivateGameObject(gameObject=var "Q Trail", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Charge", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetDamageModeFSM", parameters=[1], storeResult=(unset var))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quake Fall", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=-50, everyFrame=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="QUAKE FALL START", delay=0, everyFrame=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"HERO LANDED", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=0, tolerance=0.2, equal=→"HERO LANDED", lessThan=(none), greaterThan=(none), everyFrame=true)
+    on HERO LANDED → Quake1 Land
+  }
+
+  state Quake1 Land {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="END ALL INVULN", delay=0, everyFrame=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hero_quake_spell_impact, finishedEvent=(none))
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_quake_spell_impact, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=QuakeImpact)
+    SendEventByName(eventTarget=GameObject(var "Q Orbs"), sendEvent="PLAY", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Fall Damage", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Cam Target", delivery=SendMessage, options=1, functionCall=SetQuake(false))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO CAST SPELL", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Flash Slam", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q1 Pillar", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="BigShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Trail", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Slam", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quake Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="QUAKE FALL END", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Quake Finish
+  }
+
+  state On Ground? {
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["onGround"], storeResult=var "On Ground")
+    BoolTest(boolVariable=var "On Ground", isTrue=→"ON GROUND", isFalse=→"OFF GROUND", everyFrame=false)
+    on ON GROUND → Q On Ground
+    on OFF GROUND → Q Off Ground
+  }
+
+  state Q On Ground {
+    SetFloatValue(floatVariable=var "Quake Antic Speed", floatValue=11, everyFrame=false)
+    on FINISHED → Quake Antic
+  }
+
+  state Q Off Ground {
+    SetFloatValue(floatVariable=var "Quake Antic Speed", floatValue=0, everyFrame=false)
+    on FINISHED → Quake Antic
+  }
+
+  state Quake Finish {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetDamageModeFSM", parameters=[0], storeResult=(unset var))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["spellQuake", false], storeResult=(unset var))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=QuakeInvuln())
+    on FINISHED → Spell End
+  }
+
+  state Wallside? {
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["wallSliding"], storeResult=var "Wall Sliding")
+    BoolTest(boolVariable=var "Wall Sliding", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlipSprite())
+    on FINISHED → Fireball Antic
+  }
+
+  state Has Scream? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="screamLevel", storeValue=var "Spell Level")
+    IntCompare(integer1=var "Spell Level", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=→"CAST", everyFrame=false)
+    on CANCEL → Has Fireball?
+    on CAST → Scream Get?
+  }
+
+  state Scream Antic1 {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hero_scream_spell, finishedEvent=(none))
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_scream_spell, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=Scream)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Scream Burst 1
+  }
+
+  state Scream Burst 1 {
+    SendEventByName(eventTarget=GameObject(var "Scr Orbs"), sendEvent="PLAY", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    CreateObject(gameObject=Roar Wave Emitter Scream, spawnPoint=var "Self", position=(0, 2, 0), rotation=(unset), storeObject=var "Roar Wave", networkInstantiate=false, networkGroup=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=TakeMP(var "MP Cost"))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO CAST SPELL", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Roar Wave", fsmName="emitter", variableName="No Waves", setValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scr Heads", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scr Heads", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End Roar
+  }
+
+  state Scream End {
+    SendEventByName(eventTarget=GameObject(var "Roar Wave"), sendEvent="END", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Spell End
+  }
+
+  state End Roar {
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Roar Wave"), sendEvent="END", delay=0, everyFrame=false)
+    on FINISHED → Scream End
+  }
+
+  state Quake2 Down {
+    ActivateGameObject(gameObject=var "Q Fall Damage", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Cam Target", delivery=SendMessage, options=1, functionCall=SetQuake(true))
+    ActivateGameObject(gameObject=var "Q Trail 2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Charge", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetDamageModeFSM", parameters=[1], storeResult=(unset var))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quake Fall 2", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=-50, everyFrame=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="QUAKE FALL START", delay=0, everyFrame=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"HERO LANDED", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=0, tolerance=0.2, equal=→"HERO LANDED", lessThan=(none), greaterThan=(none), everyFrame=true)
+    on HERO LANDED → Q2 Land
+  }
+
+  state Q2 Land {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="END ALL INVULN", delay=0, everyFrame=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hero_void_quake_impact, finishedEvent=(none))
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_void_quake_impact, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=QuakeImpact)
+    SendEventByName(eventTarget=GameObject(var "Q Orbs"), sendEvent="PLAY", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Fall Damage", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Cam Target", delivery=SendMessage, options=1, functionCall=SetQuake(false))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO CAST SPELL", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Flash Slam", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="BigShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Trail 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Slam 2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="QUAKE FALL END", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quake Land 2", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Q2 Pillar
+  }
+
+  state Q2 Pillar {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    SendEventByName(eventTarget=GameObject(var "Q Orbs 2"), sendEvent="PLAY", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Pillar", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Mega", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on ANIM END → Quake Finish
+  }
+
+  state Scream Burst 2 {
+    SendEventByName(eventTarget=GameObject(var "Scr Orbs"), sendEvent="PLAY", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Scr Orbs 2"), sendEvent="PLAY", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    CreateObject(gameObject=Roar Wave Emitter Scream, spawnPoint=var "Self", position=(0, 3, 0), rotation=(unset), storeObject=var "Roar Wave", networkInstantiate=false, networkGroup=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=TakeMP(var "MP Cost"))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO CAST SPELL", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Roar Wave", fsmName="emitter", variableName="No Waves", setValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scr Heads 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scr Heads 2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream 2", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End Roar 2
+  }
+
+  state Scream End 2 {
+    SendEventByName(eventTarget=GameObject(var "Roar Wave"), sendEvent="END", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream End 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Spell End
+  }
+
+  state End Roar 2 {
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Roar Wave"), sendEvent="END", delay=0, everyFrame=false)
+    on FINISHED → Scream End 2
+  }
+
+  state FSM Cancel {
+    ActivateGameObject(gameObject=var "Q Fall Damage", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Cam Target", delivery=SendMessage, options=1, functionCall=SetQuake(false))
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=false, everyFrame=false)
+    SendEventToRegister(eventName="HERO FOCUS END")
+    AudioStop(gameObject=var "SlugWalk Audio")
+    AudioStop(gameObject=var "Charge Audio")
+    VibrationPlayerStop(target=var "Charge Audio")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["spellQuake", false], storeResult=(unset var))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", false], storeResult=(unset var))
+    AudioStop(gameObject=var "Charge Audio")
+    ActivateGameObject(gameObject=var "Q Trail", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Trail 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Slam", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Charge", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Lines Anim", active=false)
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    on FINISHED → Reset Damage Mode
+  }
+
+  state Level Check {
+    IntCompare(integer1=var "Spell Level", integer2=1, equal=→"LEVEL 1", lessThan=→"LEVEL 1", greaterThan=→"LEVEL 2", everyFrame=false)
+    on LEVEL 1 → Fireball 1
+    on LEVEL 2 → Fireball 2
+  }
+
+  state Level Check 2 {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=TakeMP(var "MP Cost"))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["spellQuake", true], storeResult=(unset var))
+    IntCompare(integer1=var "Spell Level", integer2=1, equal=→"LEVEL 1", lessThan=→"LEVEL 1", greaterThan=→"LEVEL 2", everyFrame=false)
+    on LEVEL 1 → Q1 Effect
+    on LEVEL 2 → Q2 Effect
+  }
+
+  state Set Focus Speed {
+    SetBoolValue(boolVariable=var "Quick Focus", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Time Per MP Drain", floatValue=var "Time Per MP Drain UnCH", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_7", isTrue=(none), isFalse=→"FINISHED")
+    SetBoolValue(boolVariable=var "Quick Focus", boolValue=true, everyFrame=false)
+    SetFloatValue(floatVariable=var "Time Per MP Drain", floatValue=var "Time Per MP Drain CH", everyFrame=false)
+    on FINISHED → Deep Focus Speed
+  }
+
+  state Level Check 3 {
+    IntCompare(integer1=var "Spell Level", integer2=1, equal=→"LEVEL 1", lessThan=→"LEVEL 1", greaterThan=→"LEVEL 2", everyFrame=false)
+    on LEVEL 1 → Scream Antic1
+    on LEVEL 2 → Scream Antic2
+  }
+
+  state Set Full {
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=false, everyFrame=false)
+    on FINISHED → Focus Get Finish
+  }
+
+  state Grace Check {
+    BoolTest(boolVariable=var "Refocusing", isTrue=(none), isFalse=→"FIRST", everyFrame=false)
+    FloatCompare(float1=var "Grace Timer", float2=var "Grace Time", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetMPCharge(var "Start MP"))
+    on FINISHED → Focus Cancel
+    on FIRST → First Grace Check
+  }
+
+  state First Grace Check {
+    FloatCompare(float1=var "Grace Timer", float2=0.2, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetMPCharge(var "Start MP"))
+    on FINISHED → Focus Cancel
+  }
+
+  state Reset Cam Zoom {
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=true, everyFrame=false)
+    SetPosition(gameObject=var "Main Camera", vector=(unset), x=(unset), y=(unset), z=-38.1, space=1, everyFrame=false, lateUpdate=false)
+    AudioStop(gameObject=var "SlugWalk Audio")
+    SendMessage(gameObject=var "Cam Target", delivery=SendMessage, options=1, functionCall=SetQuake(false))
+    SetBoxCollider2DSize(gameObject1=var "Hero Box", width=(unset), height=1.1875, offsetX=(unset), offsetY=-0.703125)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    on FINISHED → Cancel All
+  }
+
+  state Focus Start D {
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", true], storeResult=(unset var))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", true], storeResult=(unset var))
+    AudioPlay(gameObject=var "Charge Audio", volume=1, oneShotClip=<null>, finishedEvent=(none))
+    VibrationPlayerPlay(target=var "Charge Audio")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP HERO EXIT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS START", delay=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Focus")
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)
+    Wait(time=var "Focus Start Time", finishEvent=→"FINISHED", realTime=false)
+    on BUTTON UP → Focus Cancel D
+    on FINISHED → Focus D
+  }
+
+  state Focus Cancel D {
+    BoolTest(boolVariable=var "Dream End", isTrue=→"DREAM", isFalse=(none), everyFrame=false)
+    FadeAudio(gameObject=var "Charge Audio", startVolume=1, endVolume=0, time=0.33)
+    VibrationPlayerStop(target=var "Charge Audio")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM FOCUS END", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", false], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS END", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect End")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Focus End", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=false, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"ANIM END", realTime=false)
+    on ANIM END → Regain Control
+    on DREAM → Keep Focus
+  }
+
+  state Focus D {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM FOCUS START", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=true, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Lines Anim", active=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=60, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=60, everyFrame=false)
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP", activeBool=(unset), stateEntryOnly=false)
+    on BUTTON UP → Focus Cancel D
+  }
+
+  state Keep Focus {
+    SetBoolValue(boolVariable=var "Is In Dream Focus", boolValue=true, everyFrame=false)
+    on DREAM FOCUS END → Dream Focus End
+  }
+
+  state Scream Get? {
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Scream 2 Zone", isTrue=→"SCREAM GET", isFalse=(none), everyFrame=false)
+    on FINISHED → Level Check 3
+    on SCREAM GET → SG Antic
+  }
+
+  state SG Antic {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hero_scream_spell, finishedEvent=(none))
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_scream_spell, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=Scream)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Scream Burst 3
+  }
+
+  state Scream Burst 3 {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    CreateObject(gameObject=Roar Wave Emitter Scream, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Roar Wave", networkInstantiate=false, networkGroup=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=TakeMP(33))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO CAST SPELL", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Roar Wave", fsmName="emitter", variableName="No Waves", setValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scr Heads", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scr Base", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Event
+  }
+
+  state Send Event {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SCREAM GET", delay=0, everyFrame=false)
+    on SCREAM GET END → Spell End
+  }
+
+  state Spore Cloud {
+    BoolTest(boolVariable=var "Spore Cooldown", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_17", isTrue=(none), isFalse=→"FINISHED")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_10", isTrue=→"DUNG", isFalse=(none))
+    SpawnObjectFromGlobalPool(gameObject=Knight Spore Cloud, spawnPoint=var "Self", position=(0, 0, -0.001), rotation=(unset), storeObject=var "")
+    SetBoolValue(boolVariable=var "Spore Cooldown", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPORE ATTACK", delay=0, everyFrame=false)
+    on FINISHED → Set HP Amount
+    on DUNG → Dung Cloud
+  }
+
+  state Set HP Amount {
+    SetIntValue(intVariable=var "Health Increase", intValue=1, everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_34", isTrue=(none), isFalse=→"FINISHED")
+    SetIntValue(intVariable=var "Health Increase", intValue=2, everyFrame=false)
+    on FINISHED → Focus Heal
+  }
+
+  state Deep Focus Speed {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_34", isTrue=(none), isFalse=→"FINISHED")
+    FloatMultiply(floatVariable=var "Time Per MP Drain", multiplyBy=1.65, everyFrame=false)
+    on FINISHED → Slug?
+  }
+
+  state Dung Cloud {
+    SpawnObjectFromGlobalPool(gameObject=Knight Dung Cloud, spawnPoint=var "Self", position=(0, 0, -0.001), rotation=(unset), storeObject=var "")
+    SetBoolValue(boolVariable=var "Spore Cooldown", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPORE ATTACK", delay=0, everyFrame=false)
+    on FINISHED → Set HP Amount
+  }
+
+  state Focus S {
+    AudioStop(gameObject=var "SlugWalk Audio")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Slug Idle Anim")
+    FloatAdd(floatVariable=var "Grace Timer", add=1, everyFrame=true, perSecond=true)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=true, everyFrame=false)
+    FloatMultiply(floatVariable=var "Focus Zoom Time", multiplyBy=100, everyFrame=false)
+    iTweenMoveBy(gameObject=var "Main Camera", id="", vector=var "Focus Camera Zoom Current", time=var "Focus Zoom Time", delay=0, speed=(unset), easeType=linear, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetMeshRenderer(gameObject=var "Lines Anim", active=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=60, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=60, everyFrame=false)
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP", activeBool=(unset), stateEntryOnly=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=true, everyFrame=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"RIGHT", isNotPressed=(none))
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"LEFT", isNotPressed=(none))
+    on BUTTON UP → Grace Check 2
+    on LEFT GROUND → Grace Check 2
+    on FOCUS COMPLETED → Spore Cloud 2
+    on LEFT → Turn Anim L?
+    on RIGHT → Turn Anim R?
+  }
+
+  state Focus Heal 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioStop(gameObject=var "SlugWalk Audio")
+    SetBoolValue(boolVariable=var "Refocusing", boolValue=true, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=focus_health_heal, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=focus_health_heal, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=FocusHealthHeal)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SpawnObjectFromGlobalPool(gameObject=White Flash R, spawnPoint=var "Self", position=(0, 0, -0.21), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Slug Burst Anim")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Focus Burst Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="AddHealth", parameters=[var "Health Increase"], storeResult=(unset var))
+    GetPlayerDataInt(gameObject=var "GameManager", intName="health", storeValue=var "HP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="maxHealth", storeValue=var "Max HP")
+    SetVector3Value(vector3Variable=var "Focus Camera Zoom Current", vector3Value=(0, 0, 0), everyFrame=false)
+    Wait(time=0.2, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Full HP? 2
+  }
+
+  state Focus Get Finish 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetBoxCollider2DSize(gameObject1=var "Hero Box", width=(unset), height=1.1875, offsetX=(unset), offsetY=-0.703125)
+    FadeAudio(gameObject=var "Charge Audio", startVolume=1, endVolume=0, time=0.33)
+    VibrationPlayerStop(target=var "Charge Audio")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", false], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS END", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Main Camera", vector=var "Camera Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Camera Pos", vector3Value=(unset), x=(unset), y=(unset), z=var "Camera Start Z", everyFrame=false)
+    iTweenMoveTo(gameObject=var "Main Camera", id="", transformPosition=var "", vectorPosition=var "Camera Pos", time=0.2, delay=0, speed=(unset), space=0, easeType=easeOutSine, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect End")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slug Up", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=false, everyFrame=false)
+    Wait(time=0.23, finishEvent=→"ANIM END", realTime=false)
+    on ANIM END → Regain Control
+  }
+
+  state Full HP? 2 {
+    IntCompare(integer1=var "HP", integer2=var "Max HP", equal=→"CANCEL", lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="focusMP_amount", storeValue=var "Focus MP amount")
+    IntCompare(integer1=var "MP", integer2=var "Focus MP amount", equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    on FINISHED → Start MP Drain
+    on CANCEL → Set Full 2
+  }
+
+  state Set Full 2 {
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=false, everyFrame=false)
+    on FINISHED → Focus Get Finish 2
+  }
+
+  state Grace Check 2 {
+    BoolTest(boolVariable=var "Refocusing", isTrue=(none), isFalse=→"FIRST", everyFrame=false)
+    FloatCompare(float1=var "Grace Timer", float2=var "Grace Time", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetMPCharge(var "Start MP"))
+    on FINISHED → Focus Cancel 2
+    on FIRST → First Grace Check 2
+  }
+
+  state First Grace Check 2 {
+    FloatCompare(float1=var "Grace Timer", float2=0.2, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetMPCharge(var "Start MP"))
+    on FINISHED → Focus Cancel 2
+  }
+
+  state Spore Cloud 2 {
+    BoolTest(boolVariable=var "Spore Cooldown", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_17", isTrue=(none), isFalse=→"FINISHED")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_10", isTrue=→"DUNG", isFalse=(none))
+    SpawnObjectFromGlobalPool(gameObject=Knight Spore Cloud, spawnPoint=var "Self", position=(0, 0, -0.001), rotation=(unset), storeObject=var "")
+    SetBoolValue(boolVariable=var "Spore Cooldown", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPORE ATTACK", delay=0, everyFrame=false)
+    on FINISHED → Set HP Amount 2
+    on DUNG → Dung Cloud 2
+  }
+
+  state Set HP Amount 2 {
+    SetIntValue(intVariable=var "Health Increase", intValue=1, everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_34", isTrue=(none), isFalse=→"FINISHED")
+    SetIntValue(intVariable=var "Health Increase", intValue=2, everyFrame=false)
+    on FINISHED → Focus Heal 2
+  }
+
+  state Dung Cloud 2 {
+    SpawnObjectFromGlobalPool(gameObject=Knight Dung Cloud, spawnPoint=var "Self", position=(0, 0, -0.001), rotation=(unset), storeObject=var "")
+    SetBoolValue(boolVariable=var "Spore Cooldown", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPORE ATTACK", delay=0, everyFrame=false)
+    on FINISHED → Set HP Amount 2
+  }
+
+  state Slug? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_28", isTrue=→"SLUG", isFalse=→"FINISHED")
+    on SLUG → Slug Speed
+    on FINISHED → Focus
+  }
+
+  state Start Slug Anim {
+    SetBoolValue(boolVariable=var "Can Cancel", boolValue=true, everyFrame=false)
+    SetStringValue(stringVariable=var "Focus Start Anim", stringValue="Focus", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_28", isTrue=(none), isFalse=→"FINISHED")
+    SetStringValue(stringVariable=var "Focus Start Anim", stringValue="Slug Down", everyFrame=false)
+    on FINISHED → Focus Start
+  }
+
+  state Focus Cancel 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioStop(gameObject=var "SlugWalk Audio")
+    SetBoxCollider2DSize(gameObject1=var "Hero Box", width=(unset), height=1.1875, offsetX=(unset), offsetY=-0.703125)
+    FadeAudio(gameObject=var "Charge Audio", startVolume=1, endVolume=0, time=0.33)
+    VibrationPlayerStop(target=var "Charge Audio")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", false], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS END", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Main Camera", vector=var "Camera Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Camera Pos", vector3Value=(unset), x=(unset), y=(unset), z=var "Camera Start Z", everyFrame=false)
+    iTweenMoveTo(gameObject=var "Main Camera", id="", transformPosition=var "", vectorPosition=var "Camera Pos", time=0.2, delay=0, speed=(unset), space=0, easeType=easeOutSine, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect End")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slug Up", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=false, everyFrame=false)
+    on ANIM END → Regain Control
+  }
+
+  state Turn Anim L? {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Slug Walk Anim")
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Slug Turn Anim")
+    on FINISHED → Focus Left
+  }
+
+  state Anim Check {
+    PlayerDataBoolAllTrue(gameObject=var "GameManager", stringVariables=["equippedCharm_5", "equippedCharm_17"], trueEvent=→"SHROOMBLOCK", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_5", isTrue=→"BLOCKER", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_17", isTrue=→"SHROOM", isFalse=→"FINISHED")
+    on FINISHED → Normal
+    on BLOCKER → Blocker
+    on SHROOM → Shroom
+    on SHROOMBLOCK → Combo
+  }
+
+  state Normal {
+    SetStringValue(stringVariable=var "Slug Burst Anim", stringValue="Slug Burst", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Idle Anim", stringValue="Slug Idle", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Turn Anim", stringValue="Slug Turn", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Walk Anim", stringValue="Slug Walk", everyFrame=false)
+    on FINISHED → Speedup?
+  }
+
+  state Focus Left {
+    AudioPlay(gameObject=var "SlugWalk Audio", volume=1, oneShotClip=<null>, finishedEvent=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceLeft())
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Slug Speed L", y=(unset), everyFrame=false)
+    FloatAdd(floatVariable=var "Grace Timer", add=1, everyFrame=true, perSecond=true)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=true, everyFrame=false)
+    FloatMultiply(floatVariable=var "Focus Zoom Time", multiplyBy=100, everyFrame=false)
+    iTweenMoveBy(gameObject=var "Main Camera", id="", vector=var "Focus Camera Zoom Current", time=var "Focus Zoom Time", delay=0, speed=(unset), easeType=linear, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetMeshRenderer(gameObject=var "Lines Anim", active=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=60, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=60, everyFrame=false)
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP", activeBool=(unset), stateEntryOnly=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=true, everyFrame=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"IDLE")
+    on IDLE → Focus S
+    on LEFT GROUND → Grace Check 2
+    on FOCUS COMPLETED → Spore Cloud 2
+    on BUTTON UP → Grace Check 2
+  }
+
+  state Turn Anim R? {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Slug Walk Anim")
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=(none), negativeEvent=→"FINISHED", space=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Slug Turn Anim")
+    on FINISHED → Focus Right
+  }
+
+  state Slug Speed {
+    SetBoxCollider2DSize(gameObject1=var "Hero Box", width=(unset), height=0.6124725, offsetX=(unset), offsetY=-0.9906387)
+    SetFloatValue(floatVariable=var "Focus Zoom Time", floatValue=var "Time Per MP Drain", everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "Start MP")
+    SetFloatValue(floatVariable=var "Slug Speed L", floatValue=-6, everyFrame=false)
+    SetFloatValue(floatVariable=var "Slug Speed R", floatValue=6, everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_7", isTrue=(none), isFalse=→"FINISHED")
+    SetFloatValue(floatVariable=var "Slug Speed L", floatValue=-12, everyFrame=false)
+    SetFloatValue(floatVariable=var "Slug Speed R", floatValue=12, everyFrame=false)
+    on FINISHED → Anim Check
+  }
+
+  state Start MP Drain {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StartMPDrain", parameters=[var "Time Per MP Drain"], storeResult=(unset var))
+    on FINISHED → Focus S
+  }
+
+  state Focus Right {
+    AudioPlay(gameObject=var "SlugWalk Audio", volume=1, oneShotClip=<null>, finishedEvent=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceRight())
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Slug Speed R", y=(unset), everyFrame=false)
+    FloatAdd(floatVariable=var "Grace Timer", add=1, everyFrame=true, perSecond=true)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=true, everyFrame=false)
+    FloatMultiply(floatVariable=var "Focus Zoom Time", multiplyBy=100, everyFrame=false)
+    iTweenMoveBy(gameObject=var "Main Camera", id="", vector=var "Focus Camera Zoom Current", time=var "Focus Zoom Time", delay=0, speed=(unset), easeType=linear, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetMeshRenderer(gameObject=var "Lines Anim", active=true)
+    Tk2dPlayAnimation(gameObject=var "Lines Anim", animLibName="", clipName="Focus Effect")
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=60, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=60, everyFrame=false)
+    ListenForCast(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP", activeBool=(unset), stateEntryOnly=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=true, everyFrame=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"IDLE")
+    on IDLE → Focus S
+    on LEFT GROUND → Grace Check 2
+    on FOCUS COMPLETED → Spore Cloud 2
+    on BUTTON UP → Grace Check 2
+  }
+
+  state Speedup? {
+    BoolTest(boolVariable=var "Quick Focus", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BuildString(stringParts=[var "Slug Walk Anim", " Quick"], separator="", addToEnd=true, storeResult=var "Slug Walk Anim", everyFrame=false)
+    BuildString(stringParts=[var "Slug Turn Anim", " Quick"], separator="", addToEnd=true, storeResult=var "Slug Turn Anim", everyFrame=false)
+    on FINISHED → Start MP Drain
+  }
+
+  state Blocker {
+    SetStringValue(stringVariable=var "Slug Burst Anim", stringValue="Slug Burst B", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Idle Anim", stringValue="Slug Idle B", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Turn Anim", stringValue="Slug Turn B", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Walk Anim", stringValue="Slug Walk B", everyFrame=false)
+    on FINISHED → Speedup?
+  }
+
+  state Shroom {
+    SetStringValue(stringVariable=var "Slug Burst Anim", stringValue="Slug Burst S", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Idle Anim", stringValue="Slug Idle S", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Turn Anim", stringValue="Slug Turn S", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Walk Anim", stringValue="Slug Walk S", everyFrame=false)
+    on FINISHED → Speedup?
+  }
+
+  state Combo {
+    SetStringValue(stringVariable=var "Slug Burst Anim", stringValue="Slug Burst BS", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Idle Anim", stringValue="Slug Idle BS", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Turn Anim", stringValue="Slug Turn BS", everyFrame=false)
+    SetStringValue(stringVariable=var "Slug Walk Anim", stringValue="Slug Walk BS", everyFrame=false)
+    on FINISHED → Speedup?
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Scream Antic2 {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hero_void_scream_spell, finishedEvent=(none))
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_void_scream_spell, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=Scream)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Scream Burst 2
+  }
+
+  state Enter Quake {
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["spellQuake", true], storeResult=(unset var))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    IntCompare(integer1=var "Spell Level", integer2=1, equal=→"LEVEL 1", lessThan=→"LEVEL 1", greaterThan=→"LEVEL 2", everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetDamageModeFSM", parameters=[1], storeResult=(unset var))
+    on LEVEL 1 → Quake1 Down
+    on LEVEL 2 → Quake2 Down
+  }
+
+  state Can Cast? QC {
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="CanCast", parameters=[], storeResult=var "Return Bool")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    IntCompare(integer1=var "MP", integer2=var "MP Cost", equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Return Bool", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Inactive
+    on FINISHED → QC
+  }
+
+  state QC {
+    BoolTest(boolVariable=var "Pressed Up", isTrue=→"SCREAM", isFalse=(none), everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Pressed Down", isTrue=→"QUAKE", isFalse=→"FIREBALL", everyFrame=false)  // disabled
+    ListenForUp(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"SCREAM", isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"QUAKE", isNotPressed=→"FIREBALL", isPressedBool=(unset), stateEntryOnly=false)
+    on FIREBALL → Has Fireball?
+    on QUAKE → Has Quake?
+    on SCREAM → Has Scream?
+  }
+
+  state Dream Focus End {
+    FadeAudio(gameObject=var "Charge Audio", startVolume=1, endVolume=0, time=0.33)
+    VibrationPlayerStop(target=var "Charge Audio")
+    SetBoolValue(boolVariable=var "Is In Dream Focus", boolValue=false, everyFrame=false)
+  }
+
+  state Reset Damage Mode {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ResetQuakeDamage", parameters=[], storeResult=(unset var))
+    on FINISHED → Inactive
+  }
+
+  state Q1 Effect {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hero_quake_spell_dash)
+    ActivateGameObject(gameObject=var "Q Flash Start", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "SD Sharp Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_quake_spell_dash, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=QuakeEffect)
+    on FINISHED → Quake1 Down
+  }
+
+  state Q2 Effect {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hero_quake_spell_dash)
+    ActivateGameObject(gameObject=var "Q Flash Start", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "SD Sharp Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_quake_spell_dash, motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=QuakeEffect)
+    on FINISHED → Quake2 Down
+  }
+
+  state Cancel {
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Inactive
+  }
+
+  state Cancel All {
+    BoolTest(boolVariable=var "Is In Dream Focus", isTrue=→"DREAM FOCUS END", isFalse=(none), everyFrame=false)
+    SendMessage(gameObject=var "Cam Target", delivery=SendMessage, options=1, functionCall=SetQuake(false))
+    SetBoolValue(boolVariable=var "Didnt Hit Full HP", boolValue=false, everyFrame=false)
+    AudioStop(gameObject=var "Charge Audio")
+    VibrationPlayerStop(target=var "Charge Audio")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO FOCUS END", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "SlugWalk Audio")
+    ActivateGameObject(gameObject=var "Q Trail 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["spellQuake", false], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Spore Cooldown", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Scream 2 Zone", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["focusing", false], storeResult=(unset var))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", false], storeResult=(unset var))
+    ActivateGameObject(gameObject=var "Q Trail", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Slam", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Charge", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Q Fall Damage", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Focus Burst Anim", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Lines Anim", active=false)
+    SetParticleEmissionRate(gameObject=var "Dust L", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Dust R", emissionRate=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopMPDrain", parameters=[0.02], storeResult=(unset var))
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus2", setValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Can Cancel", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    BoolTest(boolVariable=var "Focusing", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Focusing", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="QUAKE FALL END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Roar Wave"), sendEvent="END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FOCUS END", delay=0, everyFrame=false)
+    on FINISHED → Reset Damage Mode
+    on DREAM FOCUS END → Dream Focus End
+  }
+
+  var Grace Time: float = 0.45
+  var Hero Gravity: float = 0.79
+  var SlugWalk Audio: gameObject = Knight:1/Sounds/SlugWalk
+
+  var Button Down Time: float = 0.25
+  var Camera Start Z: float = 0
+  var Fireball Recoil Current: float = 0
+  var Fireball Recoil Distance: float = 1
+  var Focus Start Time: float = 0.25
+  var Focus Zoom Time: float = 0
+  var Grace Timer: float = 0
+  var Quake Antic Speed: float = 0
+  var Self X Scale: float = 0
+  var Slug Speed L: float = 0
+  var Slug Speed R: float = 4
+  var Time Per MP Drain: float = 0.0325
+  var Time Per MP Drain CH: float = 0.018
+  var Time Per MP Drain UnCH: float = 0.027
+  var Y Speed: float = 0
+  var Focus MP amount: int = 0
+  var HP: int = 0
+  var Health Increase: int = 0
+  var MP: int = 0
+  var MP Cost: int = 33
+  var Max HP: int = 0
+  var Spell Level: int = 0
+  var Start MP: int = 0
+  var Can Cancel: bool = false
+  var Didnt Hit Full HP: bool = false
+  var Double: bool = false
+  var Dream End: bool = false
+  var Dream Focus: bool = false
+  var Focusing: bool = false
+  var Is In Dream Focus: bool = false
+  var On Ground: bool = false
+  var Pressed Down: bool = false
+  var Pressed Up: bool = false
+  var Quick Focus: bool = false
+  var Refocusing: bool = false
+  var Return Bool: bool = false
+  var Scream 2 Zone: bool = false
+  var Spore Cooldown: bool = false
+  var Wall Sliding: bool = false
+  var Focus Start Anim: string = ""
+  var Slug Burst Anim: string = ""
+  var Slug Idle Anim: string = ""
+  var Slug Turn Anim: string = ""
+  var Slug Walk Anim: string = ""
+  var Camera Pos: vector3 = (0, 0, 0)
+  var Fireball Recoil Vector: vector3 = (0, 0, 0)
+  var Focus Camera Zoom: vector3 = (0, 0, 3)
+  var Focus Camera Zoom Current: vector3 = (0, 0, 0)
+  var Quake Antic Vector: vector3 = (0, 0, 0)
+  var Burst Rocks: gameObject = <null>
+  var Cam Target: gameObject = <null>
+  var Charge Audio: gameObject = <null>
+  var Dust L: gameObject = <null>
+  var Dust Plume: gameObject = <null>
+  var Dust R: gameObject = <null>
+  var Effects Folder: gameObject = <null>
+  var Fireball Top: gameObject = <null>
+  var Focus Burst Anim: gameObject = <null>
+  var Focus Effects: gameObject = <null>
+  var Hero Box: gameObject = <null>
+  var Lines Anim: gameObject = <null>
+  var Main Camera: gameObject = <null>
+  var Q Charge: gameObject = <null>
+  var Q Fall Damage: gameObject = <null>
+  var Q Flash Slam: gameObject = <null>
+  var Q Flash Start: gameObject = <null>
+  var Q Mega: gameObject = <null>
+  var Q Orbs: gameObject = <null>
+  var Q Orbs 2: gameObject = <null>
+  var Q Pillar: gameObject = <null>
+  var Q Slam: gameObject = <null>
+  var Q Slam 2: gameObject = <null>
+  var Q Slam Lines: gameObject = <null>
+  var Q Trail: gameObject = <null>
+  var Q Trail 2: gameObject = <null>
+  var Q1 Pillar: gameObject = <null>
+  var Roar Wave: gameObject = <null>
+  var SD Sharp Flash: gameObject = <null>
+  var Scr Base: gameObject = <null>
+  var Scr Base 2: gameObject = <null>
+  var Scr Heads: gameObject = <null>
+  var Scr Heads 2: gameObject = <null>
+  var Scr Orbs: gameObject = <null>
+  var Scr Orbs 2: gameObject = <null>
+  var Self: gameObject = <null>
+  var Spells Folder: gameObject = <null>
+}

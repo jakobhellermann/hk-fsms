@@ -1,0 +1,573 @@
+# Control
+# 1 location(s):
+#   Slab_16b / Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother
+
+fsm Control {
+  start Init
+  on STUN → Stun Start  // from any state
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    GetGrandParent(gameObject=Self, storeResult=var "Battle Scene")
+    FindNamedChild(gameObject=var "Battle Scene", storeResult=var "Spawner Flies")
+    GetHP(target=Self, storeValue=var "P2 HP")
+    MultiplyIntByFloat(integer=var "P2 HP", multiplyFloat=0.55, storeResult=var "P2 HP", everyFrame=false, forceRoundUp=false)
+    on FINISHED → Dormant
+  }
+
+  state Idle {
+    AudioPlaySimple(gameObject=var "Audio Loop Fly", volume=1, oneShotClip=<null>)
+    GetPosition(gameObject=Self, vector=var "Buzz Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=9.5, max=10.5, storeResult=var "Buzz Y")
+    SetVector3XYZ(vector3Variable=var "Buzz Pos", vector3Value=(unset), x=(unset), y=var "Buzz Y", z=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    ActivateGameObject(gameObject=var "Collider Fly", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.2)
+    IdleBuzzV3(gameObject=Self, waitMin=0.1, waitMax=0.4, speedMax=12, accelerationMin=500, accelerationMax=500, roamingRangeX=0.1, roamingRangeY=0.1, manualStartPos=var "Buzz Pos")
+    Wait(time=var "Idle Time", finishEvent=→"FINISHED", realTime=false)
+    BoolFlip(boolVariable=var "Might Evade")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Evade Range", storeResult=var "In Evade Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    SetBoolValue(boolVariable=var "Evade Ready", boolValue=false, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Evade Ready", BoolValue=true, Time=0.2, SetOppositeOnStateEntry=false)
+    BoolTestMulti(boolVariables=[var "Evade Ready", var "In Evade Range", var "Might Evade"], boolStates=[true, true, true], trueEvent=→"EVADE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Choice
+    on EVADE → Evade Antic
+    on TOOK DAMAGE → Dmg Response
+    on SING → Sing
+  }
+
+  state Choice {
+    SendEvent(eventTarget=Self, sendEvent=→"P2", delay=0, everyFrame=false)  // disabled
+    CompareHP(enemy=var "Self", integer2=var "P2 HP", equal=(none), lessThan=→"P2", greaterThan=(none), everyFrame=false)
+    GetChildCount(gameObject=var "Spawner Flies", storeResult=var "Free Flies")
+    IntTestToBool(int1=var "Free Flies", int2=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Can Hatch", everyFrame=false)
+    SendRandomEventV4(events=[→"LEAP", →"SPIT", →"HATCH"], weights=[1, 1, 1], eventMax=[1, 1, 1], missedMax=[2, 3, 2], activeBool=var "Can Hatch")
+    SendRandomEventV4(events=[→"LEAP", →"SPIT"], weights=[1, 1], eventMax=[1, 1], missedMax=[1, 1], activeBool=(unset))
+    on SPIT → Set Spits
+    on LEAP → Leap Antic
+    on HATCH → Hatch Antic
+    on P2 → Choice P2
+  }
+
+  state Spit Antic 1 {
+    PlayAudioEvent(audioClip=broodmother_spit_antic (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_spit_antic (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spit Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DistanceFlyHorizontal(gameObject=Self, target=var "Hero", distance=12, startY=(unset), floorDistance=7, yDistanceAllowance=1, speedMax=6, acceleration=0.5, stayLeft=false, stayRight=false, dontAffectY=false)
+    on FINISHED → Spit Antic 2
+  }
+
+  state Spit Antic 2 {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ActivateGameObject(gameObject=var "Collider SpitAntic", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DistanceFlyHorizontal(gameObject=Self, target=var "Hero", distance=12, startY=(unset), floorDistance=7, yDistanceAllowance=1, speedMax=6, acceleration=0.5, stayLeft=false, stayRight=false, dontAffectY=false)
+    Wait(time=0.583, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spit Angle
+  }
+
+  state Spit {
+    PlayAudioEvent(audioClip=broodmother_spit (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_spit (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Spit", emit=0, resetIfPlaying=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spit", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DistanceFlyHorizontal(gameObject=Self, target=var "Hero", distance=12, startY=(unset), floorDistance=7, yDistanceAllowance=1, speedMax=5, acceleration=0.5, stayLeft=false, stayRight=false, dontAffectY=false)
+    ActivateGameObject(gameObject=var "Collider Spit", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    FlingObjectsFromGlobalPool(gameObject=Slab Fly Glob (localpoolprefabs_assets_areaslab.bundle), spawnPoint=var "Spit Point", position=(unset), spawnMin=1, spawnMax=1, speedMin=22, speedMax=22, angleMin=var "Angle Min", angleMax=var "Angle Max", originVariationX=0, originVariationY=0, FSM="Control", FSMEvent="DO BOUNCE")
+    on FINISHED → Respit?
+  }
+
+  state Spit Recover {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Idle
+  }
+
+  state Spit Angle {
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=185, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=220, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=320, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=355, everyFrame=false)
+    on FINISHED → Spit
+  }
+
+  state Respit? {
+    IntAdd(intVariable=var "Spits", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Spits", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"SPIT", everyFrame=false)
+    on FINISHED → Spit Recover
+    on SPIT → Spit Antic 1
+  }
+
+  state Set Spits {
+    RandomInt(min=1, max=2, storeResult=var "Spits", inclusiveMax=true, noRepeat=false)
+    on FINISHED → Spit Antic 1
+  }
+
+  state Leap Antic {
+    CancelRecoil(target=Self)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_attack_short (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    PlayAudioEvent(audioClip=broodmother_jump_horiz_antic (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    RandomFloat(min=7.5, max=8.5, storeResult=var "Buzz Y")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leap Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AnimateRigidBodyYPositionTo(GameObject=Self, ToValue=var "Buzz Y", time=0.6, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    on FINISHED → Leap
+  }
+
+  state Leap {
+    AudioStop(gameObject=var "Audio Loop Fly", fadeTime=0)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    PlayAudioEvent(audioClip=broodmother_jump_horiz_jump (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    ActivateGameObject(gameObject=var "Collider Leap", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    SetVelocityByScale(gameObject=Self, speed=-25, ySpeed=12, everyFrame=false)
+    on LAND → Land
+  }
+
+  state Land {
+    PlayAudioEvent(audioClip=broodmother_jump_horiz_land_slide (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Swipe", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Collider Leap", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    DecelerateV2(gameObject=Self, deceleration=0.93, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Swipe
+  }
+
+  state Swipe {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.93, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Swipe", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Swipe End
+  }
+
+  state Swipe End {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.93, brakeOnExit=true)
+    ActivateGameObject(gameObject=var "Collider SwipeEnd", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.45, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Releap?
+  }
+
+  state Swipe Lift {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Swipe End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=broodmother_jump_horiz_antic (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Start Flying
+  }
+
+  state Start Flying {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Releap? {
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "X Distance", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=18, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=→"FINISHED", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=true, everyFrame=false)
+    SendRandomEventV4(events=[→"FINISHED", →"LEAP"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on FINISHED → Swipe Lift
+    on LEAP → Leap Turn
+  }
+
+  state Leap Turn {
+    PlayAudioEvent(audioClip=broodmother_jump_horiz_turn_around_on_ground (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Swipe Turn")
+    Wait(time=0.65, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Collider SwipeTurn", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    on FINISHED → Flip
+  }
+
+  state Flip {
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Leap
+  }
+
+  state Stun Start {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_stun (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioStop(gameObject=var "Audio Loop Fly", fadeTime=0)
+    SetFloatValue(floatVariable=var "Stun Timer", floatValue=2, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Stagger")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=25, ySpeed=0, everyFrame=false)
+    on FINISHED → Stun Air
+  }
+
+  state Stun Air {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Stun Fall
+  }
+
+  state Stun Fall {
+    SetGravity2dScale(gameObject=Self, gravityScale=2)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Fall")
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Stun Land
+  }
+
+  state Stunned {
+    FloatAdd(floatVariable=var "Stun Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on TOOK DAMAGE → Stun Damage
+    on END → Stun End
+    on SING → Sing
+  }
+
+  state Stun Damage {
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_stun_hit (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FloatAdd(floatVariable=var "Stun Timer", add=-0.25, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Stunned
+    on END → Stun End
+  }
+
+  state Stun End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 10), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Collider Stunned", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Fly", volume=1, oneShotClip=<null>)
+    on FINISHED → Idle
+  }
+
+  state Stun Land {
+    PlayAudioEvent(audioClip=broodmother_stunned_land (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Land")
+    ActivateGameObject(gameObject=var "Collider Stunned", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slam Effect Stun", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    on FINISHED → Stunned
+  }
+
+  state Dormant {
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    on BATTLE START → Entry Antic
+  }
+
+  state Entry Antic {
+    AudioPlayInState(gameObject=var "Audio Loop EntryAntic", volume=1)
+    PlayAudioEvent(audioClip=broodmother_entrance_antic (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetPosition(gameObject=Self, vector=(unset), x=7.63, y=-11.6, z=5, space=1, everyFrame=false, lateUpdate=false)
+    DoCameraShake(VisibleRenderer=var "Pt EntryAntic", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitterInState(gameObject=var "Pt EntryAntic")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=false, Delay=0)
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=2)  // disabled
+    on FINISHED → Burst In
+  }
+
+  state Burst In {
+    PlayAudioEvent(audioClip=broodmother_entrance_burst (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=big_swamp_water_exit (sfxstatic_assets_areaswamp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlaySimple(gameObject=var "Audio Loop Fly", volume=1, oneShotClip=<null>)
+    PlayParticleEmitter(gameObject=var "Pt Break", emit=0, resetIfPlaying=false)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leap Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, 10.5, 0), time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Roar
+  }
+
+  state Roar {
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="BROODMOTHER")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    GetPosition(gameObject=Self, vector=var "Tween Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Tween Pos", vector3Value=(unset), x=(unset), y=(unset), z=0.007, everyFrame=false)
+    AnimatePositionTo(gameObject=Self, toValue=var "Tween Pos", localSpace=false, time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    Wait(time=3, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=BM_roar_type_01 (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CallMethodProper(gameObject=Self, behaviour="NonBouncer", methodName="SetActive", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=2)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    ApplyMusicCue(musicCue=Boss Strive (audiocuesdynamic_assets_boss.bundle), delayTime=0, transitionTime=0)  // disabled
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.1)  // disabled
+    TransitionToAudioSnapshot(snapshot=Main and Action (audioobjects_assets_all.bundle), transitionTime=0.2)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    on FINISHED → Idle
+  }
+
+  state Death {
+    SendEventByName(eventTarget=GameObject(var "Spawner Flies"), sendEvent="FLY SPAWN END", delay=0, everyFrame=false)
+  }
+
+  state Evade Antic {
+    PlayAudioEvent(audioClip=broodmother_jump_horiz_turn_around_on_ground (sfxstatic_assets_areaslab.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    RayCast2dV2(fromGameObject=var "Ray Pt Centre", fromPosition=(unset), direction=(1, 0), space=1, distance=6, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Collider Evade", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Evade
+    on CANCEL → Idle
+  }
+
+  state Evade {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=60, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Collider Evade", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Choice
+  }
+
+  state Hatch Antic {
+    PlayAudioEvent(audioClip=broodmother_give_birth_antic (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_hatch_antic (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    RandomBool(storeResult=var "Double Hatch")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatch Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DistanceFlyHorizontal(gameObject=Self, target=var "Hero", distance=12, startY=(unset), floorDistance=7, yDistanceAllowance=1, speedMax=6, acceleration=0.5, stayLeft=false, stayRight=false, dontAffectY=false)
+    on FINISHED → Spawn Enemy
+  }
+
+  state Spawn Enemy {
+    GetRandomChild(gameObject=var "Spawner Flies", storeResult=var "Fly To Spawn")
+    GameObjectIsNull(gameObject=var "Fly To Spawn", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Fly To Spawn", targetObject=var "Hatch Point", xOffset=0, yOffset=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Hatch X Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Hatch X Speed", multiplyBy=-20, everyFrame=false)
+    SetVelocity2d(gameObject=var "Fly To Spawn", vector=(unset), x=var "Hatch X Speed", y=-20, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Fly To Spawn"), sendEvent="MOTHER HATCH", delay=0, everyFrame=false)
+    MatchScaleSign(Target=var "Fly To Spawn", MatchTo=var "Self", EveryFrame=false)
+    on FINISHED → Hatch
+  }
+
+  state Hatch {
+    PlayAudioEvent(audioClip=broodmother_give_birth (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_hatch (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    PlayAudioEvent(audioClip=mini_mawlek_spit (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatch", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Hatch Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Hatch", emit=0, resetIfPlaying=false)
+    on FINISHED → Rehatch?
+  }
+
+  state Choice P2 {
+    SendEvent(eventTarget=Self, sendEvent=→"SLAM", delay=0, everyFrame=false)  // disabled
+    GetChildCount(gameObject=var "Spawner Flies", storeResult=var "Free Flies")
+    IntTestToBool(int1=var "Free Flies", int2=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Can Hatch", everyFrame=false)
+    SendRandomEventV4(events=[→"LEAP", →"SPIT", →"HATCH", →"SLAM"], weights=[1, 1, 1, 1], eventMax=[1, 1, 2, 1], missedMax=[3, 3, 2, 3], activeBool=var "Can Hatch")
+    SendRandomEventV4(events=[→"LEAP", →"SPIT", →"SLAM"], weights=[1, 1, 1], eventMax=[1, 1, 1], missedMax=[2, 2, 2], activeBool=(unset))
+    on SPIT → Set Spits
+    on LEAP → Leap Antic
+    on HATCH → Hatch Antic
+    on SLAM → Slam Roar Antic
+  }
+
+  state Slam Roar Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slam Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=true)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Slam Roar
+  }
+
+  state Slam Roar {
+    BoolTest(boolVariable=var "Did Rage Roar", isTrue=(none), isFalse=→"P2", everyFrame=false)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)  // disabled
+    AnimateRigidBodyYPositionTo(GameObject=Self, ToValue=10.5, time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Slam Start
+    on P2 → Slam Roar Init
+  }
+
+  state Slam Start {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slam Start")
+    AnimateRigidBodyYPositionTo(GameObject=Self, ToValue=12.5, time=0.25, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    SetIntValue(intVariable=var "Slams", intValue=3, everyFrame=false)
+    PlayAudioEvent(audioClip=broodmother_jump_horiz_jump (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slam Down
+  }
+
+  state Slam Up {
+    PlayAudioEvent(audioClip=brkn_wand_down_stab_dash (sfxstatic_assets_areaantareaboneareacoralareamemoryareaslab.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slam Up")
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=45, everyFrame=true)
+    ActivateGameObject(gameObject=var "Slam Enemy Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"LAND", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"LAND", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Slam Up Land
+  }
+
+  state Slam Up Land {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_stun_hit (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slam Up Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 40), x=(unset), y=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Slam Effect U", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=big_fly_wall_hit (sfxstatic_assets_areaslabareawilds.bundle), pitchMin=1, pitchMax=0.85, volume=1.15, delay=0, storePlayer=<null>)
+    on FINISHED → Turn Down?
+  }
+
+  state Turn Down? {
+    RayCast2dV2(fromGameObject=var "Slam Wall Ray Pt U", fromPosition=(unset), direction=(-2, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Slam Down
+  }
+
+  state Slam Down {
+    PlayAudioEvent(audioClip=brkn_wand_down_stab_dash (sfxstatic_assets_areaantareaboneareacoralareamemoryareaslab.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slam Down")
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=-45, everyFrame=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    ActivateGameObject(gameObject=var "Slam Enemy Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on LAND → Slam Down Land
+  }
+
+  state Slam Down Land {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=BM_stun_hit (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slam Down Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, -40), x=(unset), y=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Slam Effect D", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=big_fly_wall_hit (sfxstatic_assets_areaslabareawilds.bundle), pitchMin=1, pitchMax=0.85, volume=1.15, delay=0, storePlayer=<null>)
+    on FINISHED → Slam End?
+  }
+
+  state Slam End? {
+    IntAdd(intVariable=var "Slams", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Slams", integer2=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=false)
+    on END → Slam End
+    on FINISHED → Turn Up?
+  }
+
+  state Slam End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slam Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-5, ySpeed=20, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    on FINISHED → Idle
+  }
+
+  state Turn Up? {
+    RayCast2dV2(fromGameObject=var "Slam Wall Ray Pt D", fromPosition=(unset), direction=(-2, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Slam Up
+  }
+
+  state Slam Roar Init {
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    AnimateRigidBodyYPositionTo(GameObject=Self, ToValue=10.5, time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Did Rage Roar", boolValue=true, everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=0.5, everyFrame=false)
+    on FINISHED → Slam Start
+  }
+
+  state Rehatch? {
+    BoolTest(boolVariable=var "Double Hatch", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SetBoolValue(boolVariable=var "Double Hatch", boolValue=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatch Antic Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DistanceFlyHorizontal(gameObject=Self, target=var "Hero", distance=12, startY=(unset), floorDistance=7, yDistanceAllowance=1, speedMax=6, acceleration=0.5, stayLeft=false, stayRight=false, dontAffectY=false)
+    on CANCEL → Idle
+    on FINISHED → Spawn Enemy
+  }
+
+  state Dmg Response {
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Choice
+  }
+
+  state Sing {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=BM_sing (sfxdynamic_assets_areaslab.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    ShoveFromWall(gameObject=Self, shoveForce=50, rayLength=4, checkUp=false, checkDown=true, checkLeft=false, checkRight=false, everyFrame=false)
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Choice
+  }
+
+  var Buzz Y: float = 0
+  var Angle Min: float = 0
+  var Angle Max: float = 0
+  var X Distance: float = 0
+  var Stun Timer: float = 0
+  var Hatch X Speed: float = 0
+  var Idle Time: float = 0.8
+  var Spits: int = 0
+  var Free Flies: int = 0
+  var P2 HP: int = 0
+  var Slams: int = 0
+  var Might Evade: bool = false
+  var In Evade Range: bool = false
+  var Evade Ready: bool = false
+  var Can Hatch: bool = false
+  var Did Rage Roar: bool = false
+  var Double Hatch: bool = false
+  var Buzz Pos: vector3 = (0, 0, 0)
+  var Tween Pos: vector3 = (0, 0, 0)
+  var Collider Fly: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider Fly
+  var Collider Leap: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider Leap
+  var Collider Spit: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider Spit
+  var Collider SpitAntic: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider SpitAntic
+  var Collider Stunned: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider Stunned
+  var Collider Swipe: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider Swipe
+  var Collider SwipeEnd: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider SwipeEnd
+  var Collider SwipeTurn: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider SwipeTurn
+  var Slam Effect: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Slam Effect
+  var Spit Effect: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Spit Effect
+  var Spit Point: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Spit Point
+  var Pt EntryAntic: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Pt EntryAntic
+  var Pt Break: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Pt Break
+  var Slam Effect Stun: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Slam Effect Stun
+  var Battle Scene: gameObject = <null>
+  var Spawner Flies: gameObject = <null>
+  var Collider Evade: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Collider Evade
+  var Hatch Point: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Hatch Point
+  var Fly To Spawn: gameObject = <null>
+  var Self: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother
+  var Pt Hatch: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Pt Hatch
+  var Pt Spit: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Pt Spit
+  var Hatch Effect: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Hatch Effect
+  var Slam Wall Ray Pt U: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Slam Wall Ray Pt U
+  var Slam Wall Ray Pt D: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Slam Wall Ray Pt D
+  var Slam Effect U: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Slam Effect U
+  var Slam Effect D: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Slam Effect D
+  var Audio Loop Fly: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Audio Loop Fly
+  var Audio Loop EntryAntic: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Audio Loop EntryAntic
+  var Slam Enemy Damager: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Slam Enemy Damager
+  var Ray Pt Centre: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Ray Pt Centre
+  var Audio Loop Voice: gameObject = Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 4/Slab Fly Broodmother/Audio Loop Voice
+}

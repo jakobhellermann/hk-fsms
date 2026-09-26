@@ -1,0 +1,452 @@
+# Control
+# 1 location(s):
+#   Hang_04_boss / Battle Scene/Wave 5 - Song Admins/Song Administrator (1)
+
+fsm Control {
+  start Init
+
+  state Init {
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    FindAlertRange(target=Self, storeResult=var "Patrol Range", childName="Patrol Range")
+    FindChild(gameObject=Self, childName="Patrol Range", storeResult=var "Patrol Range Obj")
+    SetParent(gameObject=var "Patrol Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Home", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringSwitch(stringVariable=var "Clip", compareTo=["Rest Ground", "Rest Wall", "Fly In"], sendEvent=[→"GROUND", →"WALL", →"FLY IN"], everyFrame=false)
+    on GROUND → Rest Ground
+    on WALL → Rest Wall
+    on FLY IN → Fly In Ready
+  }
+
+  state Rest Ground {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    CallMethodProper(gameObject=Self, behaviour="SetZ", methodName="CancelSetZ", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on WAKE → Ground Wake
+    on TOOK DAMAGE → Ground Wake
+  }
+
+  state Ground Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Ground Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="ADMIN WAKE", delay=0, everyFrame=false)
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Z Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Minister_alert_long (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Ground Rise
+  }
+
+  state Ground Rise {
+    PlayAudioEvent(audioClip=song_administrator_dash_back (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider Fly", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=15, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Set Attack Time
+  }
+
+  state Chase {
+    AudioPlayInState(gameObject=Self, volume=1)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    RandomFloat(min=6, max=7.5, storeResult=var "Distance")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=7, acceleration=0.15, targetsHeight=false, height=0, minAboveHero=2)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    FloatAdd(floatVariable=var "Attack Time", add=-1, everyFrame=true, perSecond=true)
+    FloatTestToBool(float1=var "Attack Time", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Attack Ready", greaterThanBool=(unset), everyFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Attack Ready", BoolValue=true, Time=var "Attack Time", SetOppositeOnStateEntry=true)  // disabled
+    BoolTestMulti(boolVariables=[var "Attack Ready", var "In Attack Range"], boolStates=[true, true], trueEvent=→"ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    CheckAlertRange(alertRange=var "Patrol Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"UNALERT", OutOfRangeDelay=0, everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Attack Choice
+    on TOOK DAMAGE → Range Check
+    on UNALERT → Unalert Patrol
+    on SING → Sing
+  }
+
+  state Rest Wall {
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"LEAVE WALL", isFalse=(none))
+    ActivateGameObject(gameObject=var "Collider Wall", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on WAKE → Wall Wake
+    on TOOK DAMAGE → Wall Wake
+    on LEAVE WALL → Start Off Wall
+  }
+
+  state Wall Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Wall Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="ADMIN WAKE", delay=0, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Minister_alert_long (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Wall Kick
+  }
+
+  state Wall Kick {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=song_administrator_dash_back (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider Fly", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocityByScale(gameObject=Self, speed=-18, ySpeed=5, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Set Attack Time
+  }
+
+  state Attack Antic {
+    PlayAudioEvent(audioClip=song_administrator_antic (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Minister_small_move (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider AttackAntic", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=1.5, storeAngle=var "Angle", pause=0, everyFrame=false)
+    ClampAngleByScale(gameObject=Self, space=0, angleVariable=var "Angle", positiveMinValue=135, positiveMaxValue=225, negativeMinValue=-45, negativeMaxValue=45, everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=-14, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.925, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slash Antic")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Attack
+  }
+
+  state Range Check {
+    FloatClamp(floatVariable=var "Attack Time", minValue=0, maxValue=0.5, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=false)  // disabled
+    on ATTACK → Attack Choice
+    on FINISHED → Chase
+  }
+
+  state Attack {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Minister_attack_triple (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=song_administrator_attack (sfxstatic_assets_areasong.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Slash Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=true)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=33, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.93, brakeOnExit=false)
+    FaceAngleV3(GameObject=Self, AngleOffset=0, WorldSpace=false, SpriteFacesRight=false, EveryFrame=true, skipOnEnter=false)
+    on FINISHED → Attack End
+    on MULTI HIT CONNECT → Multihit
+  }
+
+  state Attack End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider Fly", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Evade?
+  }
+
+  state Retreat? {
+    SendRandomEventV4(events=[→"FINISHED", (none)], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    AudioPlayInState(gameObject=Self, volume=1)
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    RandomFloat(min=8.5, max=11, storeResult=var "Distance")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=7, acceleration=0.15, targetsHeight=false, height=0, minAboveHero=1)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    on FINISHED → Set Attack Time
+    on TOOK DAMAGE → Range Check
+  }
+
+  state Evade? {
+    SendRandomEventV4(events=[→"FINISHED", (none)], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Evade Range", storeResult=false, sendEvent="EVADE", outOfRangeEvent="", everyFrame=false)
+    on FINISHED → Retreat?
+    on EVADE → Evade Antic
+  }
+
+  state Evade Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=song_administrator_dash_back (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Minister_small_move (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    on FINISHED → Evade
+  }
+
+  state Evade {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider Evade", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=25, ySpeed=5, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=0.975, brakeOnExit=false)
+    on FINISHED → Chase
+  }
+
+  state Fly In Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on BATTLE START → Battle Fly In
+    on WAKE → Wake Fly In Pause
+    on ADMIN WAKE → Check Pos
+  }
+
+  state Check Pos {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"SHIFT", greaterThan=(none), everyFrame=false)
+    on SHIFT → Shift
+    on FINISHED → Fly In
+  }
+
+  state Shift {
+    SetParent(gameObject=var "Spawn Pos Alt", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Spawn Pos Alt", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    on FINISHED → Fly In
+  }
+
+  state Fly In {
+    PlayRandomAudioClipTable(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Minister_alert_long (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=10, z=-15, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, -10, 15), time=0.75, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.55)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider Fly", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Battler", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Set Attack Time
+  }
+
+  state Battle Fly In {
+    SetBoolValue(boolVariable=var "In Battle", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Battler", boolValue=true, everyFrame=false)
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Z Pos")
+    on FINISHED → Check Pos
+  }
+
+  state Wake Fly In Pause {
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fly In
+  }
+
+  state Set Attack Time {
+    RandomFloat(min=0.5, max=1.5, storeResult=var "Attack Time")
+    on FINISHED → Chase
+  }
+
+  state Unalert Patrol {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=1)
+    DistanceFly(gameObject=Self, target=var "Home", distance=1, speedMax=4, acceleration=0.17, targetsHeight=false, height=(unset), minAboveHero=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Can ReAlert", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=true)
+    CheckAlertRange(alertRange=var "Patrol Range", storeResult=var "In Patrol Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can ReAlert", var "In Attack Range", var "In Patrol Range"], sendEvent=→"WAKE", storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"WAKE", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on WAKE → ReAlert
+    on TOOK DAMAGE → ReAlert
+  }
+
+  state ReAlert {
+    SetFloatValue(floatVariable=var "Attack Time", floatValue=0.5, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wake Range OffWall", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Minister_alert_long (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Chase
+  }
+
+  state Multihit {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=-0.003, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="MultiSlash Connect", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Reset Z Pos
+  }
+
+  state Attack Choice {
+    SendEvent(eventTarget=Self, sendEvent=→"PARRY", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"CHARGE", →"PARRY"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on CHARGE → Attack Antic
+    on PARRY → Shove Horizontally?
+  }
+
+  state Parry Stance {
+    ActivateGameObject(gameObject=var "SA_parry_enter_flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=hornet_parry_stance (sfxstatic_assets_areaorgan.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.85, finishEvent=→"END", realTime=false)
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=false, DistancePast=1, StoreResult=(unset), PassedEvent=→"END", NotPassedEvent=(none), EveryFrame=true)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=6, acceleration=0.15, targetsHeight=false, height=0, minAboveHero=2)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on END → Parry Stance End
+    on BLOCKED HIT → Parry Block
+  }
+
+  state Parry Stance End {
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider ParryStance", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Parry Stance End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=ruin_shield_sentry_shield_move (sfxstatic_assets_areacogareadocksareahangareashellwood.bundle), pitchMin=1.5, pitchMax=1.6, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Evade?
+  }
+
+  state Parry Block {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Parry", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider ParryAntic", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "SA_parry_impact_flash_effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=song_administrator_dash_back (sfxstatic_assets_areasong.bundle), pitchMin=1.5, pitchMax=1.5, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AccelerateToY(gameObject=Self, accelerationFactor=0.35, targetSpeed=10)
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=false)
+    SetVelocityByScale(gameObject=Self, speed=20, ySpeed=-4, everyFrame=false)
+    on FINISHED → Parry Slash 1
+  }
+
+  state Parry Slash 1 {
+    PlayAudioEventRandom(audioClips=[song_administrator_single_slash_please_replace_with_this (sfxstatic_assets_areasong.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Minister_attack_long (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Parry Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "ParrySlash Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-45, ySpeed=-20, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=2, targetSpeed=10)
+    on FINISHED → Parry Slash 2
+  }
+
+  state Parry Slash 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "ParrySlash Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=2, targetSpeed=10)
+    on FINISHED → Parry Slash 3
+  }
+
+  state Parry Slash 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "ParrySlash Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=2, targetSpeed=10)
+    on FINISHED → Parry Slash 4
+  }
+
+  state Parry Slash 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "ParrySlash Hit 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=var "Slash Decel", decelerationY=(unset), brakeOnExit=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=2, targetSpeed=10)
+    on FINISHED → Parry Slash End
+  }
+
+  state Parry Slash End {
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=0.85, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Parry Slash End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider Fly", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Evade?
+  }
+
+  state Shove Horizontally? {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)  // disabled
+    FloatCompare(float1=var "Distance", float2=4, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)  // disabled
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)  // disabled
+    on FINISHED → Parry Stance Antic
+  }
+
+  state Parry Stance Antic {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Minister_small_move (sfxdynamic_assets_areahang.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    PlayAudioEvent(audioClip=ruin_shield_sentry_shield_move (sfxstatic_assets_areacogareadocksareahangareashellwood.bundle), pitchMin=1.2, pitchMax=1.3, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Parry Stance", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateAllChildren(gameObject=var "Colliders", activate=false)
+    ActivateGameObject(gameObject=var "Collider ParryStance", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=6, acceleration=0.15, targetsHeight=false, height=0, minAboveHero=2)
+    on FINISHED → Parry Stance
+  }
+
+  state Sing {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Minister_sing (sfxdynamic_assets_areahang.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase
+  }
+
+  state Start Off Wall {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Translate", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Translate", multiplyBy=-5, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Translate", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetPositionToObject2D(gameObject=var "Home", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Collider Fly", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wake Range OffWall", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Off Wall Idle
+  }
+
+  state Off Wall Idle {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    IdleBuzzV4(gameObject=Self, waitMin=0.5, waitMax=0.7, speedMax=2, deceleration=1, accelerationMin=0.15, accelerationMax=0.25, roamingRangeX=2, roamingRangeY=1, manualStartPos=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range OffWall", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"WAKE", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on WAKE → ReAlert
+    on TOOK DAMAGE → ReAlert
+  }
+
+  state Reset Z Pos {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Evade Antic
+  }
+
+  var Attack Time: float = 0
+  var Distance: float = 0
+  var Angle: float = 0
+  var Z Pos: float = 0
+  var Slash Decel: float = 0.97
+  var Translate: float = 0
+  var Attack Ready: bool = false
+  var Battler: bool = false
+  var Can ReAlert: bool = false
+  var In Attack Range: bool = false
+  var In Battle: bool = false
+  var In Patrol Range: bool = false
+  var Clip: string = ""
+  var Collider AttackAntic: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Colliders/Collider AttackAntic
+  var Collider Evade: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Colliders/Collider Evade
+  var Collider Fly: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Colliders/Collider Fly
+  var Collider Rest: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Colliders/Collider Rest
+  var Collider Wall: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Colliders/Collider Wall
+  var Colliders: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Colliders
+  var Parent: gameObject = <null>
+  var Patrol Range Obj: gameObject = <null>
+  var Slash Collider: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Slash Collider
+  var Spawn Pos Alt: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Spawn Pos Alt
+  var Terrain Collider: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Terrain Collider
+  var Home: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Home
+  var Collider ParryStance: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Colliders/Collider ParryStance
+  var Collider ParryAntic: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Colliders/Collider ParryAntic
+  var ParrySlash Hit 1: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/ParrySlash Hit 1
+  var ParrySlash Hit 2: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/ParrySlash Hit 2
+  var ParrySlash Hit 3: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/ParrySlash Hit 3
+  var ParrySlash Hit 4: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/ParrySlash Hit 4
+  var SA_parry_enter_flash: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/SA_parry_enter_flash
+  var SA_parry_impact_flash_effect: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/SA_parry_impact_flash_effect
+  var Audio Loop Voice: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Audio Loop Voice
+  var Self: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)
+  var Wake Range OffWall: gameObject = Battle Scene/Wave 5 - Song Admins/Song Administrator (1)/Wake Range OffWall
+  var Patrol Range: object = <null>
+}

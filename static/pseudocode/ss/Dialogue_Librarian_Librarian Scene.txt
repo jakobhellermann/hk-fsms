@@ -1,0 +1,429 @@
+# Dialogue
+# 1 location(s):
+#   Library_08 / Librarian Scene/Librarian
+
+fsm Dialogue {
+  start Init
+
+  state Init {
+    ActivateGameObject(gameObject=var "Tink Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    EnableFSM(gameObject=Self, fsmName="Melody Sing", enable=false, resetOnExit=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Initial State
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Skip Got Dlg", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    CheckTrackTriggerCount(target=var "Sleep Trigger", count=0, test=LessThanOrEqual, everyFrame=true, successEvent=→"EXITED")
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=3, MinReactDelay=1.4, MaxReactDelay=1.8, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Has Relics?
+    on EXITED → Exited
+    on SING → Sing
+    on TINKED → Tinked
+    on STARTLE → Startle
+  }
+
+  state Initial State {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hidden", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Wait for Enter
+  }
+
+  state Wait for Enter {
+    TriggerEnterEventSubscribe(trigger=var "Initial Wake Trigger", triggerEnteredEvent=→"ENTERED", triggerExitedEvent=(none), triggerStayedEvent=(none))
+    on ENTERED → Awake?
+  }
+
+  state Awake? {
+    PlayerDataVariableTest(VariableName="LibrarianAskedForRelic", ExpectedValue=true, IsExpectedEvent=→"SMALL", IsNotExpectedEvent=(none))
+    CallMethodProper(gameObject=Self, behaviour="RelicBoardOwner", methodName="IsAnyRelicsToDeposit", parameters=[], storeResult=var "Has Relics", EveryFrame=false)
+    BoolTest(boolVariable=var "Has Relics", isTrue=→"BIG", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Wait for Enter
+    on BIG → Big Wake
+    on SMALL → Small Wake
+  }
+
+  state Big Wake {
+    SendEventToRegister(eventName="VAULTKEEPER EMERGED")
+    SendEventToRegister(eventName="PAUSE TENTACLES")
+    SendEventToRegister(eventName="FORCE MOVE TENTACLES")
+    StartRoarEmitter(spawnPoint=Librarian Scene/Librarian/Roar Point, delay=1000, stunHero=false, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartRoarLock", parameters=[], storeResult=(unset var), EveryFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Emerge Dust", emit=0, resetIfPlaying=true)
+    PlayAudioEvent(audioClip=librarian_move_into_view (sfxstatic_assets_arealibrary.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vaultcentipede_cry (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=var "Arms Flailing", pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessageV2(gameObject=Librarian Scene/Librarian Rags, delivery=BroadcastMessage, options=1, functionCall=Impulse(), everyFrame=false)
+    on FINISHED → Roar
+  }
+
+  state Small Wake {
+    SendEventToRegister(eventName="PAUSE TENTACLES")
+    SendEventToRegister(eventName="VAULTKEEPER EMERGED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vaultcentipede_cry (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SendEventToRegister(eventName="FORCE MOVE TENTACLES")
+    SendMessageV2(gameObject=Librarian Scene/Librarian Rags, delivery=BroadcastMessage, options=1, functionCall=Impulse(), everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Emerge Dust", emit=0, resetIfPlaying=true)
+    PlayAudioEvent(audioClip=librarian_move_into_view (sfxstatic_assets_arealibrary.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Appear", AnimationCompleteEvent=→"FINISHED")
+    on FINISHED → Roar Small
+  }
+
+  state Enable {
+    SendEventToRegister(eventName="FORCE MOVE TENTACLES END")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state No Relics Dlg {
+    RunDialogue(Sheet="City", Key="LIBRARIAN_NO_RELICS", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TextAlignmentOptions(0), OffsetY=0, Target=Self)
+    on CANCEL → Open Relic Board
+    on CONVO_END → Open Relic Board
+  }
+
+  sequence state Dlg End {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    BoolTest(boolVariable=var "Do Quest Updated", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ShowQuestUpdatedStandalone(Quest=Citadel Ascent Melody Librarian Return (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle))
+    SetBoolValue(boolVariable=var "Do Quest Updated", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Roar {
+    StartRoarEmitter(spawnPoint=Librarian Scene/Librarian/Roar Point, delay=0, stunHero=false, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    PlayAudioEvent(audioClip=scream_rumble_miscellaneous (sfxstatic_assets_areaarboriumareabonearealibraryareashellwoodareawilds.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Roar End
+  }
+
+  sequence state Roar End {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopRoarLock", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    Comment(comment="Added to prevent animation snapping when regaining control and detecting input (eg jump). Make sure to remove lock")
+    HeroLockState(heroLockStates=ControlLocked, mode=Add, setOppositeOnExit=false)
+    StopRoarEmitter(delay=0)
+    HeroControllerMethods(method=RegainControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))  // disabled
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SendEventToRegister(eventName="FORCE MOVE TENTACLES END")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Antic", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Wait
+  }
+
+  state First Relic Ask Dlg {
+    SetPlayerDataVariable(VariableName="LibrarianAskedForRelic", SetValue=true)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_FIRST_RELIC_ASK", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Relics?
+  }
+
+  sequence state Give Relics? {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    HeroLockState(heroLockStates=ControlLocked, mode=Remove, setOppositeOnExit=false)
+    RelicBoardOwnerYesNo(Target=Self, TranslationSheet="City", TranslationKey="LIBRARIAN_RELIC_ASK_PROMPT", TranslationKeyPlural="LIBRARIAN_RELIC_ASK_PROMPT_PLURAL", YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on TRUE → Grab All Relics
+    on FALSE → Declined Dlg
+  }
+
+  state Has Relics? {
+    BoolTest(boolVariable=var "Was Tinked", isTrue=→"TINKED", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTrueAndFalse(trueBool="blackThreadWorld", falseBool="LibrarianMetAct3", isTrue=→"ACT3", isFalse=(none))
+    CallMethodProper(gameObject=Self, behaviour="RelicBoardOwner", methodName="IsAllRelicsDeposited", parameters=[], storeResult=var "AllRelicsDeposited", EveryFrame=false)
+    BoolTest(boolVariable=var "AllRelicsDeposited", isTrue=→"DESPOSITED ALL RELICS", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RelicBoardOwner", methodName="IsAnyRelicsToDeposit", parameters=[], storeResult=var "Has Relics", EveryFrame=false)
+    BoolTest(boolVariable=var "Has Relics", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Given First?
+    on FALSE → Quest Help Dlg?
+    on TINKED → Tinked Dlg
+    on DESPOSITED ALL RELICS → Deposited All Relics Dlg
+    on ACT3 → Act 3 Meet
+  }
+
+  state Relic Ask Dlg {
+    RunDialogue(Sheet="City", Key="LIBRARIAN_RELIC_ASK", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Relics?
+  }
+
+  state First Relic Got Dlg {
+    SetPlayerDataVariable(VariableName="GivenLibrarianRelic", SetValue=true)
+    SetBoolValue(boolVariable=var "Do Close Speak", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_FIRST_RELIC_GOT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Open Relic Board
+  }
+
+  state Declined Dlg {
+    RunDialogue(Sheet="City", Key="LIBRARIAN_RELIC_DECLINED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Disappear
+  }
+
+  sequence state Disappear {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventToRegister(eventName="VAULTKEEPER LEFT")
+    SendEventToRegister(eventName="RESUME TENTACLES")
+    SendEventToRegister(eventName="FORCE MOVE TENTACLES")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    SendMessageV2(gameObject=Librarian Scene/Librarian Rags, delivery=BroadcastMessage, options=1, functionCall=Impulse(), everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Emerge Dust", emit=0, resetIfPlaying=true)
+    PlayAudioEvent(audioClip=librarian_move_into_view (sfxstatic_assets_arealibrary.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Disappear", AnimationCompleteEvent=(none))
+    SendEventToRegister(eventName="FORCE MOVE TENTACLES END")
+    on FINISHED → Reappear Wait
+  }
+
+  sequence state Grab All Relics {
+    BoolTest(boolVariable=var "Did Give Relic", isTrue=(none), isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Give Relic", boolValue=true, everyFrame=false)
+    PlayAudioEvent(audioClip=librarian_relic_grab_antic (sfxstatic_assets_arealibrary.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vaultcentipede_swipe (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Swipe Antic", AnimationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=librarian_relic_grab_grab (sfxstatic_assets_arealibrary.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Swipe", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Grab Flash
+  }
+
+  state Wait {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    HeroTurnToFace(Target=Self)
+    on FINISHED → First Relic Ask Dlg
+  }
+
+  sequence state Open Relic Board {
+    CallMethodProper(gameObject=Self, behaviour="RelicBoardOwner", methodName="DepositCollectedRelics", parameters=[], storeResult=(unset var), EveryFrame=false)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    ShowRelicBoard(Target=Self, ClosedEvent=→"CANCEL")
+    on CANCEL → Melody NoPlay Dlg
+    on MELODY CYLINDER PLAYED → Needolin Pre Wait
+  }
+
+  state Closed First Dlg {
+    BoolTest(boolVariable=var "Do Close Speak", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Close Speak", boolValue=false, everyFrame=false)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_CLOSED_FIRST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Dlg End
+    on CONVO_END → Dlg End
+  }
+
+  state First? {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    BoolTest(boolVariable=var "Skip Got Dlg", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    PlayerDataVariableTest(VariableName="GivenLibrarianRelic", ExpectedValue=false, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on CANCEL → Open Relic Board
+    on TRUE → First Relic Got Dlg
+    on FALSE → Relic Got Dlg
+  }
+
+  state Relic Got Dlg {
+    RunDialogue(Sheet="City", Key="LIBRARIAN_RELIC_GOT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TextAlignmentOptions(0), OffsetY=0, Target=Self)
+    on CONVO_END → Open Relic Board
+  }
+
+  state Grab Flash {
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    SendMessageV2(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=flashFocusHeal(), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=hornet_edge_grab_up (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=shiny_item_pickup (sfxstatic_assets_currency.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → First?
+  }
+
+  state Roar Small {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Roar End Small
+  }
+
+  sequence state Roar End Small {
+    SendEventToRegister(eventName="FORCE MOVE TENTACLES END")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Antic", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Enable
+  }
+
+  sequence state Reappear Wait {
+    WaitRandom(timeMin=3, timeMax=5, finishEvent=(none), realTime=false)
+    BoolTest(boolVariable=var "Was Tinked", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Enter Wait
+    on CANCEL → Small Wake
+  }
+
+  state Enter Wait {
+    TriggerEnterEventSubscribe(trigger=var "Wake Trigger", triggerEnteredEvent=→"ENTERED", triggerExitedEvent=(none), triggerStayedEvent=(none))
+    on ENTERED → Small Wake
+  }
+
+  state Given First? {
+    CollectableRelicCheck(Relic=Librarian Melody Cylinder (dataassets_assets_assets/dataassets/collectables/relics.bundle), StoreIsCollected=(unset), StoreIsDeposited=(unset), StoreIsInInventory=(unset), NotCollectedEvent=(none), IsCollectedEvent=(none), IsDepositedEvent=(none), IsInInventoryEvent=→"MELODY")
+    PlayerDataVariableTest(VariableName="GivenLibrarianRelic", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → First Ask Repeat Dlg
+    on TRUE → Relic Ask Dlg
+    on MELODY → Ask Melody
+  }
+
+  state First Ask Repeat Dlg {
+    RunDialogue(Sheet="City", Key="LIBRARIAN_FIRST_RELIC_ASK_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Relics?
+  }
+
+  sequence state Tinked {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vaultcentipede_hit_react (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=var "Arms Flailing", pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Tink Hit", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.7, finishEvent=(none), realTime=false)
+    SetBoolValue(boolVariable=var "Was Tinked", boolValue=true, everyFrame=false)
+    on FINISHED → Disappear
+  }
+
+  state Tinked Dlg {
+    SetBoolValue(boolVariable=var "Was Tinked", boolValue=false, everyFrame=false)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_TINKED_RETURN", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TextAlignmentOptions(0), OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End
+  }
+
+  state Exited {
+    SetBoolValue(boolVariable=var "Was Tinked", boolValue=false, everyFrame=false)
+    on FINISHED → Disappear
+  }
+
+  state Quest Help Dlg? {
+    PlayerDataVariableTest(VariableName="LibrarianMentionedMelody", ExpectedValue=true, IsExpectedEvent=→"CANCEL", IsNotExpectedEvent=(none))
+    CollectableRelicCheck(Relic=Librarian Melody Cylinder (dataassets_assets_assets/dataassets/collectables/relics.bundle), StoreIsCollected=(unset), StoreIsDeposited=(unset), StoreIsInInventory=(unset), NotCollectedEvent=(none), IsCollectedEvent=→"CANCEL", IsDepositedEvent=→"CANCEL", IsInInventoryEvent=(none))
+    CheckQuestState(NotTrackedEvent=→"CANCEL", TrackedEvent=(none), CompletedEvent=→"CANCEL", Quest=Citadel Ascent Melodies (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle))
+    SavedItemCanGetMore(Item=Citadel Ascent Melody Librarian (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle), trueEvent=(none), falseEvent=→"CANCEL", storeValue=(unset))
+    SetPlayerDataVariable(VariableName="LibrarianMentionedMelody", SetValue=true)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_QUEST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → No Relics Dlg
+    on CONVO_END → Open Relic Board
+  }
+
+  sequence state Needolin Pre Wait {
+    Comment(comment="Start playing now to allow for clip fully start on this audio source")
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=2, finishEvent=(none), realTime=false)
+    SetBoolValue(boolVariable=var "Did Give Relic", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Close Speak", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "In Melody Sequence", boolValue=true, everyFrame=false)
+    on FINISHED → Needolin Pre
+  }
+
+  state Needolin Pre {
+    RunDialogue(Sheet="City", Key="LIBRARIAN_MELODY_PLAY_PRE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Needolin
+  }
+
+  sequence state Needolin {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    SetPlayerDataBool(boolName="disableInventory", value=true)
+    HeroTurnToFace(Target=Librarian Scene/Gramaphone)
+    EnableFSM(gameObject=Self, fsmName="Melody Sing", enable=true, resetOnExit=false)
+    RunFSM(fsmTemplateControl=template=9181458956515203482 in[Melody End Time<-5.753, Melody End Includes Loop<-true, UI Msg Event<-var "UI Msg Event", Override Loop Object<-Librarian Scene/Gramaphone, Give Item<-var "Give Item", Melody End Clip<-melody_b_loop_with_end_baked_inv2 (sfxstatic_assets_arealibrary.bundle)], finishEvent=(none), everyFrame=false)
+    CallStaticMethod(className="HeroTalkAnimation", methodName="SetTalking", parameters=[false, true], storeResult=(unset var), everyFrame=false)
+    SetPlayerDataBool(boolName="disableInventory", value=false)
+    on FINISHED → Needolin Post
+  }
+
+  state Melody NoPlay Dlg {
+    CollectableRelicCheck(Relic=Librarian Melody Cylinder (dataassets_assets_assets/dataassets/collectables/relics.bundle), StoreIsCollected=(unset), StoreIsDeposited=var "Is Melody Deposited", StoreIsInInventory=(unset), NotCollectedEvent=(none), IsCollectedEvent=(none), IsDepositedEvent=(none), IsInInventoryEvent=(none))
+    GetPlayerDataBool(boolName="HasMelodyLibrarian", storeValue=var "Has Melody")
+    BoolTestMulti(boolVariables=[var "Is Melody Deposited", var "Has Melody"], boolStates=[true, false], trueEvent=(none), falseEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Give Relic", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Close Speak", boolValue=false, everyFrame=false)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_MELODY_NOPLAY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Close Given All
+    on CONVO_END → Dlg End
+  }
+
+  state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayAudioEvent(audioClip=relic_dealer_lean_over_hornet_intimidatingly (sfxstatic_assets_areabellarealibrary.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=3, MinReactDelay=0.5, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=vaultcentipede_pray (sfxdynamic_assets_arealibrary.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  sequence state Sing End {
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Sing End", AnimationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=relic_dealer_lean_back_to_normal (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Enable
+  }
+
+  state Ask Melody {
+    SetBoolValue(boolVariable=var "Skip Got Dlg", boolValue=true, everyFrame=false)
+    GetPlayerDataBool(boolName="LibrarianAskedForMelody", storeValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="LIBRARIAN_RELIC_ASK_MELODY", trueString="LIBRARIAN_RELIC_ASK_MELODY_REOFFER", everyFrame=false)
+    RunDialogue(Sheet="City", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataBool(boolName="LibrarianAskedForMelody", value=true)
+    on CONVO_END → Give Relics?
+  }
+
+  state Needolin Post {
+    SetBoolValue(boolVariable=var "Do Quest Updated", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_MELODY_PLAY_POST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "In Melody Sequence", boolValue=false, everyFrame=false)
+    on CONVO_END → Dlg End
+  }
+
+  state Deposited All Relics Dlg {
+    RunDialogue(Sheet="City", Key="LIBRARIAN_NO_RELICS_FULL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TextAlignmentOptions(0), OffsetY=0, Target=Self)
+    on CANCEL → Open Relic Board
+    on CONVO_END → Open Relic Board
+  }
+
+  state Act 3 Meet {
+    SetPlayerDataVariable(VariableName="LibrarianMetAct3", SetValue=true)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_ACT3_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TextAlignmentOptions(0), OffsetY=0, Target=Self)
+    on CONVO_END → Dlg End
+  }
+
+  state Close Given All {
+    BoolTest(boolVariable=var "Did Give Relic", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Give Relic", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RelicBoardOwner", methodName="IsAllRelicsDeposited", parameters=[], storeResult=var "Just Deposited All", EveryFrame=false)
+    BoolTest(boolVariable=var "Just Deposited All", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SetBoolValue(boolVariable=var "Just Deposited All", boolValue=false, everyFrame=false)
+    RunDialogue(Sheet="City", Key="LIBRARIAN_ALL_RELICS", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Closed First Dlg
+    on CONVO_END → Dlg End
+  }
+
+  sequence state Startle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=vaultcentipede_cry (sfxdynamic_assets_arealibrary.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=relic_dealer_lean_over_hornet_intimidatingly (sfxstatic_assets_areabellarealibrary.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Startle", AnimationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Idle
+  }
+
+  var Do Close Speak: bool = false
+  var Has Relics: bool = false
+  var Was Tinked: bool = false
+  var Is Melody Deposited: bool = false
+  var Has Melody: bool = false
+  var Skip Got Dlg: bool = false
+  var Test: bool = false
+  var AllRelicsDeposited: bool = false
+  var Just Deposited All: bool = false
+  var Did Give Relic: bool = false
+  var Do Quest Updated: bool = false
+  var In Melody Sequence: bool = false
+  var Dlg: string = ""
+  var Emerge Dust: gameObject = Librarian Scene/Librarian/Emerge Dust
+  var Tink Detector: gameObject = Librarian Scene/Librarian/Tink Detector
+  var Sleep Trigger: gameObject = Librarian Scene/Librarian/Sleep Range
+  var Gramaphone Main: gameObject = Librarian Scene/Gramaphone/Audio Loop Player
+  var Gramaphone Needolin Event: gameObject = <null>
+  var Audio Loop Voice: gameObject = Librarian Scene/Librarian/Audio Loop Voice
+  var Initial Wake Trigger: object = Librarian Scene/Librarian/Initial Wake Detector@TriggerEnterEvent
+  var Wake Trigger: object = Librarian Scene/Librarian/Wake Range@TriggerEnterEvent
+  var Arms Flailing: object = Vaultkeeper_body_shake (sfxstatic_assets_arealibrary.bundle)
+}

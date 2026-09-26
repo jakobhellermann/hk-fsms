@@ -1,0 +1,298 @@
+# Zombie Miner
+# 2 location(s):
+#   Mines_03 / Zombie Miner 1 (3)
+#   Mines_37 / Zombie Miner 1 (3)
+
+fsm Zombie Miner {
+  start Init
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Position", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Goal", floatValue=var "Point 1", everyFrame=false)
+    FloatAdd(floatVariable=var "Goal", add=var "Position", everyFrame=false, perSecond=false)
+    FindChild(gameObject=Self, childName="Floor Detector", storeResult=var "Floor Detector Obj")
+    FindChild(gameObject=Self, childName="Evade Range", storeResult=var "Evade Range Obj")
+    FindChild(gameObject=Self, childName="Slash Range", storeResult=var "Slash Range Obj")
+    FindChild(gameObject=Self, childName="Roof Check", storeResult=var "Roof Check Obj")
+    on FINISHED → Mining
+  }
+
+  state Idle {
+    BoolTest(boolVariable=var "Evade Range", isTrue=→"EVADE RANGE", isFalse=(none), everyFrame=true)
+    SetCircleCollider(gameObject=var "Waker", active=false)
+    BoolTest(boolVariable=var "Attack Range", isTrue=→"HERO IN RANGE", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Mining", isTrue=(none), isFalse=→"NOT MINING", everyFrame=false)
+    Wait(time=6, finishEvent=→"FINISHED", realTime=false)
+    on HERO IN RANGE → Startled?
+    on EVADE RANGE → Slash?
+    on NOT MINING → Running
+    on TOOK DAMAGE → Startled?
+    on UNALERT → 
+    on FINISHED → Unalert
+  }
+
+  state Attack Antic {
+    BoolTest(boolVariable=var "Roof Check", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Hero Distance", everyFrame=false)
+    StopWalker(target=Self, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"TRIGGER", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    on TRIGGER → Shoot
+    on CANCEL → Move Start
+  }
+
+  state Spawn Bullet R {
+    SpawnObjectFromGlobalPool(gameObject=Shot PickAxe (sharedassets73.assets), spawnPoint=var "SpawnPoint", position=(unset), rotation=(unset), storeObject=var "Pickaxe")
+    SetVelocity2d(gameObject=var "Pickaxe", vector=(unset), x=var "Hero Distance", y=19, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"Amin End")
+    SetWalkerFacing(walkRight=true, randomStartDir=false, target=Self, everyFrame=false)
+    on Amin End → Cooldown
+  }
+
+  state Cooldown {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.5, finishEvent=→"WAIT", realTime=false)  // disabled
+    WaitRandom(timeMin=0.1, timeMax=0.4, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Move Start
+  }
+
+  state Spawn Bullet L {
+    FloatMultiply(floatVariable=var "Hero Distance", multiplyBy=-1, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Shot PickAxe (sharedassets73.assets), spawnPoint=var "SpawnPoint", position=(unset), rotation=(unset), storeObject=var "Pickaxe")
+    SetVelocity2d(gameObject=var "Pickaxe", vector=(unset), x=var "Hero Distance", y=19, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"Amin End")
+    SetWalkerFacing(walkRight=false, randomStartDir=false, target=Self, everyFrame=false)
+    on Amin End → Cooldown
+  }
+
+  state Shoot {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=zombie_miner_throw (sharedassets32.assets))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="PLAY", delay=0, everyFrame=false)
+    RandomFloatV2(min=-1, max=1, storeResult=var "Distance Vary", everyFrame=false)
+    FloatAddV2(floatVariable=var "Hero Distance", add=var "Distance Vary", everyFrame=false, perSecond=false, fixedUpdate=false, activeBool=(unset))
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"SHOOTRIGHT", leftEvent=→"SHOOTLEFT", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)
+    on SHOOTLEFT → Spawn Bullet L
+    on SHOOTRIGHT → Spawn Bullet R
+  }
+
+  state Evade Start {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Floor Detector", isTrue=(none), isFalse=→"TERRAIN DETECTOR", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Evade Speed", floatValue=-13, everyFrame=false)
+    FloatCompare(float1=var "Scale", float2=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Evade Speed", floatValue=13, everyFrame=false)
+    on FINISHED → Evade Start Anim
+    on TERRAIN DETECTOR → Attack Choice
+  }
+
+  state Evade {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Evade Speed", y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hornet_small_jump (sharedassets15.assets), pitchMin=1.15, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Evade Recover
+  }
+
+  state Evade Recover {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hornet_ground_land (sharedassets28.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Evade Slash?
+  }
+
+  state Evade Start Anim {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Evade
+  }
+
+  state Mining {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    BoolTest(boolVariable=var "Mining", isTrue=(none), isFalse=→"NOT MINING", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Mining")
+    RandomInt(min=0, max=10, storeResult=var "Start Frame", inclusiveMax=true)
+    Tk2dPlayFrame(gameObject=Self, frame=var "Start Frame")
+    on NOT MINING → Running
+    on FINISHED → Idle
+    on TOOK DAMAGE → Idle
+  }
+
+  state Run and Mine {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Position", y=(unset), z=(unset), space=0, everyFrame=false)
+    DebugLog(logLevel=1, text="Run and Mine", sendToUnityLog=false)
+    FloatCompare(float1=var "Position", float2=var "Goal", tolerance=1, equal=→"TURN", lessThan=(none), greaterThan=(none), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Run Speed", y=(unset), everyFrame=false)
+    on TURN → Set Goal
+    on FINISHED → Pause Frame
+  }
+
+  state Running {
+    DebugLog(logLevel=1, text="Running", sendToUnityLog=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    FaceDirection(gameObject=Self, spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", everyFrame=false, pauseBetweenTurns=false, pauseTime=0)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Run and Mine
+  }
+
+  state Set Goal {
+    FloatCompare(float1=var "Goal", float2=var "Point 1", tolerance=0, equal=→"SWAP GOAL", lessThan=(none), greaterThan=(none), everyFrame=false)
+    DebugLog(logLevel=1, text="Set Goal", sendToUnityLog=false)
+    SetFloatValue(floatVariable=var "Goal", floatValue=var "Point 1", everyFrame=false)
+    FloatAdd(floatVariable=var "Goal", add=var "Position", everyFrame=false, perSecond=false)
+    FloatMultiplyV2(floatVariable=var "Run Speed", multiplyBy=-1, everyFrame=false, fixedUpdate=false)
+    on FINISHED → Run and Mine
+    on SWAP GOAL → SWAP GOAL
+  }
+
+  state SWAP GOAL {
+    SetFloatValue(floatVariable=var "Goal", floatValue=var "Point 2", everyFrame=false)
+    DebugLog(logLevel=1, text="Swap Goal", sendToUnityLog=false)
+    FloatAdd(floatVariable=var "Goal", add=var "Position", everyFrame=false, perSecond=false)
+    FloatMultiplyV2(floatVariable=var "Run Speed", multiplyBy=-1, everyFrame=false, fixedUpdate=false)
+    on FINISHED → Run and Mine
+  }
+
+  state Pause Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Move Start {
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Startled? {
+    StopWalker(target=Self, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP MINING", delay=0, everyFrame=false)
+    SetCircleCollider(gameObject=var "Waker", active=true)
+    BoolTest(boolVariable=var "Startled", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Startled", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Floor Detector Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Evade Range Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Range Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Roof Check Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Shift?
+  }
+
+  state Shift? {
+    SendRandomEvent(events=[→"FINISHED", →"CANCEL"], weights=[0.6, 0.4], delay=0)
+    on CANCEL → Movestart
+    on FINISHED → Start Shift
+  }
+
+  state Start Shift {
+    RandomBool(storeResult=var "Facing Right")  // disabled
+    SetWalkerFacing(walkRight=(unset), randomStartDir=true, target=Self, everyFrame=false)
+    on FINISHED → Movestart
+  }
+
+  state End Shift {
+    StopWalker(target=Self, everyFrame=false)
+    on FINISHED → Attack Choice
+  }
+
+  state Movestart {
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    WaitRandom(timeMin=0.15, timeMax=0.65, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End Shift
+  }
+
+  state Face Hero {
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    on FINISHED → Evade Start
+  }
+
+  state Attack Choice {
+    BoolTest(boolVariable=var "Slash Range", isTrue=→"SLASH", isFalse=→"THROW", everyFrame=false)
+    on THROW → Attack Antic
+    on SLASH → Slash Antic
+  }
+
+  state Slash Antic {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="MOVESTOP", delay=0, everyFrame=false)
+    StopWalker(target=Self, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Slash
+  }
+
+  state Slash {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[zombie_shield_sword_1 (sharedassets32.assets), zombie_shield_sword_2 (sharedassets32.assets), zombie_shield_sword_3 (sharedassets32.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Slash Speed", float2=var "Scale", operation=Multiply, storeResult=var "Slash Speed Crt", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Slash Speed Crt", y=(unset), everyFrame=false)  // disabled
+    on FINISHED → Slash Recover
+  }
+
+  state Slash Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Cooldown
+  }
+
+  state Evade Slash? {
+    SendRandomEvent(events=[→"SLASH", →"FINISHED"], weights=[1, 1], delay=0)
+    on FINISHED → Cooldown
+    on SLASH → Slash Antic
+  }
+
+  state Slash? {
+    StopWalker(target=Self, everyFrame=false)
+    SendRandomEvent(events=[→"SLASH", (none)], weights=[0.6, 0.4], delay=0)
+    BoolTest(boolVariable=var "Slash Range", isTrue=→"SLASH", isFalse=→"FINISHED", everyFrame=false)  // disabled
+    on FINISHED → Face Hero
+    on SLASH → Slash Antic
+  }
+
+  state Unalert {
+    BoolTest(boolVariable=var "Startled", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Startled", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Floor Detector Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Evade Range Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Range Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Roof Check Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Point 1: float = 10
+  var Point 2: float = -20
+  var Run Speed: float = 10
+  var Mining: bool = true
+  var SpawnPoint: gameObject = Zombie Miner 1 (3)/SpawnPoint
+
+  var Distance Vary: float = 0
+  var Evade Speed: float = 0
+  var Goal: float = 0
+  var Hero Distance: float = 0
+  var Position: float = 0
+  var Scale: float = 0
+  var Slash Speed: float = 12
+  var Slash Speed Crt: float = 0
+  var Start Frame: int = 0
+  var Attack Range: bool = false
+  var Evade Range: bool = false
+  var Facing Right: bool = false
+  var Floor Detector: bool = false
+  var Roof Check: bool = false
+  var Slash Range: bool = false
+  var Startled: bool = false
+  var Evade Range Obj: gameObject = <null>
+  var Floor Detector Obj: gameObject = <null>
+  var Pickaxe: gameObject = <null>
+  var Roof Check Obj: gameObject = <null>
+  var Self: gameObject = <null>
+  var Slash: gameObject = Zombie Miner 1 (3)/Slash
+  var Slash Range Obj: gameObject = <null>
+  var Waker: gameObject = Zombie Miner 1 (3)/Waker
+}

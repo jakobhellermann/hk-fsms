@@ -1,0 +1,118 @@
+# Conversation Control
+# 1 location(s):
+#   Town / Nymm NPC
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Idle
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="Display Right", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="NYMM", everyFrame=false)
+    on FINISHED → Choice
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Meet {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NYMM_MEET", "CP2"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="nymmSpoken", value=true)  // disabled
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Nymm_talk_01 (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Get Charm
+  }
+
+  state Choice {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="nymmSpoken", isTrue=(none), isFalse=→"MEET")
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="equippedCharm_40", falseBool="nymmCharmConvo", isTrue=→"EQUIPPED", isFalse=(none))
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="openedBlackEggDoor", falseBool="nymmFinalConvo", isTrue=→"FINAL", isFalse=(none))
+    on MEET → Meet
+    on FINISHED → Repeat
+    on EQUIPPED → Equipped
+    on FINAL → Final
+  }
+
+  state Repeat {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NYMM_REPEAT", "CP2"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Nymm_talk_03 (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Get Charm {
+    SetPlayerDataBool(boolName="nymmSpoken", value=true)
+    SetPlayerDataBool(boolName="gotCharm_40", value=true)
+    SetPlayerDataInt(intName="grimmChildLevel", value=5)
+    SetPlayerDataInt(intName="charmCost_40", value=3)
+    CreateObject(gameObject=Item Get Effect (sharedassets7.assets), spawnPoint=var "Hero", position=(0, -0.76, -1), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=shiny_item_pickup (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    CreateObject(gameObject=Relic Get Msg (resources.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Msg", networkInstantiate=false, networkGroup=0)
+    FindChild(gameObject=var "Msg", childName="Text", storeResult=var "Msg Text")
+    FindChild(gameObject=var "Msg", childName="Icon", storeResult=var "Msg Icon")
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=charm_grimmkin_05 (resources.assets))
+    GetLanguageString(sheetName="UI", convName="CHARM_NAME_40_N", storeValue=var "Msg text")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Msg text")
+    on FINISHED → Talk Finish
+  }
+
+  state Equipped {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NYMM_BRUMM_CHARM", "CP2"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="nymmCharmConvo", value=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Nymm_talk_02 (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Final {
+    SetPlayerDataBool(boolName="nymmFinalConvo", value=true)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="nymmMissedEggOpen", isTrue=→"CANCEL", isFalse=(none))
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NYMM_FINAL", "CP2"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Nymm_talk_02 (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+    on CANCEL → Repeat
+  }
+
+  var Spoken: bool = false
+  var Msg text: string = ""
+  var Area Title: gameObject = <null>
+  var Msg: gameObject = <null>
+  var Msg Icon: gameObject = <null>
+  var Msg Text: gameObject = <null>
+  var Self: gameObject = <null>
+}

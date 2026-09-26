@@ -1,0 +1,227 @@
+# Control
+# 2 location(s):
+#   Coral_23 / Coral Spike Goomba
+#   Coral_24 / Coral Spike Goomba
+
+fsm Control {
+  start Pause
+
+  state Init {
+    GetPersistentBool(target=var "z Crust Wall Persistent", storeValue=var "Crust Wall Broken")
+    BoolTest(boolVariable=var "Crust Wall Broken", isTrue=→"WALL BROKEN", isFalse=(none), everyFrame=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Rest", equalEvent=→"HIDING", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Wait for Hero
+    on HIDING → Hiding
+    on WALL BROKEN → Wall Broken
+  }
+
+  state Walking {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    PlayParticleEmitterInState(gameObject=var "Pt Walk")
+    on SING → Start Sing Walking
+    on ATTACK → Charge Start
+    on TOOK DAMAGE → Range Check
+  }
+
+  sequence state Start Sing Walking {
+    AudioStop(gameObject=Self, fadeTime=0)
+    PlayAudioEventRandom(audioClips=[coral_tree_grow_1 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_2 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_3 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_4 (sfxstatic_assets_areacoral.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    StopCrawler(Target=Self, WaitForTurn=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetAudioSource(gameObject=Self, active=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Sing
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=coral_spike_goomba_sing (sfxdynamic_assets_areacoral.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Charge Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=12, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.88, decelerationY=(unset), brakeOnExit=false)
+    RayCast2dV2(fromGameObject=var "EdgeBehind Ray", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "No Floor Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlipEveryFrame(boolVariable=var "No Floor Behind", everyFrame=true)
+    SetVelocity2dBool(gameObject=Self, activeBool=var "No Floor Behind", vector=(unset), x=0, y=(unset), everyFrame=true)
+    PlayAudioEventRandom(audioClips=[coral_tree_grow_1 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_2 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_3 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_4 (sfxstatic_assets_areacoral.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=coral_spike_goomba_gruntmed (sfxdynamic_assets_areacoral.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Charge
+  }
+
+  state Range Check {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=0, tolerance=9, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on FINISHED → Charge Start
+    on CANCEL → Walking
+  }
+
+  state Start Walker {
+    SetAudioSource(gameObject=Self, active=true)
+    StartCrawler(Target=Self, ScheduleTurn=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    on FINISHED → Walk Start
+  }
+
+  state Charge {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "X Scale", float2=-18, operation=Multiply, storeResult=var "Charge Speed", everyFrame=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=0.8, targetSpeed=var "Charge Speed")
+    PlayParticleEmitterInState(gameObject=var "Pt Charge")
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=false, DistancePast=6, StoreResult=(unset), PassedEvent=→"PASS", NotPassedEvent=(none), EveryFrame=true)
+    RayCast2dV2(fromGameObject=var "Wall Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Wall Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Wall Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Edge Ray", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Ground Ahead", var "Wall Ahead"], boolStates=[false, false], trueEvent=→"SKID", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Breaker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlayInState(gameObject=var "Charge Loop", volume=1)
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed Crt", everyFrame=true)
+    FloatCompare(float1=var "Speed Crt", float2=0, tolerance=0, equal=→"SKID", lessThan=(none), greaterThan=(none), everyFrame=true)
+    on SKID → Skid
+    on WALL → Wall Hit
+    on PASS → No Turn
+  }
+
+  state Skid {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitterInState(gameObject=var "Pt Charge")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    PlayAudioEvent(audioClip=bone_goomba_large_emerge (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=coral_spike_goomba_gruntshort (sfxdynamic_assets_areacoral.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Face Hero
+  }
+
+  state Wall Hit {
+    ActivateGameObject(gameObject=var "Wall Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=coral_spike_goomba_gruntshort (sfxdynamic_assets_areacoral.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Skid
+  }
+
+  state No Turn {
+    SetBoolValue(boolVariable=var "No Turn", boolValue=true, everyFrame=false)
+    on FINISHED → Skid
+  }
+
+  state Walk Start {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Walking
+    on SING → Start Sing Walking
+  }
+
+  state Charge Start {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioStop(gameObject=Self, fadeTime=0)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    StopCrawler(Target=Self, WaitForTurn=true)
+    SetAudioSource(gameObject=Self, active=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Charge Antic
+    on SING → Start Sing Walking
+  }
+
+  state Hiding {
+    SetTransformParent(gameObject=var "Crust Walls", parent=<null>, worldPositionStays=true)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on WAKE → Wake Antic
+    on TOOK DAMAGE → Wake Antic
+    on CORAL DAMAGED → Wake Antic
+    on CORAL DESTROYED → Wake
+    on BREAK → Wake Antic
+  }
+
+  state Wake Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wake Antic")
+    PlayParticleEmitter(gameObject=var "Pt WakeAntic", emit=0, resetIfPlaying=false)
+    SendEventByName(eventTarget=GameObject(var "Crust Walls"), sendEvent="FORCE DAMAGE", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=coral_spike_goomba_gruntmed (sfxdynamic_assets_areacoral.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Fall
+    on CORAL DESTROYED → Fall
+  }
+
+  state Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Face Hero
+  }
+
+  state Wait For Grounded {
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    on LAND → Face Hero
+  }
+
+  state Pause {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Init
+  }
+
+  state Wait for Hero {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on WAKE → Start Walker
+  }
+
+  state Face Hero {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Start Walker
+  }
+
+  state Wall Broken {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Walk")
+    ActivateGameObject(gameObject=var "Crust Walls", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Start Walker
+  }
+
+  state Fall {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    SendEventByName(eventTarget=GameObject(var "Crust Walls"), sendEvent="BREAK", delay=0, everyFrame=false)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    on LAND → Wake
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEventRandom(audioClips=[coral_tree_grow_1 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_2 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_3 (sfxstatic_assets_areacoral.bundle), coral_tree_grow_4 (sfxstatic_assets_areacoral.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Start Walker
+  }
+
+  var z Crust Wall Persistent: gameObject = <null>
+
+  var Distance: float = 0
+  var X Scale: float = 0
+  var Charge Speed: float = 0
+  var Speed Crt: float = 0
+  var Ground Ahead: bool = false
+  var No Floor Behind: bool = false
+  var No Turn: bool = false
+  var Wall Ahead: bool = false
+  var Crust Wall Broken: bool = false
+  var Clip: string = ""
+  var Audio Loop Voice: gameObject = Coral Spike Goomba/Audio Loop Voice
+  var Breaker: gameObject = Coral Spike Goomba/Breaker
+  var Charge Loop: gameObject = Coral Spike Goomba/Charge Loop
+  var Crust Walls: gameObject = Coral Spike Goomba/Crust Walls
+  var Edge Ray: gameObject = Coral Spike Goomba/Edge Ray
+  var EdgeBehind Ray: gameObject = Coral Spike Goomba/EdgeBehind Ray
+  var Pt Charge: gameObject = Coral Spike Goomba/Pt Charge
+  var Pt WakeAntic: gameObject = Coral Spike Goomba/Pt WakeAntic
+  var Wall Effect: gameObject = Coral Spike Goomba/Wall Effect
+  var Wall Ray: gameObject = Coral Spike Goomba/Wall Ray
+  var Pt Walk: gameObject = Coral Spike Goomba/Pt Walk
+}

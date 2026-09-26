@@ -1,0 +1,190 @@
+# flea_game_master_control
+# 1 location(s):
+#   Aqueduct_05_festival / Caravan_States/Flea Festival/Flea Game - Bouncing
+
+// uses template: flea_game_master_control
+fsm flea_game_master_control {
+  start Init
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Flea Games Host NPC")
+    FindNamedChild(gameObject=Self, storeResult=var "Active While Playing")
+    FindNamedChild(gameObject=Self, storeResult=var "Inactive While Playing")
+    FindNamedChild(gameObject=Self, storeResult=var "Active During Game End")
+    FindNamedChild(gameObject=Self, storeResult=var "Game Start Pos")
+    FindNamedChild(gameObject=Self, storeResult=var "Game End Pos")
+    ActivateGameObject(gameObject=var "Inactive While Playing", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Active While Playing", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Active During Game End", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AddEventRegister(target=Self, eventName="GAME END")
+    AddEventRegister(target=Self, eventName="SCORE")
+    AddEventRegister(target=Self, eventName="GAME END MANUAL")
+    on FINISHED → Inactive
+  }
+
+  state Inactive {
+    on GAME BEGIN → Transition To Game
+  }
+
+  sequence state Transition To Game {
+    ActivateWorldRumble(SetActive=false)
+    SendEventToRegister(eventName="AMBIENT FLEA AUDIO STOP")
+    PlayAudioEvent(audioClip=flea_games_start_sting (sfxstatic_assets_areaaqueduct.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Music@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=1)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="PREPARE FLEA GAME", delay=0, everyFrame=false)
+    Wait(time=1.75, finishEvent=(none), realTime=false)
+    ClearHeroEffects()
+    RunGarbageCollector(finishEvent=(none))
+    GetSilk(StoreAmount=var "Add Silk")
+    TakeSilk(target=var "Hero", amount=var "Add Silk")
+    GetPlayerDataVariable(VariableName="silkRegenMax", StoreValue=var "Add Silk")
+    AddSilk(target=var "Hero", amount=var "Add Silk", playHeroEffect=false)
+    ToolsActiveStateControl(SetActiveState=Disabled)
+    ActivateGameObject(gameObject=var "Inactive While Playing", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Active While Playing", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scene Fleas", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Hero", targetObject=var "Game Start Pos", xOffset=0, yOffset=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Flea Games Host NPC", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Other Host 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Other Host 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Counter", behaviour="SimpleCounter", methodName="Appear", parameters=[], storeResult=(unset var), EveryFrame=false)
+    GetPlayerDataVariable(VariableName=var "Score PD Int", StoreValue=var "Saved Score")
+    GetConstantsValue(variableName=var "Score Constants Int", storeValue=var "Min Score")
+    GetConstantsValue(variableName=var "Score Constants Int Seth", storeValue=var "Min Score Plus")
+    GetPlayerDataBool(boolName="SethJoinedFleatopia", storeValue=var "Seth Joined")
+    ConvertBoolToInt(boolVariable=var "Seth Joined", intVariable=var "Min Score Plus", falseValue=0, trueValue=var "Min Score Plus", everyFrame=false)
+    IntOperator(integer1=var "Min Score", integer2=var "Min Score Plus", operation=Max, storeResult=var "Min Score", everyFrame=false)
+    IntOperator(integer1=var "Saved Score", integer2=var "Min Score", operation=Max, storeResult=var "Saved Score", everyFrame=false)
+    CallMethodProper(gameObject=var "Counter", behaviour="SimpleCounter", methodName="SetTarget", parameters=[var "Saved Score"], storeResult=(unset var), EveryFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    ClearHeroEffects()
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=1)
+    Wait(time=1.1, finishEvent=(none), realTime=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Transitioning - Can End
+  }
+
+  state Begin Game {
+    SetIntValue(intVariable=var "Score", intValue=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="GAME BEGIN PLAY", delay=0, everyFrame=false)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=true, bossTitle=var "Title Key")
+    on FINISHED → Playing
+  }
+
+  state Playing {
+    on GAME END → Take Control
+    on SCORE → Increment Score
+    on GAME END MANUAL → Manual End
+  }
+
+  state Take Control {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    ActivateGameObject(gameObject=var "Active During Game End", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="FLEA GAME FAILED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="GAME FAILED", delay=0, everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=0.5)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Music (audioobjects_assets_all.bundle), spawnPoint=var "Hero", audioClip=H95 End Sting (audiocuesstatic_assets_fleacaravan.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.25, storePlayer=<null>)
+    RunFSM(fsmTemplateControl=template=5120264638226263702, finishEvent=(none), everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End Fadeout
+  }
+
+  sequence state Transition From Game {
+    ToolsActiveStateControl(SetActiveState=Active)
+    CallMethodProper(gameObject=var "Counter", behaviour="SimpleCounter", methodName="Disappear", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="GAME END PLAY", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Inactive While Playing", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Active During Game End", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scene Fleas", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Hero", targetObject=var "Game End Pos", xOffset=0, yOffset=0, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    ActivateGameObject(gameObject=var "Active While Playing", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Flea Games Host NPC", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Other Host 1", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Other Host 2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    SendEventToRegister(eventName="AMBIENT FLEA AUDIO START")
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=1)
+    Wait(time=1.6, finishEvent=(none), realTime=false)
+    ActivateWorldRumble(SetActive=true)
+    on FINISHED → Save Max
+  }
+
+  state Increment Score {
+    IntAdd(intVariable=var "Score", add=1, everyFrame=false)
+    FsmIntAdd(gameObject=Self, fsmName="Game Specific Control", variableName="Scores On Board", addValue=-1, everyFrame=false)
+    FsmIntAdd(gameObject=Self, fsmName="Game Specific Control", variableName="Score Until Set Complete", addValue=-1, everyFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Game Specific Control"), sendEvent="SCORE", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Counter", behaviour="SimpleCounter", methodName="Increment", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Playing
+  }
+
+  state Manual End {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=0.5)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Music (audioobjects_assets_all.bundle), spawnPoint=var "Hero", audioClip=H95 End Sting (audiocuesstatic_assets_fleacaravan.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.25, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="GAME FAILED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="FLEA GAME FAILED")
+    Wait(time=2, finishEvent=(none), realTime=false)
+    ActivateGameObject(gameObject=var "Active During Game End", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → End Fadeout
+  }
+
+  state Save Max {
+    GetPlayerDataVariable(VariableName=var "Score PD Int", StoreValue=var "Saved Score")
+    IntCompare(integer1=var "Score", integer2=var "Saved Score", equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetPlayerDataVariable(VariableName=var "Score PD Int", SetValue=var "Score")
+    on FINISHED → Pass Control
+  }
+
+  state Pass Control {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    RemoveHeroInputBlocker(Blocker=Self)
+    SendEventByName(eventTarget=GameObject(var "Flea Games Host NPC"), sendEvent="GAME COMPLETED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="ANY GAME COMPLETED")
+    on FINISHED → Inactive
+  }
+
+  sequence state End Fadeout {
+    ApplyMusicCue(musicCue=None (audiocuesdynamic_assets_shared.bundle), delayTime=0, transitionTime=0)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=1)
+    Wait(time=1.25, finishEvent=(none), realTime=false)
+    ActivateGameObject(gameObject=var "AreaTitle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    RunGarbageCollector(finishEvent=(none))
+    on FINISHED → Transition From Game
+  }
+
+  sequence state Transitioning - Can End {
+    Wait(time=0.25, finishEvent=(none), realTime=false)
+    ApplyMusicCue(musicCue=Pinstress (audiocuesdynamic_assets_areaaqueduct.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.1)
+    on FINISHED → Begin Game
+    on GAME END → Take Control
+  }
+
+  var Score PD Int: string = "fleaGames_bouncing_highscore"
+  var Title Key: string = "FLEA_BOUNCE"
+  var Score Constants Int: string = "FLEA_FESTIVAL_CHAMP_BOUNCE"
+  var Score Constants Int Seth: string = "FLEA_FESTIVAL_SETH_BOUNCE"
+  var Other Host 1: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Flea Games Host NPC
+  var Other Host 2: gameObject = Caravan_States/Flea Festival/Flea Game - Dodging/Flea Games Host NPC
+  var Scene Fleas: gameObject = Caravan_States/Flea Festival/Fleas - Disabled During Games
+  var Counter: gameObject = Flea Games Counter Bounce Variant
+
+  var Score: int = 0
+  var Saved Score: int = 0
+  var Add Silk: int = 0
+  var Min Score: int = 0
+  var Min Score Plus: int = 0
+  var Seth Joined: bool = false
+  var Flea Games Host NPC: gameObject = <null>
+  var Active While Playing: gameObject = <null>
+  var Game Start Pos: gameObject = <null>
+  var Game End Pos: gameObject = <null>
+  var Inactive While Playing: gameObject = <null>
+  var Active During Game End: gameObject = <null>
+}

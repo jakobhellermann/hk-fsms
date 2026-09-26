@@ -1,0 +1,113 @@
+# Control
+# 1 location(s):
+#   Peak_07 / Pinstress Control/No Pinstress Scene/Peaks Drifter (11)
+
+fsm Control {
+  start Init
+  on ZERO HP → Die  // from any state
+
+  state Init {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomInt(min=3, max=8, storeResult=var "Start Frame", inclusiveMax=true, noRepeat=false)
+    Tk2dPlayFrame(gameObject=Self, frame=var "Start Frame")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    AudioPlayInState(gameObject=Self, volume=1)
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1.5, speedMax=5, accelerationMin=10, accelerationMax=15, roamingRangeX=0.75, roamingRangeY=0.75, manualStartPos=var "Start Pos")  // disabled
+    BoolTest(boolVariable=var "Blizzard", isTrue=→"BLIZZARD", isFalse=(none), everyFrame=false)
+    IdleBuzzV4(gameObject=Self, waitMin=0.75, waitMax=1.5, speedMax=5, deceleration=0.95, accelerationMin=10, accelerationMax=15, roamingRangeX=0.4, roamingRangeY=0.35, manualStartPos=(unset))  // disabled
+    TiltBySpeed(gameObject=Self, tiltFactor=-12, tiltMax=8, rotationSpeed=5)  // disabled
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.3, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on TOOK DAMAGE → Damage
+    on BLIZZARD → Blizzard Idle
+    on SING → Sing
+  }
+
+  state Damage {
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Bounce")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)  // disabled
+    on FINISHED → Idle
+    on TOOK DAMAGE → Damage
+  }
+
+  state Die {
+    SetIsDead(target=Self, setValue=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopSway())
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=500, z=(unset), space=0, everyFrame=false, lateUpdate=false)  // disabled
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    WaitRandom(timeMin=2.5, timeMax=2.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    BlackThreadStateReset(Target=Self)
+    on FINISHED → Respawn
+  }
+
+  state Respawn {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RefillHP())
+    SetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=30, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    TranslateRandom(gameObject=Self, translateMin=(-10, 5, 0), translateMax=(10, 10, 0), space=0)
+    on FINISHED → Fly In
+  }
+
+  state Fly In {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly In")
+    AnimatePositionTo(gameObject=Self, toValue=var "Start Pos", localSpace=false, time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 0), everyframe=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(0.4433962, 0.4433962, 0.4433962, 1), duration=0.5)
+    on FINISHED → Land
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly In End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    on FINISHED → Fly
+  }
+
+  state Fly {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rise")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartSway())
+    on FINISHED → Idle
+  }
+
+  state Blizzard Idle {
+    IdleBuzzV4(gameObject=Self, waitMin=0.75, waitMax=1.5, speedMax=5, deceleration=0.95, accelerationMin=20, accelerationMax=25, roamingRangeX=0.1, roamingRangeY=0.1, manualStartPos=(unset))
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=-30, space=0, everyFrame=false, lateUpdate=false)
+    WaitRandom(timeMin=1, timeMax=2, finishEvent=→"BLOW", realTime=false)  // disabled
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=true, limitFps=20)  // disabled
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.3, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Idle
+    on TOOK DAMAGE → Damage
+    on SING → Sing
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=peak_drifter_sing (sfxdynamic_assets_areapeak.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fly
+  }
+
+  var Blizzard: bool = false
+
+  var Start Frame: int = 0
+  var Start Pos: vector3 = (0, 0, 0)
+  var Damage Collider: gameObject = Pinstress Control/No Pinstress Scene/Peaks Drifter (11)/Damage Collider
+  var Audio Loop Voice: gameObject = Pinstress Control/No Pinstress Scene/Peaks Drifter (11)/Audio Loop Voice
+}

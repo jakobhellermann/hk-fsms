@@ -1,0 +1,155 @@
+# Control
+# 1 location(s):
+#   Peak_06 / Crystal Drifter (1)
+
+fsm Control {
+  start Init
+
+  state Init {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Fly")
+    RandomFloat(min=0, max=7, storeResult=var "Start Frame")
+    Tk2dPlayFrame(gameObject=var "Sprite", frame=0)
+    SetAudioLoop(gameObject=Self, loop=true)
+    SetAudioClip(gameObject=Self, audioClip=crystal_drifter_fly_loop (sfxstatic_assets_areapeak.bundle), autoPlay=true, stopOnExit=false)
+    AudioPlayInState(gameObject=Self, volume=1)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on TOOK DAMAGE → Antic
+    on ATTACK → Antic
+    on TOOK HEAVY DAMAGE → Insta Break
+    on SING → Sing
+  }
+
+  state Antic {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    SetAudioLoop(gameObject=Self, loop=false)
+    SetAudioClip(gameObject=Self, audioClip=crystal_drifter_antic (sfxstatic_assets_areapeak.bundle), autoPlay=true, stopOnExit=false)
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Antic")
+    PlayParticleEmitterChildren(gameObject=var "Pt Antic", resetTimeIfPlaying=false, stopOnStateExit=true)
+    Wait(time=0.85, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlashingWhite())
+    StopParticleEmittersInChildren(gameObject=var "Pt Idle")
+    PlayParticleEmitterChildren(gameObject=var "Pt Broken", resetTimeIfPlaying=false, stopOnStateExit=false)
+    on FINISHED → Crystal Burst
+    on SING → Sing
+  }
+
+  state Crystal Burst {
+    SpawnRandomObjectsRadialV2(Prefab=Crystal Drifter Spikes (localpoolprefabs_assets_areapeak.bundle), SpawnPoint=Self, SpawnAsChildren=false, MinCount=8, MaxCount=8, MinAngle=0, MaxAngle=360, AngleErrorMax=2, SpawnRadius=3)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Burst", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitterChildren(gameObject=var "Pt Form", resetTimeIfPlaying=false, stopOnStateExit=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    PlayRandomAudioClipTable(Table=crystal_break (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayAudioEvent(audioClip=crystal_drifter_attack (sfxstatic_assets_areapeak.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Journal Entry?
+  }
+
+  state Spike Damage {
+    SetMeshRenderer(gameObject=var "Sprite", active=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spike Jitter
+  }
+
+  state Spike Jitter {
+    SendMessageV2(gameObject=Self, delivery=BroadcastMessage, options=1, functionCall=SendEvent("SPIKES JITTER"), everyFrame=false)  // disabled
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spike Break
+  }
+
+  state Spike Break {
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)  // disabled
+    SendMessageV2(gameObject=Self, delivery=BroadcastMessage, options=1, functionCall=SendEvent("SPIKES BREAK"), everyFrame=false)  // disabled
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reform Antic
+  }
+
+  state Reform Antic {
+    SetAudioClip(gameObject=Self, audioClip=crystal_drifter_re-spawn_start (sfxstatic_assets_areapeak.bundle), autoPlay=true, stopOnExit=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Pt ReformAntic", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt ReformAntic", resetTimeIfPlaying=false, stopOnStateExit=true)
+    on FINISHED → Reform
+  }
+
+  state Reform {
+    SetMeshRenderer(gameObject=var "Sprite", active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Regrow", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RefillHP())
+    on FINISHED → Reform 2
+  }
+
+  state Reform 2 {
+    PlayAudioEvent(audioClip=crystal_drifter_re-spawn_end (sfxstatic_assets_areapeak.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitterChildren(gameObject=var "Pt Reform", resetTimeIfPlaying=false, stopOnStateExit=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt Idle", resetTimeIfPlaying=false, stopOnStateExit=false)
+    StopParticleEmittersInChildren(gameObject=var "Pt Broken")
+    ActivateGameObject(gameObject=var "Pt ReformAntic", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Insta Break {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Burst", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitterChildren(gameObject=var "Pt Form", resetTimeIfPlaying=false, stopOnStateExit=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    PlayAudioEvent(audioClip=crystal_drifter_attack (sfxstatic_assets_areapeak.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Journal Entry? 2
+  }
+
+  state Insta Break End {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=var "Sprite", active=false)
+    on FINISHED → Reform Antic
+  }
+
+  state Journal Entry? {
+    HasTakenDamage(target=Self, takenDamageBool=var "Has Taken Damage", eventTarget=Self, takenDamageEvent=(none))
+    BoolTest(boolVariable=var "Has Taken Damage", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    RecordJournalKillV2(Record=Crystal Drifter (dataassets_assets_assets/dataassets/enemyjournal/journalrecords.bundle), ShowPopup=true)
+    on FINISHED → Spike Damage
+  }
+
+  state Journal Entry? 2 {
+    HasTakenDamage(target=Self, takenDamageBool=var "Has Taken Damage", eventTarget=Self, takenDamageEvent=(none))
+    BoolTest(boolVariable=var "Has Taken Damage", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    RecordJournalKillV2(Record=Crystal Drifter (dataassets_assets_assets/dataassets/enemyjournal/journalrecords.bundle), ShowPopup=true)
+    on FINISHED → Insta Break End
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Antic")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=crystal_drifter_sing (sfxdynamic_assets_areapeak.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  var Start Frame: float = 0
+  var Has Taken Damage: bool = false
+  var Start Pos: vector3 = (0, 0, 0)
+  var Pt Idle: gameObject = Crystal Drifter (1)/Pt Idle
+  var Pt Antic: gameObject = Crystal Drifter (1)/Pt Antic
+  var Pt Form: gameObject = Crystal Drifter (1)/Pt Form
+  var Pt ReformAntic: gameObject = Crystal Drifter (1)/Pt ReformAntic
+  var Pt Reform: gameObject = Crystal Drifter (1)/Pt Reform
+  var Pt Broken: gameObject = Crystal Drifter (1)/Pt Broken
+  var Current Audio: gameObject = <null>
+  var Sprite: gameObject = Crystal Drifter (1)/Sprite
+  var Audio Loop Voice: gameObject = Crystal Drifter (1)/Audio Loop Voice
+}

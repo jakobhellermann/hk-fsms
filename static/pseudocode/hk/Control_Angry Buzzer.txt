@@ -1,0 +1,93 @@
+# Control
+# 1 location(s):
+#   sharedassets34.assets / Angry Buzzer
+
+fsm Control {
+  start Initiate
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    IdleBuzz(gameObject=var "Self", waitMin=0.75, waitMax=1, speedMax=1.75, accelerationMax=15, roamingRange=1)
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    on ALERT → Startles?
+    on TOOK DAMAGE → Startles?
+  }
+
+  state Startle {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[buzzer_startle_01 (sharedassets6.assets), buzzer_startle_02 (sharedassets6.assets), buzzer_startle_03 (sharedassets6.assets)], weights=[1, 1, 1], pitchMin=1.2, pitchMax=1.4, volume=1, delay=0, storePlayer=<null>)
+    SetVelocity2d(gameObject=var "Self", vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Startle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    on ANIM END → Chase Start
+  }
+
+  state Startles? {
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")  // disabled
+    GetFsmGameObject(gameObject=var "Alerter", fsmName="alert_range", variableName="Hero", storeValue=var "Hero", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Startles", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Startle
+    on FALSE → Chase Start
+  }
+
+  state Chase - In Sight {
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    ChaseObject(gameObject=var "Self", target=var "Hero", speedMax=7, acceleration=0.175, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)
+    NextFrameEvent(sendEvent=→"WAIT")
+    on WAIT → Chase - Out of Sight
+  }
+
+  state Initiate {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Alert Range New", storeResult=var "Alerter")
+    GetHero(storeResult=var "Hero")
+    BoolTest(boolVariable=var "Start Alert", isTrue=→"ALERT", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+    on ALERT → Chase Start
+  }
+
+  state Chase - Out of Sight {
+    ChaseObject(gameObject=var "Self", target=var "Hero", speedMax=7, acceleration=0.175, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    Wait(time=var "Attention Span", finishEvent=→"WAIT", realTime=false)
+    on ALERT → Chase - In Sight
+    on WAIT → Stop
+  }
+
+  state Stop {
+    SetAudioPitch(gameObject=var "Self", pitch=1, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Tk2dPlayFrame(gameObject=var "Self", frame=3)
+    Decelerate(gameObject=var "Self", deceleration=0.12)
+    Wait(time=1, finishEvent=→"WAIT", realTime=false)
+    SetAudioClip(gameObject=Self, audioClip=bursting_buzzer_fly_loop)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on WAIT → Idle
+  }
+
+  state Chase Start {
+    SetAudioPitch(gameObject=var "Self", pitch=1.25, everyFrame=false)  // disabled
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Chase")
+    Tk2dPlayFrame(gameObject=var "Self", frame=3)
+    SetAudioClip(gameObject=Self, audioClip=infected_buzzer_attack_loop)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    Wait(time=0, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Chase - In Sight
+  }
+
+  var Attention Span: float = 8
+  var Start Alert: bool = false
+  var Startles: bool = true
+
+  var Can See Hero: bool = false
+  var In Alert Range: bool = false
+  var Alerter: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Self: gameObject = <null>
+}

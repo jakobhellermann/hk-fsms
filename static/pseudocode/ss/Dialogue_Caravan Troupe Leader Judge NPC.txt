@@ -1,0 +1,211 @@
+# Dialogue
+# 1 location(s):
+#   Coral_Judge_Arena / Caravan_Set/Caravan/Active/Caravan Troupe Leader Judge NPC
+
+fsm Dialogue {
+  start Init
+  on CARAVAN TRAVEL ENDED → Traveled Dlg  // from any state
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Should Wave?
+  }
+
+  state Idle {
+    on INTERACT → Met?
+  }
+
+  state Traveled Dlg {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_MEET_JUDGE_TRAVELED", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Reward Dlg
+  }
+
+  state End Dlg {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Meet {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_MEET_JUDGE", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Reward Dlg
+  }
+
+  state Repeat {
+    ConvertBoolToString(boolVariable=var "Need More Fleas", stringVariable=var "Dlg", falseString="TROUPE_LEADER_REPEAT_GENERIC", trueString="TROUPE_LEADER_REPEAT_JUDGE", everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dlg
+  }
+
+  state Met? {
+    PlayerDataBoolTest(boolName="MetCaravanTroupeLeaderJudge", isTrue=(none), isFalse=→"FALSE")
+    GetProperty(targetProperty=QuestTargetPlayerDataBools.CompletedCount on FleasCollected Target (dataassets_assets_assets/dataassets/questsystem/proxies.bundle), everyFrame=false)
+    IntCompareToBool(integer1=var "Fleas Saved", integer2=22, equalBool=(unset), lessThanBool=var "Need More Fleas", greaterThanBool=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName="CaravanTroupeLeaderCanLeaveJudge", isTrue=(none), isFalse=→"FINISHED")
+    BoolTest(boolVariable=var "Need More Fleas", isTrue=(none), isFalse=→"CAN LEAVE", everyFrame=false)
+    on FALSE → Meet
+    on FINISHED → Shared Dlg?
+    on CAN LEAVE → Ready To Leave
+  }
+
+  state End 3 {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    ActivateInteraction(Activate=false)
+    on FINISHED → No Travel
+  }
+
+  sequence state Travel Prompt {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    GetLanguageString(sheetName="Caravan", convName="TROUPE_TRAVEL_PROMPT", storeValue=var "Travel Prompt Text")
+    DialogueYesNo(Text=var "Travel Prompt Text", TranslationSheet="", TranslationKey="", UseCurrency=false, CurrencyCost=0, CurrencyType=None, YesEvent=→"SUCCESS", NoEvent=→"FAILURE", ReturnHUDAfter=false)
+    on SUCCESS → Accept
+    on FAILURE → Decline
+  }
+
+  state Decline {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_JUDGE_LEAVE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End 3
+  }
+
+  state End 2 {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=false, Target=Self, UseChildren=false)
+    ActivateInteraction(Activate=false)
+    on FINISHED → Travel
+  }
+
+  state Accept {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_JUDGE_TRAVEL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End 2
+  }
+
+  state Travel {
+    SendEventByNameV2(eventTarget=GameObjectFSM(var "Quest End Object", fsm="Quest End Sequence"), sendEvent="QUEST END TRAVEL", delay=0, everyFrame=false)
+  }
+
+  state No Travel {
+    SendEventByNameV2(eventTarget=GameObjectFSM(var "Quest End Object", fsm="Quest End Sequence"), sendEvent="QUEST END NOTRAVEL", delay=0, everyFrame=false)
+  }
+
+  state Can Leave {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_JUDGE_CANLEAVE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Travel Prompt
+  }
+
+  state Shared Dlg? {
+    RunFSM(fsmTemplateControl=template=1575824009301008301, finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → End Dlg
+    on CANCEL → Repeat
+  }
+
+  state Enough Fleas {
+    GetPlayerDataBool(boolName="SeenFleatopiaEmpty", storeValue=var "SeenFleatopiaEmpty")
+    BoolTest(boolVariable=var "SeenFleatopiaEmpty", isTrue=→"CAN LEAVE", isFalse=→"HINT", everyFrame=false)
+    on HINT → No Lake
+    on CAN LEAVE → Can Leave First
+  }
+
+  state Ready To Leave {
+    PlayerDataVariableTest(VariableName="TroupeLeaderSpokenFleatopiaSearch", ExpectedValue=true, IsExpectedEvent=→"CANCEL", IsNotExpectedEvent=(none))
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_JUDGE_READYTOLEAVE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Enough Fleas
+    on CANCEL → Enough Fleas
+  }
+
+  state No Lake {
+    GetPlayerDataVariable(VariableName="TroupeLeaderSpokenFleatopiaSearch", StoreValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="TROUPE_LEADER_JUDGE_READYTOLEAVE_NO_LAKE", trueString="TROUPE_LEADER_JUDGE_READYTOLEAVE_NO_LAKE_REPEAT", everyFrame=false)
+    SetPlayerDataVariable(VariableName="TroupeLeaderSpokenFleatopiaSearch", SetValue=true)
+    RunDialogue(Sheet="Caravan", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dlg
+  }
+
+  state Can Leave First {
+    PlayerDataVariableTest(VariableName="TroupeLeaderSpokenFleatopiaSearch", ExpectedValue=true, IsExpectedEvent=→"CANCEL", IsNotExpectedEvent=(none))
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_JUDGE_CANLEAVE_FIRST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Travel Prompt
+    on CANCEL → Can Leave
+  }
+
+  state Reward Dlg {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_JUDGE_REWARD", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dlg 2
+  }
+
+  state End Dlg 2 {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Hornet Reach
+  }
+
+  state Award Spool Piece {
+    SetPlayerDataBool(boolName="MetCaravanTroupeLeaderJudge", value=true)
+    AddEventRegister(target=Self, eventName="SILK SPOOL UI END")
+    CreateObject(gameObject=Silk Spool Instant (silkspoolupgrade_assets_all.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "")
+    RunFSM(fsmTemplateControl=template=-7694940084789001237, finishEvent=(none), everyFrame=false)  // disabled
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on SILK SPOOL UI END → Restart Interactible
+  }
+
+  state Hornet Reach {
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Stand 1")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Award Spool Piece
+  }
+
+  state Should Wave? {
+    GetEntryGateName(StoreValue=var "Entry Gate")
+    PlayerDataBoolTest(boolName="MetCaravanTroupeLeaderJudge", isTrue=→"FINISHED", isFalse=(none))
+    StringCompare(stringVariable=var "Entry Gate", compareTo="left1", equalEvent=→"WAVE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Entry Gate", compareTo="right1", equalEvent=→"WAVE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Idle
+    on WAVE → Wave Wait
+  }
+
+  state Wave Wait {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Caravan_Set/Caravan/Active/Caravan Troupe Leader Judge NPC@HeroPerformanceSingReaction, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckAlertRange(alertRange=Caravan_Set/Caravan/Active/Caravan Troupe Leader Judge NPC/Wave Detector@AlertRange, storeResult=(unset), InRangeEvent=→"WAVE", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    on WAVE → Waving
+  }
+
+  state Waving {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Waving Turn")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FaceObjectV4(ObjectA=Self, ObjectB=var "Hero", SpriteFacesRight=false, NewAnimationClip="Waving Turn", ResetFrame=true, PauseBetweenTurns=0.5, StoreDuration=(unset), turnAudioClipTable=<null>, EveryFrame=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Mooshka_wave_for_attention (sfxdynamic_assets_fleacaravan.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    WaitRandom(timeMin=3, timeMax=3.5, finishEvent=→"REPEAT", realTime=false)
+    on INTERACT → Activate Look NPC
+    on REPEAT → Waving
+  }
+
+  state Activate Look NPC {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Caravan_Set/Caravan/Active/Caravan Troupe Leader Judge NPC@HeroPerformanceSingReaction, everyFrame=false)
+    on FINISHED → Meet
+  }
+
+  state Restart Interactible {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → End Dlg
+  }
+
+  var Quest End Object: gameObject = Caravan_Set/Caravan
+
+  var Fleas Saved: int = 0
+  var SeenFleatopiaEmpty: bool = false
+  var Test: bool = false
+  var Need More Fleas: bool = false
+  var Travel Prompt Text: string = ""
+  var Dlg: string = ""
+  var Entry Gate: string = ""
+  var Audio Loop Voice: gameObject = Caravan_Set/Caravan/Active/Caravan Troupe Leader Judge NPC/Audio Loop Voice
+}

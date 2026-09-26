@@ -1,0 +1,116 @@
+# Javelin Control
+# 1 location(s):
+#   localpoolprefabs_assets_areaant.bundle / Bone Hunter Javelin
+
+fsm Javelin Control {
+  start Init
+  on PROJECTILE BREAK → Break  // from any state
+  on DEALT DAMAGE → Dealt Damage  // from any state
+
+  state Init {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Javelin Fly")
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    ActivateGameObject(gameObject=var "Break Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Damage Impact", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Fly {
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Terrain(8), sendEvent=→"HIT TERRAIN", storeCollider=var "")
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    Wait(time=4, finishEvent=→"WAIT", realTime=false)
+    ActivateGameObject(gameObject=var "Attack Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ReceivedDamage(Target=var "Attack Detector", collideTag="", sendEvent=(none), sendEventHeavy=→"PROJECTILE BREAK", sendEventSpikes=→"PROJECTILE BREAK", sendEventLava=(none), sendEventLightning=(none), storeGameObject=var "", ignoreAcid=false, ignoreLava=false, ignoreWater=false, ignoreHunterWeapon=false, ignoreTraps=false, ignoreNail=false, ignoreSpikes=false, storeDamageDealt=(unset), storeDirection=var "Direction", storeMagnitudeMultiplier=(unset), firstHitOnly=false)
+    on HIT TERRAIN → Stick
+    on PARRIED → Check
+    on WAIT → Break
+  }
+
+  state Stick {
+    PlayAudioEvent(audioClip=spear_impact (sfxstatic_assets_areapeak.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Javelin Thunk")
+    ActivateGameObject(gameObject=var "Thunk Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=4, finishEvent=→"WAIT", realTime=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    on WAIT → Break
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Break {
+    PlayParticleEmitter(gameObject=var "Pt Break", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Break Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=barrel_death_2 (sfxstatic_assets_areashellwoodshared.bundle), pitchMin=0.9, pitchMax=0.9, volume=0.85, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Deactivate
+  }
+
+  state Deflect {
+    FloatAdd(floatVariable=var "Angle", add=var "Angle Mod", everyFrame=false, perSecond=false)
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed", multiplyBy=2, everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    on FINISHED → Fly
+  }
+
+  state Check {
+    GetVelocityAsAngle(gameObject=Self, storeAngle=var "Angle", everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=0, tolerance=1, equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=180, tolerance=0, equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    on L → Deflect L
+    on R → Deflect R
+    on FINISHED → Deflect Other
+  }
+
+  state Deflect L {
+    RandomFloat(min=-10, max=-13, storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Deflect R {
+    RandomFloat(min=10, max=13, storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Deflect Other {
+    RandomFloat(min=5, max=10, storeResult=var "Angle Mod")
+    RandomlyFlipFloat(storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Dealt Damage {
+    ActivateGameObject(gameObject=var "Damage Impact", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Deactivate
+  }
+
+  state Deactivate {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    on FINISHED → Recycle
+  }
+
+  var Angle: float = 0
+  var Angle Mod: float = 0
+  var Speed: float = 0
+  var Direction: float = 0
+  var Break Effect: gameObject = Bone Hunter Javelin/Break Effect
+  var Pt Break: gameObject = Bone Hunter Javelin/Pt Break
+  var Thunk Effect: gameObject = Bone Hunter Javelin/Thunk Effect
+  var Damage Impact: gameObject = Bone Hunter Javelin/Damage Impact
+  var Attack Detector: gameObject = Bone Hunter Javelin/Attack Detector
+}

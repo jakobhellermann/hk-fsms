@@ -1,0 +1,150 @@
+# Stun Control
+# 2 location(s):
+#   Library_13 / Grand Stage Scene/Boss Scene TormentedTrobbio/Tormented Trobbio
+#   Memory_Ant_Queen / Boss Scene/Hunter Queen Boss
+
+// uses template: stun_control
+fsm Stun Control {
+  start Init
+  on STUN CONTROL FORCE STUN → Stun  // from any state
+  on STUN CONTROL STOP → Stop Daze Effect 2  // from any state
+  on STUN CONTROL RESET → Stop Daze Effect 3  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="DazedEffect Marker", storeResult=var "DazedEffect Marker")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    SetFloatValue(floatVariable=var "Stun Damage", floatValue=0, everyFrame=false)
+    on STUN DAMAGE → Max Check
+  }
+
+  state In Combo {
+    FloatAdd(floatVariable=var "Combo Counter", add=var "Stun Damage", everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Hits Total", add=var "Stun Damage", everyFrame=false, perSecond=false)
+    SetFloatValue(floatVariable=var "Stun Damage", floatValue=0, everyFrame=false)
+    FloatCompare(float1=var "Combo Counter", float2=var "Stun Combo", tolerance=var "Epsilon", equal=→"STUN", lessThan=(none), greaterThan=→"STUN", everyFrame=false)  // disabled
+    Wait(time=var "Combo Time", finishEvent=→"TIME OUT", realTime=false)
+    on TIME OUT → Reset Counter
+    on STUN DAMAGE → Continue Combo
+    on STUN → Stun
+  }
+
+  state Reset Counter {
+    SetFloatValue(floatVariable=var "Combo Counter", floatValue=0, everyFrame=false)
+    on FINISHED → Stop Daze Effect
+  }
+
+  state Continue Combo {
+    BoolTest(boolVariable=var "Abyss Attacking", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    FloatCompare(float1=var "Hits Total", float2=var "Stun Hit Max", tolerance=var "Epsilon", equal=→"STUN", lessThan=(none), greaterThan=→"STUN", everyFrame=false)
+    on FINISHED → In Combo
+    on STUN → Stun
+  }
+
+  state Stun {
+    SpawnObjectFromGlobalPool(gameObject=Stun Effect (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Combo Counter", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Hits Total", floatValue=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=ResetSingCooldown())
+    on FINISHED → Dazed Effect
+  }
+
+  state Max Check {
+    BoolTest(boolVariable=var "Abyss Attacking", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    FloatCompare(float1=var "Hits Total", float2=var "Stun Hit Max", tolerance=var "Epsilon", equal=→"STUN", lessThan=→"FINISHED", greaterThan=→"STUN", everyFrame=false)
+    on FINISHED → In Combo
+    on STUN → Stun
+  }
+
+  state Stop {
+    on STUN CONTROL START → Reset Counter
+    on STUN DAMAGE → Unstun Increment
+  }
+
+  state Unstun Increment {
+    FloatAdd(floatVariable=var "Hits Total", add=var "Stun Damage", everyFrame=false, perSecond=false)
+    SetFloatValue(floatVariable=var "Stun Damage", floatValue=0, everyFrame=false)
+    on FINISHED → Stop
+  }
+
+  state Reset {
+    SetFloatValue(floatVariable=var "Hits Total", floatValue=0, everyFrame=false)
+    on STUN CONTROL START → Reset Counter
+  }
+
+  state Dazed Effect {
+    GameObjectIsNull(gameObject=var "DazedEffect Marker", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    GetScale(gameObject=var "DazedEffect Marker", vector=(unset), xScale=var "Daze X Scale", yScale=var "Daze Y Scale", zScale=(unset), space=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Dazed Effect (globalpoolprefabs_assets_all.bundle), spawnPoint=var "DazedEffect Marker", position=(unset), rotation=(unset), storeObject=var "DazedEffect")
+    SetScale(gameObject=var "DazedEffect", vector=(unset), x=var "Daze X Scale", y=var "Daze Y Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "DazedEffect", animLibName="", clipName="Dazed")  // disabled
+    SetParent(gameObject=var "DazedEffect", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Stunned
+  }
+
+  state Stun End {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=boss_stun_ss_release (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Stop Daze Effect
+  }
+
+  state Stunned {
+    on STUN CONTROL START → Stun End
+    on TOOK HEAVY DAMAGE → Quick End
+  }
+
+  state Quick End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="END", delay=0, everyFrame=false)
+    on FINISHED → Stunned
+    on STUN CONTROL START → Stun End
+  }
+
+  state Stop Daze Effect {
+    GameObjectIsNull(gameObject=var "DazedEffect", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "DazedEffect", animLibName="", clipName="Dazed End")  // disabled
+    Tk2dPlayFrame(gameObject=Self, frame=0)  // disabled
+    SendEventByName(eventTarget=GameObject(var "DazedEffect"), sendEvent="STUN EFFECT END", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "DazedEffect", fadeTime=0)
+    SetGameObject(variable=var "DazedEffect", gameObject=<null>, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Stop Daze Effect 2 {
+    GameObjectIsNull(gameObject=var "DazedEffect", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "DazedEffect", animLibName="", clipName="Dazed End")  // disabled
+    Tk2dPlayFrame(gameObject=Self, frame=0)  // disabled
+    SendEventByName(eventTarget=GameObject(var "DazedEffect"), sendEvent="STUN EFFECT END", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "DazedEffect", fadeTime=0)
+    SetGameObject(variable=var "DazedEffect", gameObject=<null>, everyFrame=false)
+    on FINISHED → Stop
+  }
+
+  state Stop Daze Effect 3 {
+    GameObjectIsNull(gameObject=var "DazedEffect", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "DazedEffect", animLibName="", clipName="Dazed End")  // disabled
+    Tk2dPlayFrame(gameObject=Self, frame=0)  // disabled
+    SendEventByName(eventTarget=GameObject(var "DazedEffect"), sendEvent="STUN EFFECT END", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "DazedEffect", fadeTime=0)
+    SetGameObject(variable=var "DazedEffect", gameObject=<null>, everyFrame=false)
+    on FINISHED → Reset
+  }
+
+  var Combo Time: float = 1
+  var Stun Combo: int = 15
+  var Stun Hit Max: int = 16
+
+  var Daze X Scale: float = 0
+  var Daze Y Scale: float = 0
+  var Hits Total: float = 0
+  var Combo Counter: float = 0
+  var Stun Damage: float = 0
+  var Epsilon: float = 0.01
+  var Daze Effect Active: bool = false
+  var Abyss Attacking: bool = false
+  var DazedEffect: gameObject = <null>
+  var DazedEffect Marker: gameObject = <null>
+  var Self: gameObject = <null>
+}

@@ -1,0 +1,142 @@
+# Blob
+# 8 location(s):
+#   Ruins1_30 / Mage Blob 2
+#   Ruins1_30 / Mage Blob 2 (4)
+#   Ruins1_32 / Mage Blob 2 (4)
+#   Ruins1_32 / Mage Blob 2 (5)
+#   Ruins1_32 / Mage Blob 2 (2)
+#   Room_Colosseum_Gold / Colosseum Manager/Waves/Wave 23/Mage Blob 2
+#   Ruins1_23 / Mage Blob 2 (1)
+#   Ruins1_23 / Mage Blob 2 (2)
+
+// uses template: mage_blob
+fsm Blob {
+  start Init
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Ground Detect", storeResult=var "Ground Detect Obj")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    FindChild(gameObject=Self, childName="Hero Saver", storeResult=var "Hero Saver Obj")
+    FindChild(gameObject=Self, childName="Spawn Range", storeResult=var "Spawn Range")
+    BoolTest(boolVariable=var "Spawns", isTrue=→"SPAWNS", isFalse=(none), everyFrame=false)
+    on FINISHED → First Walk
+    on SPAWNS → Hide
+  }
+
+  state Check {
+    AudioStop(gameObject=Self)
+    SetAudioClip(gameObject=Self, audioClip=mage_blob_walk_loop)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Walk Anim")
+    WalkLeftRight(gameObject=Self, walkSpeed=2.5, spriteFacesLeft=true, groundLayer="Terrain", turnDelay=0.5, walkAnimName=var "Walk Anim", turnAnimName=var "Turn Anim", startLeft=false, startRight=false, keepDirection=true)
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatTestToBool(float1=var "Timer", float2=0.5, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Waited", everyFrame=true)
+    FloatClamp(floatVariable=var "Timer", minValue=0, maxValue=10, everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Waited", var "In Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    on ATTACK → Movestop
+  }
+
+  state Movestop {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Face
+  }
+
+  state Charge {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"COLLIDE", bottomHitEvent=(none), leftHitEvent=→"COLLIDE", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Charge Anim")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed", y=(unset), everyFrame=true)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Ground Detected", boolValue=true, everyFrame=false)
+    RayCast2d(fromGameObject=var "Ground Detect Obj", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Ground Detected", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTest(boolVariable=var "Ground Detected", isTrue=(none), isFalse=→"NO GROUND", everyFrame=true)
+    SetAudioClip(gameObject=Self, audioClip=mage_blob_charge_loop)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → State 1
+    on NO GROUND → State 1
+    on COLLIDE → State 1
+  }
+
+  state Stop Charge {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "In Range", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "ChargeEnd Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check
+  }
+
+  state Face {
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Facing", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Facing", float2=var "ChargeSpeed", operation=Multiply, storeResult=var "Speed", everyFrame=false)
+    on FINISHED → Charge
+  }
+
+  state Hide {
+    AudioStop(gameObject=Self)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=false)
+    StopWalker(target=Self, everyFrame=false)
+    on SPAWN → Spawn Pause
+  }
+
+  state Spawn Pause {
+    WaitRandom(timeMin=0, timeMax=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Saver
+  }
+
+  state Check Saver {
+    BoolTest(boolVariable=var "Hero Saver", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Spawn
+  }
+
+  state Spawn {
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spawn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mage_blob_appear, pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SetCollider(gameObject=Self, active=true)
+    on FINISHED → First Walk
+  }
+
+  state First Walk {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Walk Anim")
+    BoolTest(boolVariable=var "In Range", isTrue=→"ATTACK", isFalse=(none), everyFrame=true)
+    WalkLeftRight(gameObject=Self, walkSpeed=2.5, spriteFacesLeft=true, groundLayer="Terrain", turnDelay=0.5, walkAnimName=var "Walk Anim", turnAnimName=var "Turn Anim", startLeft=false, startRight=false, keepDirection=true)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    ActivateGameObject(gameObject=var "Spawn Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hero Saver Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on ATTACK → Movestop
+  }
+
+  state State 1 {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Stop Charge
+  }
+
+  var Spawns: bool = true
+  var Charge Anim: string = "Charge2"
+  var ChargeEnd Anim: string = "ChargeEnd2"
+  var Turn Anim: string = "Turn2"
+  var Walk Anim: string = "Walk2"
+
+  var ChargeSpeed: float = -5
+  var Facing: float = 0
+  var Speed: float = 0
+  var Timer: float = 0
+  var Ground Detected: bool = false
+  var Hero Saver: bool = false
+  var In Range: bool = false
+  var Waited: bool = false
+  var Ground Detect Obj: gameObject = <null>
+  var Hero Saver Obj: gameObject = <null>
+  var Self: gameObject = <null>
+  var Spawn Range: gameObject = <null>
+}

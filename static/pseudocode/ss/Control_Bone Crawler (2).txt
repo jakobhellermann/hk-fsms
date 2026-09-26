@@ -1,0 +1,115 @@
+# Control
+# 3 location(s):
+#   Ant_19 / Bone Crawler (2)
+#   Bone_10 / Bone Crawler (2)
+#   Bone_16 / Bone Crawler (2)
+
+fsm Control {
+  start Init
+
+  state Init {
+    FindChild(gameObject=Self, childName="Wake Range", storeResult=var "Wake Range")
+    GameObjectIsNull(gameObject=var "Wake Range", isNull=(none), isNotNull=→"WAIT", storeResult=(unset), everyFrame=false)
+    on FINISHED → Check Roof
+    on WAIT → Wait
+  }
+
+  state Walk {
+    SetAudioSource(gameObject=Self, active=true)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Antic
+    on TOOK DAMAGE → Antic
+    on SING → Sing Start
+  }
+
+  sequence state Antic {
+    StopCrawler(Target=Self, WaitForTurn=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spike Antic")
+    SetAudioSource(gameObject=Self, active=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=var "On Roof", playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[bone_crawler_spike_antic (sfxstatic_assets_areabone.bundle)], weights=[1], pitchMin=0.9, pitchMax=1.1, stopPreviousSound=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spike 1
+  }
+
+  state Spike 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spike", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Spike Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=bone_crawler_spikes (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=12, resetOnStateExit=false)
+    on FINISHED → Spike 2
+  }
+
+  state Spike 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Spike Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Spike 3
+  }
+
+  state Spike 3 {
+    Wait(time=1, finishEvent=→"NEXT", realTime=false)
+    ActivateGameObject(gameObject=var "Spike Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on NEXT → Retract
+  }
+
+  state Retract {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spike Retract", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=bone_crawler_sheath (sfxstatic_assets_areabone.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=12, resetOnStateExit=false)
+    on FINISHED → Attack Recover
+  }
+
+  state Attack Recover {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    StartCrawler(Target=Self, ScheduleTurn=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    AudioStop(gameObject=var "Audio Loop Voice", fadeTime=0.15)
+    on FINISHED → Walk
+    on SING → Sing Start
+  }
+
+  state Sing {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=<null>, noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Attack Recover
+    on SING DURATION END → Attack Recover
+  }
+
+  state Wait {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on WAKE → Check Roof
+  }
+
+  state Check Roof {
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false)
+    FloatCompare(float1=var "Rotation", float2=0, tolerance=1, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "On Roof", boolValue=true, everyFrame=false)
+    on FINISHED → Start Crawler
+  }
+
+  state Start Crawler {
+    StartCrawler(Target=Self, ScheduleTurn=false)
+    on FINISHED → Walk
+  }
+
+  state Sing Start {
+    StopCrawler(Target=Self, WaitForTurn=true)
+    on FINISHED → Sing
+  }
+
+  var Rotation: float = 0
+  var On Roof: bool = false
+  var Audio Loop Voice: gameObject = Bone Crawler (2)/Audio Loop Voice
+  var Spike Hit 1: gameObject = Bone Crawler (2)/Spike Hit 1
+  var Spike Hit 2: gameObject = Bone Crawler (2)/Spike Hit 2
+  var Spike Hit 3: gameObject = Bone Crawler (2)/Spike Hit 3
+  var Wake Range: gameObject = <null>
+}

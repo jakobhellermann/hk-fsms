@@ -1,0 +1,101 @@
+# Crystal Flyer
+# 22 location(s):
+#   Mines_04 / Crystal Flyer (2)
+#   Mines_04 / Crystal Flyer (3)
+#   Mines_04 / Crystal Flyer (1)
+#   Mines_04 / Crystal Flyer
+#   Mines_07 / Crystal Flyer
+#   Mines_07 / Crystal Flyer (2)
+#   Mines_16 / Crystal Flyer (1)
+#   Mines_16 / Crystal Flyer
+#   Mines_20 / Crystal Flyer
+#   Mines_20 / Crystal Flyer (1)
+#   Mines_20 / Crystal Flyer (3)
+#   Mines_20 / Crystal Flyer (2)
+#   Mines_23 / Crystal Flyer (2)
+#   Mines_23 / Crystal Flyer
+#   Mines_23 / Crystal Flyer (1)
+#   Mines_25 / Crystal Flyer (2)
+#   Mines_25 / Crystal Flyer
+#   Mines_25 / Crystal Flyer (1)
+#   Mines_34 / Crystal Flyer
+#   Mines_35 / Crystal Flyer
+#   Mines_35 / Crystal Flyer (2)
+#   Mines_35 / Crystal Flyer (1)
+
+// component disabled: this FSM does not run until something enables it
+fsm Crystal Flyer {
+  start Init
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Max", floatValue=1.5, everyFrame=false)
+    SetBoolValue(boolVariable=var "First Attack", boolValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    IdleBuzz(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=1.75, accelerationMax=15, roamingRange=1)
+    BoolTest(boolVariable=var "Alert Range", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn To Fly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    on ALERT → Alert
+  }
+
+  state Alert {
+    DistanceFly(gameObject=Self, target=var "Hero", distance=5.5, speedMax=5, acceleration=0.045, targetsHeight=true, height=5.5)  // disabled
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn To Fly", resetFrame=false, everyFrame=true)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=3.5, acceleration=0.1, targetsHeight=true, height=5.5)
+    WaitRandom(timeMin=var "Wait Min", timeMax=var "Wait Max", finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    SetBoolValue(boolVariable=var "Not In Range", boolValue=var "Alert Range", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Not In Range", everyFrame=true)
+    FloatAddV2(floatVariable=var "Unalert Timer", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "Not In Range")
+    SetFloatValueV2(floatVariable=var "Unalert Timer", floatValue=0, everyFrame=true, activeBool=var "Alert Range")
+    FloatCompare(float1=var "Unalert Timer", float2=8, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UNALERT", everyFrame=true)
+    on FINISHED → Angle Check
+    on UNALERT → Idle
+  }
+
+  state Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=3.5, acceleration=0.05, targetsHeight=true, height=5.2)
+    BoolTest(boolVariable=var "First Attack", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=1.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Max", floatValue=2.5, everyFrame=false)
+    on FINISHED → Fire
+  }
+
+  state Fire {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=crystal_flyer_shoot (sharedassets251.assets))
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", everyFrame=false)
+    FloatClamp(floatVariable=var "Angle", minValue=var "Angle Min", maxValue=var "Angle Max", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Crystal Shot (sharedassets251.assets), spawnPoint=var "Self", position=(0, -0.5, 0), rotation=(unset), storeObject=var "Shot")
+    FireAtTarget(gameObject=var "Shot", target=var "Hero", speed=20, position=(0, -0.5, 0), spread=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "First Attack", boolValue=false, everyFrame=false)
+    on FINISHED → Alert
+  }
+
+  state Angle Check {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", everyFrame=false)
+    FloatInRange(floatVariable=var "Angle", lowerValue=var "Angle Min", upperValue=var "Angle Max", boolVariable=(unset), trueEvent=→"ATTACK", falseEvent=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=0.5, everyFrame=false)
+    on FINISHED → Alert
+    on ATTACK → Antic
+  }
+
+  var Angle: float = 0
+  var Angle Max: float = 330
+  var Angle Min: float = 210
+  var Unalert Timer: float = 0
+  var Wait Max: float = 2.5
+  var Wait Min: float = 1.5
+  var Alert Range: bool = false
+  var First Attack: bool = false
+  var Not In Range: bool = false
+  var Self: gameObject = <null>
+  var Shot: gameObject = <null>
+}

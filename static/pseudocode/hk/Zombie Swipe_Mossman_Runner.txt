@@ -1,0 +1,130 @@
+# Zombie Swipe
+# 7 location(s):
+#   Fungus1_01 / Mossman_Runner
+#   Fungus1_05 / Mossman_Runner
+#   Fungus1_06 / Mossman_Runner
+#   Fungus1_07 / Mossman_Runner
+#   Fungus1_07 / Mossman_Runner (1)
+#   Fungus1_31 / _Enemies/Mossman_Runner
+#   sharedassets128.assets / Mossman_Runner
+
+// uses template: mossman_swipe
+fsm Zombie Swipe {
+  start Initialise
+  on RECOIL HORIZONTAL → Reset  // from any state
+
+  state Initialise {
+    GetHero(storeResult=var "Hero")
+    FindChild(gameObject=Self, childName="Attack Range", storeResult=var "Attack Region")
+    FindChild(gameObject=Self, childName="Pt Roll", storeResult=var "Pt Roll")
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Ready
+  }
+
+  state Ready {
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Attack Range"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    on ATTACK ALERT → Left or Right?
+  }
+
+  state Anticipate {
+    RandomFloat(min=0.9, max=1.1, storeResult=var "Chooser")
+    SetAudioPitch(gameObject=var "Self", pitch=var "Chooser", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[Mosskin_attack_01, Mosskin_attack_02, Mosskin_attack_03], weights=[1, 1, 1], pitchMin=1.1, pitchMax=1.2)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Anticipate")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Reverse Back
+  }
+
+  state Left or Right? {
+    StopWalker(target=Self, everyFrame=false)
+    SetFloatValue(floatVariable=var "Lunge Speed Adjust", floatValue=var "Lunge Speed", everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Self X", tolerance=0, equal=→"HERO IS LEFT", lessThan=→"HERO IS LEFT", greaterThan=→"HERO IS RIGHT", everyFrame=false)
+    on HERO IS RIGHT → R? 2
+    on HERO IS LEFT → R?
+  }
+
+  state Face Left {
+    FloatMultiply(floatVariable=var "Lunge Speed Adjust", multiplyBy=-1, everyFrame=false)
+    SetScale(gameObject=var "Self", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetWalkerFacing(walkRight=false, randomStartDir=(unset), target=Self, everyFrame=false)
+    on FINISHED → Reverse
+  }
+
+  state Face Right {
+    SetScale(gameObject=var "Self", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetWalkerFacing(walkRight=true, randomStartDir=(unset), target=Self, everyFrame=false)
+    on FINISHED → Reverse
+  }
+
+  state Lunge {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Lunge")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetVelocity2d(gameObject=var "Self", vector=(unset), x=var "Lunge Speed Adjust", y=(unset), everyFrame=true)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[mossman_roll_attack], weights=[1], pitchMin=1, pitchMax=1)
+    PlayParticleEmitter(gameObject=var "Pt Roll", emit=0)
+    on WAIT → Cooldown
+  }
+
+  state Cooldown {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack Cooldown")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on WAIT → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Wait(time=var "Idle Time", finishEvent=→"WAIT", realTime=false)
+    on WAIT → Reset
+  }
+
+  state Reset {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    on FINISHED → Ready
+  }
+
+  state R? {
+    BoolTest(boolVariable=var "Reverse", isTrue=→"REVERSE", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Face Left
+    on REVERSE → Face Right
+  }
+
+  state R? 2 {
+    BoolTest(boolVariable=var "Reverse", isTrue=→"REVERSE", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Face Right
+    on REVERSE → Face Left
+  }
+
+  state Reverse {
+    BoolTest(boolVariable=var "Reverse", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FlipScale(gameObject=var "Self", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Anticipate
+  }
+
+  state Reverse Back {
+    BoolTest(boolVariable=var "Reverse", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FlipScale(gameObject=var "Self", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Lunge
+  }
+
+  var Idle Time: float = 0.25
+  var Lunge Speed: float = 9
+  var Reverse: bool = false
+
+  var Chooser: float = 0
+  var Hero X: float = 0
+  var Lunge Speed Adjust: float = 0
+  var Self X: float = 0
+  var Can See Hero: bool = false
+  var In Attack Range: bool = false
+  var Attack Region: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Pt Roll: gameObject = Mossman_Runner/Pt Roll
+  var Self: gameObject = <null>
+}

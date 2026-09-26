@@ -1,0 +1,118 @@
+# Roar Lock
+# 2 location(s):
+#   Knight_Pickup / Knight
+#   resources.assets / Knight:1
+
+fsm Roar Lock {
+  start Init
+  on HERO DAMAGED → Cancel Effects  // from any state
+  on LEAVING SCENE → Cancel Effects  // from any state
+  on LEVEL LOADED → Cancel Effects  // from any state
+
+  state Detect {
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="Roar", collideLayer="", sendEvent=→"ROAR ENTER", storeCollider=var "Roar Object")
+    on ROAR ENTER → Roar Allowed?
+  }
+
+  state Lock Start {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO ROAR LOCKED", delay=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["facingRight"], storeResult=var "Facing Right")
+    GameObjectIsNull(gameObject=var "Roar Object", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Roar Object", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Roar is Right", leftBool=var "Roar is Left", everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Roar is Left", var "Facing Right"], sendEvent=→"FLIP", storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Roar is Right"], boolStates=[false, true], trueEvent=→"FLIP", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on FLIP → Flip
+    on FINISHED → Set Push Direction
+  }
+
+  state Flip {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FlipSprite", parameters=[], storeResult=(unset var))
+    BoolFlip(boolVariable=var "Facing Right")
+    on FINISHED → Set Push Direction
+  }
+
+  state Check On Ground {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["onGround"], storeResult=var "On Ground")
+    BoolTest(boolVariable=var "On Ground", isTrue=→"GROUNDED", isFalse=→"UNGROUNDED", everyFrame=false)
+    on GROUNDED → Lock Grounded
+    on UNGROUNDED → Lock Air
+  }
+
+  state Lock Grounded {
+    SetParticleEmissionRate(gameObject=var "Roar Dust", emissionRate=65, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Roar Dust Lil", emissionRate=20, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar Lock")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="Roar", collideLayer="", sendEvent=→"ROAR EXIT", storeCollider=var "")
+    on ROAR EXIT → Regain Control
+    on LEFT GROUND → Lock Air
+    on ROAR EXIT SCENE → Cancel Effects
+  }
+
+  state Set Push Direction {
+    SetRotation(gameObject=var "Roar Dust", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=180, zAngle=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Current Push Strength", floatValue=var "Push Strength", everyFrame=false)
+    SetFloatValue(floatVariable=var "Push Strength Air", floatValue=var "Push Strength", everyFrame=false)
+    FloatMultiply(floatVariable=var "Push Strength Air", multiplyBy=5, everyFrame=false)
+    BoolTest(boolVariable=var "Facing Right", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FloatMultiply(floatVariable=var "Current Push Strength", multiplyBy=-1, everyFrame=false)
+    FloatMultiply(floatVariable=var "Push Strength Air", multiplyBy=-1, everyFrame=false)
+    SetRotation(gameObject=var "Roar Dust", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=0, zAngle=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Check On Ground
+  }
+
+  state Regain Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SendEventToRegister(eventName="KNIGHT EXITED ROAR")
+    on FINISHED → Cancel Effects
+  }
+
+  state Init {
+    FindChild(gameObject=Self, childName="Effects", storeResult=var "Effects Folder")
+    FindChild(gameObject=var "Effects Folder", childName="Roar Dust", storeResult=var "Roar Dust")
+    FindChild(gameObject=var "Effects Folder", childName="Roar Dust Lil", storeResult=var "Roar Dust Lil")
+    on FINISHED → Detect
+  }
+
+  state Cancel Effects {
+    SetParticleEmissionRate(gameObject=var "Roar Dust Lil", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Roar Dust", emissionRate=0, everyFrame=false)
+    on FINISHED → Detect
+  }
+
+  state Lock Air {
+    SetParticleEmissionRate(gameObject=var "Roar Dust Lil", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Roar Dust", emissionRate=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Push Strength Air", y=(unset), everyFrame=true)
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="Roar", collideLayer="", sendEvent=→"ROAR EXIT", storeCollider=var "")
+    on ROAR EXIT → Regain Control
+    on HERO LANDED → Lock Grounded
+  }
+
+  state Roar Allowed? {
+    BoolTest(boolVariable=var "No Roar", isTrue=→"CANCEL", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Lock Start
+    on CANCEL → Detect
+  }
+
+  var Push Strength: float = 1
+
+  var Current Push Strength: float = 0
+  var Push Strength Air: float = 0
+  var Facing Right: bool = false
+  var No Roar: bool = false
+  var On Ground: bool = false
+  var Roar is Left: bool = false
+  var Roar is Right: bool = false
+  var Effects Folder: gameObject = <null>
+  var Roar Dust: gameObject = <null>
+  var Roar Dust Lil: gameObject = <null>
+  var Roar Object: gameObject = <null>
+}

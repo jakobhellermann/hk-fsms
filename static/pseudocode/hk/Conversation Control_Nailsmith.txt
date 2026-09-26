@@ -1,0 +1,475 @@
+# Conversation Control
+# 1 location(s):
+#   Room_nailsmith / Nailsmith
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="nailsmithCliff", isTrue=→"LEFT", isFalse=(none))
+    on CONVO START → Hero Look
+    on LEFT → Leave
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindGameObject(objectName="", withTag="Cinematic", store=var "Cinematic Player")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk to Idle")  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk to Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → B Down Pause
+  }
+
+  state Hero Look {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Met?
+  }
+
+  state Meet 1 {
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_MEET_1", "Nailsmith"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="metNailsmith", value=true)
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Nailmsith_talk_02 (sharedassets16.assets))
+    on CONVO_FINISH → Meet 2
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpEnd")
+    AudioStop(gameObject=Self)
+    on FINISHED → Box Down
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Price Check
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=var "Upgrade Cost", everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Prompt Convo", "Prompts"], storeResult=(unset var))
+    on NO → Decline Pause
+    on YES → Yes
+  }
+
+  state Dial Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="TALK END", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Look")
+    on FINISHED → Box Up YN
+  }
+
+  state Enough Geo? {
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Nailmsith_talk_04 (sharedassets16.assets))
+    GetPlayerDataInt(gameObject=var "GameManager", intName="geo", storeValue=var "Player Geo")
+    IntCompare(integer1=var "Player Geo", integer2=var "Upgrade Cost", equal=→"ENOUGH", lessThan=→"NOT ENOUGH", greaterThan=→"ENOUGH", everyFrame=false)
+    on ENOUGH → Decline
+    on NOT ENOUGH → Not Enough Geo
+  }
+
+  state Not Enough Geo {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_NOT_ENOUGH_GEO", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish 2
+  }
+
+  state Yes {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=3.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up 3
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Keep Talking")
+    on FINISHED → Enough Geo?
+  }
+
+  state Decline {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_DECLINE", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish 2
+  }
+
+  state Talk Finish 2 {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Decline Pause {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    on FINISHED → Box Up 2
+  }
+
+  state Box Up 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Keep Talking")
+    on FINISHED → Accept
+  }
+
+  state Accept {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_ACCEPT", "Nailsmith"], storeResult=(unset var))
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=ResetSemiPersistentItems())
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=TimePasses())
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Nailmsith_talk_05 (sharedassets14.assets))
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Box Down 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk to Idle")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk to Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    on FINISHED → Fade Out
+  }
+
+  state Fade Out {
+    SetFsmFloat(gameObject=var "HUD Blanker", fsmName="Blanker Control", variableName="Fade Time", setValue=0.5, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Scene Blanker
+  }
+
+  state Cinematic {
+    SendMessage(gameObject=var "Cinematic Player", delivery=SendMessage, options=1, functionCall=TriggerStartVideo())
+    on CINEMATIC END → Cinematic End
+  }
+
+  state Fade In {
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SCENE BLANKER OFF", delay=0, everyFrame=false)
+    on FINISHED → Take Ore
+  }
+
+  state Box Up 4 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk")
+    on FINISHED → Complete Convo
+  }
+
+  state Complete 1 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_COMPLETE_1", "Nailsmith"], storeResult=(unset var))
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveGame())
+    on CONVO_FINISH → Talk Finish 2
+  }
+
+  state Upgrade {
+    SetPlayerDataBool(boolName="honedNail", value=true)
+    SetPlayerDataInt(intName="nailDamage", value=var "New Damage")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="UPDATE NAIL DAMAGE", delay=0, everyFrame=false)
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="nailSmithUpgrades")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_upgradeNail())
+    on FINISHED → Box Up 4
+  }
+
+  state Met? {
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REGREET", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metNailsmith", isTrue=→"GREET", isFalse=→"MEET")
+    on MEET → Meet 1
+    on GREET → Greet
+    on REGREET → Regreet
+  }
+
+  state Greet {
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_GREET", "Nailsmith"], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk")
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="NAILSMITH", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Nailmsith_greet (sharedassets14.assets))
+    on CONVO_FINISH → Offer Type
+  }
+
+  state Regreet {
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_REGREET", "Nailsmith"], storeResult=(unset var))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk")
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="NAILSMITH", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Nailmsith_talk_02 (sharedassets16.assets))
+    on CONVO_FINISH → Offer Type
+  }
+
+  state Offer Type {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="nailSmithUpgrades", storeValue=var "Upgrades Completed")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="ore", storeValue=var "Ore")
+    IntSwitch(intVariable=var "Upgrades Completed", compareTo=[0, 1, 2, 3], sendEvent=[→"OFFER 1", →"OFFER 2", →"OFFER 3", →"OFFER 4"], everyFrame=false)
+    on OFFER 1 → Offer 1
+    on OFFER 2 → Offer 2
+    on OFFER 3 → Offer 3
+    on OFFER 4 → Offer 4
+  }
+
+  state Offer 2 {
+    IntCompare(integer1=var "Ore", integer2=1, equal=(none), lessThan=→"NOT ENOUGH", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Ore Decrement", intValue=-1, everyFrame=false)
+    SetStringValue(stringVariable=var "Prompt Convo", stringValue="NAILSMITH_UPGRADE_2", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_OFFER_ORE", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Dial Box Down
+    on NOT ENOUGH → Not Enough 2
+  }
+
+  state Offer 1 {
+    SetIntValue(intVariable=var "Ore Decrement", intValue=0, everyFrame=false)
+    SetStringValue(stringVariable=var "Prompt Convo", stringValue="NAILSMITH_UPGRADE_1", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_OFFER", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Dial Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Price Check {
+    IntSwitch(intVariable=var "Upgrades Completed", compareTo=[0, 1, 2, 3], sendEvent=[(none), (none), (none), (none)], everyFrame=false)
+    on 1 → Upgrade 1
+    on 2 → Upgrade 2
+    on 3 → Upgrade 3
+    on 4 → Upgrade 4
+  }
+
+  state Upgrade 1 {
+    GetLanguageString(sheetName="Prices", convName="NAIL_UPGRADE_1", storeValue=var "Price String")
+    ConvertStringToInt(stringVariable=var "Price String", intVariable=var "Upgrade Cost", everyFrame=false)
+    SetIntValue(intVariable=var "New Damage", intValue=var "Upgrade 1", everyFrame=false)
+    SetStringValue(stringVariable=var "Prompt Convo", stringValue="NAILSMITH_UPGRADE", everyFrame=false)  // disabled
+    on FINISHED → Send Text
+  }
+
+  state Upgrade 2 {
+    GetLanguageString(sheetName="Prices", convName="NAIL_UPGRADE_2", storeValue=var "Price String")
+    ConvertStringToInt(stringVariable=var "Price String", intVariable=var "Upgrade Cost", everyFrame=false)
+    SetIntValue(intVariable=var "New Damage", intValue=var "Upgrade 2", everyFrame=false)
+    SetStringValue(stringVariable=var "Prompt Convo", stringValue="NAILSMITH_UPGRADE_ORE", everyFrame=false)  // disabled
+    on FINISHED → Send Text
+  }
+
+  state Upgrade 3 {
+    GetLanguageString(sheetName="Prices", convName="NAIL_UPGRADE_3", storeValue=var "Price String")
+    ConvertStringToInt(stringVariable=var "Price String", intVariable=var "Upgrade Cost", everyFrame=false)
+    SetIntValue(intVariable=var "New Damage", intValue=var "Upgrade 3", everyFrame=false)
+    SetStringValue(stringVariable=var "Prompt Convo", stringValue="NAILSMITH_UPGRADE_ORE", everyFrame=false)  // disabled
+    on FINISHED → Send Text
+  }
+
+  state Upgrade 4 {
+    GetLanguageString(sheetName="Prices", convName="NAIL_UPGRADE_4", storeValue=var "Price String")
+    ConvertStringToInt(stringVariable=var "Price String", intVariable=var "Upgrade Cost", everyFrame=false)
+    SetIntValue(intVariable=var "New Damage", intValue=var "Upgrade 4", everyFrame=false)
+    SetStringValue(stringVariable=var "Prompt Convo", stringValue="NAILSMITH_UPGRADE_ORE", everyFrame=false)  // disabled
+    on FINISHED → Send Text
+  }
+
+  state Take Ore {
+    IntCompare(integer1=var "Upgrades Completed", integer2=0, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="ore", amount=var "Ore Decrement")
+    on FINISHED → Upgrade
+  }
+
+  state Offer 3 {
+    IntCompare(integer1=var "Ore", integer2=2, equal=(none), lessThan=→"NOT ENOUGH", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Ore Decrement", intValue=-2, everyFrame=false)
+    SetStringValue(stringVariable=var "Prompt Convo", stringValue="NAILSMITH_UPGRADE_3", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_OFFER_ORE", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Dial Box Down
+    on NOT ENOUGH → Not Enough 3
+  }
+
+  state Offer 4 {
+    IntCompare(integer1=var "Ore", integer2=3, equal=(none), lessThan=→"NOT ENOUGH", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Ore Decrement", intValue=-3, everyFrame=false)
+    SetStringValue(stringVariable=var "Prompt Convo", stringValue="NAILSMITH_UPGRADE_4", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_OFFER_ORE", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Dial Box Down
+    on NOT ENOUGH → Not Enough 4
+  }
+
+  state Not Enough 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_NEED_ORE1", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Not Enough 3 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_NEED_ORE2", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Not Enough 4 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_NEED_ORE3", "Nailsmith"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Complete Convo {
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Nailmsith_talk_03 (sharedassets16.assets))
+    GetPlayerDataInt(gameObject=var "GameManager", intName="nailSmithUpgrades", storeValue=var "Upgrades Completed")
+    IntSwitch(intVariable=var "Upgrades Completed", compareTo=[1, 2, 3, 4], sendEvent=[(none), (none), (none), (none)], everyFrame=false)
+    on 1 → Complete 1
+    on 2 → Complete 2
+    on 3 → Complete 3
+    on 4 → Complete 4
+  }
+
+  state Complete 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_COMPLETE_2", "Nailsmith"], storeResult=(unset var))
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveGame())
+    on CONVO_FINISH → Talk Finish 2
+  }
+
+  state Complete 3 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_COMPLETE_3", "Nailsmith"], storeResult=(unset var))
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveGame())
+    on CONVO_FINISH → Talk Finish 2
+  }
+
+  state Complete 4 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_COMPLETE_4", "Nailsmith"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="nailsmithCliff", value=true)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveGame())
+    on CONVO_FINISH → Box Down 3
+  }
+
+  state Leave {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Fade Out 2 {
+    SetFsmFloat(gameObject=var "HUD Blanker", fsmName="Blanker Control", variableName="Fade Time", setValue=1, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Leave Pause
+  }
+
+  state Fade In 2 {
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Leave End
+  }
+
+  state Leave Pause {
+    FindGameObject(objectName="room_nailsmith_bg 13", withTag="Untagged", store=var "Lit Room")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NAILSMITH LEAVE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Lit Room", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateAllChildren(gameObject=var "Self", activate=false)
+    SetCollider(gameObject=Self, active=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on FINISHED → Fade In 2
+  }
+
+  state Leave End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fade Out 2
+  }
+
+  state Cinematic End {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fade In
+  }
+
+  state B Down Pause {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → End
+  }
+
+  state Meet 2 {
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_MEET_2", "Nailsmith"], storeResult=(unset var))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk")
+    AudioStop(gameObject=Self)
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Nailmsith_greet (sharedassets14.assets))
+    on CONVO_FINISH → Meet 3
+  }
+
+  state Meet 3 {
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NAILSMITH_MEET_3", "Nailsmith"], storeResult=(unset var))
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="NAILSMITH", everyFrame=false)
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    on CONVO_FINISH → Offer Type
+  }
+
+  state Idle Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fade Out
+  }
+
+  state Scene Blanker {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SCENE BLANKER ON", delay=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Cinematic
+  }
+
+  var Upgrade 1: int = 9
+  var Upgrade 2: int = 13
+  var Upgrade 3: int = 17
+  var Upgrade 4: int = 21
+
+  var New Damage: int = 0
+  var Ore: int = 0
+  var Ore Decrement: int = -1
+  var Player Geo: int = 0
+  var Upgrade Cost: int = 0
+  var Upgrades Completed: int = 0
+  var Spoken: bool = false
+  var PD Bool Name: string = ""
+  var Pay Prompt Convo: string = ""
+  var Price String: string = ""
+  var Prompt Convo: string = ""
+  var Area Title: gameObject = <null>
+  var Cinematic Player: gameObject = <null>
+  var Lit Room: gameObject = <null>
+  var Roar: gameObject = <null>
+  var Self: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

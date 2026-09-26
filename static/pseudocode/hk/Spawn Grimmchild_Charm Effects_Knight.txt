@@ -1,0 +1,96 @@
+# Spawn Grimmchild
+# 1 location(s):
+#   Knight_Pickup / Knight/Charm Effects
+
+fsm Spawn Grimmchild {
+  start Init
+  on LEVEL LOADED → Spawn Pause  // from any state
+  on CHARM EQUIP CHECK → Normal Spawn  // from any state
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Check
+  }
+
+  state Check {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="destroyedNightmareLantern", isTrue=→"UNEQUIPPED", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_40", isTrue=→"EQUIPPED", isFalse=→"UNEQUIPPED")
+    on EQUIPPED → Spawn
+    on UNEQUIPPED → Unequipped
+  }
+
+  state Unequipped {
+  }
+
+  state Spawn {
+    FindGameObject(objectName="", withTag="Grimmchild", store=var "Child")
+    GameObjectIsNull(gameObject=var "Child", isNull=(none), isNotNull=→"CANCEL", storeResult=(unset), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Grimmchild (resources.assets), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "Child")
+    BoolTest(boolVariable=var "Quick Spawn", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetFsmBool(gameObject=var "Child", fsmName="Control", variableName="Scene Appear", setValue=true, everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Dream Appear
+  }
+
+  state Spawn Pause {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetBoolValue(boolVariable=var "Quick Spawn", boolValue=true, everyFrame=false)
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Dream?
+  }
+
+  state Idle {
+  }
+
+  state Nightmare? {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetSceneNameString", parameters=[], storeResult=var "Scene Name")
+    StringCompare(stringVariable=var "Scene Name", compareTo="Grimm_Nightmare", equalEvent=→"NIGHTMARE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Scene Name", compareTo="GG_Grimm_Nightmare", equalEvent=→"NIGHTMARE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Scene Name", compareTo="GG_Grimm", equalEvent=→"NIGHTMARE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Charms Allowed?
+    on NIGHTMARE → No Summon
+  }
+
+  state No Summon {
+  }
+
+  state Charms Allowed? {
+    GetFsmBool(gameObject=var "Hero", fsmName="ProxyFSM", variableName="No Charms", storeValue=var "No Charms", everyFrame=false)
+    BoolTest(boolVariable=var "No Charms", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="IsGameplayScene", parameters=[], storeResult=var "Is Gameplay Scene")
+    BoolTest(boolVariable=var "Is Gameplay Scene", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on FINISHED → Check
+    on CANCEL → No Summon
+  }
+
+  state Normal Spawn {
+    SetBoolValue(boolVariable=var "Quick Spawn", boolValue=false, everyFrame=false)
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Check
+  }
+
+  state Wait for Hero in Position {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Spawn
+  }
+
+  state Dream? {
+    CheckCurrentMapZone(mapZone="DREAM_WORLD", equalEvent=(none), notEqualEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Dream Appear", boolValue=true, everyFrame=false)
+    on FINISHED → Nightmare?
+  }
+
+  state Dream Appear {
+    BoolTest(boolVariable=var "Dream Appear", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetFsmBool(gameObject=var "Child", fsmName="Control", variableName="Dream Appear", setValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Dream Appear: bool = false
+  var Is Gameplay Scene: bool = false
+  var No Charms: bool = false
+  var Quick Spawn: bool = false
+  var Scene Name: string = ""
+  var Child: gameObject = <null>
+}

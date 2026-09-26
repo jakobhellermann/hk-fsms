@@ -1,0 +1,107 @@
+# Control
+# 1 location(s):
+#   sharedassets324.assets / Hornet Barb
+
+fsm Control {
+  start Init
+  on HORNET KILLED → Land  // from any state
+
+  state Init {
+    SetCircleCollider(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    GetOwner(storeGameObject=var "Self")
+    ActivateGameObject(gameObject=var "Spell Detect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Dust Trail")
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.008, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Distance Check
+  }
+
+  state Thread {
+    SetRandomRotation(gameObject=Self, x=false, y=false, z=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Barb Thread")
+    on BARB READY → Barb Antic
+  }
+
+  state Barb Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Barb Spike Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Barb
+  }
+
+  state Barb {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[spikes_arm_1, spikes_arm_2, spikes_arm_3], weights=[1, 1, 1], pitchMin=1, pitchMax=1)
+    SetCircleCollider(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Barb Spike")
+    SetCollider(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Spell Detect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on BLOCKED HIT → Hit
+    on SPELL → Insta Break
+    on GRIMMBALL → Insta Break
+    on ORBIT SHIELD → Insta Break
+    on ORBIT SHIELD B → Insta Break
+  }
+
+  state Distance Check {
+    FindClosest(gameObject=Self, withTag="Boss Attack", ignoreOwner=true, mustBeVisible=false, storeObject=var "Closest Barb", storeDistance=(unset), everyFrame=false)
+    GameObjectIsNull(gameObject=var "Closest Barb", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Closest Barb", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=1.5, tolerance=0, equal=(none), lessThan=→"CLOSE", greaterThan=(none), everyFrame=false)
+    on CLOSE → Recycle
+    on FINISHED → Thread
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Hit {
+    SendEvent(eventTarget=Self, sendEvent=→"BREAK", delay=0, everyFrame=false)
+    on FINISHED → Barb
+    on BREAK → Break
+    on SPELL → Land
+  }
+
+  state Break {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=spikes_break)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Barb Loose")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", everyFrame=false)
+    FloatAdd(floatVariable=var "Angle", add=180, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=50, everyFrame=false)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Terrain(8), sendEvent=→"LAND", storeCollider=var "")
+    CallMethodProper(gameObject=Self, behaviour="SpinSelfSimple", methodName="DoSpin", parameters=[], storeResult=(unset var))
+    PlayParticleEmitter(gameObject=var "Dust Trail", emit=0)
+    on LAND → Land
+    on SPELL → Land
+  }
+
+  state Land {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Barb Break", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetCircleCollider(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false)
+    StopParticleEmitter(gameObject=var "Dust Trail")
+    on FINISHED → Recycle Pause
+  }
+
+  state Recycle Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on FINISHED → Recycle
+  }
+
+  state Insta Break {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=spikes_break)
+    on FINISHED → Land
+  }
+
+  var Angle: float = 0
+  var Distance: float = 0
+  var Closest Barb: gameObject = <null>
+  var Dust Trail: gameObject = Hornet Barb/Dust Trail
+  var Self: gameObject = <null>
+  var Spell Detect: gameObject = Hornet Barb/Spell Detect
+}

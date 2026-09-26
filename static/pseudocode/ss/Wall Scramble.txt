@@ -1,0 +1,307 @@
+# Wall Scramble
+# 1 location(s):
+#   heroloading_assets_all.bundle / Hero_Hornet
+
+// uses template: hornet_wall_scramble
+fsm Wall Scramble {
+  start Init
+  on FSM CANCEL → Cancel All  // from any state
+  on HERO DAMAGED → Cancel All  // from any state
+  on LEAVING SCENE → Cancel All  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Effects", storeResult=var "Effects")
+    FindChild(gameObject=var "Effects", childName="WallScramble Dust", storeResult=var "WallScramble Dust")
+    FindNamedChild(gameObject=var "Effects", storeResult=var "Hornet_Wall_Scramble_Burst_Effect")
+    FindNamedChild(gameObject=var "Effects", storeResult=var "Walldash Kickoff")
+    FindNamedChild(gameObject=Self, storeResult=var "Centre")
+    FindChild(gameObject=var "Effects", childName="wall_launch_puff", storeResult=var "Launch Effect")
+    on FINISHED → Idle
+  }
+
+  state Cancel All {
+    ActivateGameObject(gameObject=var "Hornet_Wall_Scramble_Burst_Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStop(gameObject=var "Scramble Audio Player", fadeTime=0)
+    BoolTest(boolVariable=var "Queue Scramble", isTrue=→"SCRAMBLE", isFalse=(none), everyFrame=false)
+    GetHeroCState(VariableName="wallScrambling", StoreValue=var "Test", EveryFrame=false)
+    BoolTest(boolVariable=var "Test", isTrue=→"END", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+    on SCRAMBLE → Take Control
+    on END → Return Control
+  }
+
+  sequence state Idle {
+    SetBoolValue(boolVariable=var "Queue Scramble", boolValue=false, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    EnableFsmSelf(SetEnabled=false)
+    on SCRAMBLE → FSM Cancel
+  }
+
+  state Take Control {
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetBoolValue(boolVariable=var "Queue Scramble", boolValue=false, everyFrame=false)
+    SetHeroCState(VariableName="wallScrambling", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    HeroControllerMethods(method=RelinquishControlNotVelocity, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroBoxControl(heroBoxState=WallSlide)
+    on FINISHED → Scramble Antic
+  }
+
+  state FSM Cancel {
+    SetBoolValue(boolVariable=var "Queue Scramble", boolValue=true, everyFrame=false)
+    SendEventToRegister(eventName="FSM CANCEL")
+  }
+
+  state Start Scramble {
+    HeroBoxControl(heroBoxState=WallScramble)
+    SetHeroAffectedByGravity(SetTime=0, CanSet=(unset), SetAffectedByGravity=false)
+    ActivateGameObject(gameObject=var "Hornet_Wall_Scramble_Burst_Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hornet_Wall_Scramble_Burst_Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignToBool(Value=var "X Scale", StoreIsPositive=var "Facing Left", EveryFrame=false)
+    PlayAudioEventRandom(audioClips=[hornet_wall_scramble_1 (sfxstatic_assets_shared.bundle), hornet_wall_scramble_2 (sfxstatic_assets_shared.bundle), hornet_wall_scramble_3 (sfxstatic_assets_shared.bundle)], pitchMin=0.9, pitchMax=1.1, volume=0.65, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Scramble Audio Player")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hornet_wall_scramble (vibrationstatic_assets_vibrationdataasset.bundle), motors=All, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="get_IsUsingQuickening", parameters=[], storeResult=var "Is Quickened", EveryFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Is Quickened", floatVariable=var "Scramble Speed", falseValue=22, trueValue=30, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Scramble Speed", everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Is Quickened", stringVariable=var "Scramble Clip", falseString="Wall Scramble", trueString="Wall Scramble Quickened", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Scramble Clip")
+    on FINISHED → Scramble Up
+  }
+
+  state Scramble Up {
+    ListenForDashReleased(storeDashWasReleased=var "Dash Was Released", timeBeforeActive=0.15)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Is Left Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Is Right Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForDashV3(EventTarget=Self, IsActive=(unset), DelayBeforeActive=(unset), WasPressed=(none), WasReleased=(none), IsPressed=(none), IsNotPressed=(none), SetIsPressed=var "Is Dash Pressed")
+    ConvertBoolToFloat(boolVariable=var "Is Dash Pressed", floatVariable=var "Down Force", falseValue=-72, trueValue=-48, everyFrame=true)
+    AddForce2d(gameObject=Self, forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=var "Down Force", vector3=(unset), everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=0.5, tolerance=0, equal=(none), lessThan=→"END", greaterThan=(none), everyFrame=true)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="IsFacingNearSlideableWall", parameters=[], storeResult=var "Still Touching Wall", EveryFrame=true)
+    BoolTest(boolVariable=var "Still Touching Wall", isTrue=(none), isFalse=→"MANTLE", everyFrame=true)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="HasHarpoonDash", parameters=[], storeResult=var "Has Harpoon Dash", EveryFrame=false)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=var "Has Harpoon Dash")
+    BoolTestMulti(boolVariables=[var "Facing Left", var "Is Left Pressed", var "Is Right Pressed"], boolStates=[true, true, false], trueEvent=(none), falseEvent=(none), storeResult=var "Hugging Wall L", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing Left", var "Is Right Pressed", var "Is Left Pressed"], boolStates=[false, true, false], trueEvent=(none), falseEvent=(none), storeResult=var "Hugging Wall R", everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Hugging Wall L", var "Hugging Wall R"], sendEvent=(none), storeResult=var "Is Hugging Wall", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Is Hugging Wall", var "Dash Was Released"], sendEvent=(none), storeResult=var "Can Repeat Dash", everyFrame=true)
+    ListenForDashV3(EventTarget=Self, IsActive=var "Can Repeat Dash", DelayBeforeActive=0.3, WasPressed=(none), WasReleased=(none), IsPressed=→"REPEAT DASH", IsNotPressed=(none), SetIsPressed=(unset))
+    BoolTestMulti(boolVariables=[var "Is Hugging Wall"], boolStates=[false], trueEvent=(none), falseEvent=(none), storeResult=var "Can Dash Off", everyFrame=true)
+    ListenForDashV3(EventTarget=Self, IsActive=var "Can Dash Off", DelayBeforeActive=0.1, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), SetIsPressed=(unset))
+    PlayParticleEmitterInState(gameObject=var "WallScramble Dust")
+    HeroCheckForBumpVertical(Direction=1, StoreHitBump=(unset), StoreHitWall=(unset), BumpEvent=(none), NoBumpEvent=(none), WallEvent=→"ROOF", EveryFrame=true)
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0.15)
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=(unset))
+    on CANCEL → To Air
+    on END → Scramble End
+    on JUMP → Wall Jump
+    on HARPOON → Harpoon Cancel
+    on REPEAT DASH → Scramble Antic R
+    on ROOF → Hit Roof
+    on ATTACK → To Attack
+    on MANTLE → Mantle Antic
+    on TOOL → To Tool Throw
+    on DASH CANCEL → Walldash Cancel
+  }
+
+  state Scramble End {
+    SetBoolValue(boolVariable=var "Dash Was Released", boolValue=true, everyFrame=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Is Left Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=var "Is Right Pressed", pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.8, brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Scramble End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="HasHarpoonDash", parameters=[], storeResult=var "Has Harpoon Dash", EveryFrame=false)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=var "Has Harpoon Dash")
+    BoolTestMulti(boolVariables=[var "Facing Left", var "Is Left Pressed", var "Is Right Pressed"], boolStates=[true, true, false], trueEvent=(none), falseEvent=(none), storeResult=var "Hugging Wall L", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing Left", var "Is Right Pressed", var "Is Left Pressed"], boolStates=[false, true, false], trueEvent=(none), falseEvent=(none), storeResult=var "Hugging Wall R", everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Hugging Wall L", var "Hugging Wall R"], sendEvent=(none), storeResult=var "Is Hugging Wall", everyFrame=true)
+    ListenForDashV3(EventTarget=Self, IsActive=var "Is Hugging Wall", DelayBeforeActive=0, WasPressed=→"REPEAT DASH", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), SetIsPressed=(unset))
+    BoolTestMulti(boolVariables=[var "Is Hugging Wall"], boolStates=[false], trueEvent=(none), falseEvent=(none), storeResult=var "Can Dash Off", everyFrame=true)
+    ListenForDashV3(EventTarget=Self, IsActive=var "Can Dash Off", DelayBeforeActive=0.1, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), SetIsPressed=(unset))
+    ListenForDashV3(EventTarget=Self, IsActive=(unset), DelayBeforeActive=0, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), SetIsPressed=(unset))
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=0, distance=0.8, minDepth=(unset), maxDepth=(unset), hitEvent=→"ROOF", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    HeroCheckForBumpVertical(Direction=1, StoreHitBump=(unset), StoreHitWall=(unset), BumpEvent=(none), NoBumpEvent=(none), WallEvent=→"ROOF", EveryFrame=true)
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="IsFacingNearSlideableWall", parameters=[], storeResult=var "Still Touching Wall", EveryFrame=true)
+    BoolTest(boolVariable=var "Still Touching Wall", isTrue=(none), isFalse=→"MANTLE", everyFrame=true)
+    on FINISHED → To Wall Slide
+    on JUMP → Wall Jump
+    on HARPOON → Harpoon Cancel
+    on REPEAT DASH → Scramble Antic
+    on ROOF → Hit Roof
+    on ATTACK → To Attack
+    on MANTLE → Mantle Antic
+    on DASH CANCEL → Walldash Cancel
+  }
+
+  state Return Control {
+    AudioStop(gameObject=var "Scramble Audio Player", fadeTime=0)
+    SetHeroAffectedByGravity(SetTime=0, CanSet=(unset), SetAffectedByGravity=true)
+    HeroControllerMethods(method=RegainControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StartAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetHeroCState(VariableName="wallScrambling", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Idle
+  }
+
+  state To Wall Slide {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithWallslide", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Return Control
+  }
+
+  state To Air {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDownSpikeBounceSlightlyShort", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=hornet_wall_jump_kickoff_1 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetHeroAffectedByGravity(SetTime=0, CanSet=(unset), SetAffectedByGravity=false)
+    on FINISHED → Return Control
+  }
+
+  state Wall Jump {
+    PlayAudioEvent(audioClip=hornet_forward_spin (sfxstatic_assets_shared.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithWallJump", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Return Control
+  }
+
+  state Harpoon Cancel {
+    AudioStop(gameObject=var "Scramble Audio Player", fadeTime=0)
+    SetHeroCState(VariableName="wallScrambling", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Harpoon Dash"), sendEvent="DO MOVE FIXED", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Scramble Antic {
+    PlayRandomAudioClipTable(Table=Wallrun Grunt Hornet Voice (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Scramble Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.85, brakeOnExit=false)  // disabled
+    SetHeroAffectedByGravity(SetTime=0, CanSet=(unset), SetAffectedByGravity=false)
+    on FINISHED → Start Scramble
+  }
+
+  state Init Anim {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Scramble", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    on FINISHED → Start Scramble
+  }
+
+  state Hit Roof {
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=1.3, pitchMax=1.3, volume=0.75, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    AllowMantle()
+    SendEventByNameV2(eventTarget=GameObject(Self), sendEvent="SUPERJUMP HIT ROOF", delay=0, everyFrame=false)  // disabled
+    on FINISHED → Hit Roof Soft
+  }
+
+  state Scramble Antic R {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Scramble Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.88, brakeOnExit=false)
+    SetHeroAffectedByGravity(SetTime=0, CanSet=(unset), SetAffectedByGravity=false)
+    PlayRandomAudioClipTable(Table=Wallrun Grunt Hornet Voice (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Start Scramble
+  }
+
+  state Hit Roof Soft {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(0, 0), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Scramble End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Detach
+  }
+
+  state To Attack {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithAttack", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Return Control
+  }
+
+  state Mantle Antic {
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    RayCast2dV2(fromGameObject=var "Centre", fromPosition=(unset), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=Self, fromPosition=(-0.24, 0), direction=(0, 1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"ROOF CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8), Hero Detector(13)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(0.24, 0), direction=(0, 1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"ROOF CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8), Hero Detector(13)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Scramble Mantle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Launch Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[hornet_edge_grab_v2_1 (herosfxstatic_assets_all.bundle), hornet_edge_grab_v2_2 (sfxstatic_assets_shared.bundle), hornet_edge_grab_v2_3 (sfxstatic_assets_shared.bundle), hornet_edge_grab_v2_4 (sfxstatic_assets_shared.bundle)], weights=[0.25, 0.25, 0.25, 0.25], pitchMin=1, pitchMax=1)
+    on FINISHED → Mantle Shift
+    on ROOF CANCEL → Hit Roof
+    on JUMP → Fall Fix
+    on CANCEL → Return Control
+  }
+
+  state Mantle Shift {
+    FindGameObject(objectName="", withTag="CameraTarget", store=var "CamTarget")
+    SendMessage(gameObject=var "CamTarget", delivery=SendMessage, options=0, functionCall=ShorterDetach())
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Translate", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiplyV2(floatVariable=var "Translate", multiplyBy=0.4, everyFrame=false, fixedUpdate=false)
+    GetPosition2d(gameObject=Self, vector_2d=var "Translate Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    Vector2AddXY(vector2Variable=var "Translate Pos", addX=var "Translate", addY=1.35, everyFrame=false, perSecond=false)
+    MovePosition2dV2(gameObject=Self, targetPosition=var "", vector=var "Translate Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Translate", y=1.35, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → To Air
+  }
+
+  state Detach {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Translate", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Translate", float2=0.2, operation=Multiply, storeResult=var "Translate", everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Translate", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlipSprite())
+    on FINISHED → Return Control
+  }
+
+  state To Tool Throw {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithToolThrow", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Return Control
+  }
+
+  state Fall Fix {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CancelDownSpikeBounces", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Wall Jump
+  }
+
+  state Walldash Cancel {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FlipSprite", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithDashKeepFacing", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Walldash Kickoff", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Return Control
+  }
+
+  var Y Speed: float = 0
+  var Down Force: float = 0
+  var X Scale: float = 0
+  var Translate: float = 0
+  var Scramble Speed: float = 0
+  var Facing Left: bool = false
+  var Hugging Wall L: bool = false
+  var Is Dash Pressed: bool = false
+  var Is Left Pressed: bool = false
+  var Is Right Pressed: bool = false
+  var Queue Scramble: bool = false
+  var Still Touching Wall: bool = false
+  var Hugging Wall R: bool = false
+  var Is Hugging Wall: bool = false
+  var Is Quickened: bool = false
+  var Test: bool = false
+  var Dash Was Released: bool = false
+  var Can Repeat Dash: bool = false
+  var Has Harpoon Dash: bool = false
+  var Can Dash Off: bool = false
+  var Scramble Clip: string = ""
+  var Translate Pos: vector2 = (0, 0)
+  var CamTarget: gameObject = <null>
+  var Effects: gameObject = <null>
+  var Hornet_Wall_Scramble_Burst_Effect: gameObject = <null>
+  var Launch Effect: gameObject = <null>
+  var Scramble Audio Player: gameObject = <null>
+  var Self: gameObject = <null>
+  var WallScramble Dust: gameObject = <null>
+  var Walldash Kickoff: gameObject = <null>
+  var Centre: gameObject = <null>
+}

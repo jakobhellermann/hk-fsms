@@ -1,0 +1,88 @@
+# Dialogue Page Control
+# 2 location(s):
+#   Menu_Title / _GameCameras/HudCamera/DialogueManager/Text YN
+#   resources.assets / _GameCameras/HudCamera/DialogueManager/Text YN
+
+fsm Dialogue Page Control {
+  start Init
+  on HERO DAMAGED → Hero Damaged  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Stop", storeResult=var "Stop")
+    FindChild(gameObject=Self, childName="Geo Text", storeResult=var "Geo Text")
+    FindChild(gameObject=Self, childName="UI List", storeResult=var "UI List")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on PAGE_END → 
+    on CONVERSATION_END → Activate Geo Text?
+  }
+
+  state Conversation End {
+    ActivateGameObject(gameObject=var "UI List", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Ready for Input
+  }
+
+  state End Conversation {
+    CallMethodProper(gameObject=Self, behaviour="DialogueBox", methodName="HideText", parameters=[], storeResult=(unset var))
+    GetFsmInt(gameObject=var "UI List", fsmName="ui_list", variableName="Current Item", storeValue=var "Item Number", everyFrame=false)
+    ActivateGameObject(gameObject=var "UI List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Geo Text", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    IntSwitch(intVariable=var "Item Number", compareTo=[1, 2], sendEvent=[→"YES", →"NO"], everyFrame=false)
+    on YES → Take Geo
+    on NO → No
+  }
+
+  state Take Geo {
+    IntCompare(integer1=var "Toll Cost", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeGeo", parameters=[var "Toll Cost"], storeResult=(unset var))
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)  // disabled
+    on FINISHED → Yes
+  }
+
+  state No {
+    SendEventByName(eventTarget=GameObject(var "Requester"), sendEvent="NO", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Yes {
+    SendEventByName(eventTarget=GameObject(var "Requester"), sendEvent="YES", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Activate Geo Text? {
+    ActivateGameObject(gameObject=var "Geo Text", activate=true, recursive=true, resetOnExit=false, everyFrame=false)
+    ConvertIntToString(intVariable=var "Toll Cost", stringVariable=var "Toll Cost String", format="", everyFrame=false)
+    SetTextMeshText(gameObject=var "Geo Text", textString=var "Toll Cost String")
+    IntCompare(integer1=var "Toll Cost", integer2=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    ActivateGameObject(gameObject=var "Geo Text", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="NO", delay=0, everyFrame=false)
+    on FINISHED → Pause
+    on NO → Conversation End
+  }
+
+  state Ready for Input {
+    on UI SELECTION MADE → End Conversation
+  }
+
+  state Pause {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Conversation End
+  }
+
+  state Hero Damaged {
+    CallMethodProper(gameObject=Self, behaviour="DialogueBox", methodName="HideText", parameters=[], storeResult=(unset var))
+    ActivateGameObject(gameObject=var "UI List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Geo Text", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Item Number: int = 0
+  var Toll Cost: int = 0
+  var Toll Cost String: string = ""
+  var Geo Text: gameObject = <null>
+  var Requester: gameObject = <null>
+  var Stop: gameObject = <null>
+  var UI List: gameObject = <null>
+}

@@ -1,0 +1,201 @@
+# Shop Region
+# 1 location(s):
+#   Room_nailmaster / Sit Region
+
+fsm Shop Region {
+  start Pause
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=var "Self", childName="Prompt Marker", storeResult=var "Prompt Marker")
+    CreateObject(gameObject=Arrow Prompt (resources.assets), spawnPoint=var "Prompt Marker", position=(unset), rotation=(unset), storeObject=var "Prompt", networkInstantiate=false, networkGroup=0)  // disabled
+    SetFsmString(gameObject=var "Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Sit", everyFrame=false)
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    FindChild(gameObject=Self, childName="Knight Sit", storeResult=var "Knight Sit")
+    FindChild(gameObject=Self, childName="CameraLockArea", storeResult=var "CamLock")
+    on FINISHED → Out Of Range
+  }
+
+  state Out Of Range {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)  // disabled
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="", collideLayer="", sendEvent=→"IN RANGE", storeCollider=var "")
+    HidePromptMarker(storedObject=var "Prompt")
+    on IN RANGE → In Range
+  }
+
+  state In Range {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="UP", delay=0, everyFrame=false)  // disabled
+    ShowPromptMarker(prefab=Arrow Prompt New (resources.assets), labelName="Sit", spawnPoint=var "Prompt Marker", storeObject=var "Prompt")
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="", collideLayer="", sendEvent=→"OUT OF RANGE", storeCollider=var "")
+    GetAxis(axisName="Vertical", multiplier=1, store=var "Axis Vert", everyFrame=true)  // disabled
+    FloatCompare(float1=var "Axis Vert", float2=0.6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UP PRESSED", everyFrame=true)  // disabled
+    ListenForUp(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    on OUT OF RANGE → Out Of Range
+    on UP PRESSED → Can Inspect?
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Range
+  }
+
+  state Can Inspect? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanInput", parameters=[], storeResult=var "Can Input")
+    BoolTest(boolVariable=var "Can Input", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["onGround"], storeResult=var "On Ground")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["attacking"], storeResult=var "Attacking")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["upAttacking"], storeResult=var "Attacking Up")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["downAttacking"], storeResult=var "Attacking Down")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["dashing"], storeResult=var "Dashing")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["backDashing"], storeResult=var "Backdashing")
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolAnyTrue(boolVariables=[var "Attacking", var "Attacking Down", var "Attacking Up", var "Backdashing", var "Dashing"], sendEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Take Control
+  }
+
+  state Take Control {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    on FINISHED → Check Proximity
+  }
+
+  state Regain Control {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHOP STOP", delay=0, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Out Of Range
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Sit {
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    HidePromptMarker(storedObject=var "Prompt")
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "Knight Sit", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetMeshRenderer(gameObject=var "Knight Sit", active=true)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=var "Knight Sit", animLibName="", clipName="Knight Sit")
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Sitting
+  }
+
+  state Check Proximity {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Hero X", float2=var "Move To X", tolerance=0.5, equalBool=var "Hero Mid", lessThanBool=var "Hero On Left", greaterThanBool=var "Hero On Right", everyFrame=false)
+    GetScale(gameObject=var "Hero", vector=(unset), xScale=var "Hero X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Hero X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Facing Right", greaterThanBool=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Hero Mid", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Hero On Left", isTrue=→"MOVE RIGHT", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Hero On Right", isTrue=→"MOVE LEFT", isFalse=(none), everyFrame=false)
+    on MOVE RIGHT → Move Hero Right
+    on MOVE LEFT → Move Hero Left
+    on FINISHED → Check Facing
+  }
+
+  state Move Hero Right {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Move To X", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    SetBoolValue(boolVariable=var "Hero Facing Right", boolValue=true, everyFrame=false)
+    on FINISHED → Check Facing
+  }
+
+  state Turn Hero Left {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Sit
+  }
+
+  state Move Hero Left {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=-6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Move To X", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    SetBoolValue(boolVariable=var "Hero Facing Right", boolValue=false, everyFrame=false)
+    on FINISHED → Check Facing
+  }
+
+  state Turn Hero Right {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Sit
+  }
+
+  state Check Facing {
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Face Hero Right", var "Hero Facing Right"], boolStates=[true, false], trueEvent=→"TURN RIGHT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Face Hero Right", var "Hero Facing Right"], boolStates=[false, true], trueEvent=→"TURN LEFT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on TURN LEFT → Turn Hero Left
+    on TURN RIGHT → Turn Hero Right
+    on FINISHED → Sit
+  }
+
+  state Sitting {
+    ListenForUp(eventTarget=Self, wasPressed=→"RISE", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForRight(eventTarget=Self, wasPressed=→"RISE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForLeft(eventTarget=Self, wasPressed=→"RISE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForJump(eventTarget=Self, wasPressed=→"RISE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForDown(eventTarget=Self, wasPressed=→"RISE", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForDash(eventTarget=Self, wasPressed=→"RISE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForAttack(eventTarget=Self, wasPressed=→"RISE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on RISE → Rise
+  }
+
+  state Mesh Rend {
+    SetMeshRenderer(gameObject=var "Knight Sit", active=false)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    on FINISHED → Regain Control
+  }
+
+  state Rise {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Knight Sit", clipName="Knight Sit End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "CamLock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    on FINISHED → Mesh Rend
+  }
+
+  var Move To X: float = 64.01
+  var Face Hero Right: bool = true
+  var Prompt Name: string = "Listen"
+
+  var Axis Vert: float = 0
+  var Hero X: float = 0
+  var Hero X Scale: float = 0
+  var Attacking: bool = false
+  var Attacking Down: bool = false
+  var Attacking Up: bool = false
+  var Backdashing: bool = false
+  var Can Input: bool = false
+  var Dashing: bool = false
+  var Hero Facing Right: bool = false
+  var Hero Mid: bool = false
+  var Hero On Left: bool = false
+  var Hero On Right: bool = false
+  var On Ground: bool = false
+  var Hero Pos: vector3 = (0, 0, 0)
+  var CamLock: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Knight Sit: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Prompt Marker: gameObject = <null>
+  var Self: gameObject = <null>
+}

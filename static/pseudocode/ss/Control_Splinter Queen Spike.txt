@@ -1,0 +1,164 @@
+# Control
+# 1 location(s):
+#   Shellwood_18 / Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike
+
+fsm Control {
+  start Init
+  on TOOK SPELL DAMAGE → Shatter  // from any state
+  on TOOK EXPLOSION DAMAGE → Shatter  // from any state
+  on TOOK HEAVY DAMAGE → Shatter  // from any state
+  on WITCH SPIKE CRUSH → Shatter  // from any state
+
+  state Init {
+    SetMeshRenderer(gameObject=Self, active=false)
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), space=0, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Wait(time=2, finishEvent=→"SPIKE", realTime=false)  // disabled
+    SetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on SPIKE → Rotation
+    on SPIKE 2 → Spike 2 Pause
+    on SPIKE SPREE → Spree Pause
+    on SPIKE 3 → Spike 3 Pause
+  }
+
+  state Down 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spear Down", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Down 2
+    on SPIKE CLEANUP → Shatter
+    on TOOK DAMAGE → Down Damage
+  }
+
+  state Down 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Down 3
+    on SPIKE CLEANUP → Shatter
+    on TOOK DAMAGE → Down Damage
+  }
+
+  state Downed {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Hit 4", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=var "RoofShaker Idle", active=false, resetOnExit=false)
+    on FINISHED → Idle
+    on SPIKE CLEANUP → Shatter
+  }
+
+  state Shatter {
+    SetIntValue(intVariable=var "Hits", intValue=3, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hit 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=Self, parent=var "Parent", resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Hit 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hit 3", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hit 4", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    PlayParticleEmitter(gameObject=var "Pt Destroy", emit=0, resetIfPlaying=false)
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=shellwood_twig_wall_break (sfxstatic_assets_areashellwood.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Dormant
+  }
+
+  state Spike Antic {
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="SPIKE ANTIC", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    RandomlyFlipScale(gameObject=Self)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Antic")
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetCollider(gameObject=var "RoofShaker Idle", active=true, resetOnExit=false)
+    RandomFloat(min=0.8, max=1.2, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on FINISHED → Down Start
+    on SPIKE CLEANUP → Dormant
+  }
+
+  state Spike 2 Pause {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rotation
+    on SPIKE CLEANUP → Dormant
+  }
+
+  state Spree Pause {
+    Wait(time=var "Spike Spree Time", finishEvent=→"FINISHED", realTime=false)
+    RandomFloat(min=-3, max=3, storeResult=var "Rotation")
+    on FINISHED → Spree Extra
+    on SPIKE CLEANUP → Dormant
+  }
+
+  state Spree Extra {
+    WaitRandom(timeMin=0, timeMax=0.1, finishEvent=→"FINISHED", realTime=false)
+    Translate(gameObject=Self, vector=(unset), x=var "z Spike Spree Shift", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Spike Antic
+    on SPIKE CLEANUP → Dormant
+  }
+
+  state Rotation {
+    RandomFloat(min=-9, max=9, storeResult=var "Rotation")
+    on FINISHED → Spike Antic
+  }
+
+  state Spike 3 Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rotation
+    on SPIKE CLEANUP → Dormant
+  }
+
+  state Down 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Downed
+    on SPIKE CLEANUP → Shatter
+    on TOOK DAMAGE → Down Damage
+  }
+
+  state Idle {
+    on TOOK DAMAGE → Damage
+    on SPIKE CLEANUP → Shatter
+  }
+
+  state Damage {
+    IntAdd(intVariable=var "Hits", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Hits", integer2=0, equal=→"DESTROY", lessThan=→"DESTROY", greaterThan=(none), everyFrame=false)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+    on DESTROY → Shatter
+  }
+
+  state Down Damage {
+    IntAdd(intVariable=var "Hits", add=-1, everyFrame=false)
+    GotoPreviousState()
+  }
+
+  state Down Start {
+    PlayAudioEventRandom(audioClips=[splinter_queen_spike_appear_1 (sfxstatic_assets_areashellwood.bundle), splinter_queen_spike_appear_2 (sfxstatic_assets_areashellwood.bundle), splinter_queen_spike_appear_3 (sfxstatic_assets_areashellwood.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Down 1
+  }
+
+  var Spike Spree Time: float = 0
+  var z Spike Spree Shift: float = 0
+
+  var Rotation: float = 0
+  var Start X: float = 0
+  var Pitch: float = 0
+  var Hits: int = 3
+  var Hit 1: gameObject = Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike/Hit 1
+  var Hit 2: gameObject = Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike/Hit 2
+  var Hit 3: gameObject = Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike/Hit 3
+  var Slam Effect: gameObject = Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike/Slam Effect
+  var Pt Destroy: gameObject = Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike/Pt Destroy
+  var Pt Antic: gameObject = Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike/Pt Antic
+  var Parent: gameObject = <null>
+  var Hit 4: gameObject = Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike/Hit 4
+  var RoofShaker Idle: gameObject = Boss Scene Parent/Boss Scene/Spikes/Splinter Queen Spike/RoofShaker Idle
+}

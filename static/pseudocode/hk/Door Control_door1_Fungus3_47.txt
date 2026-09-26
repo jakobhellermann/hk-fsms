@@ -1,0 +1,160 @@
+# Door Control
+# 1 location(s):
+#   Fungus3_47 / door1
+
+fsm Door Control {
+  start Wait for enter scene
+  on SHINY ITEM ENTER → On Item  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetHero(storeResult=var "Hero")
+    SetGameObject(variable=var "Main Camera", gameObject=var "MainCamera", everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Prompt Marker", storeResult=var "Prompt Marker")
+    on FINISHED → Crossroads?
+  }
+
+  state Idle {
+    HidePromptMarker(storedObject=var "Prompt")
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="", collideLayer="", sendEvent=→"IN RANGE", storeCollider=var "")
+    on IN RANGE → In Range
+  }
+
+  state In Range {
+    ShowPromptMarker(prefab=Arrow Prompt New (resources.assets), labelName=var "Prompt Name", spawnPoint=var "Prompt Marker", storeObject=var "Prompt")
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="", collideLayer="", sendEvent=→"OUT OF RANGE", storeCollider=var "")
+    ListenForDown(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForUp(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    on OUT OF RANGE → Idle
+    on UP PRESSED → Can Enter?
+  }
+
+  state Can Enter? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanInteract", parameters=[], storeResult=var "Can Interact")
+    BoolTest(boolVariable=var "Can Interact", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → WP Door?
+  }
+
+  state Cancel Frame {
+    HidePromptMarker(storedObject=var "Prompt")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Enter {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOOR ENTER", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    SendEventByName(eventTarget=GameObject(var "Main Camera"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    on FINISHED → Change Scene
+  }
+
+  state Change Scene {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    BeginSceneTransition(sceneName=var "New Scene", entryGateName=var "Entry Gate", entryDelay=var "Entry Pause", visualization=Default, preventCameraFadeOut=false)
+  }
+
+  state Audio Snapshots {
+    TransitionToAudioSnapshot(snapshot=var "Atmos Snapshot", transitionTime=var "Audio Transition Time")
+    TransitionToAudioSnapshot(snapshot=var "Enviro Snapshot", transitionTime=var "Audio Transition Time")
+    TransitionToAudioSnapshot(snapshot=var "Music Snapshot", transitionTime=var "Audio Transition Time")
+    TransitionToAudioSnapshot(snapshot=Off (resources.assets), transitionTime=0.3)
+    on FINISHED → Send Compass Event
+  }
+
+  state Crossroads? {
+    BoolTest(boolVariable=var "Crossroads Ascent", isTrue=→"WAIT", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Normal Pause
+    on WAIT → Visited Check
+  }
+
+  state Visited Check {
+    GetPlayerDataBool(boolName="visitedCrossroads", storeValue=var "Visited Crossroads")
+    BoolTest(boolVariable=var "Visited Crossroads", isTrue=→"VISITED", isFalse=→"UNVISITED", everyFrame=false)
+    on VISITED → Visited
+    on UNVISITED → Unvisited
+  }
+
+  state Visited {
+    Wait(time=3.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Unvisited {
+    Wait(time=10, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Normal Pause {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state On Item {
+    HidePromptMarker(storedObject=var "Prompt")
+    on SHINY ITEM EXIT → Idle
+  }
+
+  state Enter Anim? {
+    ForceHeroFootstepSound(forceFootstepSound=Walk, endOnStateExit=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Exit")
+    BoolTest(boolVariable=var "Over Hero", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Enter")
+    on FINISHED → Enter
+  }
+
+  state Send Compass Event {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SET COMPASS POINT", delay=0, everyFrame=false)
+    on FINISHED → Enter Anim?
+  }
+
+  state WP Door? {
+    StringCompare(stringVariable=var "New Scene", compareTo="White_Palace_01", equalEvent=→"WHITE PALACE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on WHITE PALACE → Pan Up
+    on FINISHED → Audio Snapshots
+  }
+
+  state Pan Up {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    FindChild(gameObject=Self, childName="CamLock", storeResult=var "CamLock")
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Enter")
+    Wait(time=1, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Enter
+  }
+
+  state Wait for enter scene {
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Pause
+  }
+
+  state Pause {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Init
+  }
+
+  var Audio Transition Time: float = 0.3
+  var Crossroads Ascent: bool = false
+  var Over Hero: bool = false
+  var Entry Gate: string = "left1"
+  var New Scene: string = "Fungus3_archive"
+  var Prompt Name: string = "Enter"
+  var Atmos Snapshot: object = at None (resources.assets)
+  var Enviro Snapshot: object = <null>
+  var Music Snapshot: object = Off (resources.assets)
+
+  var Entry Pause: float = 0
+  var Can Interact: bool = false
+  var Visited Crossroads: bool = false
+  var CamLock: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Main Camera: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Prompt Marker: gameObject = <null>
+  var Self: gameObject = <null>
+}

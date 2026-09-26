@@ -1,0 +1,532 @@
+# Inventory Control
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Inventory
+#   Menu_Title / _GameCameras/HudCamera/In-game/Inventory
+
+fsm Inventory Control {
+  start Init
+  on NO INV → No Inv  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Border", storeResult=var "Border")
+    FindChild(gameObject=var "Border", childName="Arrows", storeResult=var "Arrows")
+    FindChild(gameObject=var "Arrows", childName="Arrow Right", storeResult=var "Arrow R")
+    FindChild(gameObject=var "Arrows", childName="Arrow Left", storeResult=var "Arrow L")
+    FindChild(gameObject=var "Border", childName="Pane Name", storeResult=var "Pane Name Obj")
+    ActivateGameObject(gameObject=var "Border", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGameObjectSelf(variable=var "Inventory", gameObject=Self, everyFrame=false)
+    FindChild(gameObject=Self, childName="Map", storeResult=var "Map Pane")
+    CallMethodProper(gameObject=var "Map Pane", behaviour="InventoryMapManager", methodName="EnsureMapsSpawned", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Closed
+  }
+
+  state Closed {
+    ActivateGameObject(gameObject=var "Current Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGameObject(variable=var "Target Pane", gameObject=<null>, everyFrame=false)
+    ListenForInventoryShortcut(WasPressed=→"BUTTON PRESSED", StoreShortcut=var "Button Shortcut", CurrentPaneIndex=(unset))
+    on BUTTON PRESSED → Can Open Inventory?
+    on OPEN INVENTORY MAP → Map Shortcut
+  }
+
+  state Can Open Inventory? {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="IsGameplayScene", parameters=[], storeResult=var "Is Gameplay Scene", EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanOpenInventory", parameters=[], storeResult=var "Can Open Inventory", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Open Inventory", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Closed
+    on FINISHED → Single Pane?
+  }
+
+  state Open {
+    CallMethodProper(gameObject=Self, behaviour="InventoryPaneList", methodName="OnOpeningInventory", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=_GameCameras/HudCamera/In-game/Inventory/Border/Inventory ScreenPlane, behaviour="DisplayFrozenCamera", methodName="Freeze", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Opened", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Open", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DESTROY JOURNAL MSG", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INVENTORY OPENED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="INVENTORY OPENED")
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SetIsInventoryOpen", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=ui_pause_inventory_appear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT", delay=0, everyFrame=false)
+    on HERO DAMAGED → Damage Close
+    on FINISHED → Check Pane
+    on HERO ROAR LOCKED → R Lock Close
+    on INVENTORY CANCEL → R Lock Close
+  }
+
+  state Close {
+    CallMethodProper(gameObject=Self, behaviour="InventoryPaneList", methodName="OnClosingInventory", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAP KEY DOWN", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=SetCanPan(false))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INVENTORY CLOSED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="INVENTORY CLOSED")
+    SetPlayerDataInt(intName="currentInvPane", value=var "Current Pane Num")
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="DOWN", delay=0, everyFrame=false)
+    FadeNestedFadeGroupV3(Target=var "Border", ToAlpha=0, FadeTime=0.2, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    FadeNestedFadeGroupV3(Target=var "Current Pane", ToAlpha=0, FadeTime=0.2, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="CHANGE DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=ui_pause_inventory_dissapear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Close End
+  }
+
+  state Regain Control {
+    SetBoolValue(boolVariable=var "Open", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Not Close", boolValue=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SetIsInventoryOpen", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=_GameCameras/HudCamera/In-game/Inventory/Border/Inventory ScreenPlane, behaviour="DisplayFrozenCamera", methodName="Unfreeze", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayerDataBoolTest(boolName="atBench", isTrue=→"FINISHED", isFalse=(none))
+    SetProperty(targetProperty=InventoryPaneList.CanSwitchPanes on _GameCameras/HudCamera/In-game/Inventory@InventoryPaneList, everyFrame=false)
+    on FINISHED → Cheat Tool Change?
+  }
+
+  state Opened {
+    BoolTest(boolVariable=var "Queued Move L", isTrue=→"MOVE PANE L QUICK", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Queued Move R", isTrue=→"MOVE PANE R QUICK", isFalse=(none), everyFrame=false)
+    ListenForInventoryShortcut(WasPressed=→"CLOSE", StoreShortcut=var "Button Shortcut", CurrentPaneIndex=var "Current Pane Num")
+    ListenForMenuActions(eventTarget=Self, submitPressed=(none), cancelPressed=→"BACK", ignoreAttack=false)
+    ListenForPaneRight(eventTarget=Self, wasPressed=→"MOVE PANE R QUICK", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForPaneLeft(eventTarget=Self, wasPressed=→"MOVE PANE L QUICK", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on HERO DAMAGED → Damage Close
+    on CLOSE → Can Close?
+    on HERO ROAR LOCKED → R Lock Close
+    on INVENTORY CANCEL → R Lock Close
+    on MOVE PANE L QUICK → Move L Quick
+    on MOVE PANE L → Move L Slow
+    on MOVE PANE R QUICK → Move R Quick
+    on MOVE PANE R → Move R Slow
+    on BACK → Can Close? Back
+    on FADE TO TARGET → Into Sub Pane
+    on MOVE PANE TO → Move Pane To
+  }
+
+  state Open Current Pane {
+    FadeNestedFadeGroupV3(Target=var "Border", ToAlpha=1, FadeTime=0.2, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    FadeGroupUp(target=var "Current Pane")
+    FadeNestedFadeGroup(Target=var "Current Pane", ToAlpha=0, FadeTime=0)
+    FadeNestedFadeGroupV3(Target=var "Current Pane", ToAlpha=1, FadeTime=0.2, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="UP", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="SETUP", delay=0, everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Just Finished Open?
+    on HERO ROAR LOCKED → Close
+    on HERO DAMAGED → Damage Close
+    on INVENTORY CANCEL → R Lock Close
+  }
+
+  state Set R Increment {
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Allow Pane Swapping", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Single Pane", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Next Pane Start X", floatValue=31, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Prev Pane End Pos", vector3Value=(unset), x=-31, y=0, z=0, everyFrame=false)
+    SetStringValue(stringVariable=var "Arrow Broadcast Event", stringValue="ARROW R ANIM START", everyFrame=false)
+    SetStringValue(stringVariable=var "Particle Obj Name", stringValue="Particles R", everyFrame=false)
+    on FINISHED → Target? R
+    on CANCEL → Pane Move Cancel
+  }
+
+  state Set L Increment {
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Allow Pane Swapping", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Single Pane", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Next Pane Start X", floatValue=-31, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Prev Pane End Pos", vector3Value=(unset), x=31, y=0, z=0, everyFrame=false)
+    SetStringValue(stringVariable=var "Arrow Broadcast Event", stringValue="ARROW L ANIM START", everyFrame=false)
+    SetStringValue(stringVariable=var "Particle Obj Name", stringValue="Particles L", everyFrame=false)
+    on FINISHED → Target? L
+    on CANCEL → Pane Move Cancel
+  }
+
+  state Tween Panes {
+    SetGameObject(variable=var "Target Pane", gameObject=<null>, everyFrame=false)
+    SetBoolValue(boolVariable=var "Queued Move L", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Queued Move R", boolValue=false, everyFrame=false)
+    FindChild(gameObject=Self, childName=var "Particle Obj Name", storeResult=var "Particle Obj")
+    SendEventToRegister(eventName=var "Arrow Broadcast Event")
+    ActivateGameObject(gameObject=var "Current Pane", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="UP", delay=0, everyFrame=false)
+    FadeNestedFadeGroupV3(Target=var "Current Pane", ToAlpha=1, FadeTime=0.2, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    SendEventByName(eventTarget=GameObject(var "Prev Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="SETUP", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "Current Pane", vector=(unset), x=var "Next Pane Start X", y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    iTweenMoveTo(gameObject=var "Current Pane", id="", transformPosition=var "", vectorPosition=(0, 0, 0), time=0.35, delay=0, speed=(unset), space=1, easeType=13, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=true, stopOnExit=true, loopDontFinish=true)
+    iTweenMoveTo(gameObject=var "Prev Pane", id="", transformPosition=var "", vectorPosition=var "Prev Pane End Pos", time=0.35, delay=0, speed=(unset), space=1, easeType=13, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=(none), realTime=true, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=true)
+    ListenForPaneRight(eventTarget=Self, wasPressed=→"MOVE PANE R QUICK", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForPaneLeft(eventTarget=Self, wasPressed=→"MOVE PANE L QUICK", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on FINISHED → Pane Final Pos
+    on HERO DAMAGED → Damage Close
+    on HERO ROAR LOCKED → R Lock Close
+    on INVENTORY CANCEL → R Lock Close
+    on MOVE PANE L QUICK → Queue Move L
+    on MOVE PANE R QUICK → Queue Move R
+  }
+
+  state Single Pane? {
+    SetBoolValue(boolVariable=var "Single Pane", boolValue=false, everyFrame=false)
+    GetInventoryPaneCount(paneListChild=Self, UnlockedPaneCount=(unset), SinglePaneEvent=(none), ManyPaneEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Single Pane", boolValue=true, everyFrame=false)
+    on FINISHED → Calc Completion
+  }
+
+  state Opened? {
+    BoolTest(boolVariable=var "Opened", isTrue=→"OPEN", isFalse=→"NOT OPEN", everyFrame=false)
+    on OPEN → Tween Panes
+    on NOT OPEN → First Pane Activate
+  }
+
+  state Map Shortcut {
+    SetBoolValue(boolVariable=var "Map Shortcut", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Map Pane", fsmName="UI Control", variableName="Zoom Shortcut", setValue=true, everyFrame=false)
+    on FINISHED → Single Pane?
+  }
+
+  state R Lock Close {
+    CallMethodProper(gameObject=Self, behaviour="InventoryPaneList", methodName="OnClosingInventory", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAP KEY DOWN", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=SetCanPan(false))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CHARM EQUIP CHECK", delay=0, everyFrame=false)  // disabled
+    SendToolEquipChanged()
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)  // disabled
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INVENTORY CLOSED", delay=0, everyFrame=false)
+    SetPlayerDataInt(intName="currentInvPane", value=var "Current Pane Num")
+    FadeNestedFadeGroupV3(Target=var "Border", ToAlpha=0, FadeTime=0.2, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    FadeNestedFadeGroupV3(Target=var "Current Pane", ToAlpha=0, FadeTime=0.2, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="CHANGE DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Inventory Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=_GameCameras/HudCamera/In-game/Inventory/Border/Inventory ScreenPlane, behaviour="DisplayFrozenCamera", methodName="Unfreeze", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SetIsInventoryOpen", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=ui_pause_inventory_dissapear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Regain Control 2
+  }
+
+  state Regain Control 2 {
+    SendMessage(gameObject=var "Current Pane", delivery=SendMessage, options=1, functionCall=PaneEnd())
+    SetBoolValue(boolVariable=var "Open", boolValue=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    on FINISHED → Closed
+  }
+
+  state Can Close? {
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Close
+    on CANCEL → Opened
+  }
+
+  state Calc Completion {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CountGameCompletion", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Open
+  }
+
+  state No Inv {
+    on LEVEL LOADED → Closed
+  }
+
+  state Damage Close {
+    CallMethodProper(gameObject=Self, behaviour="InventoryPaneList", methodName="OnClosingInventory", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAP KEY DOWN", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=SetCanPan(false))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INVENTORY CLOSED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="INVENTORY CLOSED")
+    SetPlayerDataInt(intName="currentInvPane", value=var "Current Pane Num")
+    SendEventByName(eventTarget=GameObject(var "Border"), sendEvent="DOWN", delay=0, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Border", ToAlpha=0, FadeTime=0.2)
+    FadeGroupDown(target=var "Current Pane", fast=false)
+    FadeNestedFadeGroup(Target=var "Current Pane", ToAlpha=0, FadeTime=0.2)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="CHANGE DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Inventory Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=ui_pause_inventory_dissapear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.05, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Close End
+  }
+
+  state Close End {
+    SendMessage(gameObject=var "Current Pane", delivery=SendMessage, options=1, functionCall=PaneEnd())
+    PlayerDataBoolTest(boolName="atBench", isTrue=(none), isFalse=→"FINISHED")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CHARM EQUIP CHECK", delay=0, everyFrame=false)  // disabled
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="MaxHealth", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendToolEquipChanged()
+    on FINISHED → Regain Control
+  }
+
+  state Pane Final Pos {
+    SetPosition(gameObject=var "Current Pane", vector=(unset), x=0, y=0, z=0, space=1, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=var "Prev Pane", vector=var "Prev Pane End Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Prev Pane"), sendEvent="DOWN", delay=0, everyFrame=false)
+    FadeNestedFadeGroupV3(Target=var "Prev Pane", ToAlpha=0, FadeTime=0.2, Curve=curve[(time=0, value=0, inSlope=0, outSlope=1), (time=1, value=1, inSlope=1, outSlope=0)], Realtime=true)
+    on FINISHED → Set Opened
+  }
+
+  state Set Proxy {
+    SetFsmEnum(gameObject=var "Current Pane", fsmName="Inventory Proxy", variableName="Start Selection", setValue=Previous, everyFrame=false)
+    on FINISHED → Opened?
+  }
+
+  state Previous Pane {
+    SetCurrentInventoryPane(PaneList=Self, PaneIndex=-1, CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    on FINISHED → Set Proxy
+  }
+
+  state Check Pane {
+    BoolTest(boolVariable=var "Map Shortcut", isTrue=→"MAP", isFalse=(none), everyFrame=false)
+    EnumSwitch(enumVariable=var "Button Shortcut", compareTo=[InventoryShortcutButtons(0), InventoryShortcutButtons(1), InventoryShortcutButtons(2), InventoryShortcutButtons(3), InventoryShortcutButtons(4)], sendEvent=[→"FINISHED", →"MAP SHORTCUT", →"JOURNAL SHORTCUT", →"TOOLS SHORTCUT", →"QUESTS SHORTCUT"], everyFrame=false)
+    on MAP → Quick Map
+    on MAP SHORTCUT → Map
+    on JOURNAL SHORTCUT → Journal
+    on TOOLS SHORTCUT → Tools
+    on QUESTS SHORTCUT → Quests
+    on FINISHED → Previous Pane
+  }
+
+  state Reset Vars {
+    SetBoolValue(boolVariable=var "Map Shortcut", boolValue=false, everyFrame=false)
+    on FINISHED → Set Proxy
+  }
+
+  state Move L Quick {
+    SetEnumValue(enumVariable=var "Start Selection Value", enumValue=Previous, everyFrame=false)
+    SetIntValue(intVariable=var "Target Pane Index", intValue=-1, everyFrame=false)
+    on FINISHED → Set L Increment
+  }
+
+  state Move R Quick {
+    SetEnumValue(enumVariable=var "Start Selection Value", enumValue=Previous, everyFrame=false)
+    SetIntValue(intVariable=var "Target Pane Index", intValue=-1, everyFrame=false)
+    on FINISHED → Set R Increment
+  }
+
+  state Quick Map {
+    SetStaticVariable(variableName="quickMapZoom", setValue=true, sceneTransitionsLimit=0)
+    SetCurrentInventoryPane(PaneList=Self, PaneIndex=4, CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    on FINISHED → Reset Vars
+  }
+
+  state Set Opened {
+    SetStaticVariable(variableName="quickMapZoom", setValue=false, sceneTransitionsLimit=0)
+    SetIntValue(intVariable=var "Next Pane Num", intValue=var "Current Pane Num", everyFrame=false)
+    SetBoolValue(boolVariable=var "Opened", boolValue=true, everyFrame=false)
+    SetPlayerDataInt(intName="currentInvPane", value=var "Current Pane Num")
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="ACTIVATE", delay=0, everyFrame=false)
+    GameObjectCompare(gameObjectVariable=var "Current Pane", compareTo=var "Prev Pane", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Prev Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Pane Move Prevented?
+  }
+
+  state Can Close? Back {
+    CheckIsCheatManagerOpen(TrueEvent=→"CANCEL", FalseEvent=(none), StoreValue=(unset), EveryFrame=false)
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    GameObjectCompare(gameObjectVariable=var "Target Pane", compareTo=<null>, equalEvent=(none), notEqualEvent=→"BACK", storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "In Sub Menu", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Close
+    on CANCEL → Opened
+    on BACK → Fade Panes Back
+  }
+
+  state Queue Move L {
+    SetBoolValue(boolVariable=var "Queued Move L", boolValue=true, everyFrame=false)
+    on FINISHED → Pane Final Pos
+  }
+
+  state Queue Move R {
+    SetBoolValue(boolVariable=var "Queued Move R", boolValue=true, everyFrame=false)
+    on FINISHED → Pane Final Pos
+  }
+
+  state Move R Slow {
+    SetEnumValue(enumVariable=var "Start Selection Value", enumValue=LeftMost, everyFrame=false)
+    SetIntValue(intVariable=var "Target Pane Index", intValue=-1, everyFrame=false)
+    on FINISHED → Set R Increment
+  }
+
+  state Move L Slow {
+    SetEnumValue(enumVariable=var "Start Selection Value", enumValue=RightMost, everyFrame=false)
+    SetIntValue(intVariable=var "Target Pane Index", intValue=-1, everyFrame=false)
+    on FINISHED → Set L Increment
+  }
+
+  state First Pane Activate {
+    SetPosition(gameObject=var "Current Pane", vector=(unset), x=0, y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    FadeNestedFadeGroup(Target=var "Current Pane", ToAlpha=0, FadeTime=0)
+    ActivateGameObject(gameObject=var "Current Pane", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Open Current Pane
+  }
+
+  state Pane Move Cancel {
+    BoolTest(boolVariable=var "Pane Move Custom", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Pane Move Prevented", boolValue=true, everyFrame=false)
+    on FINISHED → Pane Move Prevented?
+  }
+
+  sequence state Pane Move Prevented? {
+    BoolTest(boolVariable=var "Pane Move Prevented", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Pane Move Prevented", boolValue=false, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    SendMessageV2(gameObject=var "Current Pane", delivery=SendMessage, options=1, functionCall=PaneMovePrevented(), everyFrame=false)
+    on FINISHED → Opened
+  }
+
+  state Fade Panes {
+    SetCurrentInventoryPaneCustom(PaneList=Self, NewPane=var "Target Pane", CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    FadeNestedFadeGroup(Target=var "Current Pane", ToAlpha=0, FadeTime=0)
+    ActivateGameObject(gameObject=var "Current Pane", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="UP", delay=0, everyFrame=false)
+    FadeNestedFadeGroupV3(Target=var "Current Pane", ToAlpha=1, FadeTime=0.3, Curve=curve[(time=0, value=0, inSlope=0, outSlope=0), (time=0.5, value=0, inSlope=Infinity, outSlope=2), (time=1, value=1, inSlope=2, outSlope=2)], Realtime=true)
+    FadeNestedFadeGroupV3(Target=var "Prev Pane", ToAlpha=0, FadeTime=0.3, Curve=curve[(time=0, value=0, inSlope=2, outSlope=2), (time=0.5, value=1, inSlope=2, outSlope=Infinity), (time=1, value=1, inSlope=0, outSlope=0)], Realtime=true)
+    SendEventByName(eventTarget=GameObject(var "Prev Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="SETUP", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "Current Pane", vector=(unset), x=0, y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=true)
+    ListenForPaneRight(eventTarget=Self, wasPressed=→"MOVE PANE R QUICK", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForPaneLeft(eventTarget=Self, wasPressed=→"MOVE PANE L QUICK", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on FINISHED → Fade Panes End
+    on HERO DAMAGED → Damage Close
+    on HERO ROAR LOCKED → R Lock Close
+    on INVENTORY CANCEL → R Lock Close
+    on MOVE PANE L QUICK → Queue Move L
+    on MOVE PANE R QUICK → Queue Move R
+  }
+
+  state Fade Panes Back {
+    SetGameObject(variable=var "Target Pane", gameObject=var "Prev Pane", everyFrame=false)
+    SetBoolValue(boolVariable=var "In Sub Menu", boolValue=false, everyFrame=false)
+    on FINISHED → Fade Panes
+  }
+
+  state Into Sub Pane {
+    SetBoolValue(boolVariable=var "In Sub Menu", boolValue=true, everyFrame=false)
+    on FINISHED → Fade Panes
+  }
+
+  state Fade Panes End {
+    BoolTest(boolVariable=var "In Sub Menu", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetGameObject(variable=var "Target Pane", gameObject=<null>, everyFrame=false)
+    on FINISHED → Set Opened
+  }
+
+  state Map {
+    SetCurrentInventoryPane(PaneList=Self, PaneIndex=4, CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    on FINISHED → Set Proxy
+  }
+
+  state Journal {
+    SetCurrentInventoryPane(PaneList=Self, PaneIndex=3, CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    on FINISHED → Set Proxy
+  }
+
+  state Tools {
+    SetCurrentInventoryPane(PaneList=Self, PaneIndex=1, CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    on FINISHED → Set Proxy
+  }
+
+  state Quests {
+    SetCurrentInventoryPane(PaneList=Self, PaneIndex=2, CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    on FINISHED → Set Proxy
+  }
+
+  state Move Pane To {
+    SetEnumValue(enumVariable=var "Start Selection Value", enumValue=Previous, everyFrame=false)
+    IntCompare(integer1=var "Target Pane Index", integer2=var "Current Pane Num", equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    on L → Set L Increment
+    on R → Set R Increment
+  }
+
+  state Next Pane L {
+    SetNextInventoryPane(PaneList=Self, Direction=-1, CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    GameObjectCompare(gameObjectVariable=var "Current Pane", compareTo=var "Prev Pane", equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetFsmEnum(gameObject=var "Current Pane", fsmName="Inventory Proxy", variableName="Start Selection", setValue=var "Start Selection Value", everyFrame=false)
+    on FINISHED → Opened?
+    on CANCEL → Pane Move Cancel
+  }
+
+  state Next Pane R {
+    SetNextInventoryPane(PaneList=Self, Direction=1, CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    GameObjectCompare(gameObjectVariable=var "Current Pane", compareTo=var "Prev Pane", equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetFsmEnum(gameObject=var "Current Pane", fsmName="Inventory Proxy", variableName="Start Selection", setValue=var "Start Selection Value", everyFrame=false)
+    on FINISHED → Opened?
+    on CANCEL → Pane Move Cancel
+  }
+
+  state Next Pane Target {
+    SetCurrentInventoryPane(PaneList=Self, PaneIndex=var "Target Pane Index", CurrentPane=var "Current Pane", CurrentPaneIndex=var "Current Pane Num", PreviousPane=var "Prev Pane")
+    GameObjectCompare(gameObjectVariable=var "Current Pane", compareTo=var "Prev Pane", equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetFsmEnum(gameObject=var "Current Pane", fsmName="Inventory Proxy", variableName="Start Selection", setValue=var "Start Selection Value", everyFrame=false)
+    on FINISHED → Opened?
+    on CANCEL → Pane Move Cancel
+  }
+
+  state Target? L {
+    IntCompare(integer1=var "Target Pane Index", integer2=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    on L → Next Pane L
+    on FINISHED → Next Pane Target
+  }
+
+  state Target? R {
+    IntCompare(integer1=var "Target Pane Index", integer2=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    on R → Next Pane R
+    on FINISHED → Next Pane Target
+  }
+
+  state Cheat Tool Change? {
+    PlayerDataVariableTest(VariableName="atBench", ExpectedValue=true, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=(none))
+    CallStaticMethod(className="CheatManager", methodName="get_CanChangeEquipsAnywhere", parameters=[], storeResult=var "Change Equips Cheat", everyFrame=false)
+    BoolTest(boolVariable=var "Change Equips Cheat", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    TryReplenishTools(DoReplenish=true, Method=Bench, trueEvent=(none), falseEvent=(none), storeValue=(unset))
+    on FINISHED → Closed
+  }
+
+  state Just Finished Open? {
+    BoolTest(boolVariable=var "Opened", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendEventToRegister(eventName="INVENTORY OPEN COMPLETE")
+    on FINISHED → Set Opened
+  }
+
+  var Allow Pane Swapping: bool = true
+  var Do Not Close: bool = false
+
+  var Next Pane Start X: float = 0
+  var Current Pane Num: int = 0
+  var Next Pane Num: int = 0
+  var Target Pane Index: int = 0
+  var Can Open Inventory: bool = false
+  var In Sub Menu: bool = false
+  var Is Gameplay Scene: bool = false
+  var Map Shortcut: bool = false
+  var Open: bool = false
+  var Opened: bool = false
+  var Single Pane: bool = false
+  var Queued Move L: bool = false
+  var Queued Move R: bool = false
+  var Pane Move Prevented: bool = false
+  var Pane Move Custom: bool = false
+  var Change Equips Cheat: bool = false
+  var Arrow Broadcast Event: string = ""
+  var Particle Obj Name: string = ""
+  var Prev Pane End Pos: vector3 = (0, 0, 0)
+  var Arrow L: gameObject = <null>
+  var Arrow R: gameObject = <null>
+  var Arrows: gameObject = <null>
+  var Border: gameObject = <null>
+  var Current Pane: gameObject = <null>
+  var Inventory Pane: gameObject = <null>
+  var Map Pane: gameObject = <null>
+  var Pane Name Obj: gameObject = <null>
+  var Particle Obj: gameObject = <null>
+  var Prev Pane: gameObject = <null>
+  var Target Pane: gameObject = <null>
+  var Start Selection Value: enum = InventoryItemManager+SelectedActionType(0)
+  var Button Shortcut: enum = InventoryShortcutButtons(0)
+}

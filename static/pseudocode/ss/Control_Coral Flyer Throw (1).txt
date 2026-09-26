@@ -1,0 +1,365 @@
+# Control
+# 1 location(s):
+#   Memory_Coral_Tower / Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)
+
+fsm Control {
+  start Init
+  on MULTI HIT CONNECT → Multihit  // from any state
+
+  state Init {
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Fly In", equalEvent=→"FLY IN", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Spear Spawn Pause
+    on FLY IN → Fly In Ready
+  }
+
+  state Spear Spawn Pause {
+    GetPosition2D(gameObject=Self, vector=var "Spawn Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    SetPosition2D(GameObject=Self, Vector=(unset), X=-100, Y=100, Space=0, EveryFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    GetConstantsValue(variableName="CORAL_SPEAR_SPAWN_TIME", storeValue=var "Spawn Time")
+    Wait(time=var "Spawn Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Burst Out
+  }
+
+  state Burst Out {
+    SetPosition2D(GameObject=Self, Vector=var "Spawn Pos", X=(unset), Y=(unset), Space=0, EveryFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Air Roar", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=CWF_attack (sfxdynamic_assets_areacoralareamemory.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Start
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)  // disabled
+    Tk2DAnimationByDirection(gameObject=Self, spriteFacesRight=false, forwardClip="Fly", backwardClip="Fly Back", faceObject=true, objectToFace=var "Hero", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    RandomFloat(min=10, max=14, storeResult=var "Distance")
+    RandomFloat(min=3.5, max=6.5, storeResult=var "Height")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=6.5, acceleration=0.35, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    ShoveFromWall(gameObject=Self, shoveForce=40, rayLength=var "Roof Distance", checkUp=true, checkDown=false, checkLeft=false, checkRight=false, everyFrame=true)
+    RandomFloat(min=1, max=1.75, storeResult=var "Idle Time")
+    SetBoolValueAtTime(BoolVariable=var "Can Attack", BoolValue=true, Time=var "Idle Time", SetOppositeOnStateEntry=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Attack", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Under Range", storeResult=var "In Under Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Did Evade", var "In Under Range"], boolStates=[false, true], trueEvent=→"EVADE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on TOOK DAMAGE → Dmg Response
+    on ATTACK → Slash?
+    on EVADE → Evade Check
+  }
+
+  state Dmg Response {
+    SetBoolValue(boolVariable=var "Can Attack", boolValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Throw Antic {
+    SetBoolValue(boolVariable=var "Can Attack", boolValue=false, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=CWF_attack (sfxdynamic_assets_areacoralareamemory.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=bone_hunter_throw_sword_antic (sfxstatic_assets_areaant.bundle), pitchMin=0.9, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Did Evade", boolValue=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=5, acceleration=0.25, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    ShoveFromWall(gameObject=Self, shoveForce=50, rayLength=4, checkUp=true, checkDown=false, checkLeft=false, checkRight=false, everyFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Aim Throw
+  }
+
+  state Throw {
+    PlayAudioEvent(audioClip=shakra_throw_disc (sfxstatic_assets_mapper.bundle), pitchMin=0.8, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=5, acceleration=0.25, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    ShoveFromWall(gameObject=Self, shoveForce=50, rayLength=4, checkUp=true, checkDown=false, checkLeft=false, checkRight=false, everyFrame=true)
+    SpawnObjectFromGlobalPool(gameObject=Coral Flyer Throw Projectile (localpoolprefabs_assets_areacoralareamemory.bundle), spawnPoint=var "Projectile Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatClamp(floatVariable=var "Throw X", minValue=var "Throw Min", maxValue=var "Throw Max", everyFrame=false)
+    SetFsmFloat(gameObject=var "Projectile", fsmName="Control", variableName="X Speed", setValue=var "Throw X", everyFrame=false)
+    ActivateGameObject(gameObject=var "Projectile", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Projectile", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Body Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tail Collider", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Rethrow?
+  }
+
+  state Aim Throw {
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=var "Self X", y=(unset), space=0, everyFrame=false)
+    GetPosition2d(gameObject=var "Hero", vector_2d=(unset), x=var "Hero X", y=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Hero X", float2=var "Self X", operation=Subtract, storeResult=var "Throw X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Throw X", multiplyBy=1.2, everyFrame=false)
+    SetFloatValue(floatVariable=var "Throw Min", floatValue=-20, everyFrame=false)
+    SetFloatValue(floatVariable=var "Throw Max", floatValue=-5, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    SetFloatValue(floatVariable=var "Throw Min", floatValue=5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Throw Max", floatValue=20, everyFrame=false)
+    on FINISHED → Throw
+  }
+
+  state Rethrow? {
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)  // disabled
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    RayCast2dV2(fromGameObject=var "Ray Centre", fromPosition=(unset), direction=(1, 0), space=1, distance=5, minDepth=(unset), maxDepth=(unset), hitEvent=→"FINISHED", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=var "In Slash Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    SendRandomEventV4(events=[→"ATTACK", →"FINISHED", →"SLASH"], weights=[0.5, 0.5, 0.5], eventMax=[3, 2, 2], missedMax=[3, 4, 4], activeBool=var "In Slash Range")
+    SendRandomEventV4(events=[→"ATTACK", →"FINISHED"], weights=[0.5, 0.5], eventMax=[3, 2], missedMax=[2, 3], activeBool=(unset))
+    on ATTACK → Throw Evade
+    on FINISHED → Evade?
+    on SLASH → Slash Antic
+  }
+
+  state Throw Evade {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="ReThrow Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=bone_hunter_throw_sword_antic (sfxstatic_assets_areaant.bundle), pitchMin=0.9, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocityByScale(gameObject=Self, speed=25, ySpeed=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Aim Rethrow
+  }
+
+  state Start {
+    RandomFloat(min=0, max=360, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=4, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Rethrow {
+    PlayAudioEvent(audioClip=shakra_throw_disc (sfxstatic_assets_mapper.bundle), pitchMin=0.8, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="ReThrow", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=5, acceleration=0.25, targetsHeight=true, height=var "Height", minAboveHero=(unset))
+    ShoveFromWall(gameObject=Self, shoveForce=50, rayLength=4, checkUp=true, checkDown=false, checkLeft=false, checkRight=false, everyFrame=true)
+    SpawnObjectFromGlobalPool(gameObject=Coral Flyer Throw Projectile (localpoolprefabs_assets_areacoralareamemory.bundle), spawnPoint=var "Projectile Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatClamp(floatVariable=var "Throw X", minValue=var "Throw Min", maxValue=var "Throw Max", everyFrame=false)
+    SetFsmFloat(gameObject=var "Projectile", fsmName="Control", variableName="X Speed", setValue=var "Throw X", everyFrame=false)
+    ActivateGameObject(gameObject=var "Projectile", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Projectile", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Body Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tail Collider", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Evade?
+  }
+
+  state Aim Rethrow {
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=var "Self X", y=(unset), space=0, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=CWF_attack (sfxdynamic_assets_areacoralareamemory.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    GetPosition2d(gameObject=var "Hero", vector_2d=(unset), x=var "Hero X", y=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Hero X", float2=var "Self X", operation=Subtract, storeResult=var "Throw X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Throw X", multiplyBy=1.2, everyFrame=false)
+    SetFloatValue(floatVariable=var "Throw Min", floatValue=-20, everyFrame=false)
+    SetFloatValue(floatVariable=var "Throw Max", floatValue=-5, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    SetFloatValue(floatVariable=var "Throw Min", floatValue=5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Throw Max", floatValue=20, everyFrame=false)
+    on FINISHED → Rethrow
+  }
+
+  state Evade? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Evade Range", storeResult=false, sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    SendRandomEventV4(events=[→"EVADE", →"FINISHED"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on EVADE → Evade Check
+    on FINISHED → Idle
+  }
+
+  state Evade Check {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetBoolValue(boolVariable=var "Did Evade", boolValue=true, everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Ray Centre", fromPosition=(unset), direction=(1, 0), space=1, distance=5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=var "Hero Below", rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=-4, reverseIfNegativeScale=false, everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Wall Behind", var "Hero Below"], boolStates=[true, false], trueEvent=→"CANCEL", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Wall Behind", var "Hero Below"], boolStates=[true, true], trueEvent=→"FLIP", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Evade
+    on CANCEL → Idle
+    on FLIP → Flip
+  }
+
+  state Evade {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=40, ySpeed=5, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    PlayAudioEvent(audioClip=bone_hunter_fly_antic (sfxstatic_assets_areaant.bundle), pitchMin=0.9, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=CWF_dodge (sfxdynamic_assets_areacoralareamemory.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Idle
+  }
+
+  state Flip {
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Evade
+  }
+
+  state Fly In Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    ActivateGameObject(gameObject=var "Tail Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Ambush Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)  // disabled
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    on FINISHED → Check Pos
+  }
+
+  state Check Pos {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"SHIFT", greaterThan=(none), everyFrame=false)
+    on SHIFT → Shift
+    on FINISHED → Fly In
+  }
+
+  state Shift {
+    SetParent(gameObject=var "Spawn Pos Alt", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Spawn Pos Alt", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    on FINISHED → Fly In
+  }
+
+  state Fly In {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=10, z=-15, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    PlayRandomAudioClipTable(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=CWF_attack (sfxdynamic_assets_areacoralareamemory.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, -10, 15), time=0.75, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.55)
+    SetBoolValue(boolVariable=var "Startled", boolValue=true, everyFrame=false)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    ActivateGameObject(gameObject=var "Tail Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Start
+  }
+
+  state Slash? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    SendRandomEventV4(events=[→"FINISHED", →"SLASH"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on FINISHED → Throw Antic
+    on SLASH → Slash Antic
+  }
+
+  state Slash Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=CWF_attack (sfxdynamic_assets_areacoralareamemory.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetVelocityByScale(gameObject=Self, speed=14, ySpeed=5, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=bone_hunter_jump (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Tail Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Slash 1
+  }
+
+  state Slash 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[bone_hunter_sword_1 (sfxstatic_assets_areaant.bundle), bone_hunter_sword_2 (sfxstatic_assets_areaant.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=-18, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash 2
+  }
+
+  state Slash 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash 3
+  }
+
+  state Slash 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash 4
+  }
+
+  state Slash 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash 5
+  }
+
+  state Slash End {
+    ActivateGameObject(gameObject=var "Tail Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Evade?
+  }
+
+  state Slash 5 {
+    ActivateGameObject(gameObject=var "Slash Collider 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEventRandom(audioClips=[bone_hunter_sword_1 (sfxstatic_assets_areaant.bundle), bone_hunter_sword_2 (sfxstatic_assets_areaant.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash 6
+  }
+
+  state Slash 6 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash 7
+  }
+
+  state Slash 7 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash 8
+  }
+
+  state Slash 8 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash 9
+  }
+
+  state Slash 9 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=var "Slash Decel", brakeOnExit=false)
+    on FINISHED → Slash End
+  }
+
+  state Multihit {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Multihit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Slash End
+  }
+
+  var Roof Distance: float = 4
+
+  var Distance: float = 0
+  var Height: float = 0
+  var Idle Time: float = 0
+  var Self X: float = 0
+  var Hero X: float = 0
+  var Throw X: float = 0
+  var Throw Max: float = 0
+  var Throw Min: float = 0
+  var Angle: float = 0
+  var Spawn Time: float = 0
+  var Slash Decel: float = 0.95
+  var Can Attack: bool = false
+  var In Attack Range: bool = false
+  var Did Evade: bool = false
+  var In Under Range: bool = false
+  var Wall Behind: bool = false
+  var Hero Below: bool = false
+  var Startled: bool = false
+  var In Slash Range: bool = false
+  var Clip: string = ""
+  var Spawn Pos: vector2 = (0, 0)
+  var Projectile Point: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Projectile Point
+  var Projectile: gameObject = <null>
+  var Throw Collider: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Throw Collider
+  var Rethrow Collider: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Rethrow Collider
+  var Throw Body Collider: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Throw Body Collider
+  var Ray Centre: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Ray Centre
+  var Tail Collider: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Tail Collider
+  var Spawn Pos Alt: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Spawn Pos Alt
+  var Slash Collider 1: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Slash Collider 1
+  var Slash Collider 2: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Slash Collider 2
+  var Slash Collider 3: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Slash Collider 3
+  var Slash Collider 4: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Slash Collider 4
+  var Audio Loop Voice: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Audio Loop Voice
+  var Terrain Collider: gameObject = Battle Scenes/Battle Scene Chamber 2/Wave 8/Coral Flyer Throw (1)/Terrain Collider
+}

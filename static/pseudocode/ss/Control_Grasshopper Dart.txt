@@ -1,0 +1,168 @@
+# Control
+# 1 location(s):
+#   localpoolprefabs_assets_areaclover.bundle / Grasshopper Dart
+
+fsm Control {
+  start Init
+  on PROJECTILE BREAK → Break  // from any state
+  on DAMAGED HERO → Damaged Hero  // from any state
+
+  state Init {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    ActivateGameObject(gameObject=var "Water Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=0.005, max=0.0059, storeResult=var "Z Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Follow
+  }
+
+  state Fly {
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Orb Target", collideLayer=Terrain(8), sendEvent=→"BREAK", storeCollider=var "")
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Terrain(8), sendEvent=→"HIT TERRAIN", storeCollider=var "")
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Water Surface", collideLayer=(unset), sendEvent=→"WATER", storeCollider=var "Surface")
+    on HIT TERRAIN → Stick
+    on PARRIED → Check
+    on WATER → Splash
+    on BREAK → Break
+  }
+
+  state Stick {
+    PlayAudioEventRandom(audioClips=[grasshopper_fly_projectile_Impact_1 (sfxstatic_assets_areaclover.bundle), grasshopper_fly_projectile_Impact_2 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dart Thunk")
+    ActivateGameObject(gameObject=var "Thunk Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=6, finishEvent=→"WAIT", realTime=false)
+    StopParticleEmitter(gameObject=var "Pt Trail")
+    PlayParticleEmitter(gameObject=var "Pt Thunk", emit=0, resetIfPlaying=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0.7058823, 0.7058823, 0.7058823, 1), everyframe=false)
+    ActivateGameObject(gameObject=var "Water Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on WAIT → Break
+    on CLOVER BATTLE END → Battle End Pause
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Break {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    PlayParticleEmitter(gameObject=var "Pt Break", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Break Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Thunk Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Trail")
+    PlayParticleEmitter(gameObject=var "Pt Thunk", emit=0, resetIfPlaying=false)
+    on FINISHED → Recycle
+  }
+
+  state Deflect {
+    FloatAdd(floatVariable=var "Angle", add=var "Angle Mod", everyFrame=false, perSecond=false)
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed", multiplyBy=2, everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    on FINISHED → Fly
+  }
+
+  state Check {
+    GetVelocityAsAngle(gameObject=Self, storeAngle=var "Angle", everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=0, tolerance=1, equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=180, tolerance=0, equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    on L → Deflect L
+    on R → Deflect R
+    on FINISHED → Deflect Other
+  }
+
+  state Deflect L {
+    RandomFloat(min=-10, max=-13, storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Deflect R {
+    RandomFloat(min=10, max=13, storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Deflect Other {
+    RandomFloat(min=5, max=10, storeResult=var "Angle Mod")
+    RandomlyFlipFloat(storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Follow {
+    EaseFloat(fromValue=200, toValue=0, floatVariable=var "Accel", time=0.25, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=40, accelerationForce=var "Accel", offsetX=0, offsetY=0)  // disabled
+    ChaseObjectV3(gameObject=Self, target=var "Target", accelerationForce=var "Accel", offsetX=0, offsetY=0, speedMax=32, speedMin=32)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Orb Target", collideLayer=Terrain(8), sendEvent=→"BREAK", storeCollider=var "")
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Terrain(8), sendEvent=→"HIT TERRAIN", storeCollider=var "")
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    ActivateGameObjectDelay(gameObject=var "Throw Effect", activate=true, resetOnExit=false, delay=0.001)  // disabled
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Water Surface", collideLayer=(unset), sendEvent=→"WATER", storeCollider=var "Surface")
+    on FINISHED → Fly
+    on HIT TERRAIN → Stick
+    on PARRIED → Check
+    on WATER → Splash
+    on BREAK → Break
+  }
+
+  state Splash {
+    SpawnObjectFromGlobalPool(gameObject=Lil Splash (localpoolprefabs_assets_water.bundle), spawnPoint=var "Throw Effect", position=(unset), rotation=(unset), storeObject=var "Splash")
+    GetPosition(gameObject=var "Surface", vector=(unset), x=(unset), y=var "Surface Y", z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Splash", vector=(unset), x=(unset), y=var "Surface Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=var "Splash", vector=(unset), x=(unset), y=-0.25, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetRotation(gameObject=var "Splash", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    ActivateGameObject(gameObject=var "Water Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Recycle
+  }
+
+  state Battle End Pause {
+    WaitRandom(timeMin=0, timeMax=0.25, finishEvent=(none), realTime=false)
+    on FINISHED → Break
+  }
+
+  state Damaged Hero {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Impact", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Trail")
+    on FINISHED → Recycle
+  }
+
+  var Angle: float = 0
+  var Angle Mod: float = 0
+  var Speed: float = 0
+  var Accel: float = 0
+  var Surface Y: float = 0
+  var Z Pos: float = 0
+  var Break Effect: gameObject = Grasshopper Dart/Break Effect
+  var Pt Break: gameObject = Grasshopper Dart/Pt Break
+  var Pt Thunk: gameObject = Grasshopper Dart/Pt Thunk
+  var Pt Trail: gameObject = Grasshopper Dart/Pt Trail
+  var Target: gameObject = <null>
+  var Throw Effect: gameObject = Grasshopper Dart/Thunk Effect
+  var Thunk Effect: gameObject = Grasshopper Dart/Thunk Effect
+  var Surface: gameObject = <null>
+  var Splash: gameObject = <null>
+  var Water Detector: gameObject = Grasshopper Dart/Water Detector
+  var Slash Impact: gameObject = Grasshopper Dart/Slash Impact
+}

@@ -1,0 +1,455 @@
+# Control
+# 1 location(s):
+#   Arborium_01 / Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)
+
+fsm Control {
+  start Init
+  on GO LEFT → Go Left  // from any state
+  on GO RIGHT → Go Right  // from any state
+  on GO UP → Go Up  // from any state
+  on GO RIGHT → Go Down  // from any state
+  on LIGHTNING ANTIC → Lightning Defend  // from any state
+
+  state Init {
+    FindAlertRange(target=Self, storeResult=var "Alert Range", childName="Alert Range")
+    SetParent(gameObject=var "Patrol Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Start Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep", equalEvent=→"SLEEP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    StringCompare(stringVariable=var "Clip", compareTo="Fly In", equalEvent=→"FLY IN", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Wake Startle", equalEvent=→"SLEEP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Unalert Patrol
+    on FLY IN → Fly In Ready
+    on SLEEP → Sleeping Corpse
+  }
+
+  state Unalert Patrol {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Battler", isTrue=→"BATTLER", isFalse=(none), everyFrame=false)
+    IdleBuzzV2(gameObject=Self, waitMin=0.5, waitMax=1, speedMax=2.5, accelerationMax=15, roamingRangeX=2, roamingRangeY=2, manualStartPos=(unset))
+    ShoveFromWall(gameObject=Self, shoveForce=10, rayLength=4, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+    on BATTLER → In Range
+    on SING → Sing
+  }
+
+  state Startle {
+    BoolTest(boolVariable=var "Did Startle", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=memorium_keeper_attack (sfxdynamic_assets_areaarborium.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Did Startle", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=3, everyFrame=false)
+    PlayAudioEvent(audioClip=song_reed_antic (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → In Range
+  }
+
+  state In Range {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=9, speedMax=5, acceleration=0.3, targetsHeight=true, height=4, minAboveHero=(unset))
+    WaitRandom(timeMin=0.7, timeMax=1, finishEvent=→"ATTACK", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Throw Range", storeResult=false, sendEvent="", outOfRangeEvent="RANGE OUT", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=var "In Slash Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Block Ready", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    RandomBool(storeResult=var "Will Block")
+    BoolAllTrue(boolVariables=[var "In Slash Range", var "Will Block", var "Block Ready"], sendEvent=→"BLOCK", storeResult=(unset), everyFrame=true)
+    on ATTACK → Attack Choice
+    on RANGE OUT → Out of Range
+    on SING → Sing
+    on BLOCK → Block
+  }
+
+  state Throw Antic {
+    PlayAudioEvent(audioClip=arborium_keeper_throw_antic (sfxstatic_assets_areaarborium.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=memorium_keeper_attack_long (sfxdynamic_assets_areaarborium.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Spit X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Spit X", subtract=var "Self X", everyFrame=false, perSecond=false)
+    FloatMultiply(floatVariable=var "Spit X", multiplyBy=1.15, everyFrame=false)
+    RandomFloat(min=-1, max=1, storeResult=var "Random")
+    FloatAdd(floatVariable=var "Spit X", add=var "Random", everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Spit X", minValue=-15, maxValue=15, everyFrame=false)
+    FloatMinClamp(floatVariable=var "Spit X", minValue=-3, maxValue=3, everyFrame=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    ClampAngleByScale(gameObject=Self, space=0, angleVariable=var "Angle", positiveMinValue=135, positiveMaxValue=230, negativeMinValue=-50, negativeMaxValue=45, everyFrame=false)
+    on FINISHED → Throw
+  }
+
+  state Out of Range {
+    Wait(time=4, finishEvent=→"UNALERT", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Throw Range", storeResult=false, sendEvent="RANGE IN", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=5, acceleration=0.3, targetsHeight=true, height=4, minAboveHero=(unset))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on RANGE IN → Insta Throw?
+    on UNALERT → Unalert Patrol
+    on SING → Sing
+  }
+
+  state Throw {
+    PlayAudioEvent(audioClip=arborium_keeper_throw (sfxstatic_assets_areaarborium.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SpawnObjectFromGlobalPool(gameObject=Lightning Bola Ball Enemy (localpoolprefabs_assets_areaarborium.bundle), spawnPoint=var "Throw Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=25, everyFrame=false)
+    AddForce2d(gameObject=var "Projectile", forceMode=1, atPosition=(unset), vector=(unset), x=(unset), y=10, vector3=(unset), everyFrame=false)
+    SetDamageHeroAmount(target=var "Projectile", damageDealt=2)  // disabled
+    SetGravity2dScale(gameObject=var "Projectile", gravityScale=1)  // disabled
+    SetVelocity2d(gameObject=var "Projectile", vector=(unset), x=var "Spit X", y=10, everyFrame=false)  // disabled
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Juke Evade?
+    on SING → Sing
+  }
+
+  state Go Left {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-8, y=(unset), everyFrame=false)
+    on FINISHED → Out of Range
+  }
+
+  state Go Right {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=8, y=(unset), everyFrame=false)
+    on FINISHED → Out of Range
+  }
+
+  state Go Up {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=8, everyFrame=false)
+    on FINISHED → Out of Range
+  }
+
+  state Go Down {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-8, everyFrame=false)
+    on FINISHED → Out of Range
+  }
+
+  state Throw Evade {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=6, ySpeed=3, everyFrame=false)
+    on FINISHED → Roof Avoid
+  }
+
+  state Roof Avoid {
+    RayCast2dV2(fromGameObject=var "Throw Point", fromPosition=(unset), direction=(0, 1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-8, everyFrame=false)
+    on FINISHED → Throw Antic
+  }
+
+  state Insta Throw? {
+    SendRandomEventV4(events=[→"FINISHED", →"ATTACK"], weights=[0.65, 0.35], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    on FINISHED → In Range
+    on ATTACK → Attack Choice
+  }
+
+  state Fly In Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Ambush Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on BATTLE START → Battle Pause
+    on WAKE → Fly In
+  }
+
+  state Check Pos {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"SHIFT", greaterThan=(none), everyFrame=false)
+    on SHIFT → Shift
+    on FINISHED → Fly In
+  }
+
+  state Shift {
+    SetParent(gameObject=var "Spawn Pos Alt", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Spawn Pos Alt", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    on FINISHED → Fly In
+  }
+
+  state Fly In {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=memorium_keeper_attack (sfxdynamic_assets_areaarborium.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=10, z=-15, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, -10, 15), time=0.6, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.4)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    PlayRandomAudioClipTable(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → In Range
+  }
+
+  state Battle Fly In {
+    SetBoolValue(boolVariable=var "In Battle", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Battler", boolValue=true, everyFrame=false)
+    on FINISHED → Check Pos
+  }
+
+  state Attack Check {
+    SendRandomEventV4(events=[→"FINISHED", (none)], weights=[0.5, 0.5], eventMax=[1, 1], missedMax=[1, 1], activeBool=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="SLASH", outOfRangeEvent="", everyFrame=false)
+    on FINISHED → Throw Evade
+    on SLASH → Slash Antic
+  }
+
+  state Slash Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=6, ySpeed=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    PlayAudioEvent(audioClip=song_pilgrim_03_antic (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=memorium_keeper_evade (sfxdynamic_assets_areaarborium.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Slash 1
+  }
+
+  state Slash 1 {
+    SetVelocityByScale(gameObject=Self, speed=-25, ySpeed=-10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=song_pilgrim_03_attack (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 2
+  }
+
+  state Slash 2 {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=memorium_keeper_attack (sfxdynamic_assets_areaarborium.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Slash Middle
+  }
+
+  state Slash Middle {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Slash 3
+  }
+
+  state Slash 3 {
+    SetVelocityByScale(gameObject=Self, speed=-25, ySpeed=-10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=song_reed_attack (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 4
+  }
+
+  state Slash 4 {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Hit 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Slash 5
+  }
+
+  state Slash 5 {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Hit 5", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Slash Recover
+  }
+
+  state Slash Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Juke Evade?
+    on SING → Sing
+  }
+
+  state Lightning Defend {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Defend")
+    FindClosest(gameObject=Self, withTag="Explosion", ignoreOwner=true, mustBeVisible=false, storeObject=var "Warning", storeDistance=(unset), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Warning", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Warning", distance=8, speedMax=9, acceleration=0.5, targetsHeight=false, height=4, minAboveHero=(unset))
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Slash Recover
+  }
+
+  state Attack Choice {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=var "In Slash Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    SendRandomEventV4(events=[→"BLOCK", (none)], weights=[0.5, 0.5], eventMax=[1, 1], missedMax=[1, 1], activeBool=var "In Slash Range")  // disabled
+    SendRandomEventV4(events=[→"SLASH", →"THROW"], weights=[0.5, 0.75], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on THROW → Throw Evade
+    on SLASH → Juke? 2
+    on BLOCK → Block
+  }
+
+  state Fly To Slash {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Wait(time=3, finishEvent=→"CANCEL", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="SLASH", outOfRangeEvent="", everyFrame=true)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=4, speedMax=6, acceleration=0.3, targetsHeight=false, height=1, minAboveHero=(unset))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    on SLASH → Slash Antic
+    on CANCEL → Attack Choice
+  }
+
+  state Block {
+    PlayAudioEvent(audioClip=song_reed_antic (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=memorium_keeper_evade (sfxdynamic_assets_areaarborium.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Defend")
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=true)
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=-6, position=(0, 0, 0), spread=0, everyFrame=false)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=9, speedMax=7, acceleration=0.3, targetsHeight=false, height=4, minAboveHero=(unset))
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    on BLOCKED HIT → Block Hit
+    on FINISHED → Block End
+  }
+
+  state Block End {
+    DecelerateV2(gameObject=Self, deceleration=0.88, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Defend End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Choice
+  }
+
+  state Block Hit {
+    DecelerateV2(gameObject=Self, deceleration=0.88, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Block Hit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Juke? 2
+  }
+
+  state Sing {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=memorium_keeper_sing (sfxdynamic_assets_areaarborium.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → In Range
+  }
+
+  state Sleeping Corpse {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Corpse")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    GetOwner(storeGameObject=var "Self")
+    on WAKE → Wake Thread
+    on BATTLE START → Wake Thread
+  }
+
+  state Corpse Shake {
+    ObjectJitter(gameObject=var "Corpse", x=0.1, y=0.1, z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Startle Wake
+  }
+
+  state Startle Wake {
+    SetMeshRenderer(gameObject=Self, active=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=memorium_keeper_attack (sfxdynamic_assets_areaarborium.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    BoolTest(boolVariable=var "Did Startle", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Startle", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=20, everyFrame=false)
+    PlayAudioEvent(audioClip=song_reed_antic (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Corpse", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → In Range
+  }
+
+  state Battle Pause {
+    Wait(time=var "Battle Entry Pause", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Battle Fly In
+  }
+
+  state Juke Evade? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Juke Range", storeResult=false, sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=15, ySpeed=-7, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Evade")
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → In Range
+  }
+
+  state Juke? 2 {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Juke Range", storeResult=false, sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=6, ySpeed=(unset), everyFrame=false)
+    on FINISHED → Fly To Slash
+  }
+
+  state Wake Thread {
+    GetOwner(storeGameObject=var "Self")
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    SetParent(gameObject=var "Silk", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"BLACK THREAD", isFalse=(none))
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="PlayPossess", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    ObjectJitter(gameObject=var "Corpse", x=0.1, y=0.1, z=(unset), allowMovement=false, limitFps=30)
+    on FINISHED → Corpse Shake
+    on BLACK THREAD → Black Thread Wake
+  }
+
+  state Wake Antic {
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=false, limitFps=30)
+    on FINISHED → Wake Thread
+  }
+
+  state Black Thread Wake {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=BecomeThreadedNoSing())
+    ObjectJitter(gameObject=Self, x=0.05, y=0.05, z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Startle Wake
+  }
+
+  var Battle Entry Pause: float = 1.5
+
+  var Distance: float = 0
+  var Random: float = 0
+  var Self X: float = 0
+  var Spit X: float = 0
+  var Angle: float = 0
+  var Returning: bool = false
+  var Battler: bool = false
+  var In Battle: bool = false
+  var Did Startle: bool = false
+  var In Slash Range: bool = false
+  var Block Ready: bool = false
+  var Will Block: bool = false
+  var Clip: string = ""
+  var Patrol Point: gameObject = <null>
+  var Start Point: gameObject = <null>
+  var Throw Point: gameObject = Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)/Throw Point
+  var Projectile: gameObject = <null>
+  var Spawn Pos Alt: gameObject = <null>
+  var Slash Hit 1: gameObject = Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)/Slash Hit 1
+  var Slash Hit 2: gameObject = Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)/Slash Hit 2
+  var Slash Hit 3: gameObject = Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)/Slash Hit 3
+  var Slash Hit 4: gameObject = Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)/Slash Hit 4
+  var Slash Hit 5: gameObject = Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)/Slash Hit 5
+  var Warning: gameObject = <null>
+  var Corpse: gameObject = <null>
+  var Self: gameObject = <null>
+  var Silk: gameObject = <null>
+  var Terrain Collider: gameObject = Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)/Terrain Collider
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Black Thread World/Arborium Keeper (2)/Audio Loop Voice
+  var Alert Range: object = <null>
+}

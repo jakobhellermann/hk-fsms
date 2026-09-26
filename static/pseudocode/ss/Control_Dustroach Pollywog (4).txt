@@ -1,0 +1,312 @@
+# Control
+# 1 location(s):
+#   Shadow_13 / Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)
+
+fsm Control {
+  start Init
+  on GRAB HERO → Grab Start  // from any state
+  on ZERO HP → Ungrab  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Pool")
+    SetParent(gameObject=var "Pt Appear", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Flounder Splash", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetRotation(gameObject=var "Pt Appear", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetParent(gameObject=Self, parent=var "Pool", resetLocalPosition=false, resetLocalRotation=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SetPosition(gameObject=Self, vector=(unset), x=0, y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    FaceAngle(gameObject=Self, angleOffset=0, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetCollider(gameObject=var "Body Damager", active=false, resetOnExit=false)
+    SetCollider(gameObject=var "Grab Collider", active=false, resetOnExit=false)
+    on SPAWN → BG or FG
+  }
+
+  state Leap Out {
+    SetVelocity2d(gameObject=Self, vector=var "Launch Velocity", x=(unset), y=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_water_enter (sfxstatic_assets_water.bundle), pitchMin=0.75, pitchMax=1.25, volume=0.75, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=Roach Pollywog Cry (sfxdynamic_assets_areaswamp.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    FaceAngle(gameObject=Self, angleOffset=0, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SpawnObjectFromGlobalPool(gameObject=Splash Out Pollywog (localpoolprefabs_assets_areaswamp.bundle), spawnPoint=var "Self", position=(0, 1.2, -0.003), rotation=(0, 0, 0), storeObject=var "")
+    SetCollider(gameObject=var "Grab Collider", active=true, resetOnExit=false)
+    on FINISHED → Falling
+  }
+
+  state Falling {
+    Trigger2dEvent(gameObject=Self, trigger=0, collideTag="Water Surface", sendEvent=→"SPLASH", storeCollider=var "")
+    Trigger2dEvent(gameObject=Self, trigger=1, collideTag="Water Surface", sendEvent=→"SPLASH", storeCollider=var "")
+    FaceAngle(gameObject=Self, angleOffset=0, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"COLLIDE", storeCollider=var "", storeForce=(unset))
+    Collision2dEvent(gameObject=Self, collision=1, collideTag="", sendEvent=→"COLLIDE", storeCollider=var "", storeForce=(unset))
+    EaseFloat(fromValue=var "Z Pos", toValue=var "Target Z", floatVariable=var "Tween Z", time=0.3, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Tween Z", space=0, everyFrame=true, lateUpdate=false)
+    on SPLASH → Splash In
+    on COLLIDE → Land Check
+  }
+
+  state Splash In {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SpawnObjectFromGlobalPool(gameObject=Splash In Pollywog (localpoolprefabs_assets_areaswamp.bundle), spawnPoint=var "Self", position=(0, -0.2, -0.003), rotation=(0, 0, 0), storeObject=var "")
+    PlayAudioEvent(audioClip=enemy_splash_in_water (sfxstatic_assets_water.bundle), pitchMin=0.75, pitchMax=1.25, volume=0.75, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Flounder Splash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Death Air {
+    SetIsDead(target=Self, setValue=true)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetCollider(gameObject=var "Body Damager", active=false, resetOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Air")
+    ActivateGameObject(gameObject=var "Land Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=15, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    CheckCollisionSide(collidingObject=var "Land Collider", topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    ActivateGameObject(gameObject=var "Corpse Splasher", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Dormant
+    on LAND → Burst
+  }
+
+  state Land Check {
+    GetCollision2dInfo(gameObjectHit=var "", relativeVelocity=(unset), relativeSpeed=(unset), contactPoint=(unset), contactNormal=var "Collision Normal", shapeCount=(unset), physics2dMaterialName="")
+    GetVector3XYZ(vector3Variable=var "Collision Normal", storeX=(unset), storeY=var "Collision Y", storeZ=(unset), everyFrame=false)
+    FloatCompare(float1=var "Collision Y", float2=1, tolerance=0.01, equal=→"LAND", lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    on CANCEL → Falling
+    on LAND → Flounder Start
+  }
+
+  state Flounder Start {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flounder")
+    SetCollider(gameObject=var "Grab Collider", active=false, resetOnExit=false)
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=1, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Velocity X", float2=0, tolerance=0, equal=→"L", lessThan=→"L", greaterThan=→"R", everyFrame=false)
+    on L → Flounder L
+    on R → Flounder R
+  }
+
+  state Flounder L {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Home Dir
+  }
+
+  state Flounder Land {
+    PlayAudioEventRandom(audioClips=[goop_impact_1 (sfxstatic_assets_areaslab.bundle), goop_impact_2 (sfxstatic_assets_areaslab.bundle), goop_impact_3 (sfxstatic_assets_areaslab.bundle), goop_impact_4 (sfxstatic_assets_areaslab.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Flounder Splash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Flounder Splash", targetObject=var "Self", xOffset=0, yOffset=-0.6, everyFrame=false)
+    SetPosition(gameObject=var "Flounder Splash", vector=(unset), x=(unset), y=(unset), z=0.002, space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Flounder Splash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=var "Angle Min", max=var "Angle Max", storeResult=var "Angle")
+    RandomFloat(min=12, max=15, storeResult=var "Speed")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Flounder Air
+  }
+
+  state Flounder R {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Home Dir
+  }
+
+  state Home Dir {
+    CheckTargetDirection(gameObject=Self, target=var "Home Node", aboveEvent=(none), belowEvent=(none), rightEvent=→"R", leftEvent=→"L", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    on L → Home L
+    on R → Home R
+  }
+
+  state Home R {
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=100, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=60, everyFrame=false)
+    on FINISHED → Flounder Land
+  }
+
+  state Home L {
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=70, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=110, everyFrame=false)
+    on FINISHED → Flounder Land
+  }
+
+  state Flounder Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Trigger2dEvent(gameObject=Self, trigger=0, collideTag="Water Surface", sendEvent=→"SPLASH", storeCollider=var "")
+    on LAND → Flounder Land
+    on SPLASH → Splash In
+  }
+
+  state Grab Start {
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Hero", xOffset=0, yOffset=0, everyFrame=false)
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    SetCollider2dIsTrigger(gameObject=Self, isTrigger=false, setAllColliders=false)
+    SetBoolValue(boolVariable=var "Grabbing Hero", boolValue=true, everyFrame=false)
+    RunFSM(fsmTemplateControl=template=-5200671031615995940 in[Bypass Checks<-false, Dont Deal Damage<-false, No Hero Invuln<-false, Grab Effect Point<-var "Grab Point"], finishEvent=(none), everyFrame=false)
+    on CANCEL → Grab Cancel
+    on FINISHED → Start Grab
+  }
+
+  state Grab Air {
+    SetPositionToObject2D(gameObject=var "Hero", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Trigger2dEvent(gameObject=Self, trigger=0, collideTag="Water Surface", sendEvent=→"SPLASH", storeCollider=var "")
+    FaceAngle(gameObject=Self, angleOffset=0, angleOffsetIfMirrored=180, otherGameObject=<null>, everyFrame=true)
+    Wait(time=2, finishEvent=→"LAND", realTime=false)
+    on LAND → Grab Land
+    on SPLASH → Grab Splash
+  }
+
+  state Grab Land {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Grab Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Throw Hero
+  }
+
+  state Throw Hero {
+    SetBoolValue(boolVariable=var "Grabbing Hero", boolValue=false, everyFrame=false)
+    RunFSM(fsmTemplateControl=template=-7631507063665673418, finishEvent=(none), everyFrame=false)
+    SetCollider2dIsTrigger(gameObject=Self, isTrigger=true, setAllColliders=false)
+    on FINISHED → Flounder Start
+  }
+
+  state Grab Cancel {
+    SetBoolValue(boolVariable=var "Grabbing Hero", boolValue=false, everyFrame=false)
+    SetCollider2dIsTrigger(gameObject=Self, isTrigger=true, setAllColliders=false)
+    on FINISHED → Falling
+  }
+
+  state Start Grab {
+    SendEventToRegister(eventName="POLLYWOG GRAB")
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Velocity Y", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Velocity Y", minValue=15, maxValue=100, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Velocity Y", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Grab")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetCollider(gameObject=var "Grab Collider", active=false, resetOnExit=false)
+    SetBoolValue(boolVariable=var "Grabbing Hero", boolValue=true, everyFrame=false)
+    on FINISHED → Grab Air
+  }
+
+  state Grab Splash {
+    SpawnObjectFromGlobalPool(gameObject=Pollywog Maggot Splash Effect (localpoolprefabs_assets_areaswamp.bundle), spawnPoint=var "Hero", position=(0, -0.5, 0), rotation=(unset), storeObject=var "")
+    SpawnObjectFromGlobalPool(gameObject=Splash Effect Med (localpoolprefabs_assets_water.bundle), spawnPoint=var "Hero", position=(0, -0.5, 0), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    SetBoolValue(boolVariable=var "Grabbing Hero", boolValue=false, everyFrame=false)
+    SetHeroMaggoted(Value=true)
+    RunFSM(fsmTemplateControl=template=-7631507063665673418, finishEvent=(none), everyFrame=false)
+    SetCollider2dIsTrigger(gameObject=Self, isTrigger=true, setAllColliders=false)
+    on FINISHED → Splash In
+  }
+
+  state Ungrab {
+    BoolTest(boolVariable=var "Grabbing Hero", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="HERO GRAB END", delay=0, everyFrame=false)
+    DamageHeroDirectly(damager=Self, damageAmount=1, spikeHazard=false, sinkHazard=false)
+    SetBoolValue(boolVariable=var "Grabbing Hero", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Flounder Splash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Death Air
+  }
+
+  state Spawn Antic {
+    PlayAudioEvent(audioClip=hornet_water_exit (sfxstatic_assets_water.bundle), pitchMin=0.75, pitchMax=1.25, volume=0.85, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    PlayRandomAudioClipTable(Table=Roach Pollywog Cry (sfxdynamic_assets_areaswamp.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))  // disabled
+    SetPositionToObject2D(gameObject=var "Pt Appear", targetObject=var "Self", xOffset=0, yOffset=-0.4, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Appear", emit=0, resetIfPlaying=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-0.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, 1, 0), time=0.1, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    ConvertVector2ToAngle(vector=var "Launch Velocity", storeAngle=var "Antic Angle", everyFrame=true)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Antic Angle", space=0, everyFrame=true, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetCollider(gameObject=var "Body Damager", active=true, resetOnExit=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.55, MaxReactDelay=0.85, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Leap Pullback
+    on SING → Sing
+  }
+
+  state BG or FG {
+    SendEvent(eventTarget=Self, sendEvent=→"FG", delay=0, everyFrame=false)
+    SendRandomEvent(events=[→"BG", →"FG"], weights=[0.5, 0.5], delay=0)
+    on BG → BG
+    on FG → FG
+  }
+
+  state BG {
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Pos")
+    RandomFloat(min=-1.3, max=-1.2, storeResult=var "Target Z")
+    on FINISHED → Spawn Antic
+  }
+
+  state FG {
+    RandomFloat(min=-1.3, max=-1.2, storeResult=var "Z Pos")
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Target Z")
+    on FINISHED → Spawn Antic
+  }
+
+  state Leap Pullback {
+    SetVelocityAsAngle(gameObject=Self, angle=var "Antic Angle", speed=-10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Leap Out
+  }
+
+  state Burst {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Death Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=lifeblood_burst (sfxstatic_assets_lifeblood.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dormant
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=dust_roach_pollywog_sing_loop (sfxdynamic_assets_areaswamp.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on SING DURATION END → Leap Pullback
+  }
+
+  var Collision Y: float = 0
+  var Velocity X: float = 0
+  var Angle Min: float = 0
+  var Angle: float = 0
+  var Angle Max: float = 0
+  var Speed: float = 0
+  var Antic Angle: float = 0
+  var Velocity Y: float = 0
+  var Z Pos: float = 0
+  var Target Z: float = 0
+  var Tween Z: float = 0
+  var Grabbing Hero: bool = false
+  var Launch Velocity: vector2 = (0, 0)
+  var Collision Normal: vector3 = (0, 0, 0)
+  var Body Damager: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)/Body Damager
+  var Flounder Splash: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)/Flounder Splash
+  var Grab Collider: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)/Grab Collider
+  var Grab Point: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)/Grab Point
+  var Home Node: gameObject = <null>
+  var Land Collider: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)/Land Collider
+  var Pool: gameObject = <null>
+  var Pt Appear: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)/Pt Appear
+  var Self: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)
+  var Corpse Splasher: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)/Corpse Splasher
+  var Audio Loop Voice: gameObject = Dustroach Pollywog Control/Dustroach Pollywog Pool/Dustroach Pollywog (4)/Audio Loop Voice
+}

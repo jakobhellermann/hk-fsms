@@ -1,0 +1,290 @@
+# Control
+# 2 location(s):
+#   Slab_14 / Slab Prisoner Fly New
+#   Slab_15 / Slab Prisoner Fly New
+
+fsm Control {
+  start Init
+  on YANK → Yank Frame  // from any state
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Ground Anchor")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Chain")
+    GetPosition2D(gameObject=Self, vector=var "Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    FloatCompare(float1=var "Z Pos", float2=-0.5, tolerance=0, equal=(none), lessThan=→"FG", greaterThan=(none), everyFrame=false)
+    on FINISHED → Rest
+    on FG → FG Rest
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Idle")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    on ATTACK → Attack Antic
+  }
+
+  state Attack Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Attack Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0.2, everyFrame=false)
+    Wait(time=0.4, finishEvent=→"ATTACK", realTime=false)
+    on ATTACK → Attack Fire
+  }
+
+  state Attack Fire {
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Attack Fly")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=30, everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=0, angleOffsetIfMirrored=180, otherGameObject=var "Sprite", everyFrame=true)  // disabled
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+  }
+
+  state Attack Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetVelocityByScale(gameObject=Self, speed=-15, ySpeed=(unset), everyFrame=true)
+    on LAND → Land
+  }
+
+  state Land {
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=true)
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Attack Land")
+    WaitRandom(timeMin=0.4, timeMax=0.55, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt LandDust", emit=0, resetIfPlaying=false)
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Yank {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    FireAtTarget(gameObject=Self, target=var "Ground Anchor", speed=5, position=(0, 0, 0), spread=0, everyFrame=false)
+    AddForce2d(gameObject=Self, forceMode=1, atPosition=(unset), vector=(unset), x=(unset), y=10, vector3=(unset), everyFrame=false)
+    on FINISHED → Yank Air
+  }
+
+  state Yank Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    DecelerateXYConditional(gameObject=Self, decelerationX=0.975, decelerationY=(unset), brakeOnExit=false, conditionalBool=(unset))
+    on LAND → Yank Land
+  }
+
+  state Yank Land {
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=true)
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Yank Land")
+    WaitRandom(timeMin=0.4, timeMax=0.55, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt LandDust", emit=0, resetIfPlaying=false)
+    on FINISHED → Recover
+  }
+
+  state Yank Frame {
+    Tk2dPlayAnimation(gameObject=var "Sprite", animLibName="", clipName="Yank")
+    Wait(time=0.08, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Chain Crack", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRotation(gameObject=var "Sprite", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    on FINISHED → Yank
+  }
+
+  state Death {
+    SetParent(gameObject=var "Chain Break", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Chain Break", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Chain", delivery=BroadcastMessage, options=1, functionCall=Break())
+  }
+
+  state Rest {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"WAKE", ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on WAKE → Wake
+    on TOOK DAMAGE → Wake
+  }
+
+  state Wake {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=prisoner_enemy_small_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0.08)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=6)
+    on FINISHED → Break Chain
+  }
+
+  state Fly Launch {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flyer Sing")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=12, everyFrame=false)
+    ActivateGameObject(gameObject=var "Rest Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.95, brakeOnExit=false)
+    on FINISHED → Chase
+  }
+
+  state Chase {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flyer FlyIdle")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Flyer TurnToFlyIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=5.5, speedMax=7, acceleration=0.35, targetsHeight=true, height=3, minAboveHero=(unset))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SetBoolValueAtTime(BoolVariable=var "Can Attack", BoolValue=true, Time=0.7, SetOppositeOnStateEntry=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Attack", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    UnalertTimer(alertRange=var "Alert Range", timerVariable=var "Unalert Timer", unalertTime=2, eventTarget=Self, unalertEvent=→"UNALERT", resetOnStateEntry=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Charge Antic
+    on GO DOWN → Go Down
+    on UNALERT → Unalert
+    on SING → Sing
+  }
+
+  state Charge {
+    PlayAudioEventRandom(audioClips=[grasshopper_slasher_dash_1 (sfxstatic_assets_areaclover.bundle), grasshopper_slasher_dash_2 (sfxstatic_assets_areaclover.bundle), grasshopper_slasher_dash_3 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Flyer Charge", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=0.97, decelerationY=(unset), brakeOnExit=false)
+    SetVelocityByScale(gameObject=Self, speed=-22, ySpeed=-12, everyFrame=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.8, targetSpeed=8)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Velocity X", float2=0, tolerance=0.2, equal=→"BONK", lessThan=(none), greaterThan=(none), everyFrame=true)
+    on FINISHED → End
+    on BONK → Bonk
+  }
+
+  state End {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.975, decelerationY=(unset), brakeOnExit=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=1, targetSpeed=5)
+    on FINISHED → Chase
+  }
+
+  state Charge Antic {
+    PlayAudioEvent(audioClip=pilgrim_fly_antic (sfxstatic_assets_pilgrimslower.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=prisoner_enemy_small_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=15, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Flyer Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    SetVelocityByScale(gameObject=Self, speed=7, ySpeed=(unset), everyFrame=false)
+    AudioStopV2(gameObject=Self, fadeTime=0, cancelOnEarlyExit=false)
+    PlayAudioEventRandom(audioClips=[generic_hanging_plat_land_chain_move_1 (sfxstatic_assets_areadustareagreymoorareaslabchain.bundle), generic_hanging_plat_land_chain_move_2 (sfxstatic_assets_areagreymoorareaslabchain.bundle), generic_hanging_plat_land_chain_move_3 (sfxstatic_assets_areagreymoorareaslabchain.bundle)], pitchMin=1, pitchMax=1.25, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Charge
+  }
+
+  state FG Rest {
+    ActivateGameObject(gameObject=var "Rest Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelSetZ())
+    on KEY CHAIN BROKEN → FG Wake Pause
+  }
+
+  state Wake FG {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle L", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0.08)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=6)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=prisoner_enemy_small_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Fly Launch FG
+  }
+
+  state Fly Launch FG {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flyer FlyIdle")
+    PlayAudioEvent(audioClip=chain_cut (sfxstatic_assets_chain.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Chain", emit=0, resetIfPlaying=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=16, everyFrame=false)
+    Wait(time=0.45, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.95, brakeOnExit=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.45)
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Z Pos")
+    AnimateZPositionTo(GameObject=Self, ToValue=var "Z Pos", localSpace=false, time=0.45, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    on FINISHED → FG End
+  }
+
+  state FG End {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Chase
+  }
+
+  state FG Wake Pause {
+    WaitRandom(timeMin=0.25, timeMax=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Wake FG
+  }
+
+  state Go Down {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-6, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Chase
+  }
+
+  state Bonk {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_land (sfxstatic_assets_shared.bundle))
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flyer Bonk")
+    on FINISHED → End
+  }
+
+  state Break Chain {
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    PlayAudioEvent(audioClip=chain_cut (sfxstatic_assets_chain.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Chain", emit=0, resetIfPlaying=false)
+    on FINISHED → Fly Launch
+  }
+
+  state Unalert {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flyer FlyIdle")
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Flyer TurnToFlyIdle", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    ShoveFromWall(gameObject=Self, shoveForce=10, rayLength=1.5, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=false)
+    IdleBuzzV2(gameObject=Self, waitMin=0.5, waitMax=1, speedMax=2.5, accelerationMax=15, roamingRangeX=2, roamingRangeY=2, manualStartPos=(unset))
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=→"ALERT", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    on ALERT → Chase
+  }
+
+  state Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=prisoner_enemy_small_sing (sfxdynamic_assets_areaslab.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    on FINISHED → Chase
+  }
+
+  var Angle: float = 0
+  var Velocity X: float = 0
+  var Z Pos: float = 0
+  var Unalert Timer: float = 0
+  var In Attack Range: bool = false
+  var Can Attack: bool = false
+  var Chain Broken: bool = false
+  var In Alert Range: bool = false
+  var Pos: vector2 = (0, 0)
+  var Ground Anchor: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Sprite: gameObject = Slab Prisoner Fly New/Sprite
+  var Chain Crack: gameObject = Slab Prisoner Fly New/Chain Crack
+  var Pt LandDust: gameObject = Slab Prisoner Fly New/Pt LandDust
+  var Chain Break: gameObject = Slab Prisoner Fly New/Chain Break
+  var Chain: gameObject = <null>
+  var Rest Box: gameObject = Slab Prisoner Fly New/Rest Box
+  var Current Clip: gameObject = <null>
+  var Pt Chain: gameObject = Slab Prisoner Fly New/Pt Chain
+  var Audio Loop Voice: gameObject = Slab Prisoner Fly New/Audio Loop Voice
+  var Alert Range: object = Slab Prisoner Fly New/Alert Range@AlertRange
+}

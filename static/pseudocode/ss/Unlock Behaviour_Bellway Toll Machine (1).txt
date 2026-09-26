@@ -1,0 +1,116 @@
+# Unlock Behaviour
+# 1 location(s):
+#   Bellway_City / Bellway Toll Machine (1)
+
+fsm Unlock Behaviour {
+  start Init
+  on MAP APPEAR EXTERNAL → External  // from any state
+
+  state Inert {
+    PlayerDataVariableTest(VariableName=var "Pickup PlayerData Bool", ExpectedValue=true, IsExpectedEvent=→"ACTIVATED", IsNotExpectedEvent=(none))
+    on ACTIVATED → Map Up
+    on INTERACT → Prompt
+  }
+
+  state End Interaction {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Inert
+  }
+
+  state Init {
+    AnimatorPauseAtTime(Target=Self, Anim="Sequence", Time=0)
+    ActivateGameObject(gameObject=var "Map Raise Audio", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Music Control Bellway", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Inert
+  }
+
+  state Sequence Animation {
+    SetAnimator(target=Self, active=true)
+    CallMethodProper(gameObject=Self, behaviour="JitterSelf", methodName="StartJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    AnimatorPlay(gameObject=Self, stateName="Sequence", layer=0, normalizedTime=0, everyFrame=false)
+    PlayAudioEvent(audioClip=toll_booth_rise_and_spin (sfxstatic_assets_areacog.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ListenForAnimationEvent(Target=Self, Response=→"FINISHED")
+    on FINISHED → Sequence Strum
+  }
+
+  state Sequence End {
+    CallMethodProper(gameObject=Self, behaviour="JitterSelf", methodName="StartJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    AnimatorPlayStateWait(target=Self, stateName="Sequence End", finishEvent=→"FINISHED")
+    on FINISHED → Stop
+  }
+
+  state Map Up {
+    SetAnimator(target=Self, active=true)
+    AnimatorPlay(gameObject=Self, stateName="Map Appear", layer=0, normalizedTime=1, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    CallMethodProper(gameObject=var "Floor Gate", behaviour="Gate", methodName="Opened", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Music Control Bellway", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Stop {
+    CallMethodProper(gameObject=Self, behaviour="JitterSelf", methodName="StopJitter", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Open Floor
+  }
+
+  state Prompt {
+    RunFSM(fsmTemplateControl=template=-8990696591063553075 in[Hornet Stays Reaching<-false, Prompt Text Override<-var "Prompt Text Override", Dish<-var "Dish", Cost Reference<-var "Cost Reference"], finishEvent=(none), everyFrame=false)
+    on CANCEL → End Interaction
+    on FINISHED → Return Control
+  }
+
+  state Sequence Strum {
+    PlayAudioEvent(audioClip=bellway_toll_machine_melody_new_2 (sfxstatic_assets_areabellway.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ListenForAnimationEvent(Target=Self, Response=→"FINISHED")
+    on FINISHED → Sequence End
+  }
+
+  state Return Control {
+    SetPlayerDataBool(boolName=var "Pickup PlayerData Bool", value=true)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckBellwayAchievements", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessageV2(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl(), everyFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Sequence Animation
+  }
+
+  sequence state Open Floor {
+    CallMethodProper(gameObject=var "Floor Gate", behaviour="Gate", methodName="Open", parameters=[], storeResult=(unset var), EveryFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    GetAnimatorCurrentStateInfo(gameObject=var "Floor Gate", layerIndex=0, name="", nameHash=(unset), fullPathHash=0, shortPathHash=0, tagHash=(unset), isStateLooping=(unset), length=var "Wait Time", normalizedTime=(unset), loopCount=(unset), currentLoopProgress=(unset), everyFrame=false, everyFrameOption=0)
+    Wait(time=var "Wait Time", finishEvent=(none), realTime=false)
+    ActivateGameObject(gameObject=var "Map Raise Audio", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=2, finishEvent=(none), realTime=false)
+    on FINISHED → Map Appear
+  }
+
+  sequence state Map Appear {
+    SendEventByName(eventTarget=GameObject(var "Other Toll Machine"), sendEvent="MAP APPEAR EXTERNAL", delay=0, everyFrame=false)
+    AnimatorPlayStateWait(target=Self, stateName="Map Appear", finishEvent=(none))
+    ActivateGameObject(gameObject=var "Map Raise Audio", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Music Control Bellway", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Allow Bellbeast Call
+  }
+
+  state Allow Bellbeast Call {
+    SendEventToRegister(eventName="BELLWAY UNLOCKED")
+  }
+
+  sequence state External {
+    Wait(time=0.15, finishEvent=(none), realTime=false)
+    SetAnimator(target=Self, active=true)
+    AnimatorPlayStateWait(target=Self, stateName="Map Appear", finishEvent=(none))
+  }
+
+  var Pickup PlayerData Bool: string = "UnlockedCityStation"
+  var Floor Gate: gameObject = <null>
+  var Other Toll Machine: gameObject = <null>
+  var Cost Reference: object = Bellway Toll Lowlands (dataassets_assets_assets/dataassets/costs.bundle)
+
+  var Wait Time: float = 0
+  var Dish: gameObject = Bellway Toll Machine (1)/Machine/Active/Dish
+  var Audio: gameObject = <null>
+  var Map Raise Audio: gameObject = Bellway Toll Machine (1)/Map Raise Audio
+  var Music Control Bellway: gameObject = <null>
+}

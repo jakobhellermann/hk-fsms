@@ -1,0 +1,384 @@
+# Dialogue
+# 1 location(s):
+#   Belltown_Room_pinsmith / Plinney Inside
+
+fsm Dialogue {
+  start Init
+  on END DLG → End Dialogue  // from any state
+
+  state Init {
+    on FINISHED → Idle Init
+  }
+
+  state Idle {
+    AudioPlaySimple(gameObject=var "Audio Loop Polish", volume=1, oneShotClip=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.4, MaxReactDelay=1.8, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=plinney_hum (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=2)
+    on SING → Sing
+    on INTERACT → Met?
+    on STARTLE → Startle
+  }
+
+  state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioStopV2(gameObject=var "Audio Loop Polish", fadeTime=0.15, cancelOnEarlyExit=false)
+    ActivateTalkAnimNPC(Activate=false, StopInstantly=true, Target=Self)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Plinney_Sing (sfxdynamic_assets_areabellareamoss.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Resume
+  }
+
+  state Met? {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    GetPlayerDataBool(boolName="savedPlinney", storeValue=var "Saved Plinney")
+    GetPlayerDataBool(boolName="savedPlinneyConvo", storeValue=var "Saved Plinney Convo")
+    BoolTestMulti(boolVariables=[var "Saved Plinney", var "Saved Plinney Convo"], boolStates=[true, false], trueEvent=→"SAVED CONVO", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataVariableTest(VariableName="PinsmithMetBelltown", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Meet Dialogue
+    on TRUE → Upgrade State
+    on SAVED CONVO → Post Shellgrave
+  }
+
+  state Meet Dialogue {
+    SetPlayerDataVariable(VariableName="PinsmithMetBelltown", SetValue=true)
+    SetBoolValue(boolVariable=var "Skip Upgrade Dlg", boolValue=true, everyFrame=false)
+    GetPlayerDataBool(boolName="visitedBellhartHaunted", storeValue=var "Visited Haunted")
+    GetPlayerDataBool(boolName="citadelWoken", storeValue=var "Citadel Woken")
+    GetPlayerDataBool(boolName="spinnerDefeated", storeValue=var "Spinner Defeated")
+    BoolTestMulti(boolVariables=[var "Visited Haunted", var "Spinner Defeated"], boolStates=[false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Test", everyFrame=false)
+    BoolOperator(bool1=var "Test", bool2=var "Citadel Woken", operation=OR, storeResult=var "Test", everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Convo Key", falseString="PINSMITH_BELLTOWN_MEET_OFFER", trueString="PINSMITH_BELLTOWN_MEET_OFFER_ALT", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Upgrade State
+  }
+
+  state  Complete Repeat {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_UPGRADED_COMPLETE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state End Dialogue {
+    SetBoolValue(boolVariable=var "Skip Upgrade Dlg", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Just Completed Quest", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Further Upgrade", boolValue=false, everyFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Resume {
+    ActivateTalkAnimNPC(Activate=true, StopInstantly=false, Target=Self)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Upgrade Reoffer? {
+    BoolTest(boolVariable=var "Skip Upgrade Dlg", isTrue=→"CONVO_END", isFalse=(none), everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_UPGRADE_REOFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Upgrade? Free
+  }
+
+  state Set Upgrade 1 {
+    SetIntValue(intVariable=var "Upgrade Number", intValue=1, everyFrame=false)
+    on FINISHED → Upgrade Reoffer?
+  }
+
+  sequence state Upgrade? Free {
+    SetCinematicVideo(CinematicPlayer=var "Cinematic Player", VideoRef=Plinney_Sharpen (cinematics_assets_assets/cinematics/data/plinney_sharpen.asset.bundle))
+    DialogueYesNoV2(TranslationSheet="Belltown", TranslationKey="PINSMITH_UPGRADE_PROMPT", UseCurrency=false, CurrencyCost=0, CurrencyType=None, ConsumeCurrency=false, WillGetItem=<null>, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Upgrade Declined
+    on TRUE → Fade Down
+  }
+
+  state Set Upgrade 2 {
+    SetIntValue(intVariable=var "Upgrade Number", intValue=2, everyFrame=false)
+    on FINISHED → Quest State
+  }
+
+  state Upgrade Declined {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_UPGRADE_DECLINED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dlg 2
+  }
+
+  state Upgrade Finished Basic {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_UPGRADE_FINISHED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Upgrade {
+    SavedItemGetV2(Item=Needle Upgrade (dataassets_assets_assets/dataassets/collectables/fakecollectables.bundle), Amount=1, ShowPopup=true)
+    SetPlayerDataVariable(VariableName="InvNailHasNew", SetValue=true)
+    SetPlayerDataVariable(VariableName="InvPaneHasNew", SetValue=true)
+    SetNextInventoryCollectableItemSelectable(selectableType=Needle)
+    QueueSaveGame()
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Upgrade Finished Dlg
+  }
+
+  state Quest Offer {
+    SetPlayerDataVariable(VariableName="PinsmithQuestOffered", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_OFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Offer Quest
+  }
+
+  state Quest Reoffer {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_REOFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Offer Quest
+  }
+
+  state Cinematic {
+    ScreenFader(startColour=(0.029411793, 0.029411793, 0.029411793, 0), endColour=(0, 0, 0, 0), duration=0)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    StartCinematic(CinematicPlayer=var "Cinematic Player")
+    on CINEMATIC END → Fade Pause
+  }
+
+  sequence state Fade Down {
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=true)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    TransitionToAudioSnapshot(snapshot=Cinematic (audioobjects_assets_all.bundle), transitionTime=3)
+    AudioStopV2(gameObject=var "Audio Loop Polish", fadeTime=1, cancelOnEarlyExit=false)
+    ScreenFader(startColour=(0.029411793, 0.029411793, 0.029411793, 0), endColour=(0, 0, 0, 1), duration=1)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Cinematic
+  }
+
+  state Fade Up {
+    AudioPlaySimple(gameObject=var "Audio Loop Polish", volume=0, oneShotClip=<null>)
+    FadeAudio(gameObject=var "Audio Loop Polish", startVolume=0, endVolume=1, time=1.5)
+    ScreenFader(startColour=(0.029411793, 0.029411793, 0.029411793, 1), endColour=(0, 0, 0, 0), duration=1.5)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=1.5)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Upgrade
+  }
+
+  state Upgrade State {
+    GetPlayerDataInt(intName="nailUpgrades", storeValue=var "PD Upgrades")
+    IntSwitch(intVariable=var "PD Upgrades", compareTo=[0, 1], sendEvent=[→"0", →"1"], everyFrame=false)
+    IntCompare(integer1=var "PD Upgrades", integer2=4, equal=→"CANCEL", lessThan=→"FINISHED", greaterThan=→"CANCEL", everyFrame=false)
+    on 0 → Set Upgrade 1
+    on 1 → Set Upgrade 2
+    on FINISHED → Further Upgrades
+    on CANCEL →  Complete Repeat
+  }
+
+  state Quest State {
+    CheckQuestState(NotTrackedEvent=→"NOT TRACKED", TrackedEvent=→"TRACKED", CompletedEvent=→"COMPLETED", Quest=var "Quest")
+    on NOT TRACKED → Offered Quest?
+    on TRACKED → Can End Quest?
+    on COMPLETED → Further Upgrades
+  }
+
+  state Offered Quest? {
+    CanEndQuest(CannotEndEvent=(none), CanEndEvent=→"CANCEL", StoreValue=(unset), Quest=var "Quest")
+    PlayerDataVariableTest(VariableName="PinsmithQuestOffered", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Quest Offer
+    on TRUE → Quest Reoffer
+    on CANCEL → Quest Already Got
+  }
+
+  state Offer Quest {
+    QuestYesNo(Quest=var "Quest", YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Quest Decline
+    on TRUE → Quest Accept
+  }
+
+  state Quest Decline {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_DECLINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dlg 2
+  }
+
+  state Quest Accept {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dlg 2
+  }
+
+  state End Dlg 2 {
+    SendEvent(eventTarget=Self, sendEvent=→"END DLG", delay=0, everyFrame=false)
+  }
+
+  state Can End Quest? {
+    CanEndQuest(CannotEndEvent=→"FALSE", CanEndEvent=→"TRUE", StoreValue=(unset), Quest=var "Quest")
+    on FALSE → Quest Repeat
+    on TRUE → Quest CanComplete
+  }
+
+  state Quest Repeat {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Complete Quest? {
+    QuestCompleteYesNo(Quest=var "Quest", ConsumeCurrency=true, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Quest Complete Refuse
+    on TRUE → Quest Pre-Complete
+  }
+
+  state Quest Completed {
+    SetCinematicVideo(CinematicPlayer=var "Cinematic Player", VideoRef=Plinney_Sharpen_Oil (cinematics_assets_assets/cinematics/data/plinney_sharpen_oil.asset.bundle))
+    SetBoolValue(boolVariable=var "Just Completed Quest", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_COMPLETED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Fade Down
+  }
+
+  state Upgrade Finished Dlg {
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=false)
+    BoolTest(boolVariable=var "Just Completed Quest", isTrue=→"QUEST", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Is Further Upgrade", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on QUEST → Upgrade Finished Quest
+    on FINISHED → Upgrade Finished Basic
+    on CANCEL → Upgrade Finished Further
+  }
+
+  state Upgrade Finished Quest {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_UPGRADED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Complete Quest {
+    EndQuest(ConsumeCurrency=false, Quest=var "Quest")
+    on FINISHED → Quest Completed
+  }
+
+  state Quest Already Got {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_ALREADY_GOT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Complete Quest? 2
+  }
+
+  sequence state Complete Quest? 2 {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    QuestCompleteYesNo(Quest=var "Quest", ConsumeCurrency=true, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Upgrade Declined
+    on TRUE → Complete Quest
+  }
+
+  state Further Upgrades {
+    CollectableItemGetDataV2(CollectedAmount=(unset), IsHoldingAny=(unset), NeededAmount=1, IsCollected=(none), NotCollected=→"CANCEL", ItemName="", Sprite=var "", Item=Pale_Oil (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    SetBoolValue(boolVariable=var "Is Further Upgrade", boolValue=true, everyFrame=false)
+    IntOperator(integer1=var "PD Upgrades", integer2=1, operation=Add, storeResult=var "Upgrade Number", everyFrame=false)
+    FormatString(format="PinsmithUpg{0}Offered", variables=[var "Upgrade Number"], storeResult=var "Offered Bool Name", everyFrame=false)
+    GetPlayerDataBool(boolName=var "Offered Bool Name", storeValue=var "Test")
+    SetPlayerDataBool(boolName=var "Offered Bool Name", value=true)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="PINSMITH_UPGRADE_{0}_PRE", trueString="PINSMITH_UPGRADE_{0}_PRE_REOFFER", everyFrame=false)
+    FormatString(format=var "Dlg", variables=[var "Upgrade Number"], storeResult=var "Dlg", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Further Repeat
+    on CONVO_END → Upgrade? Cost
+  }
+
+  sequence state Upgrade? Cost {
+    IntTestToBool(int1=var "Upgrade Number", int2=4, equalBool=var "Is Final Upgrade", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=false)
+    BoolTestToObject(Test=var "Is Final Upgrade", ExpectedValue=true, TrueObject=Nail Upgrade Final Cost (dataassets_assets_assets/dataassets/costs.bundle), FalseObject=Nail Upgrade Further Cost (dataassets_assets_assets/dataassets/costs.bundle), StoreResult=var "Cost Ref", EveryFrame=false)
+    GetCostFromReference(Reference=var "Cost Ref", StoreValue=var "Cost")
+    DialogueYesNoItemV5(Prompt={Sheet="Belltown", Key="PINSMITH_UPGRADE_PROMPT"}, RequiredItems=[Pale_Oil (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle)], RequiredAmounts=[1], CurrencyCost=var "Cost", CurrencyType=Money, ShowCounter=true, ConsumeItem=true, TakeDisplay=Given, WillGetItem=<null>, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Further Upgrade Decline
+    on TRUE → Set Video
+  }
+
+  state Set Video {
+    SetCinematicVideo(CinematicPlayer=var "Cinematic Player", VideoRef=Plinney_Sharpen_Oil (cinematics_assets_assets/cinematics/data/plinney_sharpen_oil.asset.bundle))
+    Wait(time=2, finishEvent=(none), realTime=false)
+    on FINISHED → Fade Down
+  }
+
+  state Further Repeat {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_FURTHER_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Upgrade Finished Further {
+    FormatString(format="PINSMITH_UPGRADE_{0}_POST", variables=[var "Upgrade Number"], storeResult=var "Dlg", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Quest CanComplete {
+    GetPlayerDataBool(boolName="PinsmithUpg2Offered", storeValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="PINSMITH_QUEST_CANCOMPLETE", trueString="PINSMITH_QUEST_CANCOMPLETE_REOFFER", everyFrame=false)
+    SetPlayerDataBool(boolName="PinsmithUpg2Offered", value=true)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Complete Quest?
+  }
+
+  state Quest Complete Refuse {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_COMPLETE_REFUSE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Quest Pre-Complete {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_COMPLETE_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 2
+  }
+
+  state End Dialogue 2 {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Complete Quest
+  }
+
+  state Fade Pause {
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    ScreenFader(startColour=(0.029411793, 0.029411793, 0.029411793, 1), endColour=(0, 0, 0, 1), duration=0)
+    on FINISHED → Fade Up
+  }
+
+  state Further Upgrade Decline {
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_QUEST_COMPLETE_REFUSE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Post Shellgrave {
+    SetPlayerDataVariable(VariableName="savedPlinneyConvo", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="PINSMITH_BELLTOWN_POST_SAVED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Startle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioStopV2(gameObject=var "Audio Loop Polish", fadeTime=0.15, cancelOnEarlyExit=false)
+    ActivateTalkAnimNPC(Activate=false, StopInstantly=true, Target=Self)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Flinch", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Plinney_Startle (sfxdynamic_assets_areamoss.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Resume
+  }
+
+  state Idle Init {
+    AudioPlaySimple(gameObject=var "Audio Loop Polish", volume=1, oneShotClip=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.4, MaxReactDelay=1.8, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=plinney_hum (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on SING → Sing
+    on INTERACT → Met?
+    on STARTLE → Startle
+  }
+
+  var Cinematic Player: gameObject = Cinematic Player
+
+  var Upgrade Number: int = 0
+  var PD Upgrades: int = 0
+  var Cost: int = 0
+  var Is Further Upgrade: bool = false
+  var Just Completed Quest: bool = false
+  var Skip Upgrade Dlg: bool = false
+  var Visited Haunted: bool = false
+  var Is Final Upgrade: bool = false
+  var Test: bool = false
+  var Citadel Woken: bool = false
+  var Saved Plinney: bool = false
+  var Saved Plinney Convo: bool = false
+  var Spinner Defeated: bool = false
+  var Dlg: string = ""
+  var Convo Key: string = ""
+  var Offered Bool Name: string = ""
+  var Audio Loop Polish: gameObject = Plinney Inside/Audio Loop Polish
+  var Audio Loop Voice: gameObject = Plinney Inside/Audio Loop Voice
+  var Quest: object = A Pinsmiths Tools (dataassets_assets_assets/dataassets/questsystem/quests.bundle)
+  var Cost Ref: object = <null>
+}

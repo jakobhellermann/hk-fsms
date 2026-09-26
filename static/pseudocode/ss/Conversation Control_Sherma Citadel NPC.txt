@@ -1,0 +1,148 @@
+# Conversation Control
+# 1 location(s):
+#   Coral_10 / Sherma Citadel NPC
+
+fsm Conversation Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Check Type
+  }
+
+  state Chime End Wait {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="sherma_anim"), sendEvent="CHIME END", delay=0, everyFrame=false)
+    on READY → Face Hero
+  }
+
+  state Idle Chime {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="sherma_anim"), sendEvent="CHIME", delay=0, everyFrame=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=1.4, MaxReactDelay=1.8, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Chime End Wait
+    on SING → Sing
+    on STARTLE → Startle
+  }
+
+  state Check Type {
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"DEACTIVATE", isFalse=(none))
+    PlayerDataBoolTest(boolName="shermaInEnclave", isTrue=→"DEACTIVATE", isFalse=(none))
+    StringCompare(stringVariable=var "Visiting Bool", compareTo="shermaCitadelEntrance_Visiting", equalEvent=→"ENTRANCE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"DEACTIVATE", delay=0, everyFrame=false)
+    on ENTRANCE → Entrance
+    on DEACTIVATE → Deactivate
+  }
+
+  state Entrance {
+    PlayerDataBoolTest(boolName="shermaCitadelEntrance_Visiting", isTrue=(none), isFalse=→"DEACTIVATE")
+    PlayerDataBoolTest(boolName="shermaCitadelEntrance_Left", isTrue=→"DEACTIVATE", isFalse=(none))
+    PlayerDataBoolTest(boolName="shermaCitadelSpa_Seen", isTrue=→"DEACTIVATE", isFalse=(none))
+    PlayerDataBoolTest(boolName="shermaCitadelEnclave_Seen", isTrue=→"DEACTIVATE", isFalse=(none))
+    SetStringValue(stringVariable=var "Seen Bool", stringValue="shermaCitadelEntrance_Seen", everyFrame=false)
+    SetStringValue(stringVariable=var "Convo Key Meet", stringValue="SHERMA_CITADEL_ENTRANCE_MEET", everyFrame=false)
+    SetStringValue(stringVariable=var "Convo Key Repeat", stringValue="SHERMA_CITADEL_ENTRANCE_REPEAT", everyFrame=false)
+    on FINISHED → Init
+    on DEACTIVATE → Deactivate
+  }
+
+  state Deactivate {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Convo Check {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Listen")
+    SetPlayerDataBool(boolName=var "Seen Bool", value=true)
+    SetPlayerDataBool(boolName="metSherma", value=true)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="SHERMA")
+    BoolTest(boolVariable=var "Activated", isTrue=→"REPEAT", isFalse=→"MEET", everyFrame=false)
+    on MEET → Meet
+    on REPEAT → Repeat
+  }
+
+  state Face Hero {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdle")  // disabled
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TurnToIdle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo Check
+  }
+
+  state Meet {
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Key Meet", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    on CONVO_END → End Dialogue
+  }
+
+  state End Dialogue {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Listen End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chime Restart Pause
+  }
+
+  state Chime Restart Pause {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=true, facingEvent=(none), notFacingEvent=→"FINISHED", facingBool=(unset), notFacingBool=(unset))
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on INTERACT → Face Hero
+    on FINISHED → Return Facing
+  }
+
+  state Return Facing {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Scale", float2=var "Init X Scale", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle Chime
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Key Repeat", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Init {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Init X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    ActivateGameObject(gameObject=var "Seen Range", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle Chime
+  }
+
+  state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="EXCITED", delay=0, everyFrame=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=sherma_sing (sfxdynamic_assets_sherma.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on END → Sing End
+  }
+
+  state Sing End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="EXCITED END", delay=0, everyFrame=false)
+    on READY → Idle Chime
+  }
+
+  state Startle {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="GO IDLE", delay=0, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle F", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=sherma_alert (sfxdynamic_assets_sherma.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Idle Chime
+  }
+
+  var Visiting Bool: string = "shermaCitadelEntrance_Visiting"
+
+  var Init X Scale: float = 0
+  var X Scale: float = 0
+  var Activated: bool = false
+  var Convo Key Meet: string = ""
+  var Convo Key Repeat: string = ""
+  var Seen Bool: string = ""
+  var Seen Range: gameObject = Sherma Citadel NPC/Seen Range
+  var Audio Loop Voice: gameObject = Sherma Citadel NPC/Audio Loop Voice
+}

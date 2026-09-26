@@ -1,0 +1,218 @@
+# Behaviour
+# 1 location(s):
+#   Hang_06 / Aid NPC Control/Shakra Aid NPC
+
+fsm Behaviour {
+  start Pause
+  on ENEMY → Attack Antic  // from any state
+  on INTERACT → Convo Check  // from any state
+
+  state Init {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Init Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    PlayerDataBoolTest(boolName=var "PD Aid Bool", isTrue=→"ACCEPTED", isFalse=(none))
+    on FINISHED → Idle
+    on ACCEPTED → Accepted
+  }
+
+  state End Dialogue {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=1.6, MaxReactDelay=1.8, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on STARTLE → Startle
+    on SING → Sing
+    on DID TAUNT POSHANKA → Ring Greet Pause
+  }
+
+  state Close By {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Hero Range", storeResult=false, sendEvent="", outOfRangeEvent="AWAY", everyFrame=true)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckTrackTriggerCount(target=var "Enemy Range", count=1, test=MoreThanOrEqual, everyFrame=true, successEvent=→"ENEMY")
+    on AWAY → Away Pause
+  }
+
+  state Away Pause {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Hero Range", storeResult=false, sendEvent="CLOSE BY", outOfRangeEvent="", everyFrame=true)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    CheckTrackTriggerCount(target=var "Enemy Range", count=1, test=MoreThanOrEqual, everyFrame=true, successEvent=→"ENEMY")
+    on FINISHED → Turn Back
+    on CLOSE BY → Close By
+  }
+
+  state Turn Back {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Current Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Current Scale", float2=var "Init Scale", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdle")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    CheckTrackTriggerCount(target=var "Enemy Range", count=1, test=MoreThanOrEqual, everyFrame=true, successEvent=→"ENEMY")
+    on FINISHED → Idle
+  }
+
+  state Attack Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Attack
+  }
+
+  state Attack {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wild Slash")
+    ActivateGameObject(gameObject=var "Enemy Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Attack End
+  }
+
+  state Attack End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Reactivate
+  }
+
+  state Reactivate {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Turn Back
+  }
+
+  state Convo Check {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="MAPPER")
+    PlayerDataBoolTest(boolName=var "PD Aid Bool", isTrue=→"READY", isFalse=(none))
+    BoolTest(boolVariable=var "Activated", isTrue=→"REPEAT", isFalse=→"MEET", everyFrame=false)
+    on MEET → Meet
+    on REPEAT → Repeat
+    on READY → Ready
+  }
+
+  state Meet {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    BuildString(stringParts=["SHAKRA_AID_MEET_", var "Convo Key"], separator="", addToEnd=true, storeResult=var "Convo String", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo String", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Ask
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Wanderers", Key="SHAKRA_AID_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Ask
+  }
+
+  state Refuse {
+    RunDialogue(Sheet="Wanderers", Key="SHAKRA_AID_REFUSE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Ask {
+    DialogueYesNoV2(TranslationSheet="Prompts", TranslationKey="REQUEST_AID", UseCurrency=false, CurrencyCost=0, CurrencyType=0, ConsumeCurrency=false, WillGetItem=<null>, YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on YES → Accept
+    on NO → Refuse
+  }
+
+  state Accept {
+    SetPlayerDataBool(boolName=var "PD Aid Bool", value=true)
+    RunDialogue(Sheet="Wanderers", Key="SHAKRA_AID_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Ready {
+    RunDialogue(Sheet="Wanderers", Key="SHAKRA_AID_READY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Idle Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Accepted {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=true, DistancePast=0, StoreResult=var "Hero Behind", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=false)
+    ConvertBoolToString(boolVariable=var "Hero Behind", stringVariable=var "Sing Anim", falseString="Idle to Sing Right", trueString="Idle to Sing Left", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Sing Anim")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Shakra_call (sfxdynamic_assets_mapper.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.5, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Sing End
+  }
+
+  sequence state Sing End {
+    ConvertBoolToString(boolVariable=var "Hero Behind", stringVariable=var "Sing Anim", falseString="Sing Right to Idle", trueString="Sing Left to Idle", everyFrame=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWait(Target=Self, ClipName=var "Sing Anim", AnimationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Right")
+    on FINISHED → Idle
+  }
+
+  sequence state Startle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="END ANIM", delay=0, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_startle (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=true, DistancePast=0, StoreResult=var "Hero Behind", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=false)
+    ConvertBoolToString(boolVariable=var "Hero Behind", stringVariable=var "Sing Anim", falseString="Startle Right", trueString="Startle Left", everyFrame=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName=var "Sing Anim", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Right")
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Ring Greet 1 {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="END ANIM", delay=0, everyFrame=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ring Shout", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_battle_poshanka (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Ring Greet 2
+  }
+
+  state Ring Greet 2 {
+    PlayAudioEvent(audioClip=shakra_entrance_shing (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Ring Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ring Greet 3
+  }
+
+  sequence state Ring Greet 3 {
+    SetScale(gameObject=Self, vector=(unset), x=var "Idle Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Ring Shout End", AnimationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Idle
+  }
+
+  state Ring Greet Pause {
+    GetDistanceV2(gameObject=Self, target=var "Hero", targetOffsetX=0, targetOffsetY=0, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=15, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    Wait(time=0.4, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Ring Greet 1
+    on CANCEL → Idle
+  }
+
+  var PD Aid Bool: string = "shakraAidForumBattle"
+  var Convo Key: string = "FORUM"
+
+  var Init Scale: float = 0
+  var Current Scale: float = 0
+  var Distance: float = 0
+  var Idle Scale: float = 0
+  var Value: int = 0
+  var Activated: bool = false
+  var Hero Behind: bool = false
+  var Looking Back: bool = false
+  var Convo String: string = ""
+  var Sing Anim: string = ""
+  var Enemy Damager: gameObject = Aid NPC Control/Shakra Aid NPC/Enemy Damager
+  var Enemy Range: gameObject = Aid NPC Control/Shakra Aid NPC/Enemy Range
+  var Audio Loop Voice: gameObject = Aid NPC Control/Shakra Aid NPC/Audio Loop Voice
+  var Ring Flash: gameObject = Aid NPC Control/Shakra Aid NPC/Ring Flash
+}

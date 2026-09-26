@@ -1,0 +1,474 @@
+# Control
+# 1 location(s):
+#   Ant_04_mid / Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter
+
+fsm Control {
+  start Init
+  on TINK → Tink Hit  // from any state
+
+  state Init {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=var "Start X", y=var "Start Y", z=(unset), space=0, everyFrame=false)
+    GetColliderRange(gameObject=var "Tele Range", minX=var "Tele Min X", maxX=var "Tele Max X", minY=var "Tele Min Y", maxY=var "Tele Max Y", everyFrame=false)
+    SetParent(gameObject=var "Tele Marker", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Start Marker", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Centre Marker", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale Orig", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetIntValue(intVariable=var "Tink HP", intValue=var "Tink HP Max", everyFrame=false)
+    on FINISHED → Away
+  }
+
+  state Battle Cry 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ring Shout", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_battle_alert (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Battle Cry 2
+  }
+
+  state Battle Cry 2 {
+    ActivateGameObject(gameObject=var "Ring Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Wait(time=1, finishEvent=→"NEXT", realTime=false)
+    PlayAudioEvent(audioClip=shakra_entrance_shing (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetCollider(gameObject=var "Enemy Range", active=true, resetOnExit=false)
+    on NEXT → Target Enemy
+  }
+
+  state Target Enemy {
+    BoolTest(boolVariable=var "Battle Ended", isTrue=→"BATTLE END", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Hornet Defeated", isTrue=→"BATTLE END", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "No Target", boolValue=false, everyFrame=false)
+    GetTrackTriggerClosestObject(ClosestTo=Self, TrackTrigger=var "Enemy Range", StoreObject=var "Target Enemy", ExcludedObject=var "")
+    GameObjectIsNull(gameObject=var "Target Enemy", isNull=→"GROUND", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Target Enemy", vector=(unset), x=var "Enemy X", y=var "Enemy Y", z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Enemy Y", float2=var "Tele Max Y", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)  // disabled
+    IntCompare(integer1=var "Moves", integer2=0, equal=→"TELE LOOK", lessThan=→"TELE LOOK", greaterThan=(none), everyFrame=false)
+    SendRandomEventV4(events=[→"TELE LOOK", →"GROUND"], weights=[0.75, 0.25], eventMax=[3, 1], missedMax=[1, 3], activeBool=(unset))
+    SendEvent(eventTarget=Self, sendEvent=→"TELE LOOK", delay=0, everyFrame=false)  // disabled
+    on END → 
+    on CANCEL → 
+    on TELE LOOK → Look Pos
+    on GROUND → To Ground
+    on BATTLE END → To End
+  }
+
+  state Look Pos {
+    FloatCompare(float1=var "Enemy X", float2=var "Tele Max X", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"L", everyFrame=false)
+    FloatCompare(float1=var "Enemy X", float2=var "Tele Min X", tolerance=0, equal=(none), lessThan=→"R", greaterThan=(none), everyFrame=false)
+    SendRandomEvent(events=[→"L", →"R"], weights=[1, 1], delay=0)
+    on L → Look L
+    on R → Look R
+  }
+
+  state Look L {
+    FloatOperator(float1=var "Enemy X", float2=5, operation=Subtract, storeResult=var "Range Max", everyFrame=false)
+    FloatOperator(float1=var "Enemy X", float2=10, operation=Subtract, storeResult=var "Range Min", everyFrame=false)
+    FloatClamp(floatVariable=var "Range Min", minValue=var "Tele Min X", maxValue=var "Tele Max X", everyFrame=false)
+    FloatClamp(floatVariable=var "Range Max", minValue=var "Tele Min X", maxValue=var "Tele Max X", everyFrame=false)
+    RandomFloat(min=var "Range Min", max=var "Range Max", storeResult=var "Tele X")
+    on FINISHED → Do Y
+  }
+
+  state Do Y {
+    FloatOperator(float1=var "Enemy Y", float2=0.5, operation=Add, storeResult=var "Range Min", everyFrame=false)
+    FloatOperator(float1=var "Enemy Y", float2=6, operation=Add, storeResult=var "Range Max", everyFrame=false)
+    FloatClamp(floatVariable=var "Range Min", minValue=var "Tele Min Y", maxValue=var "Tele Max Y", everyFrame=false)
+    FloatClamp(floatVariable=var "Range Max", minValue=var "Tele Min Y", maxValue=var "Tele Max Y", everyFrame=false)
+    RandomFloat(min=var "Range Min", max=var "Range Max", storeResult=var "Tele Y")
+    SetPosition(gameObject=var "Tele Marker", vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Destination Distance Check
+  }
+
+  state Look R {
+    FloatOperator(float1=var "Enemy X", float2=5, operation=Add, storeResult=var "Range Min", everyFrame=false)
+    FloatOperator(float1=var "Enemy X", float2=10, operation=Add, storeResult=var "Range Max", everyFrame=false)
+    FloatClamp(floatVariable=var "Range Min", minValue=var "Tele Min X", maxValue=var "Tele Max X", everyFrame=false)
+    FloatClamp(floatVariable=var "Range Max", minValue=var "Tele Min X", maxValue=var "Tele Max X", everyFrame=false)
+    RandomFloat(min=var "Range Min", max=var "Range Max", storeResult=var "Tele X")
+    on FINISHED → Do Y
+  }
+
+  state Tele Out Antic {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_movement (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetIntValue(intVariable=var "Distance Retry", intValue=0, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Tele Marker", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    BoolTest(boolVariable=var "Grounded", isTrue=→"GROUND", isFalse=→"AIR", everyFrame=false)
+    on FINISHED → Tele Out Facing
+    on GROUND → Ground Antic
+    on AIR → Air Antic
+  }
+
+  state Tele Out {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=var "Y Translate", z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Angle", space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Move Angle", speed=15, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[shakra_zip_1 (sfxstatic_assets_mapper.bundle), shakra_zip_2 (sfxstatic_assets_mapper.bundle), shakra_zip_3 (sfxstatic_assets_mapper.bundle), shakra_zip_4 (sfxstatic_assets_mapper.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Face Target
+  }
+
+  state Tele Out Facing {
+    GetAngleToTarget2D(gameObject=Self, target=var "Tele Marker", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Tele Marker", offsetX=0, offsetY=0, storeAngle=var "Move Angle", pause=0, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"R", negativeEvent=→"L", space=0)
+    on L → Tele Out L
+    on R → Tele Out
+  }
+
+  state Tele Out L {
+    FloatAdd(floatVariable=var "Angle", add=180, everyFrame=false, perSecond=false)
+    on FINISHED → Tele Out
+  }
+
+  state Tele In {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    BoolTest(boolVariable=var "Going Home", isTrue=→"GO HOME", isFalse=(none), everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Going To Ground", isTrue=→"GROUND", isFalse=(none), everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Move Angle", speed=2, everyFrame=false)
+    SetBoolValue(boolVariable=var "Grounded", boolValue=false, everyFrame=false)
+    SelectRandomString(strings=["Air Idle 1", "Air Idle 2", "Air Idle 3", "Air Idle 4"], weights=[1, 1, 1, 1], storeString=var "Anim Clip")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Anim Clip")
+    WaitRandom(timeMin=0.35, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObjectDelay(gameObject=var "Tink Detector", activate=true, resetOnExit=true, delay=0.1)
+    on FINISHED → Next
+    on GROUND → Ground Facing
+  }
+
+  state Air Antic {
+    BuildString(stringParts=[var "Anim Clip", " Tele"], separator="", addToEnd=true, storeResult=var "Tele Out Clip", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Tele Out Clip", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFloatValue(floatVariable=var "Y Translate", floatValue=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Tele Out Facing
+  }
+
+  state Ground Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFloatValue(floatVariable=var "Y Translate", floatValue=-2, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Tele Out Facing
+  }
+
+  state Destination Distance Check {
+    IntCompare(integer1=var "Distance Retry", integer2=200, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Tele Marker", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6.5, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Tele Out Antic
+    on RETRY → Distance Retry
+  }
+
+  state Distance Retry {
+    IntAdd(intVariable=var "Distance Retry", add=1, everyFrame=false)
+    on FINISHED → Look Pos
+  }
+
+  state Next {
+    BoolTest(boolVariable=var "Battle Ended", isTrue=→"MOVE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Hornet Defeated", isTrue=→"MOVE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "No Target", isTrue=→"NO TARGET", isFalse=(none), everyFrame=false)
+    GameObjectIsNull(gameObject=var "Target Enemy", isNull=→"MOVE", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    IntAdd(intVariable=var "Moves", add=-1, everyFrame=false)
+    BoolTest(boolVariable=var "Grounded", isTrue=→"MOVE", isFalse=(none), everyFrame=false)
+    IntCompare(integer1=var "Moves", integer2=0, equal=→"ATTACK", lessThan=→"ATTACK", greaterThan=→"MOVE", everyFrame=false)
+    on MOVE → Target Enemy
+    on ATTACK → Move Choice
+    on NO TARGET → Target Enemy
+  }
+
+  state Throw Antic {
+    RandomInt(min=1, max=2, storeResult=var "Moves", inclusiveMax=true, noRepeat=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_attack_throw (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Target Enemy", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SelectRandomString(strings=["Throw", "Throw Alt"], weights=[1, 1], storeString=var "Throw Anim")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Throw Anim", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=shakra_throw_disc (sfxstatic_assets_mapper.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Throw
+  }
+
+  state Throw {
+    SetStringValue(stringVariable=var "Anim Clip", stringValue="Air Idle 4", everyFrame=false)
+    GetAngleToTarget2D(gameObject=var "Ring Point 1", target=var "Target Enemy", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FlingObjectsFromGlobalPool(gameObject=Shakra Ring Friendly (localpoolprefabs_assets_mapper.bundle), spawnPoint=var "Ring Point 1", position=(unset), spawnMin=1, spawnMax=1, speedMin=50, speedMax=50, angleMin=var "Angle", angleMax=var "Angle", originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Tink Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Target Enemy
+  }
+
+  state Away {
+    SetMeshRenderer(gameObject=Self, active=false)
+    on ENTER FORUM → Entry Tele
+  }
+
+  state Entry Tele {
+    Translate(gameObject=Self, vector=(unset), x=5, y=15, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AnimatePositionTo(gameObject=Self, toValue=var "Start Pos", localSpace=false, time=0.085, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=70, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Entry Land
+  }
+
+  state Entry Land {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Land", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=shakra_land_normal (sfxstatic_assets_mapper.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Battle Cry 1
+  }
+
+  state Face Target {
+    GameObjectIsNull(gameObject=var "Target Enemy", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Target Enemy", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Tele In
+  }
+
+  state To Ground {
+    BoolTest(boolVariable=var "Grounded", isTrue=→"GROUND", isFalse=(none), everyFrame=false)
+    on FINISHED → Ground Aim
+    on GROUND → Ground Idle
+  }
+
+  state Ground Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Tele To Battle Idle")
+    PlayAudioEvent(audioClip=shakra_land_normal (sfxstatic_assets_mapper.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Ground Idle
+  }
+
+  state Ground Aim {
+    SetBoolValue(boolVariable=var "Going To Ground", boolValue=true, everyFrame=false)
+    RandomFloat(min=var "Idle Min X", max=var "Idle Max X", storeResult=var "Tele X")
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Start Y", everyFrame=false)
+    SetPosition(gameObject=var "Tele Marker", vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Tele Out Antic
+  }
+
+  state Ground Facing {
+    FaceObjectV2(objectA=Self, objectB=var "Centre Marker", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GameObjectIsNull(gameObject=var "Target Enemy", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Target Enemy", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Ground Anim
+  }
+
+  state Ground Idle {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Going To Ground", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Grounded", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Ground End
+  }
+
+  state Tink Hit {
+    SetBoolValue(boolVariable=var "Grounded", boolValue=false, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_stun_hit (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateGameObject(gameObject=var "Tink Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    IntAdd(intVariable=var "Tink HP", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Tink HP", integer2=0, equal=→"STUN", lessThan=→"STUN", greaterThan=(none), everyFrame=false)
+    SelectRandomString(strings=["Block Hit 1", "Block Hit 2"], weights=[0.5, 0.5], storeString=var "Block Clip")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Block Clip")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=0, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObjectDelay(gameObject=var "Tink Detector", activate=true, resetOnExit=true, delay=0.15)
+    on FINISHED → Target Enemy
+    on STUN → Stun Stagger  
+  }
+
+  state Stun Fall {
+    SetVelocity2d(gameObject=Self, vector=(0, -30), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Fall")
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=5, minDepth=(unset), maxDepth=(unset), hitEvent=→"LAND", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Land Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckYPosition(gameObject=Self, compareTo=var "Land Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"LAND", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    on LAND → Stun Land
+  }
+
+  state Stun Land {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Land")
+    Wait(time=6, finishEvent=→"END", realTime=false)
+    GetVector2XY(vector2Variable=var "Land Point", storeX=(unset), storeY=var "Land Y", everyFrame=false)  // disabled
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Start Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on END → Stun End
+    on FRIEND BIND → Friend Bind
+  }
+
+  state Stun End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Target Enemy
+  }
+
+  state Friend Bind {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    PlayParticleEmitter(gameObject=var "Pt FriendBind", emit=0, resetIfPlaying=false)
+    on FINISHED → Stun End
+  }
+
+  state Stun Stagger   {
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_stun (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateGameObject(gameObject=var "Stun Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetIntValue(intVariable=var "Tink HP", intValue=var "Tink HP Max", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Stagger")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stun Fall
+  }
+
+  state Move Choice {
+    RandomInt(min=2, max=3, storeResult=var "Moves", inclusiveMax=true, noRepeat=false)
+    CheckTrackTriggerCount(target=var "Stomp Range", count=0, test=Equal, everyFrame=true, successEvent=→"THROW")
+    SendEvent(eventTarget=Self, sendEvent=→"STOMP", delay=0, everyFrame=false)
+    on THROW → Throw Antic
+    on STOMP → Stomp Antic
+  }
+
+  state Stomp Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stomp Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_attack_large_antic (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Stomp
+  }
+
+  state Stomp {
+    SetVelocity2d(gameObject=Self, vector=(0, -50), x=(unset), y=(unset), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_attack_large (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stomp")
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=→"LAND", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Land Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckYPosition(gameObject=Self, compareTo=var "Land Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"LAND", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    ActivateGameObject(gameObject=var "Stomp Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=shakra_dive_down (sfxstatic_assets_mapper.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on LAND → Stomp Land
+  }
+
+  state Stomp Land {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Start Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stomp Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Stomp Blast", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=shakra_dive_impact (sfxstatic_assets_mapper.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Ground Idle
+  }
+
+  state Ground End {
+    BoolTest(boolVariable=var "Hornet Defeated", isTrue=→"HORNET DEFEATED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Going To End", isTrue=→"BATTLE END", isFalse=(none), everyFrame=false)
+    on FINISHED → Target Enemy
+    on BATTLE END → Battle End
+    on HORNET DEFEATED → Hornet Defeated
+  }
+
+  state Battle End {
+    FaceObjectV2(objectA=Self, objectB=var "Centre Marker", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TalkToIdle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Pause
+  }
+
+  state Activate NPC {
+    SetPositionToObject2D(gameObject=var "Victory NPC", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Victory NPC", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dStopAnimation(gameObject=Self)
+  }
+
+  state To End {
+    BoolTest(boolVariable=var "Grounded", isTrue=→"GROUND", isFalse=(none), everyFrame=false)  // disabled
+    on FINISHED → End Aim
+    on GROUND → Look Pos
+  }
+
+  state End Aim {
+    SetBoolValue(boolVariable=var "Going To End", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Going To Ground", boolValue=true, everyFrame=false)
+    RandomFloat(min=var "Idle Min X", max=var "Idle Max X", storeResult=var "Tele X")  // disabled
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Start Y", everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele X", floatValue=var "Start X", everyFrame=false)
+    SetPosition(gameObject=var "Tele Marker", vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Tele Out Antic
+  }
+
+  state Idle Pause {
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Right")
+    on FINISHED → Shop NPC?
+  }
+
+  state Hornet Defeated {
+  }
+
+  state Shop NPC? {
+    GameObjectIsNull(gameObject=var "z_Shop NPC", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SetPositionToObject2D(gameObject=var "z_Shop NPC", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "z_Shop NPC"), sendEvent="SHOP NPC START", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on FINISHED → Activate NPC
+  }
+
+  var Idle Max X: float = 200.5
+  var Idle Min X: float = 187.5
+  var Victory NPC: gameObject = <null>
+  var z_Shop NPC: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Mapper NPC
+
+  var Tele Min X: float = 0
+  var Tele Max X: float = 0
+  var Tele Min Y: float = 0
+  var Tele Max Y: float = 0
+  var Enemy X: float = 0
+  var Enemy Y: float = 0
+  var Tele X: float = 0
+  var Range Max: float = 0
+  var Range Min: float = 0
+  var Tele Y: float = 0
+  var Angle: float = 0
+  var Y Translate: float = 0
+  var Distance: float = 0
+  var Move Angle: float = 0
+  var Start X: float = 0
+  var Start Y: float = 0
+  var X Scale Orig: float = 0
+  var Gravity: float = 1
+  var Land Y: float = 0
+  var Distance Retry: int = 0
+  var Moves: int = 2
+  var Tink HP: int = 1
+  var Tink HP Max: int = 15
+  var Stomp Targets: int = 0
+  var Grounded: bool = true
+  var Going Home: bool = false
+  var No Target: bool = false
+  var Going To Ground: bool = false
+  var Battle Ended: bool = false
+  var Going To End: bool = false
+  var Hornet Defeated: bool = false
+  var Anim Clip: string = "Air Idle 1"
+  var Tele Out Clip: string = ""
+  var Block Clip: string = ""
+  var Throw Anim: string = "Throw Single"
+  var Land Point: vector2 = (0, 0)
+  var Start Pos: vector3 = (0, 0, 0)
+  var Centre Marker: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Centre Marker
+  var Enemy Range: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Enemy Range
+  var Ring Flash: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Ring Flash
+  var Ring Point 1: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Ring Point 1
+  var Start Marker: gameObject = <null>
+  var Target Enemy: gameObject = <null>
+  var Tele Marker: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Tele Marker
+  var Tele Range: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Tele Range
+  var Tink Detector: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Tink Detector
+  var Tink Effect: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Tink Effect
+  var Pt FriendBind: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Pt FriendBind
+  var Stun Effect: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Stun Effect
+  var Stomp Range: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Stomp Range
+  var Stomp Damager: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Stomp Damager
+  var Stomp Blast: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Stomp Blast
+  var Self: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Normal World/Battle Scene/Shakra Fighter/Audio Loop Voice
+}

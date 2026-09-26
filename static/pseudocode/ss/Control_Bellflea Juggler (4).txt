@@ -1,0 +1,597 @@
+# Control
+# 1 location(s):
+#   Aqueduct_05_festival / Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)
+
+fsm Control {
+  start Init
+  on RESET FLEA GAMES → Dormant  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Flea Folder")
+    CreateEmptyObject(gameObject=<null>, spawnPoint=var "Terrain Detector", position=(unset), rotation=(unset), storeObject=var "Aiming Cursor")
+    GetGrandparent(gameObject=Self, storeResult=var "Game Control")
+    on FINISHED → Setup Giant
+  }
+
+  state Dormant {
+    SetParent(gameObject=Self, parent=var "Flea Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=var "Test Time", finishEvent=→"ENTER", realTime=false)  // disabled
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Quickened")
+    StopParticleEmitter(gameObject=var "Pt QuickenedStart")
+    SetBoolValue(boolVariable=var "Quickened", boolValue=false, everyFrame=false)
+    on ENTER → Entry Pause
+  }
+
+  state Choose Entry Side {
+    BoolTest(boolVariable=var "Enter Left", isTrue=→"L", isFalse=→"R", everyFrame=false)
+    SendRandomEventV4(events=[→"L", →"R"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))  // disabled
+    on L → Enter L
+    on R → Enter R
+  }
+
+  state Enter L {
+    RandomFloat(min=142, max=143, storeResult=var "Entry X")
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Translate X", floatValue=-10, everyFrame=false)
+    on FINISHED → Fly In
+  }
+
+  state Enter R {
+    RandomFloat(min=165, max=166, storeResult=var "Entry X")
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Translate X", floatValue=10, everyFrame=false)
+    on FINISHED → Fly In
+  }
+
+  state Fly In {
+    PlayRandomAudioClipTable(Table=flea_fly_away (sfxdynamic_assets_fleacaravan.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    RandomFloat(min=0.006, max=0.008, storeResult=var "Z Pos")
+    FloatAdd(floatVariable=var "Z Pos", add=var "Z Offset", everyFrame=false, perSecond=false)
+    FloatOperator(float1=var "Bounce Time", float2=0.75, operation=Multiply, storeResult=var "Bounce Time Short", everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    SetIntValue(intVariable=var "Bounce HP", intValue=var "Bounce HP Start", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Fly Anim")
+    SetMeshRenderer(gameObject=Self, active=true)
+    RandomFloat(min=12, max=14, storeResult=var "Entry Y")
+    SetPosition2D(GameObject=Self, Vector=(unset), X=var "Entry X", Y=var "Entry Y", Space=0, EveryFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Translate X", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    TranslateRandom(gameObject=Self, translateMin=(0, -6, 0), translateMax=(0, -3, 0), space=1)
+    ConvertBoolToFloat(boolVariable=var "Quickened", floatVariable=var "Anim Time", falseValue=0.6, trueValue=0.4, everyFrame=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Entry Y", localSpace=false, time=var "Anim Time", speed=(unset), delay=(unset), easeType=4, reverse=false, finishEvent=(none), realTime=false)
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Entry X", localSpace=false, time=var "Anim Time", speed=(unset), delay=(unset), easeType=25, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Quickening Effects
+  }
+
+  state Entry Cry {
+    PlayRandomAudioClipTable(Table=var "Entry Cry Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetPosition2D(GameObject=Self, Vector=(unset), X=var "Entry X", Y=var "Entry Y", Space=0, EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Cry Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Entry Dive
+  }
+
+  state Entry Dive {
+    BoolTest(boolVariable=var "Is Giant", isTrue=→"GIANT", isFalse=(none), everyFrame=false)
+    RandomFloat(min=var "Platform Min X", max=var "Platform Max X", storeResult=var "Target X")
+    RandomFloat(min=var "Apex Min", max=var "Apex Max", storeResult=var "Apex Y")
+    SetPosition2D(GameObject=var "Aiming Cursor", Vector=(unset), X=var "Target X", Y=(unset), Space=0, EveryFrame=false)
+    GetXDistance(gameObject=Self, target=var "Aiming Cursor", storeResult=var "X Distance", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=14, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETRY", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=6, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Start Anim")
+    on RETRY → Retry Entry
+    on FINISHED → Entry Up
+    on GIANT → Entry Dive Giant
+  }
+
+  state Retry Entry {
+    IntAdd(intVariable=var "Retries", add=1, everyFrame=false)
+    IntCompare(integer1=var "Retries", integer2=20, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Entry Dive
+  }
+
+  state Entry Up {
+    PlayAudioEvent(audioClip=hero_dash (herosfxstatic_assets_all.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hornet_slow_spin (sfxstatic_assets_areaaqueduct.bundle), pitchMin=1.1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FloatOperator(float1=var "Bounce Time", float2=2, operation=Divide, storeResult=var "Half Time", everyFrame=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Apex Y", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=4, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Target X", localSpace=false, time=var "Bounce Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Fall
+    on TINK UP → Tink Up
+    on TINK LEFT → Tink L
+    on TINK RIGHT → Tink R
+    on TINK DOWN → Tink Down
+  }
+
+  state Land {
+    BoolTest(boolVariable=var "Is Giant", isTrue=→"GIANT", isFalse=(none), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayRandomAudioClipTable(Table=Flea_bark (sfxdynamic_assets_fleacaravan.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayAudioEvent(audioClip=bell_fly_head_bounce (sfxstatic_assets_areabell.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartTimedJitter())
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Bellflea Drop Land")
+    SetPosition2D(GameObject=Self, Vector=(unset), X=var "Target X", Y=var "Floor Y", Space=0, EveryFrame=false)
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetFsmInt(gameObject=var "Game Control", fsmName="Game Specific Control", variableName="Tinks Until Set Complete", storeValue=var "Tinks Until Set Complete", everyFrame=false)
+    IntOperator(integer1=var "Tinks Until Set Complete", integer2=var "Bounce HP", operation=Subtract, storeResult=var "Tinks Until Set Complete", everyFrame=false)
+    SetFsmInt(gameObject=var "Game Control", fsmName="Game Specific Control", variableName="Tinks Until Set Complete", setValue=var "Tinks Until Set Complete", everyFrame=false)
+    SendEventToRegister(eventName="FLEA FAIL")
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Up
+    on GIANT → Giant Land
+  }
+
+  state Bounce Start {
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Apex Floor", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Apex Floor", add=var "Apex Floor Add", everyFrame=false, perSecond=false)
+    RandomFloat(min=var "Platform Min X Crt", max=var "Platform Max X Crt", storeResult=var "Target X")
+    RandomFloat(min=var "Apex Min", max=var "Apex Max", storeResult=var "Apex Y")
+    FloatClamp(floatVariable=var "Apex Y", minValue=var "Apex Floor", maxValue=var "Apex Ceiling", everyFrame=false)
+    SetPosition2D(GameObject=var "Aiming Cursor", Vector=(unset), X=var "Target X", Y=(unset), Space=0, EveryFrame=false)
+    GetXDistance(gameObject=Self, target=var "Aiming Cursor", storeResult=var "X Distance", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=var "Travel Max X", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETRY", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=var "Travel Min X", tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "BounceUp Anim")
+    FaceObjectV2(objectA=Self, objectB=var "Aiming Cursor", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on RETRY → Retry Bounce
+    on FINISHED → Bounce Up
+  }
+
+  state Retry Bounce {
+    IntAdd(intVariable=var "Retries", add=1, everyFrame=false)
+    IntCompare(integer1=var "Retries", integer2=20, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetFloatValue(floatVariable=var "Platform Min X Crt", floatValue=var "Platform Min X", everyFrame=false)
+    SetFloatValue(floatVariable=var "Platform Max X Crt", floatValue=var "Platform Max X", everyFrame=false)
+    on FINISHED → Bounce Start
+  }
+
+  state Bounce Up {
+    FloatOperator(float1=var "Bounce Time", float2=2, operation=Divide, storeResult=var "Half Time", everyFrame=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Apex Y", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=4, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Target X", localSpace=false, time=var "Bounce Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObjectDelay(gameObject=var "Tink Collider", activate=true, resetOnExit=false, delay=0.2)  // disabled
+    on FINISHED → Fall
+    on TINK UP → Tink Up
+    on TINK LEFT → Tink L
+    on TINK RIGHT → Tink R
+    on TINK DOWN → Tink Down
+  }
+
+  state Fall {
+    BoolTest(boolVariable=var "Quickened", isTrue=→"QUICKENED", isFalse=(none), everyFrame=false)
+    SetPosition2D(GameObject=Self, Vector=(unset), X=(unset), Y=var "Apex Y", Space=0, EveryFrame=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Floor Y", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=3, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Target X", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Fall Anim")
+    ActivateGameObject(gameObject=var "Tink Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Quickening Land
+    on TINK UP → Tink Up
+    on TINK LEFT → Tink L
+    on TINK RIGHT → Tink R
+    on TINK DOWN → Tink Down
+    on HARPOONED → Harpoon Hook
+  }
+
+  state Deduct HP {
+    PlayRandomAudioClipTable(Table=var "Bark Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventToRegister(eventName="FLEA TINKED")
+    PlayAudioEvent(audioClip=hornet_slow_spin (sfxstatic_assets_areaaqueduct.bundle), pitchMin=1.1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    IntAdd(intVariable=var "Bounce HP", add=-1, everyFrame=false)
+    on FINISHED → Check HP
+  }
+
+  state Check HP {
+    IntCompare(integer1=var "Bounce HP", integer2=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=false)
+    on FINISHED → Check Bounce Dir
+    on END → Quickening End
+  }
+
+  state BounceAway Start {
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=0.008, max=0.009, storeResult=var "Z Pos")
+    FloatAdd(floatVariable=var "Z Pos", add=var "Z Offset", everyFrame=false, perSecond=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashFocusGetQuick())
+    SpawnObjectFromGlobalPool(gameObject=Flea Game Score Effect (localpoolprefabs_assets_fleacaravan.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Score Effect")
+    SendEventToRegister(eventName="SCORE")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    FloatMultiply(floatVariable=var "Bounce Time", multiplyBy=0.35, everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Apex Floor", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Apex Floor", add=var "Apex Floor Add Final", everyFrame=false, perSecond=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Target X", y=(unset), space=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Target X", addMin=-5, addMax=5)
+    RandomFloat(min=var "Apex Min", max=var "Apex Max", storeResult=var "Apex Y")
+    FloatClamp(floatVariable=var "Apex Y", minValue=var "Apex Floor", maxValue=20.6, everyFrame=false)
+    FloatClamp(floatVariable=var "Apex Y", minValue=0, maxValue=20.6, everyFrame=false)
+    SetPosition2D(GameObject=var "Aiming Cursor", Vector=(unset), X=var "Target X", Y=(unset), Space=0, EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "BounceToLeave Anim")
+    FaceObjectV2(objectA=Self, objectB=var "Aiming Cursor", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Bounce Away
+  }
+
+  state Bounce Away {
+    BoolTest(boolVariable=var "Is Giant", isTrue=→"GIANT", isFalse=(none), everyFrame=false)
+    FloatOperator(float1=var "Bounce Time", float2=2, operation=Divide, storeResult=var "Half Time", everyFrame=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Apex Y", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Target X", localSpace=false, time=var "Bounce Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"NEXT")
+    on NEXT → Fly Away
+    on GIANT → Bounce Away Giant
+  }
+
+  state Fly Away {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Fly Anim")
+    GetPosition(gameObject=var "FlyAway Marker", vector=var "FlyAway Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    AnimatePositionTo(gameObject=Self, toValue=var "FlyAway Pos", localSpace=false, time=0.5, speed=(unset), delay=(unset), easeType=24, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    PlayRandomAudioClipTable(Table=flea_fly_away (sfxdynamic_assets_fleacaravan.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Dormant
+  }
+
+  state Entry Pause {
+    GetParent(gameObject=Self, storeResult=var "Flea Folder")
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    Wait(time=var "Entry Pause", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Quickening Effects Init
+  }
+
+  state Quickening Effects {
+    BoolTest(boolVariable=var "Is Giant", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Travel Min X", floatValue=4, everyFrame=false)
+    SetFloatValue(floatVariable=var "Travel Max X", floatValue=12, everyFrame=false)
+    SetStringValue(stringVariable=var "Cry Anim", stringValue="Bellflea Cry", everyFrame=false)
+    BoolTest(boolVariable=var "Quickened", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt QuickenedStart", emit=0, resetIfPlaying=false)
+    SetFloatValue(floatVariable=var "Travel Min X", floatValue=3, everyFrame=false)
+    SetFloatValue(floatVariable=var "Travel Max X", floatValue=5, everyFrame=false)
+    SetStringValue(stringVariable=var "Cry Anim", stringValue="Bellflea Cry Quickened", everyFrame=false)
+    on FINISHED → Entry Cry
+  }
+
+  state Quickening End {
+    BoolTest(boolVariable=var "Quickened", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    SetBoolValue(boolVariable=var "Quickened", boolValue=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt QuickenedStart", emit=0, resetIfPlaying=false)
+    StopParticleEmitter(gameObject=var "Pt Quickened")
+    on FINISHED → BounceAway Start
+  }
+
+  state Quickening Land {
+    BoolTest(boolVariable=var "Quickened", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    SetBoolValue(boolVariable=var "Quickened", boolValue=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt QuickenedStart", emit=0, resetIfPlaying=false)
+    StopParticleEmitter(gameObject=var "Pt Quickened")
+    on FINISHED → Land Below?
+  }
+
+  state Get Up {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Bellflea Drop BounceToLeave", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, 3, 0), time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    PlayRandomAudioClipTable(Table=Flea_Howl (sfxdynamic_assets_fleacaravan.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Fail Fly Away
+  }
+
+  state Tink Up {
+    SetIntValue(intVariable=var "Tink Dir", intValue=1, everyFrame=false)
+    on FINISHED → Deduct HP
+  }
+
+  state Tink R {
+    SetIntValue(intVariable=var "Tink Dir", intValue=0, everyFrame=false)
+    on FINISHED → Deduct HP
+  }
+
+  state Tink L {
+    SetIntValue(intVariable=var "Tink Dir", intValue=2, everyFrame=false)
+    on FINISHED → Deduct HP
+  }
+
+  state Check Bounce Dir {
+    IntSwitch(intVariable=var "Tink Dir", compareTo=[0, 1, 2, 3], sendEvent=[→"R", →"U", →"L", →"D"], everyFrame=false)
+    on U → Bounce Start
+    on L → Bounce L
+    on R → Bounce R
+    on D → Tinked Down
+  }
+
+  state Bounce L {
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Target X", y=(unset), space=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Target X", addMin=-4.5, addMax=-5.5)
+    FloatOperator(float1=var "Platform Max X", float2=1, operation=Subtract, storeResult=var "Target X Clamp", everyFrame=false)  // disabled
+    FloatClamp(floatVariable=var "Target X", minValue=143, maxValue=99999, everyFrame=false)
+    on FINISHED → Bounce Start Short
+  }
+
+  state Bounce R {
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Target X", y=(unset), space=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Target X", addMin=4.5, addMax=5.5)
+    FloatOperator(float1=var "Platform Max X", float2=1, operation=Add, storeResult=var "Target X Clamp", everyFrame=false)  // disabled
+    FloatClamp(floatVariable=var "Target X", minValue=0, maxValue=165, everyFrame=false)
+    on FINISHED → Bounce Start Short
+  }
+
+  state Bounce Start Short {
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Apex Floor", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Apex Floor", add=5, everyFrame=false, perSecond=false)
+    RandomFloat(min=var "Apex Min", max=var "Apex Max", storeResult=var "Apex Y")
+    FloatClamp(floatVariable=var "Apex Y", minValue=var "Apex Floor", maxValue=var "Apex Ceiling", everyFrame=false)
+    SetPosition2D(GameObject=var "Aiming Cursor", Vector=(unset), X=var "Target X", Y=(unset), Space=0, EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "BounceUp Anim")
+    FaceObjectV2(objectA=Self, objectB=var "Aiming Cursor", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Bounce Up
+  }
+
+  state Land Below? {
+    ConvertBoolToFloat(boolVariable=var "Is Giant", floatVariable=var "Ray Distance", falseValue=1, trueValue=3, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=var "Ray Distance", minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"BELOW", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    on FINISHED → Land
+    on BELOW → Fall More
+  }
+
+  state Fail Fly Away {
+    PlayRandomAudioClipTable(Table=flea_fly_away (sfxdynamic_assets_fleacaravan.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Fly Away
+  }
+
+  state Fall More {
+    ConvertBoolToFloat(boolVariable=var "Is Giant", floatVariable=var "Ray Distance", falseValue=1, trueValue=3, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=var "Ray Distance", minDepth=(unset), maxDepth=(unset), hitEvent=→"LAND", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-15, z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    on LAND → Land Low
+  }
+
+  state Land Low {
+    BoolTest(boolVariable=var "Is Giant", isTrue=→"GIANT", isFalse=(none), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayRandomAudioClipTable(Table=Flea_bark (sfxdynamic_assets_fleacaravan.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayAudioEvent(audioClip=bell_fly_head_bounce (sfxstatic_assets_areabell.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartTimedJitter())
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Bellflea Drop Land")
+    SetPosition2D(GameObject=Self, Vector=(unset), X=(unset), Y=var "Lower Floor Y", Space=0, EveryFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="FLEA FAIL")
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    GetFsmInt(gameObject=var "Game Control", fsmName="Game Specific Control", variableName="Tinks Until Set Complete", storeValue=var "Tinks Until Set Complete", everyFrame=false)
+    IntOperator(integer1=var "Tinks Until Set Complete", integer2=var "Bounce HP", operation=Subtract, storeResult=var "Tinks Until Set Complete", everyFrame=false)
+    SetFsmInt(gameObject=var "Game Control", fsmName="Game Specific Control", variableName="Tinks Until Set Complete", setValue=var "Tinks Until Set Complete", everyFrame=false)
+    on FINISHED → Get Up
+    on GIANT → Giant Land
+  }
+
+  state Tink Down {
+    SetIntValue(intVariable=var "Tink Dir", intValue=3, everyFrame=false)
+    on FINISHED → Deduct HP
+  }
+
+  state Tinked Down {
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=var "Target X", y=(unset), space=0, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-20, z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    CheckYPosition(gameObject=Self, compareTo=var "Floor Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    FloatMultiply(floatVariable=var "Half Time", multiplyBy=0.5, everyFrame=false)  // disabled
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Floor Y", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=→"FINISHED", realTime=false)  // disabled
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Target X", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Start Anim")
+    ActivateGameObject(gameObject=var "Tink Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Quickening Land
+    on TINK UP → Tink Up
+    on TINK LEFT → Tink L
+    on TINK RIGHT → Tink R
+    on TINK DOWN → Tink Down
+    on HARPOONED → Harpoon Hook
+  }
+
+  state Harpoon Freeze {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on TINK DOWN → Harpoon Hit
+    on FINISHED → Harpoon Hit
+  }
+
+  state Harpoon Hook {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Harpoon Tink Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Harpoon Tink Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Tink Collider", behaviour="TinkEffect", methodName="TryDoTinkReaction", parameters=[var "Collider", true, true], storeResult=(unset var), EveryFrame=false)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Bounce Anim")
+    on FINISHED → Harpoon Freeze
+  }
+
+  state Harpoon Dir {
+    SendEventByScale(gameObject=var "Hero", eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → Tink L
+    on R → Tink R
+  }
+
+  state Harpoon Hit {
+    ActivateGameObject(gameObject=var "Harpoon Tink Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Harpoon Tink Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Harpoon Dir
+  }
+
+  state Fall Quickened {
+    SetPosition2D(GameObject=Self, Vector=(unset), X=(unset), Y=var "Apex Y", Space=0, EveryFrame=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Floor Y", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=12, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Target X", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Bellflea Drop Fall")
+    ActivateGameObject(gameObject=var "Tink Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Quickening Land
+    on TINK UP → Tink Up
+    on TINK LEFT → Tink L
+    on TINK RIGHT → Tink R
+    on TINK DOWN → Tink Down
+    on HARPOONED → Harpoon Hook
+  }
+
+  state Quickening Effects Init {
+    BoolTest(boolVariable=var "Quickened", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlashingQuickened())
+    PlayParticleEmitter(gameObject=var "Pt Quickened", emit=0, resetIfPlaying=false)
+    on FINISHED → Choose Entry Side
+  }
+
+  state Setup Giant {
+    SetStringValue(stringVariable=var "Fly Anim", stringValue="Bellflea Fly", everyFrame=false)
+    SetStringValue(stringVariable=var "Start Anim", stringValue="Bellflea Drop Start", everyFrame=false)
+    SetStringValue(stringVariable=var "BounceUp Anim", stringValue="Bellflea Drop BounceUp", everyFrame=false)
+    SetStringValue(stringVariable=var "Fall Anim", stringValue="Bellflea Drop Fall", everyFrame=false)
+    SetStringValue(stringVariable=var "Bounce Anim", stringValue="Bellflea Drop Bounce", everyFrame=false)
+    SetStringValue(stringVariable=var "BounceToLeave Anim", stringValue="Bellflea Drop BounceToLeave", everyFrame=false)
+    BoolTest(boolVariable=var "Is Giant", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetStringValue(stringVariable=var "Fly Anim", stringValue="Giant Fly", everyFrame=false)
+    SetStringValue(stringVariable=var "Start Anim", stringValue="Giant Drop Start", everyFrame=false)
+    SetStringValue(stringVariable=var "BounceUp Anim", stringValue="Giant Drop BounceUp", everyFrame=false)
+    SetStringValue(stringVariable=var "Fall Anim", stringValue="Giant Drop Fall", everyFrame=false)
+    SetStringValue(stringVariable=var "Bounce Anim", stringValue="Giant Drop Bounce", everyFrame=false)
+    SetStringValue(stringVariable=var "BounceToLeave Anim", stringValue="Giant Drop BounceToLeave", everyFrame=false)
+    SetFloatValue(floatVariable=var "Travel Min X", floatValue=4, everyFrame=false)
+    SetFloatValue(floatVariable=var "Travel Max X", floatValue=12, everyFrame=false)
+    SetStringValue(stringVariable=var "Cry Anim", stringValue="Giant Cry", everyFrame=false)
+    SetFloatValue(floatVariable=var "Z Offset", floatValue=0.002, everyFrame=false)
+    SetFloatValue(floatVariable=var "Apex Floor Add", floatValue=4, everyFrame=false)
+    SetFloatValue(floatVariable=var "Apex Min", floatValue=15, everyFrame=false)
+    SetFloatValue(floatVariable=var "Apex Max", floatValue=18, everyFrame=false)
+    SetFloatValue(floatVariable=var "Apex Floor Add Final", floatValue=5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Floor Y", floatValue=12, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Giant Land {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)  // disabled
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SendEventToRegister(eventName="FLEA FAIL")
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetFsmInt(gameObject=var "Game Control", fsmName="Game Specific Control", variableName="Tinks Until Set Complete", storeValue=var "Tinks Until Set Complete", everyFrame=false)
+    IntOperator(integer1=var "Tinks Until Set Complete", integer2=var "Bounce HP", operation=Subtract, storeResult=var "Tinks Until Set Complete", everyFrame=false)
+    SetFsmInt(gameObject=var "Game Control", fsmName="Game Specific Control", variableName="Tinks Until Set Complete", setValue=var "Tinks Until Set Complete", everyFrame=false)
+    PlayAudioEvent(audioClip=bell_fly_head_bounce (sfxstatic_assets_areabell.bundle), pitchMin=0.6, pitchMax=0.6, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Giant Drop BounceToLeave", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → GiantAway Start
+  }
+
+  state GiantAway Start {
+    ActivateGameObject(gameObject=var "Tink Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=0.008, max=0.009, storeResult=var "Z Pos")
+    FloatAdd(floatVariable=var "Z Pos", add=var "Z Offset", everyFrame=false, perSecond=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    FloatMultiply(floatVariable=var "Bounce Time", multiplyBy=0.35, everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Apex Floor", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Apex Floor", add=var "Apex Floor Add Final", everyFrame=false, perSecond=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Target X", y=(unset), space=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Target X", addMin=-5, addMax=5)
+    RandomFloat(min=var "Apex Min", max=var "Apex Max", storeResult=var "Apex Y")
+    FloatClamp(floatVariable=var "Apex Y", minValue=var "Apex Floor", maxValue=20.6, everyFrame=false)
+    FloatClamp(floatVariable=var "Apex Y", minValue=0, maxValue=20.6, everyFrame=false)
+    SetPosition2D(GameObject=var "Aiming Cursor", Vector=(unset), X=var "Target X", Y=(unset), Space=0, EveryFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Aiming Cursor", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Giant Bounce Away
+  }
+
+  state Giant Bounce Away {
+    FloatOperator(float1=var "Bounce Time", float2=2, operation=Divide, storeResult=var "Half Time", everyFrame=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Apex Y", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Target X", localSpace=false, time=var "Bounce Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"NEXT")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=Giant Flea howl short 01 (sfxstatic_assets_areaaqueduct.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.67, storePlayer=<null>)
+    on NEXT → Fly Away
+  }
+
+  state Entry Dive Giant {
+    RandomFloat(min=var "Platform Min X", max=var "Platform Max X", storeResult=var "Target X")
+    RandomFloat(min=var "Apex Min", max=var "Apex Max", storeResult=var "Apex Y")
+    SetPosition2D(GameObject=var "Aiming Cursor", Vector=(unset), X=var "Target X", Y=(unset), Space=0, EveryFrame=false)
+    GetXDistance(gameObject=Self, target=var "Aiming Cursor", storeResult=var "X Distance", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=10, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETRY", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=4, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Start Anim")
+    on RETRY → Retry Entry
+    on FINISHED → Entry Up
+  }
+
+  state Bounce Away Giant {
+    FloatOperator(float1=var "Bounce Time", float2=2, operation=Divide, storeResult=var "Half Time", everyFrame=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Apex Y", localSpace=false, time=var "Half Time", speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    AnimateXPositionTo(GameObject=Self, ToValue=var "Target X", localSpace=false, time=var "Bounce Time", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"NEXT")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=Giant Flea howl short 01 (sfxstatic_assets_areaaqueduct.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.83, storePlayer=<null>)
+    on NEXT → Fly Away
+  }
+
+  var Test Time: float = 1
+  var Is Giant: bool = false
+  var Entry Cry Table: object = Flea_Howl (sfxdynamic_assets_fleacaravan.bundle)
+  var Bark Table: object = Flea_bark (sfxdynamic_assets_fleacaravan.bundle)
+
+  var Apex Ceiling: float = 24
+  var Apex Floor: float = 0
+  var Apex Floor Add: float = 4
+  var Apex Max: float = 20.5
+  var Apex Min: float = 18.5
+  var Apex Y: float = 0
+  var Bounce Time: float = 3
+  var Bounce Time Short: float = 0
+  var Entry Pause: float = 0
+  var Entry Time: float = 2
+  var Entry X: float = 0
+  var Entry Y: float = 0
+  var Floor Y: float = 10
+  var Half Time: float = 0
+  var Lower Floor Y: float = 0
+  var Platform Max X: float = 161
+  var Platform Max X Crt: float = 0
+  var Platform Min X: float = 147
+  var Platform Min X Crt: float = 0
+  var Target X: float = 0
+  var Translate X: float = 0
+  var Travel Max X: float = 8
+  var Travel Min X: float = 3.5
+  var X Distance: float = 0
+  var Z Offset: float = 0
+  var Z Pos: float = 0
+  var Apex Floor Add Final: float = 7
+  var Ray Distance: float = 0
+  var Anim Time: float = 0
+  var Target X Clamp: float = 0
+  var Retries: int = 0
+  var Bounce HP: int = 0
+  var Bounce HP Start: int = 3
+  var Tink Dir: int = 0
+  var Tinks Until Set Complete: int = 0
+  var Quickened: bool = false
+  var Enter Left: bool = false
+  var BounceUp Anim: string = ""
+  var Cry Anim: string = ""
+  var Fall Anim: string = ""
+  var Fly Anim: string = ""
+  var Start Anim: string = ""
+  var Bounce Anim: string = ""
+  var BounceToLeave Anim: string = ""
+  var FlyAway Pos: vector3 = (0, 0, 0)
+  var Terrain Detector: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)/Terrain Detector
+  var Aiming Cursor: gameObject = <null>
+  var Tink Collider: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)/Tink Collider
+  var FlyAway Marker: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)/FlyAway Marker
+  var Flea Folder: gameObject = <null>
+  var Pt QuickenedStart: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)/Pt QuickenedStart
+  var Pt Quickened: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)/Pt Quickened
+  var Slam Effect: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)/Slam Effect
+  var Game Control: gameObject = <null>
+  var Self: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)
+  var Score Effect: gameObject = <null>
+  var Harpoon Tink Effect: gameObject = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)/Harpoon Tink Effect
+  var Collider: object = Caravan_States/Flea Festival/Flea Game - Juggling/Bellfleas/Bellflea Juggler (4)/Tink Producer@BoxCollider2D
+}

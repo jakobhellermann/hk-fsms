@@ -1,0 +1,156 @@
+# FSM
+# 4 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Health/Health 1/Barbed Wire (1)
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Health/Health 2+/Barbed Wire
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Health/Health 2+/Barbed Wire
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Health/Health 1/Barbed Wire (1)
+
+// uses template: health_barbed_wire
+fsm FSM {
+  start Init
+  on WAIT FOR HUD → Wait For HUD  // from any state
+  on MAX HP UP FINISHED → Wait For HUD  // from any state
+
+  state Init {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetBoolValue(boolVariable=var "Was Visible", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Was Health Active", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Last HP Appeared", boolValue=false, everyFrame=false)
+    on FINISHED → Wait For HUD
+  }
+
+  sequence state Inert {
+    SetMeshRenderer(gameObject=Self, active=false)
+    BoolTest(boolVariable=var "Was Health Active", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    EnableFsmSelf(SetEnabled=false)
+    on TOOL EQUIPS CHANGED → Equipped?
+    on CANCEL → Health Inert
+    on HEALTH ACTIVE → Activate
+  }
+
+  state Equipped? {
+    CheckIfToolEquipped(Tool=Barbed Wire (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Inert
+    on TRUE → Get Health Number
+  }
+
+  sequence state Appear {
+    WaitRandom(timeMin=0, timeMax=0.2, finishEvent=(none), realTime=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetBoolValue(boolVariable=var "Was Visible", boolValue=true, everyFrame=false)
+    AudioStop(gameObject=var "Spawned Audio", fadeTime=0)
+    CheckHudVisible(trueEvent=(none), falseEvent=(none), storeValue=var "Is Visible", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Is Visible", floatVariable=var "Volume", falseValue=0, trueValue=1, everyFrame=false)
+    PlayAudioEvent(audioClip=ui_hud_barbed_bracelet_equip (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=var "Volume", audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Barbed Wire Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on TOOL EQUIPS CHANGED → Equipped? 2
+    on FINISHED → Active
+  }
+
+  state Active {
+    EnableFsmSelf(SetEnabled=false)
+    on TOOL EQUIPS CHANGED → Equipped? 2
+    on HERO DAMAGED → Impact
+  }
+
+  state Equipped? 2 {
+    CheckIfToolEquipped(Tool=Barbed Wire (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Disappear
+    on TRUE → Active
+  }
+
+  sequence state Disappear {
+    WaitRandom(timeMin=0, timeMax=0.2, finishEvent=(none), realTime=false)
+    SetBoolValue(boolVariable=var "Was Visible", boolValue=false, everyFrame=false)
+    AudioStop(gameObject=var "Spawned Audio", fadeTime=0)
+    CheckHudVisible(trueEvent=(none), falseEvent=(none), storeValue=var "Is Visible", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Is Visible", floatVariable=var "Volume", falseValue=0, trueValue=1, everyFrame=false)
+    PlayAudioEvent(audioClip=ui_hud_barbed_bracelet_unequip_pt_1 (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=var "Volume", audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Barbed Wire Disappear", AnimationCompleteEvent=(none))
+    SetMeshRenderer(gameObject=Self, active=false)
+    on TOOL EQUIPS CHANGED → Equipped?
+    on FINISHED → Inert
+  }
+
+  state Activate {
+    SetBoolValue(boolVariable=var "Was Health Active", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Last HP Appeared", isTrue=(none), isFalse=→"WAIT FOR HUD", everyFrame=false)
+    BoolTest(boolVariable=var "Was Visible", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Equipped?
+    on CANCEL → Active
+  }
+
+  state Deactivate {
+    SetBoolValue(boolVariable=var "Was Health Active", boolValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Last HP Appeared", isTrue=(none), isFalse=→"WAIT FOR HUD", everyFrame=false)
+    BoolTest(boolVariable=var "Was Visible", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Inert
+    on FINISHED → Disappear
+  }
+
+  state Wait For HUD {
+    on LAST HP ADDED → Health Active?
+    on HEALTH ACTIVE → Health Active Wait
+  }
+
+  sequence state Health Active? {
+    SetBoolValue(boolVariable=var "Last HP Appeared", boolValue=true, everyFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    BoolTest(boolVariable=var "Was Health Active", isTrue=→"HEALTH ACTIVE", isFalse=→"HEALTH INACTIVE", everyFrame=false)
+    on HEALTH ACTIVE → Activate
+    on HEALTH INACTIVE → Deactivate
+  }
+
+  state Health Inert {
+    EnableFsmSelf(SetEnabled=false)
+    on HEALTH ACTIVE → Activate
+  }
+
+  state Impact {
+    PlayAudioEvent(audioClip=hi_hud_barbed_bracelet_damage (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Barbed Wire Impact", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Active
+    on TOOL EQUIPS CHANGED → Equipped? 2
+  }
+
+  state Get Health Number {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    GetFsmInt(gameObject=var "Parent", fsmName="health_display", variableName="Health Number", storeValue=var "Health Number", everyFrame=false)
+    SetIntValue(intVariable=var "Flips Left", intValue=var "Health Number", everyFrame=false)
+    on FINISHED → Flip X
+  }
+
+  state Flip Y? {
+    FlipScale(gameObject=Self, flipHorizontally=false, flipVertically=true, everyFrame=false, lateUpdate=false)
+    IntOperator(integer1=var "Flips Left", integer2=1, operation=Subtract, storeResult=var "Flips Left", everyFrame=false)
+    IntCompare(integer1=var "Flips Left", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=→"FINISHED", everyFrame=false)
+    on CANCEL → Appear
+    on FINISHED → Flip Y?
+  }
+
+  state Flip X {
+    RandomlyFlipScale(gameObject=Self)
+    on FINISHED → Flip Y?
+  }
+
+  state Health Active Wait {
+    on LAST HP ADDED → Last HP Appeared
+  }
+
+  state Last HP Appeared {
+    SetBoolValue(boolVariable=var "Last HP Appeared", boolValue=true, everyFrame=false)
+    on FINISHED → Activate
+  }
+
+  var Health Number: int = 0
+
+  var Volume: float = 0
+  var Flips Left: int = 0
+  var Was Visible: bool = false
+  var Was Health Active: bool = false
+  var Last HP Appeared: bool = false
+  var Is Visible: bool = false
+  var Parent: gameObject = <null>
+  var Spawned Audio: gameObject = <null>
+}

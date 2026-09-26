@@ -1,0 +1,149 @@
+# Automaton Walk
+# 6 location(s):
+#   Cog_05 / Battle Scene/Aftermath/Wave Spawner/Wave 5/Song Automaton Shield
+#   Cog_05 / Battle Scene/Wave 6/Song Automaton Shield
+#   Cog_05 / Battle Scene/Wave 4/Song Automaton Shield
+#   Cog_05 / Battle Scene/Aftermath/Wave Spawner/Wave 6/Song Automaton Shield
+#   Cog_06 / Song Automaton Shield
+#   Cog_08 / Song Automaton Shield
+
+// uses template: automaton_walk_quick
+fsm Automaton Walk {
+  start Init
+  on WALK STOP → Idle  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Ray Point", storeResult=var "Ray Point")
+    FindChild(gameObject=Self, childName="Ray Point G", storeResult=var "Ray Point G")
+    on FINISHED → Get Scale
+  }
+
+  state Start Dir {
+    SendRandomEvent(events=[→"TURN", →"FINISHED"], weights=[1, 1], delay=0)
+    on FINISHED → Step Choice
+    on TURN → Turn
+  }
+
+  state Idle {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on WALK START → Stepped
+  }
+
+  state Step Choice {
+    SendRandomEventV4(events=[→"SLOW", →"FAST"], weights=[1, 1], eventMax=[3, 2], missedMax=[2, 3], activeBool=false)
+    on SLOW → Set Slow
+    on FAST → Set Fast
+  }
+
+  state Get Scale {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale R", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Scale R", float2=-1, operation=Multiply, storeResult=var "Scale L", everyFrame=false)
+    BoolTest(boolVariable=var "Faces Right", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    FloatMultiply(floatVariable=var "Scale L", multiplyBy=-1, everyFrame=false)
+    FloatMultiply(floatVariable=var "Scale R", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Turn {
+    SetScale(gameObject=Self, vector=(unset), x=var "Scale R", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    WaitRandom(timeMin=0.25, timeMax=0.45, finishEvent=→"NEXT", realTime=false)
+    on NEXT → Step Choice
+  }
+
+  state Set Slow {
+    RandomInt(min=2, max=5, storeResult=var "Steps", inclusiveMax=true, noRepeat=false)
+    SetBoolValue(boolVariable=var "Going Fast", boolValue=false, everyFrame=false)
+    on FINISHED → Do Step S
+  }
+
+  state Do Step S {
+    SetStringValueBool(stringVariable=var "Anim", testBool=var "Stepped R", trueValue="Walk R", falseValue="Walk L", everyframe=false)
+    BoolFlip(boolVariable=var "Stepped R")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RandomFloat(min=3.25, max=4.25, storeResult=var "Speed Crt")
+    SetVelocityByScale(gameObject=Self, speed=var "Speed Crt", ySpeed=(unset), everyFrame=false)
+    PlayRandomAudioClipTable(Table=var "Short Step Audio", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Stepped
+  }
+
+  state Stepped {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Ray Point", fromPosition=(unset), direction=(1, 0), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8), Enemy Detector(15), Enemies(11)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetBoolValue(boolVariable=var "Ground Ahead", boolValue=true, everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Ray Point G", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTest(boolVariable=var "Ground Ahead", isTrue=(none), isFalse=→"EDGE", everyFrame=true)
+    WaitRandom(timeMin=0.05, timeMax=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Repeat?
+    on WALL → Turn
+    on EDGE → Turn
+  }
+
+  state Repeat? {
+    IntAdd(intVariable=var "Steps", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Steps", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Going Fast", isTrue=→"FAST", isFalse=→"SLOW", everyFrame=false)
+    on SLOW → Do Step S
+    on FINISHED → Stop
+    on FAST → Do Step F
+  }
+
+  state Stop {
+    SendRandomEventV4(events=[→"REVERSE", (none)], weights=[0.25, 0.75], eventMax=[1, 3], missedMax=[3, 1], activeBool=false)
+    SendRandomEventV4(events=[→"FINISHED", (none)], weights=[0.75, 0.25], eventMax=[3, 1], missedMax=[1, 3], activeBool=false)
+    WaitRandom(timeMin=0.5, timeMax=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Step Choice
+    on REVERSE → Reverse Pause
+  }
+
+  state Set Fast {
+    RandomInt(min=2, max=4, storeResult=var "Steps", inclusiveMax=true, noRepeat=false)
+    SetBoolValue(boolVariable=var "Going Fast", boolValue=true, everyFrame=false)
+    on FINISHED → Do Step F
+  }
+
+  state Do Step F {
+    SetStringValueBool(stringVariable=var "Anim", testBool=var "Stepped R", trueValue="Walk R Q", falseValue="Walk L Q", everyframe=false)
+    BoolFlip(boolVariable=var "Stepped R")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RandomFloat(min=5, max=6, storeResult=var "Speed Crt")
+    SetVelocityByScale(gameObject=Self, speed=var "Speed Crt", ySpeed=(unset), everyFrame=false)
+    PlayRandomAudioClipTable(Table=var "Long Step Audio", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Stepped
+  }
+
+  state Reverse Step {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Walk B", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-3.5, ySpeed=(unset), everyFrame=false)
+    PlayRandomAudioClipTable(Table=var "Short Step Audio", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Reverse End
+  }
+
+  state Reverse Pause {
+    WaitRandom(timeMin=0.25, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reverse Step
+  }
+
+  state Reverse End {
+    WaitRandom(timeMin=0.7, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Step Choice
+  }
+
+  var Short Step Audio: object = song_automaton_shield_short_step (sfxdynamic_assets_areacog.bundle)
+  var Long Step Audio: object = song_automaton_shield_long_step (sfxdynamic_assets_areacog.bundle)
+
+  var Scale L: float = 0
+  var Scale R: float = 0
+  var Speed: float = 3.5
+  var Speed Crt: float = 0
+  var Steps: int = 0
+  var Faces Right: bool = true
+  var Going Fast: bool = false
+  var Ground Ahead: bool = false
+  var Stepped R: bool = false
+  var Anim: string = ""
+  var Ray Point: gameObject = <null>
+  var Ray Point G: gameObject = <null>
+}

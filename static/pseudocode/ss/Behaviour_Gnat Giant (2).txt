@@ -1,0 +1,199 @@
+# Behaviour
+# 1 location(s):
+#   Greymoor_16 / Gnat Giant (2)
+
+fsm Behaviour {
+  start Init
+  on SING → Sing  // from any state
+  on ZERO HP → Dead  // from any state
+
+  state Init {
+    BoolTest(boolVariable=var "a_WaitForWake", isTrue=→"SLEEP", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+    on SLEEP → Sleep
+  }
+
+  state Idle {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    WaitRandom(timeMin=2, timeMax=4, finishEvent=→"FINISHED", realTime=false)
+    CheckAlertRange(alertRange=var "Aggro Range", storeResult=(unset), InRangeEvent=→"AGGRO", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="IN IDLE", delay=0, everyFrame=false)
+    on FINISHED → Idle Turn?
+    on AGGRO → Aggro Start Turn
+    on TOOK DAMAGE → Damage Roar
+  }
+
+  state Idle Turn? {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="OUT IDLE", delay=0, everyFrame=false)
+    RandomInt(min=2, max=3, storeResult=var "Bounds Left", inclusiveMax=true, noRepeat=false)
+    SendRandomEventFair(Events=[{SendEvent=→"CANCEL", Probability=0.6666667}, {SendEvent=→"FINISHED", Probability=0.33333334}], TrackingArray=var "Idle Turn Tracking", MissedMultiplier=2)
+    on FINISHED → Idle Turn
+    on CANCEL → Idle Bound Start
+  }
+
+  state Idle Turn {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Bound Start
+    on TOOK DAMAGE → Damage Roar
+  }
+
+  state Idle Bound Start {
+    CheckAlertRange(alertRange=var "Aggro Range", storeResult=(unset), InRangeEvent=→"AGGRO", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    EnemyDetectTurn(Target=Self, WallDistance=1, GroundAheadDistance=1.5, DefaultFacingRight=true, ShouldTurn=→"TURN", EveryFrame=false)
+    IntCompare(integer1=var "Bounds Left", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    IntOperator(integer1=var "Bounds Left", integer2=1, operation=Subtract, storeResult=var "Bounds Left", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Bound", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=0.7, decelerationY=0, brakeOnExit=false)
+    on AGGRO → Aggro Start Turn
+    on TURN → Idle Turn
+    on CANCEL → Idle
+    on FINISHED → Idle Bound Move
+    on TOOK DAMAGE → Damage Roar
+  }
+
+  state Idle Bound Move {
+    PlayAudioEventRandom(audioClips=[giant_gnat_hop_1 (sfxstatic_assets_areagreymoor.bundle), giant_gnat_hop_2 (sfxstatic_assets_areagreymoor.bundle), giant_gnat_hop_3 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Bound Land
+  }
+
+  state Aggro Turn {
+    SetBoolValue(boolVariable=var "Did Turn", boolValue=true, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Breaker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Still Alert?
+  }
+
+  state Aggro Bound Start {
+    CheckAlertRange(alertRange=var "Unaggro Range", storeResult=var "In Aggro Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    TimeLimitSetV2(TimeDelay=var "Aggro Duration", StoreValue=var "Unalert Timer", CanSet=var "In Aggro Range", EveryFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Unalert Timer", AboveEvent=→"CANCEL", BelowEvent=(none), StoreBool=(unset), EveryFrame=true)
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=true, DistancePast=4, StoreResult=var "Passed Hero", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=false)
+    BoolTestMulti(boolVariables=[var "Passed Hero", var "Did Turn"], boolStates=[true, false], trueEvent=(none), falseEvent=(none), storeResult=(unset), everyFrame=false)
+    EnemyDetectTurn(Target=Self, WallDistance=1, GroundAheadDistance=1.5, DefaultFacingRight=true, ShouldTurn=→"TURN", EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Bound Aggro", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=0.7, decelerationY=0, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Breaker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on CANCEL → Idle
+    on TURN → Aggro Turn
+    on FINISHED → Aggro Bound Move
+  }
+
+  state Aggro Bound Move {
+    PlayAudioEventRandom(audioClips=[giant_gnat_hop_1 (sfxstatic_assets_areagreymoor.bundle), giant_gnat_hop_2 (sfxstatic_assets_areagreymoor.bundle), giant_gnat_hop_3 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocityByScale(gameObject=Self, speed=15, ySpeed=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Breaker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Bound Land
+  }
+
+  state Roar {
+    SetBoolValue(boolVariable=var "Did Turn", boolValue=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=false, Delay=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[gnat_giant_new_scream_1 (sfxstatic_assets_areagreymoor.bundle), gnat_giant_new_scream_2 (sfxstatic_assets_areagreymoor.bundle), gnat_giant_new_scream_3 (sfxstatic_assets_areagreymoor.bundle), gnat_giant_new_scream_4 (sfxstatic_assets_areagreymoor.bundle)], weights=[1, 1, 1, 1], pitchMin=0.9, pitchMax=1.1, stopPreviousSound=true)
+    on FINISHED → Aggro Bound Start
+  }
+
+  state Still Alert? {
+    RandomInt(min=3, max=4, storeResult=var "Bounds Left", inclusiveMax=true, noRepeat=false)
+    CheckAlertRange(alertRange=var "Unaggro Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"CANCEL", OutOfRangeDelay=0, everyFrame=false)
+    on CANCEL → Idle Bound Start
+    on FINISHED → Aggro Bound Start
+  }
+
+  state Aggro Start Turn {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="OUT IDLE", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    TimeLimitSetV2(TimeDelay=var "Aggro Duration", StoreValue=var "Unalert Timer", CanSet=true, EveryFrame=true)
+    GetDirection2D(From=Self, To=var "Hero", StoreVector=(unset), StoreX=var "Direction To Hero", StoreY=(unset), EveryFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignToBool(Value=var "Direction To Hero", StoreIsPositive=var "Hero Is Right", EveryFrame=false)
+    FloatSignToBool(Value=var "Scale X", StoreIsPositive=var "Facing Right", EveryFrame=false)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Hero Is Right"], boolStates=[true, true], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Hero Is Right"], boolStates=[false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Roar Antic
+  }
+
+  state Bound Land {
+    PlayAudioEventRandom(audioClips=[giant_gnat_land_1 (sfxstatic_assets_areaunderstore.bundle), giant_gnat_land_2 (sfxstatic_assets_areaunderstore.bundle), giant_gnat_land_3 (sfxstatic_assets_areaunderstore.bundle), giant_gnat_land_4 (sfxstatic_assets_areaunderstore.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt BoundDust", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Breaker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Aggro Bound Start
+  }
+
+  state Roar Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Roar
+  }
+
+  state Idle Bound Land {
+    PlayAudioEventRandom(audioClips=[giant_gnat_land_1 (sfxstatic_assets_areaunderstore.bundle), giant_gnat_land_2 (sfxstatic_assets_areaunderstore.bundle), giant_gnat_land_3 (sfxstatic_assets_areaunderstore.bundle), giant_gnat_land_4 (sfxstatic_assets_areaunderstore.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt BoundDust", emit=0, resetIfPlaying=false)
+    on FINISHED → Idle Bound Start
+  }
+
+  state Sing {
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=giant_gnat_sing (sfxdynamic_assets_areagreymoor.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="OUT IDLE", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    DoCameraShakeRepeatingV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.15, vibrate=true)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Sleep {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on WAKE → Idle
+  }
+
+  state Dead {
+    PlayAudioEvent(audioClip=giant_gnat_death_scream (sfxstatic_assets_areagreymoor.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+  }
+
+  state Damage Roar {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="OUT IDLE", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    TimeLimitSetV2(TimeDelay=var "Aggro Duration", StoreValue=var "Unalert Timer", CanSet=true, EveryFrame=false)
+    on FINISHED → Roar Antic
+  }
+
+  var a_WaitForWake: bool = false
+
+  var Aggro Duration: float = 5
+  var Direction To Hero: float = 0
+  var Scale X: float = 0
+  var Unalert Timer: float = 0
+  var Bounds Left: int = 0
+  var Facing Right: bool = false
+  var Hero Is Right: bool = false
+  var In Aggro Range: bool = false
+  var Did Turn: bool = false
+  var Passed Hero: bool = false
+  var Pt BoundDust: gameObject = Gnat Giant (2)/Pt BoundDust
+  var Audio Loop Voice: gameObject = Gnat Giant (2)/Audio Loop Voice
+  var Breaker: gameObject = Gnat Giant (2)/Breaker
+  var Aggro Range: object = Gnat Giant (2)/Aggro Range@AlertRange
+  var Unaggro Range: object = Gnat Giant (2)/Unagrro Range@AlertRange
+  var Idle Turn Tracking: array = var "Idle Turn Tracking"
+}

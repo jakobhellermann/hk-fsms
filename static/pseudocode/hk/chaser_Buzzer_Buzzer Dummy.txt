@@ -1,0 +1,87 @@
+# chaser
+# 2 location(s):
+#   Ruins2_11 / Break Jar (3)/Buzzer Dummy/Buzzer
+#   Ruins2_11 / Break Jar (2)/Buzzer Dummy/Buzzer
+
+// uses template: chaser
+fsm chaser {
+  start Initiate
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    IdleBuzz(gameObject=var "Self", waitMin=0.75, waitMax=1, speedMax=1.75, accelerationMax=15, roamingRange=1)
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=var "In Alert Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    on ALERT → Startles?
+    on TOOK DAMAGE → Startles?
+  }
+
+  state Startle {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[buzzer_startle_01, buzzer_startle_02, buzzer_startle_03], weights=[1, 1, 1], pitchMin=1.2, pitchMax=1.4, volume=1, delay=0, storePlayer=<null>)
+    SetVelocity2d(gameObject=var "Self", vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Startle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    on ANIM END → Chase Start
+  }
+
+  state Startles? {
+    BoolTest(boolVariable=var "Startles", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Startle
+    on FALSE → Chase Start
+  }
+
+  state Chase - In Sight {
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    ChaseObject(gameObject=var "Self", target=var "Hero", speedMax=5, acceleration=0.045, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)
+    NextFrameEvent(sendEvent=→"WAIT")
+    on WAIT → Chase - Out of Sight
+  }
+
+  state Initiate {
+    GetOwner(storeGameObject=var "Self")
+    FindAlertRange(target=Self, storeResult=var "Alert Range", childName="Alert Range New")
+    BoolTest(boolVariable=var "Start Alert", isTrue=→"ALERT", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+    on ALERT → Chase Start
+  }
+
+  state Chase - Out of Sight {
+    ChaseObject(gameObject=var "Self", target=var "Hero", speedMax=5, acceleration=0.045, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=var "In Alert Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    Wait(time=var "Attention Span", finishEvent=→"WAIT", realTime=false)
+    on ALERT → Chase - In Sight
+    on WAIT → Stop
+  }
+
+  state Stop {
+    SetAudioPitch(gameObject=var "Self", pitch=1, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Tk2dPlayFrame(gameObject=var "Self", frame=3)
+    Decelerate(gameObject=var "Self", deceleration=0.12)
+    Wait(time=1, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Idle
+  }
+
+  state Chase Start {
+    SetAudioPitch(gameObject=var "Self", pitch=1.25, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Chase")
+    Tk2dPlayFrame(gameObject=var "Self", frame=3)
+    Wait(time=0, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Chase - In Sight
+  }
+
+  var Attention Span: float = 10
+  var Start Alert: bool = true
+  var Startles: bool = true
+
+  var Can See Hero: bool = false
+  var In Alert Range: bool = false
+  var Self: gameObject = <null>
+  var Alert Range: object = <null>
+}

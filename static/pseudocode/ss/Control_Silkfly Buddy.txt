@@ -1,0 +1,103 @@
+# Control
+# 1 location(s):
+#   localpoolprefabs_assets_areadustmaze.bundle / Silkfly Buddy
+
+fsm Control {
+  start Wait For Start
+
+  state Idle {
+    IdleBuzzV3(gameObject=Self, waitMin=0.5, waitMax=1.5, speedMax=3, accelerationMin=5, accelerationMax=15, roamingRangeX=0.25, roamingRangeY=0.25, manualStartPos=(unset))
+    on LEAVE → Leave Pause
+  }
+
+  state Get Details {
+    GetPosition2D(gameObject=Self, vector=var "Init Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    WaitForMazeControllerDoorLink(StoreCorrectDoor=var "Correct Gate", DoorsLinkedEvent=→"FINISHED")
+    on FINISHED → Perched?
+  }
+
+  state Leave {
+    RandomFloat(min=0.075, max=0.25, storeResult=var "Accel")
+    PlayAudioEvent(audioClip=focus_ready (herosfxstatic_assets_all.bundle), pitchMin=1.45, pitchMax=1.15, volume=0.6, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    RandomFloat(min=-2, max=2, storeResult=var "Offset X")
+    RandomFloat(min=-2, max=2, storeResult=var "Offset Y")
+    GetAngleToTarget2D(gameObject=Self, target=var "Correct Gate", offsetX=var "Offset X", offsetY=var "Offset Y", storeAngle=var "Angle", pause=0, everyFrame=false)
+    Wait(time=10, finishEvent=→"FINISHED", realTime=false)
+    TiltBySpeed(gameObject=Self, tiltFactor=-5, tiltMax=10, rotationSpeed=2)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=true)
+    EaseFloat(fromValue=0, toValue=15, floatVariable=var "Speed", time=3, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    on RESPAWN → Deactivate
+  }
+
+  state Deactivate {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=-25, y=0, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Attract Glow", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Respawn
+  }
+
+  state Leave Antic {
+    AnimatorPlay(gameObject=Self, stateName="silk_fly", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.95, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 2.5), x=(unset), y=(unset), everyFrame=false)
+    WaitRandom(timeMin=1.1, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Attract Glow", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    SetSpriteRenderer(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Scared Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Leave
+  }
+
+  state Wait For Start {
+    on FLY START → Get Details
+  }
+
+  state Respawn {
+    SetPosition2D(GameObject=Self, Vector=var "Init Pos", X=0, Y=0, Space=0, EveryFrame=false)
+    AnimatorPlay(gameObject=Self, stateName="silk_fly", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    on FINISHED → Perched?
+  }
+
+  state Leave Pause {
+    WaitRandom(timeMin=0.1, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Leave Antic
+  }
+
+  state Perched? {
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", →"PERCH"], weights=[0.75, 0.25], delay=0)
+    on FINISHED → Idle
+    on PERCH → Set Perch
+  }
+
+  state Set Perch {
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Perch Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Vector2Add(vector2Variable=var "Perch Point", addVector=(0, 0.3), everyFrame=false, perSecond=false)
+    SetPosition2D(GameObject=Self, Vector=var "Perch Point", X=(unset), Y=(unset), Space=0, EveryFrame=false)
+    AnimatorPlay(gameObject=Self, stateName="silk_fly_perched", layer=0, normalizedTime=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"PERCH", delay=0, everyFrame=false)
+    on FINISHED → Idle
+    on PERCH → Perched
+  }
+
+  state Perched {
+    on LEAVE → Leave Pause
+  }
+
+  var Accel: float = 0
+  var Angle: float = 0
+  var Speed: float = 0
+  var Offset X: float = 0
+  var Offset Y: float = 0
+  var In Range: bool = false
+  var Init Pos: vector2 = (0, 0)
+  var Perch Point: vector2 = (0, 0)
+  var Buzz Point: vector3 = (0, 0, 0)
+  var Correct Gate: gameObject = <null>
+  var Attract Glow: gameObject = <null>
+  var Respawn Range Obj: gameObject = Silkfly Buddy/Respawn Range
+  var Scared Sprite: gameObject = Silkfly Buddy/Scared Sprite
+  var Respawn Range: object = <null>
+}

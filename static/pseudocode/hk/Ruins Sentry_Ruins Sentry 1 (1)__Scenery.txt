@@ -1,0 +1,349 @@
+# Ruins Sentry
+# 1 location(s):
+#   Ruins1_03 / _Scenery/Ruins Sentry 1 (1)
+
+fsm Ruins Sentry {
+  start Init
+  on ATTACK STOP → Attack Stop  // from any state
+  on BATTLE SPAWN → Sp Pause  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Patrol Voice", storeResult=var "Patrol Voice")
+    FindChild(gameObject=Self, childName="Run Check", storeResult=var "Run Check Obj")
+    FindChild(gameObject=Self, childName="Evade Check", storeResult=var "Evade Check Obj")
+    on FINISHED → Spawner?
+  }
+
+  state Idle {
+    BoolTest(boolVariable=var "Alert Region", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    AudioPlayInState(gameObject=var "Patrol Voice", volume=1)
+    on ALERT → Init Chase
+    on TOOK DAMAGE → Init Chase
+  }
+
+  state Run {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Hero Is Right", leftBool=var "Hero Is Left", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Facing Right", var "Hero Is Left"], sendEvent=→"TURN", storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Hero Is Right"], boolStates=[false, true], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Run Speed Crt", y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    BoolTest(boolVariable=var "Evade Region", isTrue=→"EVADE", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Unalert Region", isTrue=(none), isFalse=→"OUT OF RANGE", everyFrame=true)
+    BoolTest(boolVariable=var "Attack Region", isTrue=→"ATTACK", isFalse=(none), everyFrame=true)
+    SetBoolValue(boolVariable=var "Run Safe", boolValue=true, everyFrame=false)
+    RayCast2d(fromGameObject=var "Run Check Obj", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Run Safe", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTest(boolVariable=var "Run Safe", isTrue=(none), isFalse=→"RUN STOP", everyFrame=true)
+    on TURN → Turn
+    on OUT OF RANGE → Run End
+    on ATTACK → Attack Choice
+    on EVADE → Evade Check
+    on RUN STOP → Run Stop
+  }
+
+  state Init Chase {
+    StopWalker(target=Self, everyFrame=false)
+    SetFloatValue(floatVariable=var "Run Speed Crt", floatValue=var "Run Speed", everyFrame=false)
+    SetFloatValue(floatVariable=var "Evade Speed Crt", floatValue=var "Evade Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Run Speed Crt", multiplyBy=-1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Dash Speed Crt", floatValue=var "Dash Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Speed Crt", multiplyBy=-1, everyFrame=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Scale", float2=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    FloatMultiply(floatVariable=var "Run Speed Crt", multiplyBy=-1, everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Speed Crt", multiplyBy=-1, everyFrame=false)
+    FloatMultiply(floatVariable=var "Evade Speed Crt", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Startle
+  }
+
+  state Turn {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn B", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    FloatMultiply(floatVariable=var "Run Speed Crt", multiplyBy=-1, everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Speed Crt", multiplyBy=-1, everyFrame=false)
+    FloatMultiply(floatVariable=var "Evade Speed Crt", multiplyBy=-1, everyFrame=false)
+    BoolFlip(boolVariable=var "Facing Right")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Out Of Range?
+  }
+
+  state Run End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run End")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    BoolTest(boolVariable=var "Unalert Region", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Alert Cooldown
+    on ALERT → Run
+  }
+
+  state Alert Cooldown {
+    WaitRandom(timeMin=2, timeMax=3, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    BoolTest(boolVariable=var "Unalert Region", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    on FINISHED → Check Facing
+    on ALERT → Run
+  }
+
+  state Out Of Range? {
+    BoolTest(boolVariable=var "Unalert Region", isTrue=(none), isFalse=→"OUT OF RANGE", everyFrame=false)
+    on FINISHED → Run
+    on OUT OF RANGE → Alert Cooldown
+  }
+
+  state Alert End {
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Attack Choice {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Ruins_Sentry_attack_01 (sharedassets88.assets), Ruins_Sentry_attack_02 (sharedassets88.assets), Ruins_Sentry_attack_03 (sharedassets88.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendRandomEvent(events=[→"SINGLE", →"TRIPLE"], weights=[0.6, 0.4], delay=0)
+    on SINGLE → Single Antic
+    on TRIPLE → Evade First?
+  }
+
+  state Single Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack 01", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    on FINISHED → Single Dash
+  }
+
+  state Single Dash {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Dash Speed Crt", y=(unset), everyFrame=false)
+    on FINISHED → Single Swipe
+  }
+
+  state Single Swipe {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash1", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[ruin_sentry_sword_1 (sharedassets33.assets), ruin_sentry_sword_2 (sharedassets33.assets), ruin_sentry_sword_3 (sharedassets33.assets)], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1.1)
+    on FINISHED → Single Recover
+  }
+
+  state Single Recover {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Attack CD
+  }
+
+  state Attack CD {
+    WaitRandom(timeMin=0.25, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Out Of Range?
+  }
+
+  state Trip Antic 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack 03", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    on FINISHED → Trip Dash 1
+  }
+
+  state Trip Dash 1 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Dash Speed Crt", y=(unset), everyFrame=false)
+    on FINISHED → Trip Swipe 1
+  }
+
+  state Trip Swipe 1 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash1", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[zombie_shield_sword_1 (sharedassets32.assets), zombie_shield_sword_2 (sharedassets32.assets), zombie_shield_sword_3 (sharedassets32.assets)], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1.1)
+    on FINISHED → Trip Antic 2
+  }
+
+  state Trip Antic 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Trip Swipe 2
+  }
+
+  state Trip Dash 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Dash Speed Crt", y=(unset), everyFrame=false)
+    on FINISHED → Trip Swipe 3
+  }
+
+  state Trip Swipe 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash1", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[ruin_sentry_sword_1 (sharedassets33.assets), ruin_sentry_sword_2 (sharedassets33.assets), ruin_sentry_sword_3 (sharedassets33.assets)], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1.1)
+    on FINISHED → Trip Recover
+  }
+
+  state Trip Recover {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Attack CD
+  }
+
+  state Evade First? {
+    SendRandomEvent(events=[→"FINISHED", →"EVADE"], weights=[1, 1], delay=0)
+    on FINISHED → Trip Antic 1
+    on EVADE → Evade Check
+  }
+
+  state Evade Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Ruins_Sentry_evade_01 (sharedassets88.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Evade
+  }
+
+  state Evade {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Evade Speed Crt", y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Evade Recover
+  }
+
+  state Evade Recover {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Evade Cooldown
+  }
+
+  state Evade Followup? {
+    SendRandomEvent(events=[→"ATTACK", →"RUN"], weights=[1, 1], delay=0)
+    on ATTACK → Trip Antic 1
+    on RUN → Out Of Range?
+  }
+
+  state Trip Swipe 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[zombie_shield_sword_1 (sharedassets32.assets), zombie_shield_sword_2 (sharedassets32.assets), zombie_shield_sword_3 (sharedassets32.assets)], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1.1)
+    on FINISHED → Trip Antic 3
+  }
+
+  state Trip Antic 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Trip Dash 2
+  }
+
+  state Check Facing {
+    SetWalkerFacing(walkRight=false, randomStartDir=false, target=Self, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignTest(floatValue=var "Scale", isPositive=→"FINISHED", isNegative=(none), everyFrame=false)
+    SetWalkerFacing(walkRight=true, randomStartDir=false, target=Self, everyFrame=false)
+    on FINISHED → Alert End
+  }
+
+  state Evade Cooldown {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Evade Followup?
+  }
+
+  state Startle {
+    BoolTest(boolVariable=var "Spawner", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Ruins_Sentry_startle_01 (sharedassets88.assets), Ruins_Sentry_startle_02 (sharedassets88.assets), Ruins_Sentry_startle_03 (sharedassets88.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Run
+  }
+
+  state Evade Check {
+    BoolTest(boolVariable=var "Evade Safe", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)  // disabled
+    RayCast2d(fromGameObject=var "Evade Check Obj", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SendEvent(eventTarget=Self, sendEvent=→"CANCEL", delay=0, everyFrame=false)
+    on CANCEL → Single Antic
+    on FINISHED → Evade Antic
+  }
+
+  state Run Stop {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Run Recheck
+  }
+
+  state Run Recheck {
+    BoolTest(boolVariable=var "Unalert Region", isTrue=(none), isFalse=→"OUT OF RANGE", everyFrame=false)
+    BoolTest(boolVariable=var "Run Safe", isTrue=(none), isFalse=→"RUN STOP", everyFrame=false)  // disabled
+    on FINISHED → Run
+    on RUN STOP → Run Stop
+    on OUT OF RANGE → Run End
+  }
+
+  state Attack Stop {
+    ActivateGameObject(gameObject=var "Slash1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on ATTACK START → Idle
+  }
+
+  state Spawner? {
+    BoolTest(boolVariable=var "Spawner", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Sp Pause
+  }
+
+  state Sp Pause {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    StopWalker(target=Self, everyFrame=false)
+    FindChild(gameObject=Self, childName="Alert Region", storeResult=var "Alert Region Obj")
+    FindChild(gameObject=Self, childName="Unalert Region", storeResult=var "Unalert Region Obj")
+    SetBoxCollider2DSize(gameObject1=var "Alert Region Obj", width=100, height=50, offsetX=(unset), offsetY=(unset))
+    SetBoxCollider2DSize(gameObject1=var "Unalert Region Obj", width=100, height=50, offsetX=(unset), offsetY=(unset))
+    on FINISHED → Shift?
+  }
+
+  state Shift? {
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=4, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Shift X", multiplyBy=var "Scale", everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Shift X", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Spawn Anim
+  }
+
+  state Spawn Anim {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spawn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetCollider(gameObject=Self, active=true)
+    on FINISHED → Init Chase
+  }
+
+  var Dash Speed: float = 23
+  var Evade Speed: float = 15
+  var Run Speed: float = 7.5
+  var Spawner: bool = false
+
+  var Dash Speed Crt: float = 0
+  var Distance: float = 0
+  var Evade Speed Crt: float = 0
+  var Run Speed Crt: float = 0
+  var Scale: float = 0
+  var Shift X: float = -7
+  var Alert Region: bool = false
+  var Attack Region: bool = false
+  var Evade Region: bool = false
+  var Evade Safe: bool = false
+  var Facing Right: bool = false
+  var Hero Is Left: bool = false
+  var Hero Is Right: bool = false
+  var Run Safe: bool = false
+  var Unalert Region: bool = false
+  var Alert Region Obj: gameObject = <null>
+  var Evade Check Obj: gameObject = <null>
+  var Patrol Voice: gameObject = <null>
+  var Run Check Obj: gameObject = <null>
+  var Self: gameObject = <null>
+  var Slash1: gameObject = _Scenery/Ruins Sentry 1 (1)/Slash1
+  var Slash2: gameObject = _Scenery/Ruins Sentry 1 (1)/Slash2
+  var Unalert Region Obj: gameObject = <null>
+}

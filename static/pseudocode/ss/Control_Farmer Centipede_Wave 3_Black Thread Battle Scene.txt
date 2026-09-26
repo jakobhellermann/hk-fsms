@@ -1,0 +1,404 @@
+# Control
+# 1 location(s):
+#   Greymoor_04 / Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede
+
+fsm Control {
+  start Pause
+  on MOORWING ROOSTING → Dig Ambush Ready  // from any state
+
+  state Init {
+    GetPosition2D(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    FindAlertRange(target=Self, storeResult=var "Battle Range", childName="Battle Range")
+    SetParent(gameObject=var "Battle Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    BoolTest(boolVariable=var "z Dig Ambush", isTrue=→"DIG", isFalse=(none), everyFrame=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep", equalEvent=→"CORPSE AMBUSH", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Patrol", equalEvent=→"PATROL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Rest
+    on CORPSE AMBUSH → Corpse Ready
+    on DIG → Dig Ambush Ready
+    on PATROL → Patrol Pause
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Rest {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlayInState(gameObject=var "Audio Loop Catching", volume=1)
+    ActivateGameObject(gameObject=var "Pt Rain", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+  }
+
+  state Startle {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=farmer_centipede_grunt (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Startle")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToStartle", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=farmer_centipede_notice_hero (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=slab_fly_large_cage_antic_or_attack_5 (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle Chase
+  }
+
+  state Idle Chase {
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    CheckAlertRange(alertRange=var "Battle Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"UNALERT", OutOfRangeDelay=0, everyFrame=true)
+    DistanceWalk(gameObject=Self, target=var "Hero", distance=9, speed=7, range=2, changeAnimation=true, spriteFacesRight=false, forwardAnimation="Walk F", backAnimation="Walk B")
+    PlayParticleEmitterInState(gameObject=var "Pt WalkDust")
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=true, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    SetBoolValueAtTime(BoolVariable=var "Can Turn", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=false)
+    BoolTestMulti(boolVariables=[var "Can Turn", var "Facing Hero"], boolStates=[true, false], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    FloatAdd(floatVariable=var "Attack Timer", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Attack Timer", minValue=0, maxValue=100, everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    FloatTestToBool(float1=var "Attack Timer", float2=0.75, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Attack Ready", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "In Attack Range", var "Attack Ready"], boolStates=[true, true], trueEvent=→"ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    WaitRandom(timeMin=1, timeMax=4, finishEvent=→"DIG", realTime=false)
+    AudioPlayInState(gameObject=var "Audio Loop Walk F", volume=1)
+    on TURN → Turn
+    on ATTACK → Choice
+    on SING → Sing
+    on DIG → Dig Teleport
+    on UNALERT → Dig Home
+  }
+
+  state Turn {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    FloatAdd(floatVariable=var "Attack Timer", add=1, everyFrame=true, perSecond=true)
+    SetBoolValue(boolVariable=var "Can Turn", boolValue=false, everyFrame=false)
+    on FINISHED → Idle Chase
+  }
+
+  state Attack Antic 1 {
+    RandomFloat(min=-0.5, max=-1, storeResult=var "Attack Timer")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=farmer_centipede_grunt (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetIntValue(intVariable=var "Stabs", intValue=2, everyFrame=false)
+    PlayAudioEvent(audioClip=farmer_centipede_jab_attack_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Attack Antic 2
+  }
+
+  state Attack Antic 2 {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=9, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    PlayParticleEmitterInState(gameObject=var "Pt WalkDust")
+    on FINISHED → Attack Antic 3
+  }
+
+  state Attack Antic 3 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitterInState(gameObject=var "Pt WalkDust")
+    on FINISHED → Attack 1
+  }
+
+  state Attack 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayParticleEmitterInState(gameObject=var "Pt WalkDust")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=farmer_centipede_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateGameObject(gameObject=var "Stab Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-40, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.925, decelerationY=(unset), brakeOnExit=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Run", volume=1, oneShotClip=<null>)
+    PlayAudioEventRandom(audioClips=[farmer_centipede_jab_attack_1 (sfxstatic_assets_areagreymoor.bundle), farmer_centipede_jab_attack_2 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Attack 2
+  }
+
+  state Attack 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayParticleEmitterInState(gameObject=var "Pt WalkDust")
+    ActivateGameObject(gameObject=var "Stab Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Attack 3
+  }
+
+  state Attack 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=(unset), brakeOnExit=false)
+    PlayParticleEmitterInState(gameObject=var "Pt WalkDust")
+    on FINISHED → Repeat?
+  }
+
+  state Repeat? {
+    IntAdd(intVariable=var "Stabs", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Stabs", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"REPEAT", everyFrame=false)
+    on REPEAT → Attack 1
+    on FINISHED → Combo Dig?
+  }
+
+  state Attack End {
+    AudioStop(gameObject=var "Audio Loop Run", fadeTime=0)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitterInState(gameObject=var "Pt WalkDust")
+    on FINISHED → End Turn?
+  }
+
+  state End Turn? {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=(none), notFacingEvent=→"TURN", facingBool=(unset), notFacingBool=(unset))
+    on TURN → Turn
+    on FINISHED → Idle Chase
+  }
+
+  state Sing {
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=farmer_centipede_sing (sfxdynamic_assets_areagreymoor.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.6, None=→"FINISHED", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlayInState(gameObject=var "Audio Loop Catching", volume=1)
+    PlayAudioEvent(audioClip=slab_fly_large_cage_antic_or_attack_4 (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=slab_fly_large_cage_antic_or_attack_3 (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle Chase
+  }
+
+  state Choice {
+    SendEvent(eventTarget=Self, sendEvent=→"LEAP", delay=0, everyFrame=false)  // disabled
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    SendRandomEventV4(events=[→"ATTACK", →"LEAP"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=var "No Dig")
+    SendRandomEventV4(events=[→"ATTACK", →"LEAP", →"DIG"], weights=[0.375, 0.375, 0.25], eventMax=[2, 2, 1], missedMax=[3, 3, 3], activeBool=(unset))
+    on ATTACK → Attack Antic 1
+    on DIG → Dig Teleport
+    on LEAP → Leap Antic
+    on SING → Sing
+  }
+
+  state Dig Teleport {
+    BoolTest(boolVariable=var "No Dig", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=farmer_centipede_grunt (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    RunFSM(fsmTemplateControl=template=-1012256769396014524 in[Go Home<-var "Go Home", Just Dig Out<-var "Just Dig Out", Start Pos<-(0, 0, 0, 0)], finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → Idle Chase
+    on CANCEL → Idle Chase
+  }
+
+  state Corpse Ready {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelSetZ())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    Tk2dSpriteSetColor(gameObject=Self, color=(0.5294118, 0.5294118, 0.5294118, 1), everyframe=false)
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")  // disabled
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)  // disabled
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on WAKE → Corpse Wake Pause
+    on BATTLE START → Corpse Wake Pause
+  }
+
+  state Corpse Wake Antic {
+    ObjectJitter(gameObject=Self, x=0.1, y=(unset), z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Corpse Thread
+  }
+
+  state Corpse Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=farmer_centipede_grunt (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SendMessage(gameObject=var "Threads", delivery=BroadcastMessage, options=1, functionCall=ThreadEnd())
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashArmoured())
+    ScreenFlash(flashColour=(1, 1, 1, 0.603))
+    ActivateGameObject(gameObject=var "Damage Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Z Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Clear Alert Range
+  }
+
+  state Corpse Wake Pause {
+    WaitRandom(timeMin=0, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Corpse Wake Antic
+  }
+
+  state Corpse Thread {
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="PlayPossess", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Corpse Wake
+  }
+
+  state Dig Home {
+    RunFSM(fsmTemplateControl=template=-1012256769396014524 in[Go Home<-var "Go Home", Just Dig Out<-var "Just Dig Out", Start Pos<-var "Start Pos"], finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → Rest
+  }
+
+  state Dig Ambush Ready {
+    SetLayer(gameObject=Self, layer=Terrain Detector(14))
+    SetMeshRenderer(gameObject=Self, active=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on BATTLE START → Ambush Antic
+    on MOORWING LEFT → Moorwing Reappear Pause
+    on WAKE → Ambush Antic
+  }
+
+  state Ambush Antic {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt DigEmerge", emit=0, resetIfPlaying=false)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_antic (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Ambush
+  }
+
+  state Ambush {
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Ambush Dig
+  }
+
+  state Ambush Dig {
+    RunFSM(fsmTemplateControl=template=-1012256769396014524 in[Go Home<-var "Go Home", Just Dig Out<-var "Just Dig Out", Start Pos<-(unset var)], finishEvent=→"FINISHED", everyFrame=false)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_antic (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=farmer_centipede_grunt (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Clear Alert Range
+  }
+
+  state Combo Dig? {
+    SendRandomEventV4(events=[→"DIG", →"FINISHED"], weights=[0.75, 0.25], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    on FINISHED → Attack End
+    on DIG → Attack To Dig
+  }
+
+  state Attack To Dig {
+    AudioStop(gameObject=var "Audio Loop Run", fadeTime=0)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Recover Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dig Teleport
+  }
+
+  state Moorwing Reappear Pause {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ambush Antic
+  }
+
+  state Leap Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=farmer_centipede_grunt (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leap Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=farmer_centipede_notice_hero (sfxstatic_assets_areagreymoor.bundle), pitchMin=1.15, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=farmer_centipede_jump_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1.15, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Leap
+  }
+
+  state Leap {
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    ActivateGameObject(gameObject=var "Leap Tail Box", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocityByScale(gameObject=Self, speed=55, ySpeed=25, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leap", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=1, storeAngle=var "Angle", pause=0.25, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Saver", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=bone_hunter_jump_back (sfxstatic_assets_areaant.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=farmer_centipede_in_air_throw_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.1, storePlayer=<null>)
+    on FINISHED → Throw
+  }
+
+  state Throw {
+    ClampAngleByScale(gameObject=Self, space=0, angleVariable=var "Angle", positiveMinValue=190, positiveMaxValue=250, negativeMinValue=290, negativeMaxValue=350, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=farmer_centipede_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SpawnObjectFromGlobalPool(gameObject=Centipede Farmer Projectile (localpoolprefabs_assets_areagreymoor.bundle), spawnPoint=var "Throw Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=35, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap Throw")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    SetVelocityByScale(gameObject=Self, speed=5, ySpeed=10, everyFrame=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)  // disabled
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)  // disabled
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    PlayAudioEvent(audioClip=trobbio_throw (sfxstatic_assets_trobbio.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"LAND", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on LAND → Land
+  }
+
+  state Land {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Shift", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    FloatMultiply(floatVariable=var "Shift", multiplyBy=-1, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Shift", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leap Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Saver", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=blade_spider_hang_land (sfxstatic_assets_areacoral.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → End Turn?
+  }
+
+  state Patrol Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Patrol
+  }
+
+  state Patrol {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=-6, ySpeed=(unset), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlayInState(gameObject=var "Audio Loop Walk F", volume=1)
+    PlayParticleEmitterInState(gameObject=var "Pt WalkDust")
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+  }
+
+  state Clear Alert Range {
+    SetFsmObject(gameObject=Self, fsmName="Control", variableName="Battle Range", setValue=<null>, everyFrame=false)
+    on FINISHED → Idle Chase
+  }
+
+  var No Dig: bool = false
+  var z Dig Ambush: bool = true
+
+  var Attack Timer: float = 0
+  var Z Pos: float = 0
+  var Gravity: float = 1
+  var Angle: float = 0
+  var Velocity Y: float = 0
+  var Shift: float = 0
+  var Stabs: int = 0
+  var Facing Hero: bool = false
+  var Can Turn: bool = false
+  var In Attack Range: bool = false
+  var Attack Ready: bool = false
+  var Battler: bool = false
+  var Clip: string = ""
+  var Start Pos: vector2 = (0, 0)
+  var Stab Hit 1: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Stab Hit 1
+  var Stab Hit 2: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Stab Hit 2
+  var Damage Collider: gameObject = <null>
+  var Self: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede
+  var Silk: gameObject = <null>
+  var Threads: gameObject = <null>
+  var Battle Range Obj: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Battle Range
+  var Pt DigEmerge: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Pt DigEmerge
+  var Leap Tail Box: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Leap Tail Box
+  var Throw Point: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Throw Point
+  var Projectile: gameObject = <null>
+  var Terrain Saver: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Terrain Saver
+  var Audio Loop Walk F: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Audio Loop Walk F
+  var Audio Loop Run: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Audio Loop Run
+  var Audio Loop Catching: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Audio Loop Catching
+  var Pt Rain: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Pt Rain
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Audio Loop Voice
+  var Pt WalkDust: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Pt WalkDust
+  var Pt ChargeDust: gameObject = Black Thread States Thread Only Variant/Black Thread World/Black Thread Battle Scene/Wave 3/Farmer Centipede/Pt ChargeDust
+  var Battle Range: object = <null>
+}

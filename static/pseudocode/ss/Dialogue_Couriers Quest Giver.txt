@@ -1,0 +1,259 @@
+# Dialogue
+# 1 location(s):
+#   Belltown / Couriers States/Here/Couriers Quest Giver
+
+fsm Dialogue {
+  start Init
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Spoken?
+  }
+
+  state Idle {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    TriggerEnterEventSubscribe(trigger=Couriers States/Here/Couriers Quest Giver/Enter Detector@TriggerEnterEvent, triggerEnteredEvent=(none), triggerExitedEvent=→"EXIT", triggerStayedEvent=(none))
+    on INTERACT → Has Met?
+    on EXIT → Wave
+  }
+
+  state Has Met? {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    PlayerDataVariableTest(VariableName="BelltownCouriersMet", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"NOT MET")
+    GetPlayerDataBool(boolName="BelltownCouriersMetAct3", storeValue=var "Test")
+    BoolTestMulti(boolVariables=[var "Is Act 3", var "Test"], boolStates=[true, false], trueEvent=→"ACT 3 MEET", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckIfCrestEquipped(Crest=Cursed (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"CURSED", falseEvent=(none), storeValue=(unset))
+    CallMethodProper(gameObject=Self, behaviour="SimpleQuestsShopOwner", methodName="IsAnyQuestInProgress", parameters=[], storeResult=var "Any In Progress", EveryFrame=false)
+    BoolTest(boolVariable=var "Any In Progress", isTrue=→"IN PROGRESS", isFalse=(none), everyFrame=false)
+    GetPlayerDataVariable(VariableName="BelltownCouriersTalkedGourmand", StoreValue=var "Talked Gourmand")
+    GetQuestState(IsAccepted=var "Gourmand Accepted", IsCompleted=var "Gourmand Completed", Quest=Great Gourmand (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    PlayerDataVariableTest(VariableName="BelltownCouriersBrokenDlgQueued", ExpectedValue=true, IsExpectedEvent=→"BROKEN", IsNotExpectedEvent=(none))
+    BoolTestMulti(boolVariables=[var "Gourmand Accepted", var "Gourmand Completed", var "Talked Gourmand"], boolStates=[true, false, false], trueEvent=→"GOURMAND", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on NOT MET → Meet
+    on ACT 3 MEET → Meet Act 3
+    on CURSED → Cursed
+    on GOURMAND → Gourmand
+    on FINISHED → Repeat
+    on IN PROGRESS → In Progress
+    on BROKEN → Broken
+  }
+
+  state Meet {
+    SetPlayerDataVariable(VariableName="BelltownCouriersMet", SetValue=true)
+    SetPlayerDataVariable(VariableName="BelltownCouriersMetAct3", SetValue=var "Is Act 3")
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Dlg", falseString="COURIER_SHOP_MEET", trueString="COURIER_SHOP_FIRST_MEET_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Gourmand
+  }
+
+  sequence state Shop? {
+    ShowNpcDialogueTitle(Target=Self)
+    SetBoolValue(boolVariable=var "Should Wave", boolValue=false, everyFrame=false)
+    CheckIfCrestEquipped(Crest=Cursed (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=→"CURSED", falseEvent=(none), storeValue=(unset))
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    OpenSimpleShopMenu(Target=Self, NoStockEvent=→"SHOP NO STOCK", CancelledEvent=→"SHOP CLOSED", PurchasedEvent=→"SHOP PURCHASED")
+    on CURSED → End Talk
+    on SHOP NO STOCK → Not Purchased
+    on SHOP CLOSED → Not Purchased
+    on SHOP PURCHASED → Begin Quest?
+  }
+
+  state Not Purchased {
+    BoolTest(boolVariable=var "Did Cancel Dlg", isTrue=→"CONVO_END", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Cancel Dlg", boolValue=true, everyFrame=false)
+    GetPlayerDataVariable(VariableName="BelltownCouriersNotPurchasedDlg", StoreValue=var "Test")
+    SetPlayerDataVariable(VariableName="BelltownCouriersNotPurchasedDlg", SetValue=true)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="COURIER_SHOP_NOTACCEPTED", trueString="COURIER_SHOP_NOTACCEPTED_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Talk
+  }
+
+  state End Talk {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Purchased {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="TimePasses", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Should Wave", boolValue=true, everyFrame=false)
+    GetProperty(targetProperty=SimpleQuestsShopOwner.QueuedPurchaseDlg on Couriers States/Here/Couriers Quest Giver@SimpleQuestsShopOwner, everyFrame=false)
+    RunDialogueV2(CustomText=var "Dlg", Sheet="", Key="", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → First Begin Dlg
+  }
+
+  state Repeat {
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Dlg", falseString="COURIER_SHOP_REPEAT", trueString="COURIER_SHOP_REPEAT_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Shop?
+  }
+
+  state In Progress {
+    IntAddWrapped(Value=var "In Progress Dlg Counter", AddValue=1, Min=1, Max=3, InclusiveMax=true, StoreResult=var "In Progress Dlg Counter")
+    FormatString(format="COURIER_SHOP_INPROGRESS_{0}", variables=[var "In Progress Dlg Counter"], storeResult=var "Dlg", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Talk
+  }
+
+  state Begin Quest? {
+    GetProperty(targetProperty=SimpleQuestsShopOwner.QueuedCustomDelivery on Couriers States/Here/Couriers Quest Giver@SimpleQuestsShopOwner, everyFrame=false)
+    ObjectCompare(objectVariable=var "Custom Delivery", compareTo=<null>, equalEvent=(none), notEqualEvent=→"ITEM", storeResult=(unset), everyFrame=false)
+    GetProperty(targetProperty=SimpleQuestsShopOwner.QueuedQuest on Couriers States/Here/Couriers Quest Giver@SimpleQuestsShopOwner, everyFrame=false)
+    QuestYesNo(Quest=var "Quest", YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on ITEM → Take Custom Delivery?
+    on NO → Shop?
+    on YES → Get Quest Item
+  }
+
+  state Start Asleep {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=var "Courier Short")
+    EnableBehaviour(gameObject=var "Courier Short", behaviour="HeroPerformanceSingReaction", component=<null>, enable=false, resetOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Courier Short", clipName="Short Sleeping", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=var "Courier Tall")
+    EnableBehaviour(gameObject=var "Courier Tall", behaviour="HeroPerformanceSingReaction", component=<null>, enable=false, resetOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Courier Tall", clipName="Tall Sleeping", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=(none), ActiveOuter=→"SING", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=Courier_sleep_duo (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on SING → Wake
+    on TINKED → Wake
+  }
+
+  state Wake {
+    SendEventByName(eventTarget=GameObjectFSM(var "Courier Short", fsm="Anim Runner"), sendEvent="PLAY WAKE", delay=0, everyFrame=false)
+    GetFsmBool(gameObject=var "Courier Short", fsmName="Anim Runner", variableName="Is Animating", storeValue=var "Is Short Animating", everyFrame=true)
+    SendEventByName(eventTarget=GameObjectFSM(var "Courier Tall", fsm="Anim Runner"), sendEvent="PLAY WAKE", delay=0, everyFrame=false)
+    GetFsmBool(gameObject=var "Courier Tall", fsmName="Anim Runner", variableName="Is Animating", storeValue=var "Is Tall Animating", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Is Short Animating", var "Is Tall Animating"], boolStates=[false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    PlayRandomAudioClipTableV3(Table=Courier_alert_duo (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    on FINISHED → Enable Sing Performance
+  }
+
+  state Start State? {
+    SendRandomEvent(events=[→"SLEEP", →"FINISHED"], weights=[0.2, 0.8], delay=0)
+    on SLEEP → Start Asleep
+    on FINISHED → Idle
+  }
+
+  state Wave {
+    BoolTest(boolVariable=var "Should Wave", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Should Wave", boolValue=false, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Courier Short", fsm="Anim Runner"), sendEvent="PLAY WAVE", delay=0, everyFrame=false)
+    GetFsmBool(gameObject=var "Courier Short", fsmName="Anim Runner", variableName="Is Animating", storeValue=var "Is Short Animating", everyFrame=true)
+    BoolTest(boolVariable=var "Is Short Animating", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Idle
+  }
+
+  state Spoken? {
+    PlayerDataVariableTest(VariableName="BelltownCouriersMet", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"NOT MET")
+    on NOT MET → Idle Wait
+    on FINISHED → Start State?
+  }
+
+  state Idle Wait {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    SetBoolValue(boolVariable=var "Should Wave", boolValue=true, everyFrame=false)
+    TriggerEnterEventSubscribe(trigger=Couriers States/Here/Couriers Quest Giver/Exit Detector@TriggerEnterEvent, triggerEnteredEvent=→"ENTER", triggerExitedEvent=(none), triggerStayedEvent=(none))
+    on ENTER → Wave
+  }
+
+  state Get Quest Item {
+    GetQuestInfo(TargetCount=var "Target Count", CurrentCount=(unset), Quest=var "Quest")
+    SavedItemGetV2(Item=var "Quest", Amount=var "Target Count", ShowPopup=false)
+    SetDeathRespawnMarker(Target=var "Set Respawn Marker")
+    on FINISHED → Purchased
+  }
+
+  state Cursed {
+    GetPlayerDataVariable(VariableName="BelltownCouriersTalkedCursed", StoreValue=var "Test")
+    SetPlayerDataVariable(VariableName="BelltownCouriersTalkedCursed", SetValue=true)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="COURIER_SHOP_CURSED_TALK_1", trueString="COURIER_SHOP_CURSED_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Talk
+  }
+
+  state Gourmand {
+    CheckQuestStateV2(NotTrackedEvent=→"CANCEL", IncompleteEvent=(none), CompletedEvent=→"CANCEL", Quest=Great Gourmand (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    SetPlayerDataVariable(VariableName="BelltownCouriersTalkedGourmand", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="COURIER_SHOP_MENTION_GOURMAND", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Shop?
+    on CONVO_END → Shop?
+  }
+
+  state Take Custom Delivery? {
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=(unset), IsCollected=(none), NotCollected=(none), ItemName=var "Item Name", Sprite=var "", Item=var "Custom Delivery")
+    GetLocalisedString(Cell={Sheet="UI", Key="TAKE_ITEM_PROMPT"}, StoreString=var "Dlg")
+    FormatString(format=var "Dlg", variables=[var "Item Name"], storeResult=var "Dlg", everyFrame=false)
+    DialogueYesNoV3(Text=var "Dlg", TranslationSheet="", TranslationKey="", UseCurrency=false, CurrencyCost=0, CurrencyType=0, ConsumeCurrency=false, WillGetItem=var "Custom Delivery", YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on NO → Shop?
+    on YES → Custom Item Count
+  }
+
+  state Get Custom Item {
+    SavedItemGetV2(Item=var "Custom Delivery", Amount=var "Target Count", ShowPopup=false)
+    SetDeathRespawnMarker(Target=var "Set Respawn Marker")
+    on FINISHED → Purchased
+  }
+
+  state Custom Item Count {
+    SetIntValue(intVariable=var "Target Count", intValue=1, everyFrame=false)
+    SetObjectValue(objectVariable=var "Custom Delivery Standalone", objectValue=var "Custom Delivery", everyFrame=false)
+    ObjectCompare(objectVariable=var "Custom Delivery Standalone", compareTo=<null>, equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    GetProperty(targetProperty=DeliveryQuestItemStandalone.TargetCount on var "Custom Delivery Standalone", everyFrame=false)
+    on FINISHED → Get Custom Item
+  }
+
+  state Broken {
+    SetPlayerDataVariable(VariableName="BelltownCouriersBrokenDlgQueued", SetValue=false)
+    GetPlayerDataVariable(VariableName="BelltownCouriersBrokenDlg", StoreValue=var "Test")
+    SetPlayerDataVariable(VariableName="BelltownCouriersBrokenDlg", SetValue=true)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="COURIER_SHOP_BROKEN", trueString="COURIER_SHOP_BROKEN_SHORT", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Shop?
+  }
+
+  state First Begin Dlg {
+    Comment(comment="Should always play first delivery line if not seen")
+    ObjectCompare(objectVariable=var "Custom Delivery", compareTo=Courier Supplies Gourmand (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle), equalEvent=→"CONVO_END", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    PlayerDataVariableTest(VariableName="BelltownCouriersFirstBeginDlg", ExpectedValue=true, IsExpectedEvent=→"CONVO_END", IsNotExpectedEvent=(none))
+    SetPlayerDataVariable(VariableName="BelltownCouriersFirstBeginDlg", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="COURIER_SHOP_FIRSTDELIVERY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Talk
+  }
+
+  state Enable Sing Performance {
+    EnableBehaviour(gameObject=var "Courier Short", behaviour="HeroPerformanceSingReaction", component=<null>, enable=true, resetOnExit=false)
+    EnableBehaviour(gameObject=var "Courier Tall", behaviour="HeroPerformanceSingReaction", component=<null>, enable=true, resetOnExit=false)
+    on FINISHED → Idle
+  }
+
+  state Meet Act 3 {
+    SetPlayerDataVariable(VariableName="BelltownCouriersMetAct3", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="COURIER_SHOP_MEET_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Shop?
+  }
+
+  var Set Respawn Marker: gameObject = RestBench
+
+  var Target Count: int = 0
+  var In Progress Dlg Counter: int = 0
+  var Any In Progress: bool = false
+  var Is Short Animating: bool = false
+  var Is Tall Animating: bool = false
+  var Should Wave: bool = false
+  var Test: bool = false
+  var Talked Gourmand: bool = false
+  var Gourmand Accepted: bool = false
+  var Gourmand Completed: bool = false
+  var Did Cancel Dlg: bool = false
+  var Is Act 3: bool = false
+  var Dlg: string = ""
+  var Item Name: string = ""
+  var Courier Short: gameObject = Couriers States/Here/Couriers Quest Giver/Courier Short
+  var Courier Tall: gameObject = Couriers States/Here/Couriers Quest Giver/Courier Tall
+  var Audio Loop Voice: gameObject = Couriers States/Here/Couriers Quest Giver/Courier Short/Audio Loop Voice
+  var Quest: object = <null>
+  var Custom Delivery: object = <null>
+  var Custom Delivery Standalone: object = <null>
+}

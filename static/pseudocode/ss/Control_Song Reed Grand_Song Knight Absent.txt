@@ -1,0 +1,549 @@
+# Control
+# 1 location(s):
+#   Song_25 / Song Knight Control/Song Knight Absent/Song Reed Grand
+
+fsm Control {
+  start Init
+
+  state Init {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetParent(gameObject=var "Start Marker", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindAlertRange(target=Self, storeResult=var "Battle Range", childName="Battle Range")
+    SetParent(gameObject=var "Battle Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Set Rest Type
+  }
+
+  state Idle {
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    RandomBool(storeResult=var "Will Block")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Block Range", storeResult=var "In Block Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "In Block Range", var "Will Block", var "Has Custom Target"], boolStates=[true, true, false], trueEvent=→"BLOCK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on FINISHED → Sing Check
+    on BLOCK → Block
+  }
+
+  state Set Rest Type {
+    RandomlyFlipScale(gameObject=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest 1")
+    ActivateGameObject(gameObject=var "Cobweb1", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cobweb2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetStringValue(stringVariable=var "Wake Anim", stringValue="Wake 1", everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.5, 0.5], delay=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest 2")
+    SetStringValue(stringVariable=var "Wake Anim", stringValue="Wake 2", everyFrame=false)
+    ActivateGameObject(gameObject=var "Cobweb1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cobweb2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Rest
+  }
+
+  state Rest {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=true)  // disabled
+    PreventInvincibleEffect(target=Self, preventEffect=true)  // disabled
+    GameObjectIsNull(gameObject=var "Custom Target", isNull=(none), isNotNull=→"CUSTOM TARGET", storeResult=(unset), everyFrame=false)
+    SetGameObject(variable=var "Target", gameObject=var "Hero", everyFrame=false)
+    on WAKE → First Wake?
+    on TOOK DAMAGE → First Wake?
+    on BLACK CORE ENGAGED → First Wake?
+    on CUSTOM TARGET → Custom Setup
+  }
+
+  state Wake {
+    ActivateGameObject(gameObject=var "Rest Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Wake Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegisterV2(EventName="GRAND REED WAKE", ExcludeTarget=Self)
+    SetBoolValue(boolVariable=var "Other Woken", boolValue=false, everyFrame=false)
+    PlayAudioEvent(audioClip=song_reed_grand_notice_hero (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PreventInvincibleEffect(target=Self, preventEffect=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HANDMAIDEN CALL", delay=0, everyFrame=false)
+    on FINISHED → Roar?
+  }
+
+  state Attack Choice {
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SendEvent(eventTarget=Self, sendEvent=→"SLASH", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"JUMP ATTACK", →"EVADE", →"CAST", →"SLASH"], weights=[0.35, 0.3, 0.3, 0.3], eventMax=[2, 1, 1, 2], missedMax=[4, 4, 4, 4], activeBool=var "Has Custom Target")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Other Woken", isTrue=→"OTHER WAKE", isFalse=(none), everyFrame=true)
+    CheckAlertRange(alertRange=var "Battle Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"UNALERT", OutOfRangeDelay=0, everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Jump Range", storeResult=var "In Jump Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    SendRandomEventV4(events=[→"JUMP ATTACK", →"EVADE", →"CAST"], weights=[0.35, 0.35, 0.3], eventMax=[2, 2, 2], missedMax=[3, 3, 3], activeBool=var "In Jump Range")
+    SendRandomEventV4(events=[→"JUMP ATTACK", →"SLASH", →"CAST"], weights=[0.35, 0.4, 0.3], eventMax=[2, 2, 1], missedMax=[3, 3, 4], activeBool=(unset))
+    on SLASH → Set Slash
+    on JUMP ATTACK → Set Jump Attack
+    on CAST → Set Cast
+    on UNALERT → Unalert Pause
+    on OTHER WAKE → Return Antic
+    on EVADE → Crawl B Antic
+  }
+
+  state Slash Antic {
+    SetBoolValue(boolVariable=var "Triple Slash", boolValue=false, everyFrame=false)  // disabled
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_mid_grunt (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetVelocityByScale(gameObject=Self, speed=20, ySpeed=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slash Antic")
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=song_reed_grand_stab_attack_antic (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 1
+  }
+
+  state Slash 1 {
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Alt", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=song_reed_grand_stab_attack_1 (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocityByScale(gameObject=Self, speed=-50, ySpeed=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=false)
+    on FINISHED → Slash 2
+  }
+
+  state Slash 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=true)
+    on FINISHED → Triple?
+  }
+
+  state Triple? {
+    BoolTest(boolVariable=var "Triple Slash", isTrue=→"SLASH", isFalse=(none), everyFrame=false)
+    on FINISHED → Slash Recover
+    on SLASH → High Slash Antic
+  }
+
+  state High Slash 1 {
+    SetBoolValue(boolVariable=var "Triple Slash", boolValue=false, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=song_reed_grand_stab_attack_2 (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → High Slash 2
+  }
+
+  state High Slash 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Slash Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state High Slash Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Repeat Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → High Slash 1
+  }
+
+  state Slash Repeat Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Repeat Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Slash 1
+  }
+
+  state Block {
+    SendRandomEventV4(events=[→"EVADE", (none)], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Block")
+    PlayAudioEvent(audioClip=song_reed_grand_defence_block_stance (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)
+    DirectionalInvincibility(target=Self, xPositiveDirection=8, xNegativeDirection=9)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    CheckPassedTarget(Self=Self, Target=var "Target", IsActive=true, DefaultFacingRight=false, DistancePast=0.1, StoreResult=(unset), PassedEvent=→"FINISHED", NotPassedEvent=(none), EveryFrame=true)
+    on BLOCKED HIT → Block Hit
+    on FINISHED → Block End
+    on EVADE → Crawl B Antic
+  }
+
+  state Block Hit {
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Block Hit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Triple Slash", boolValue=true, everyFrame=false)
+    on FINISHED → Block Response
+  }
+
+  state Set Slash {
+    SetFloatValue(floatVariable=var "Min Distance", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Max Distance", floatValue=8, everyFrame=false)
+    SetStringValue(stringVariable=var "Attack Event", stringValue="SLASH", everyFrame=false)
+    on FINISHED → Move Choice
+  }
+
+  state Move Choice {
+    GetDistance(gameObject=Self, target=var "Target", storeResult=var "Distance", everyFrame=false)
+    FloatInRange(floatVariable=var "Distance", lowerValue=var "Min Distance", upperValue=var "Max Distance", boolVariable=(unset), trueEvent=→"FINISHED", falseEvent=(none), everyFrame=false)
+    FloatTestToBool(float1=var "Distance", float2=var "Max Distance", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Beyond Max Range", everyFrame=false)
+    FloatInRange(floatVariable=var "Distance", lowerValue=6, upperValue=13, boolVariable=var "In Hop Range", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Beyond Max Range", var "In Hop Range"], boolStates=[true, true], trueEvent=→"HOP", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Beyond Max Range", var "In Hop Range"], boolStates=[true, false], trueEvent=→"CRAWL F", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent=var "Attack Event", delay=0, everyFrame=false)
+    on SLASH → Slash Antic
+    on HOP → Hop Antic
+    on CRAWL F → Crawl F Antic
+    on JUMP ATTACK → Jump Antic
+    on CAST → Cast Antic
+  }
+
+  state Hop Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hop Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hop
+  }
+
+  state Hop {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hop F", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-22, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=1, decelerationY=(unset), brakeOnExit=true)
+    SetBoolValueAtTime(BoolVariable=var "Ready", BoolValue=true, Time=0.1, SetOppositeOnStateEntry=true)
+    GetDistance(gameObject=Self, target=var "Target", storeResult=var "Distance", everyFrame=true)
+    PlayAudioEvent(audioClip=song_reed_grand_hop (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FloatTestToBool(float1=var "Distance", float2=6.5, tolerance=0, equalBool=(unset), lessThanBool=var "Close Range", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Ready", var "Close Range"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    on FINISHED → Now In Range?
+  }
+
+  state Crawl F Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Crawl Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=song_reed_grand_notice_hero (sfxstatic_assets_areasong.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_short_grunt (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Crawl F
+  }
+
+  state Crawl F {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Crawl F")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=-19.5, ySpeed=(unset), everyFrame=false)  // disabled
+    AccelerateToXByScale(gameObject=Self, accelerationFactor=1, targetSpeed=-19.5)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatOperator(float1=var "Max Distance", float2=1.5, operation=Subtract, storeResult=var "Crawl Max Distance", everyFrame=false)
+    FloatInRange(floatVariable=var "Distance", lowerValue=var "Min Distance", upperValue=var "Crawl Max Distance", boolVariable=(unset), trueEvent=→"FINISHED", falseEvent=(none), everyFrame=true)
+    AudioPlayInState(gameObject=var "Run Loop", volume=1)
+    CheckPassedTarget(Self=Self, Target=var "Target", IsActive=true, DefaultFacingRight=false, DistancePast=0, StoreResult=(unset), PassedEvent=→"FINISHED", NotPassedEvent=(none), EveryFrame=true)
+    CheckAlertRange(alertRange=var "Battle Range", storeResult=var "In Battle Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Has Custom Target", var "In Battle Range"], boolStates=[false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    PlayParticleEmitterInState(gameObject=var "Pt ChargeDust")
+    on FINISHED → Crawl F Recover
+  }
+
+  state Crawl F Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Crawl Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=song_pilgrim_03_to_attack_stance_from_chilled (sfxstatic_assets_areasong.bundle), pitchMin=0.9, pitchMax=0.9, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Now In Range?
+  }
+
+  state Now In Range? {
+    GetDistance(gameObject=Self, target=var "Target", storeResult=var "Distance", everyFrame=false)
+    FloatInRange(floatVariable=var "Distance", lowerValue=var "Min Distance", upperValue=var "Max Distance", boolVariable=(unset), trueEvent=(none), falseEvent=→"CANCEL", everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent=var "Attack Event", delay=0, everyFrame=false)
+    on SLASH → Slash Antic
+    on CANCEL → Attack Choice
+    on JUMP ATTACK → Jump Antic
+    on CAST → Cast Antic
+  }
+
+  state Block End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Block End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Choice
+  }
+
+  state Set Jump Attack {
+    SetFloatValue(floatVariable=var "Min Distance", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Max Distance", floatValue=15, everyFrame=false)
+    SetStringValue(stringVariable=var "Attack Event", stringValue="JUMP ATTACK", everyFrame=false)
+    on FINISHED → Move Choice
+  }
+
+  state Jump Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Jump Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_short_grunt (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Jump
+  }
+
+  state Jump {
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Target X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Offset", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "X Offset", multiplyBy=12, everyFrame=false)
+    FloatAdd(floatVariable=var "Target X", add=var "X Offset", everyFrame=false, perSecond=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Target X", float2=var "Self X", operation=Subtract, storeResult=var "Jump X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.5, everyFrame=false)
+    FloatClamp(floatVariable=var "Jump X", minValue=-20, maxValue=20, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Jump")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=25, everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=song_reed_grand_jump (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Fly
+  }
+
+  state Fly {
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    DistanceFlyHorizontal(gameObject=Self, target=var "Target", distance=4.5, startY=0, floorDistance=8.5, yDistanceAllowance=1, speedMax=10.5, acceleration=0.75, stayLeft=false, stayRight=false, dontAffectY=false)
+    SetBoolValueAtTime(BoolVariable=var "Ready", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=true)
+    GetXDistance(gameObject=Self, target=var "Target", storeResult=var "Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=4, tolerance=0, equalBool=(unset), lessThanBool=var "In Stomp Range", greaterThanBool=(unset), everyFrame=true)
+    CheckPassedTarget(Self=Self, Target=var "Target", IsActive=true, DefaultFacingRight=false, DistancePast=0.1, StoreResult=var "Passed Hero", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "In Stomp Range", var "Ready"], boolStates=[true, true], trueEvent=→"JUMP ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Passed Hero", var "Ready"], boolStates=[true, true], trueEvent=→"JUMP ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Battle Range", storeResult=var "In Battle Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "In Battle Range", var "Ready"], boolStates=[false, true], trueEvent=→"JUMP ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    PlayAudioEvent(audioClip=song_reed_grand_wings_deploy (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlaySimple(gameObject=var "Fly Loop", volume=1, oneShotClip=<null>)
+    on JUMP ATTACK → Stomp Antic
+  }
+
+  state Stomp Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_mid_grunt (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    DistanceFlyHorizontal(gameObject=Self, target=var "Target", distance=4.5, startY=0, floorDistance=9.5, yDistanceAllowance=1, speedMax=5, acceleration=0.75, stayLeft=false, stayRight=false, dontAffectY=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stomp Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.88, brakeOnExit=false)
+    PlayAudioEvent(audioClip=song_reed_grand_stab_attack_antic (sfxstatic_assets_areasong.bundle), pitchMin=0.8, pitchMax=0.8, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Stomp
+  }
+
+  state Stomp {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stomp")
+    SetVelocityByScale(gameObject=Self, speed=-40, ySpeed=-60, everyFrame=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    AudioStop(gameObject=var "Fly Loop", fadeTime=0)
+    PlayAudioEvent(audioClip=song_reed_grand_dive_attack (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on LAND → Stomp Land
+  }
+
+  state Stomp Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stomp Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=2, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    ActivateGameObject(gameObject=var "down_slam_generic", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt LandDust", emit=0, resetIfPlaying=false)
+    on FINISHED → Crawl B
+  }
+
+  state Crawl B Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Crawl Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=28, ySpeed=(unset), everyFrame=false)  // disabled
+    AccelerateToXByScale(gameObject=Self, accelerationFactor=1.5, targetSpeed=20)
+    PlayAudioEvent(audioClip=song_reed_grand_notice_hero (sfxstatic_assets_areasong.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_short_grunt (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Crawl B
+  }
+
+  state Crawl B {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt ChargeDust")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Crawl B")
+    AccelerateToXByScale(gameObject=Self, accelerationFactor=1.5, targetSpeed=20)
+    SetVelocityByScale(gameObject=Self, speed=5, ySpeed=(unset), everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayInState(gameObject=var "Run Loop", volume=1)
+    on FINISHED → Crawl B Recover
+  }
+
+  state Crawl B Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Crawl Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=song_pilgrim_03_to_attack_stance_from_chilled (sfxstatic_assets_areasong.bundle), pitchMin=0.9, pitchMax=0.9, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Restart Idle
+  }
+
+  state Set Cast {
+    CheckIsBlackThreaded(Target=Self, TrueEvent=→"CANCEL", FalseEvent=(none), StoreValue=(unset), EveryFrame=false)
+    SetFloatValue(floatVariable=var "Min Distance", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Max Distance", floatValue=8, everyFrame=false)
+    SetStringValue(stringVariable=var "Attack Event", stringValue="CAST", everyFrame=false)
+    on FINISHED → Move Choice
+    on CANCEL → Attack Choice
+  }
+
+  state Cast Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=song_reed_grand_silk_sphere_antic (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_mid_grunt (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Cast
+  }
+
+  state Cast {
+    Wait(time=1.25, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "grand_reed_spell_sphere", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "grand_reed_spell_sphere", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Focus Blast", audioClip=song_reed_grand_silk_sphere_attack (sfxstatic_assets_areasong.bundle), pitchMin=1.15, pitchMax=1.15, volume=1, delay=0.7, storePlayer=<null>)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_mid_grunt (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Cast Recover
+  }
+
+  state Cast Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Unalert Pause {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Battle Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=false)
+    CheckAlertRange(alertRange=var "Battle Range", storeResult=(unset), InRangeEvent=→"WAKE", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"WAKE", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on WAKE → Attack Choice
+    on TOOK DAMAGE → Attack Choice
+    on FINISHED → Return Antic
+  }
+
+  state Return Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Crawl Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_short_grunt (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Start Marker", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Return
+  }
+
+  state Return {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Crawl B")
+    AccelerateToXByScale(gameObject=Self, accelerationFactor=1.5, targetSpeed=25)
+    AudioPlayInState(gameObject=var "Run Loop", volume=1)
+    CheckPassedTarget(Self=Self, Target=var "Start Marker", IsActive=true, DefaultFacingRight=true, DistancePast=0, StoreResult=(unset), PassedEvent=→"FINISHED", NotPassedEvent=(none), EveryFrame=true)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"R", negativeEvent=→"L", space=0)  // disabled
+    on FINISHED → Return End
+  }
+
+  state Return End {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetStringValue(stringVariable=var "Wake Anim", stringValue="Startle", everyFrame=false)
+    on FINISHED → Rest
+  }
+
+  state First Wake? {
+    BoolTest(boolVariable=var "Did Wake", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)  // disabled
+    PlayParticleEmitter(gameObject=var "Pt LandDust", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Pt WakeDust", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Cobweb1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cobweb2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=mushroom_brawler_projectile_hit_steamless (sfxstatic_assets_areaswamp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Wake
+  }
+
+  state Block Response {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Above Range", storeResult=false, sendEvent="EVADE", outOfRangeEvent="FINISHED", everyFrame=false)
+    on FINISHED → Slash Antic
+    on EVADE → Crawl B Antic
+  }
+
+  state Roar? {
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    BoolTest(boolVariable=var "Did Wake", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Wake", boolValue=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wake Roar")
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grand_reed_wake (sfxdynamic_assets_areahangareasong.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    StartRoarEmitter(spawnPoint=var "Roar Point", delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Idle
+  }
+
+  state Custom Setup {
+    SetBoolValue(boolVariable=var "Has Custom Target", boolValue=true, everyFrame=false)
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)  // disabled
+    ActivateGameObject(gameObject=var "Rest Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Other Woken", boolValue=false, everyFrame=false)
+    PreventInvincibleEffect(target=Self, preventEffect=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetBoolValue(boolVariable=var "Did Wake", boolValue=true, everyFrame=false)
+    SetGameObject(variable=var "Target", gameObject=var "Custom Target", everyFrame=false)
+    ActivateGameObject(gameObject=var "Cobweb1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cobweb2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Sing {
+    PlayAudioEvent(audioClip=song_reed_grand_jump (sfxstatic_assets_areasong.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=grand_reed_sing (sfxdynamic_assets_areahangareasong.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    PlayAudioEvent(audioClip=song_reed_grand_defence_block_stance (sfxstatic_assets_areasong.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Sing Check {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    on FINISHED → Attack Choice
+    on SING → Sing
+  }
+
+  state Restart Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Sing Check
+  }
+
+  var Cobwebs: gameObject = <null>
+  var Custom Target: gameObject = <null>
+
+  var Min Distance: float = 0
+  var Max Distance: float = 0
+  var Distance: float = 0
+  var Jump X: float = 36.53
+  var Self X: float = 0
+  var Target X: float = 0
+  var X Offset: float = 0
+  var Crawl Max Distance: float = 0
+  var Start X: float = 0
+  var Triple Slash: bool = false
+  var Will Block: bool = false
+  var In Block Range: bool = false
+  var Beyond Max Range: bool = false
+  var In Hop Range: bool = false
+  var Ready: bool = false
+  var Close Range: bool = false
+  var In Stomp Range: bool = false
+  var Passed Hero: bool = false
+  var In Battle Range: bool = false
+  var Other Woken: bool = false
+  var Did Wake: bool = false
+  var In Jump Range: bool = false
+  var Has Custom Target: bool = false
+  var Wake Anim: string = ""
+  var Attack Event: string = ""
+  var Battle Range Obj: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Battle Range
+  var Cobweb1: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Cobweb1
+  var Fly Loop: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Fly Loop
+  var Focus Blast: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Focus Blast
+  var Pt LandDust: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Pt LandDust
+  var Pt WakeDust: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Pt WakeDust
+  var Rest Collider: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Rest Collider
+  var Roar Point: gameObject = <null>
+  var Run Loop: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Run Loop
+  var Self: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand
+  var Slam Effect: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Slam Effect
+  var Slash Collider 1: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Slash Collider 1
+  var Slash Collider 2: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Slash Collider 2
+  var Start Marker: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Start Marker
+  var Target: gameObject = <null>
+  var down_slam_generic: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/down_slam_generic
+  var grand_reed_spell_sphere: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/grand_reed_spell_sphere
+  var Cobweb2: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Cobweb2
+  var Audio Loop Voice: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Audio Loop Voice
+  var Pt ChargeDust: gameObject = Song Knight Control/Song Knight Absent/Song Reed Grand/Pt ChargeDust
+  var Battle Range: object = <null>
+}

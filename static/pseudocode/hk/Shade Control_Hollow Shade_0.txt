@@ -1,0 +1,573 @@
+# Shade Control
+# 1 location(s):
+#   resources.assets / Hollow Shade:0
+
+fsm Shade Control {
+  start Pause
+  on ZERO HP → Killed  // from any state
+  on HERO LEAVE → Depart  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetHero(storeResult=var "Hero")
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="shadeFireballLevel", storeValue=var "Fireball Level")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="shadeQuakeLevel", storeValue=var "Quake Level")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="shadeScreamLevel", storeValue=var "Scream Level")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="shadeMP", storeValue=var "SP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="shadeHealth", storeValue=var "HP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="nailDamage", storeValue=var "nailDamage")
+    IntOperator(integer1=var "nailDamage", integer2=var "HP", operation=Multiply, storeResult=var "HP", everyFrame=false)
+    SetHP(target=Self, hp=var "HP")
+    FindChild(gameObject=Self, childName="Alert Range New", storeResult=var "Alerter")
+    FindChild(gameObject=Self, childName="Charge Particles", storeResult=var "Charge Effect")
+    FindChild(gameObject=Self, childName="Shade Particles", storeResult=var "Shade Particles")
+    FindChild(gameObject=Self, childName="Retreat Particles", storeResult=var "Retreat Particles")
+    FindChild(gameObject=Self, childName="Reform Particles", storeResult=var "Reform Particles")
+    FindChild(gameObject=Self, childName="Quake Blast", storeResult=var "Quake Blast")
+    FindChild(gameObject=Self, childName="Quake Hit", storeResult=var "Quake Hit")
+    FindChild(gameObject=Self, childName="Quake Pillar", storeResult=var "Quake Pillar")
+    FindChild(gameObject=Self, childName="Quake Particles", storeResult=var "Quake Particles")
+    FindChild(gameObject=Self, childName="Scream Blast", storeResult=var "Scream Blast")
+    FindChild(gameObject=Self, childName="Scream Hit", storeResult=var "Scream Hit")
+    FindChild(gameObject=Self, childName="Music Control", storeResult=var "Music Control")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHADE PRESENT", delay=0, everyFrame=false)
+    on FINISHED → Special Type
+  }
+
+  state Idle {
+    BoolTest(boolVariable=var "Friendly", isTrue=→"FRIENDLY", isFalse=(none), everyFrame=false)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+    on FRIENDLY → Friendly Idle
+  }
+
+  state Startle {
+    BoolTest(boolVariable=var "Friendly", isTrue=→"FRIENDLY", isFalse=(none), everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hollow_shade_startle, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fly
+    on FRIENDLY → Friendly Idle
+  }
+
+  state Fly {
+    SetAudioClip(gameObject=Self, audioClip=hollow_shade_fly)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    ChaseObject(gameObject=Self, target=var "Hero", speedMax=4, acceleration=0.2, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)
+    WaitRandom(timeMin=1, timeMax=2, finishEvent=→"ATTACK", realTime=false)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=4, accelerationForce=8, offsetX=0, offsetY=0)
+    GetPosition(gameObject=Self, vector=var "Current Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=true)
+    DistanceBetweenPoints(distanceResult=var "Distance From Start", point1=var "Current Pos", point2=var "Start Pos", ignoreZ=true, everyFrame=true)
+    FloatCompare(float1=var "Distance From Start", float2=var "Max Roam", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETREAT", everyFrame=true)
+    on ATTACK → Quake?
+    on RETREAT → Retreat Start
+  }
+
+  state Attack Choice {
+    SendRandomEvent(events=[→"FIREBALL", →"SLASH"], weights=[0.2, 0.8], delay=0)
+    on SLASH → Q Other?
+    on FIREBALL → Sp Check
+  }
+
+  state Position {
+    BoolAllTrue(boolVariables=[var "Quake Range", var "Will Quake"], sendEvent=→"QUAKE", storeResult=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Scream Range", var "Will Scream"], sendEvent=→"SCREAM", storeResult=(unset), everyFrame=false)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=3, speedMax=4, acceleration=0.2, targetsHeight=true, height=0)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Shade Y", z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Hero Y", float2=var "Shade Y", tolerance=0.2, equalBool=var "Same Y", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=5, tolerance=0, equalBool=(unset), lessThanBool=var "In Slash Range", greaterThanBool=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "In Slash Range", var "Same Y"], boolStates=[true, true], trueEvent=→"ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    GetPosition(gameObject=Self, vector=var "Current Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=true)
+    DistanceBetweenPoints(distanceResult=var "Distance From Start", point1=var "Current Pos", point2=var "Start Pos", ignoreZ=true, everyFrame=true)
+    FloatCompare(float1=var "Distance From Start", float2=var "Max Roam", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETREAT", everyFrame=true)
+    Wait(time=6, finishEvent=→"END", realTime=false)
+    on ATTACK → Slash Antic
+    on RETREAT → Retreat Start
+    on QUAKE → Quake Antic
+    on SCREAM → Scream Antic
+    on END → Quake?
+  }
+
+  state Slash Antic {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hollow_shade_sword, pitchMin=1, pitchMax=0.85, volume=1.15, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DistanceFly(gameObject=Self, target=var "Hero", distance=3, speedMax=4, acceleration=0.2, targetsHeight=true, height=0)
+    on FINISHED → Check Dir
+  }
+
+  state Slash {
+    ActivateGameObject(gameObject=var "Slash", activate=true, recursive=true, resetOnExit=false, everyFrame=false)
+    SetPolygonCollider(gameObject=var "Slash", active=true)
+    Tk2dPlayAnimation(gameObject=var "Slash", animLibName="", clipName="Slash Effect")
+    Tk2dPlayFrame(gameObject=var "Slash", frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.083, finishEvent=→"SLASH", realTime=false)
+    on SLASH → Slash Box
+  }
+
+  state Slash CD {
+    ActivateGameObject(gameObject=var "Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash CD", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fly
+  }
+
+  state Slash Box {
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetPolygonCollider(gameObject=var "Slash", active=false)
+    on FINISHED → Slash CD
+  }
+
+  state Check Dir {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Scale", float2=0, tolerance=0, equal=(none), lessThan=→"RIGHT", greaterThan=→"LEFT", everyFrame=false)
+    on RIGHT → Right
+    on LEFT → Left
+  }
+
+  state Right {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=8, y=(unset), everyFrame=false)
+    on FINISHED → Slash
+  }
+
+  state Left {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-8, y=(unset), everyFrame=false)
+    on FINISHED → Slash
+  }
+
+  state Fireball Pos {
+    IntOperator(integer1=var "SP", integer2=1, operation=Subtract, storeResult=var "SP", everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Shade Particles", emissionRate=900, everyFrame=false)  // disabled
+    DistanceFly(gameObject=Self, target=var "Hero", distance=12, speedMax=4, acceleration=0.2, targetsHeight=true, height=0)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Shade Y", z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Hero Y", float2=var "Shade Y", tolerance=0.2, equalBool=var "Same Y", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=12, tolerance=1, equalBool=var "In Slash Range", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "In Slash Range", var "Same Y"], boolStates=[true, true], trueEvent=→"ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    Wait(time=3, finishEvent=→"ATTACK", realTime=false)
+    GetPosition(gameObject=Self, vector=var "Current Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=true)
+    DistanceBetweenPoints(distanceResult=var "Distance From Start", point1=var "Current Pos", point2=var "Start Pos", ignoreZ=true, everyFrame=true)
+    FloatCompare(float1=var "Distance From Start", float2=var "Max Roam", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETREAT", everyFrame=true)
+    on ATTACK → Cast Antic
+    on RETREAT → Retreat Start
+  }
+
+  state Cast Antic {
+    SetParticleEmissionRate(gameObject=var "Charge Effect", emissionRate=50, everyFrame=false)
+    ObjectJitter(gameObject=Self, x=0.05, y=0.05, z=(unset), allowMovement=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Y Speed", space=0, everyFrame=true)
+    FloatMultiplyV2(floatVariable=var "X Speed", multiplyBy=0.8, everyFrame=true, fixedUpdate=true)
+    FloatMultiplyV2(floatVariable=var "Y Speed", multiplyBy=0.8, everyFrame=true, fixedUpdate=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Y Speed", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast Antic")
+    Wait(time=0.5, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Cast Charge
+  }
+
+  state Cast {
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Cast", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), everyFrame=false)
+    on FINISHED → Decel
+  }
+
+  state Check Dir 2 {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Scale", float2=0, tolerance=0, equal=(none), lessThan=→"RIGHT", greaterThan=→"LEFT", everyFrame=false)
+    on RIGHT → Right 2
+    on LEFT → Left 2
+  }
+
+  state Left 2 {
+    SetFloatValue(floatVariable=var "X Speed", floatValue=10, everyFrame=false)
+    CreateObject(gameObject=Shade Cast Ring, spawnPoint=var "Self", position=(-1.664, 0.12, -0.112), rotation=(unset), storeObject=var "Effect", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Effect", vector=(unset), x=-2, y=2, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Charge Wait
+  }
+
+  state Right 2 {
+    SetFloatValue(floatVariable=var "X Speed", floatValue=-10, everyFrame=false)
+    CreateObject(gameObject=Shade Cast Ring, spawnPoint=var "Self", position=(1.764, 0.12, -0.112), rotation=(unset), storeObject=var "Effect", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Effect", vector=(unset), x=2, y=2, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Charge Wait
+  }
+
+  state Cooldown {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Y Speed", space=0, everyFrame=true)
+    FloatMultiplyV2(floatVariable=var "X Speed", multiplyBy=0.9, everyFrame=true, fixedUpdate=true)
+    FloatMultiplyV2(floatVariable=var "Y Speed", multiplyBy=0.9, everyFrame=true, fixedUpdate=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Y Speed", everyFrame=true)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fly
+  }
+
+  state Decel {
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Y Speed", space=0, everyFrame=true)
+    FloatMultiplyV2(floatVariable=var "X Speed", multiplyBy=0.9, everyFrame=true, fixedUpdate=true)
+    FloatMultiplyV2(floatVariable=var "Y Speed", multiplyBy=0.9, everyFrame=true, fixedUpdate=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Y Speed", everyFrame=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Cooldown
+  }
+
+  state Cast Charge {
+    SetParticleEmissionRate(gameObject=var "Charge Effect", emissionRate=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast Charge")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Shade Particles", emissionRate=20, everyFrame=false)
+    on FINISHED → Check Dir 2
+  }
+
+  state Charge Wait {
+    Wait(time=0.25, finishEvent=→"WAIT", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hollow_shade_fireball, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on WAIT → Check Dir 3
+  }
+
+  state Check Dir 3 {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Scale", float2=0, tolerance=0, equal=(none), lessThan=→"RIGHT", greaterThan=→"LEFT", everyFrame=false)
+    on RIGHT → Shoot R
+    on LEFT → Shoot L
+  }
+
+  state Shoot R {
+    CreateObject(gameObject=Shadow Ball, spawnPoint=var "Self", position=(1.764, 0.12, -1), rotation=(unset), storeObject=var "Effect", networkInstantiate=false, networkGroup=0)
+    SetVelocity2d(gameObject=var "Effect", vector=(unset), x=20, y=(unset), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Black Wave Default R, spawnPoint=var "Self", position=(1, 0.12, -1), rotation=(unset), storeObject=var "")
+    on FINISHED → Cast
+  }
+
+  state Shoot L {
+    CreateObject(gameObject=Shadow Ball, spawnPoint=var "Self", position=(-1.764, 0.12, -1), rotation=(unset), storeObject=var "Effect", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Effect", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=var "Effect", vector=(unset), x=-20, y=(unset), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Black Wave Default R, spawnPoint=var "Self", position=(-1, 0.12, -1), rotation=(unset), storeObject=var "")
+    on FINISHED → Cast
+  }
+
+  state Sp Check {
+    IntCompare(integer1=var "Fireball Level", integer2=1, equal=(none), lessThan=→"RETURN", greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "SP", integer2=1, equal=→"CAST", lessThan=→"RETURN", greaterThan=→"CAST", everyFrame=false)
+    on CAST → Fireball Pos
+    on RETURN → Attack Choice
+  }
+
+  state Killed {
+    TransitionToAudioSnapshot(snapshot=Away, transitionTime=1)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHADE KILLED", delay=0, everyFrame=false)
+    CreateObject(gameObject=Hollow Shade Death, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Corpse", networkInstantiate=false, networkGroup=0)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetScale(gameObject=var "Corpse", vector=(unset), x=var "Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    DestroySelf(detachChildren=false)
+  }
+
+  state Depart {
+    CreateObject(gameObject=Hollow Shade Depart, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Corpse", networkInstantiate=false, networkGroup=0)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetScale(gameObject=var "Corpse", vector=(unset), x=var "Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    GetVelocity(gameObject=Self, vector=var "Velocity", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVelocity(gameObject=var "Corpse", vector=var "Velocity", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    DestroySelf(detachChildren=false)
+  }
+
+  state Retreat Start {
+    SetCollider(gameObject=Self, active=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Retreat Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85)
+    ActivateGameObject(gameObject=var "Terrain Buffer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Retreat
+  }
+
+  state Retreat {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    iTweenMoveTo(gameObject=Self, id="", transformPosition=var "", vectorPosition=var "Start Pos", time=1, delay=0, speed=(unset), space=0, easeType=easeInOutCubic, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=true, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetParticleEmission(gameObject=var "Shade Particles", emission=false)
+    SetParticleEmission(gameObject=var "Retreat Particles", emission=true)
+    on FINISHED → Retreat End
+  }
+
+  state Retreat End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Retreat End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetParticleEmission(gameObject=var "Retreat Particles", emission=false)
+    SetParticleEmission(gameObject=var "Shade Particles", emission=true)
+    on FINISHED → Retreat Reset
+  }
+
+  state Retreat Reset {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetCollider(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Terrain Buffer", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Special Type {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="shadeSpecialType", storeValue=var "Special Type")
+    IntSwitch(intVariable=var "Special Type", compareTo=[1, 2], sendEvent=[→"LAKE", →"JAR"], everyFrame=false)
+    GetPlayerDataString(gameObject=var "GameManager", stringName="shadeMapZone", storeValue=var "Map Zone")
+    SendEventByName(eventTarget=Self, sendEvent=var "Map Zone", delay=0, everyFrame=false)
+    on LAKE → Lake
+    on FINISHED → Idle
+    on JAR → Jar
+    on COLOSSEUM → Colosseum
+  }
+
+  state Lake {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Alerter", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Alert Range Lake", storeResult=var "Alert Range Lake")
+    ActivateGameObject(gameObject=var "Alert Range Lake", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Jar {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="collectorDefeated", isTrue=→"RETURN", isFalse=(none))
+    ActivateGameObject(gameObject=var "Terrain Buffer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindGameObject(objectName="Shade Jar", withTag="Untagged", store=var "Shade Jar")
+    SetPosition(gameObject=var "Shade Jar", vector=(unset), x=60.46, y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    SetParent(gameObject=Self, parent=var "Shade Jar", resetLocalPosition=false, resetLocalRotation=false)
+    SetCollider(gameObject=Self, active=false)
+    on BREAK → Break
+    on RETURN → Idle
+  }
+
+  state Break {
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Terrain Buffer", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Startle
+  }
+
+  state Quake? {
+    IntCompare(integer1=var "Quake Level", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "SP", integer2=1, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Quake Range", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", →"QUAKE"], weights=[0.5, 0.5], delay=0)
+    on FINISHED → Scream?
+    on QUAKE → Quake Antic
+  }
+
+  state Quake Antic {
+    GetPosition(gameObject=Self, vector=var "Quake Return Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    IntOperator(integer1=var "SP", integer2=1, operation=Subtract, storeResult=var "SP", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Quake Antic")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=10, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.85)
+    SetParticleEmissionRate(gameObject=var "Shade Particles", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Charge Effect", emissionRate=50, everyFrame=false)
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Terrain Buffer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Quake Start
+  }
+
+  state Quake Start {
+    SetParticleEmissionRate(gameObject=var "Shade Particles", emissionRate=20, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Charge Effect", emissionRate=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quake Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hero_quake_spell_prepare, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Quake
+  }
+
+  state Quake {
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Quake")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-30, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hero_quake_spell_dash, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Wait(time=1, finishEvent=→"LAND", realTime=false)
+    on LAND → Land
+  }
+
+  state Land {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hero_void_quake_impact, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quake Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetParticleEmissionRate(gameObject=var "Shade Particles", emissionRate=0, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    PlayParticleEmitter(gameObject=var "Reform Particles", emit=0)
+    ActivateGameObject(gameObject=var "Quake Blast", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Quake Pillar", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Quake Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Quake Particles", emit=0)
+    on FINISHED → Return Pause
+  }
+
+  state Quake Return {
+    iTweenMoveTo(gameObject=Self, id="", transformPosition=var "", vectorPosition=var "Quake Return Pos", time=(unset), delay=0, speed=10, space=0, easeType=easeInOutSine, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    on FINISHED → Reform
+  }
+
+  state Reform {
+    StopParticleEmitter(gameObject=var "Reform Particles")
+    SetParticleEmissionRate(gameObject=var "Shade Particles", emissionRate=20, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Retreat End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Collider On
+  }
+
+  state Return Pause {
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Quake Return
+  }
+
+  state Collider On {
+    SetCollider(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Terrain Buffer", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Q Other? {
+    SetBoolValue(boolVariable=var "Will Quake", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Scream", boolValue=false, everyFrame=false)
+    IntCompare(integer1=var "SP", integer2=0, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    SendRandomEvent(events=[→"SCREAM", →"QUAKE", →"FINISHED"], weights=[1, 1, 1], delay=0)
+    on QUAKE → Will Quake
+    on SCREAM → Will Scream
+    on FINISHED → Position
+  }
+
+  state Will Quake {
+    IntCompare(integer1=var "Quake Level", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Quake", boolValue=true, everyFrame=false)
+    on FINISHED → Position
+  }
+
+  state Will Scream {
+    IntCompare(integer1=var "Scream Level", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Scream", boolValue=true, everyFrame=false)
+    on FINISHED → Position
+  }
+
+  state Scream Antic {
+    DecelerateV2(gameObject=Self, deceleration=0.85)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hero_void_scream_spell, pitchMin=1, pitchMax=1, volume=1, delay=0.75, storePlayer=<null>)
+    IntOperator(integer1=var "SP", integer2=1, operation=Subtract, storeResult=var "SP", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Scream Antic")
+    SetParticleEmissionRate(gameObject=var "Shade Particles", emissionRate=0, everyFrame=false)
+    SetParticleEmissionRate(gameObject=var "Charge Effect", emissionRate=50, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Scream
+  }
+
+  state Scream? {
+    IntCompare(integer1=var "Scream Level", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "SP", integer2=1, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Scream Range", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", →"SCREAM"], weights=[0.5, 0.5], delay=0)
+    on FINISHED → Attack Choice
+    on SCREAM → Scream Antic
+  }
+
+  state Scream {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Scream")
+    ActivateGameObject(gameObject=var "Scream Blast", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Scream Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SetParticleEmissionRate(gameObject=var "Charge Effect", emissionRate=0, everyFrame=false)
+    on FINISHED → Scream Recover
+  }
+
+  state Scream Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetParticleEmissionRate(gameObject=var "Shade Particles", emissionRate=20, everyFrame=false)
+    on FINISHED → Fly
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Friendly?
+  }
+
+  state Friendly? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="royalCharmState", storeValue=var "Royal Charm State")
+    IntCompare(integer1=var "Royal Charm State", integer2=4, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Friendly", boolValue=true, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    on FINISHED → Init
+  }
+
+  state Friendly Idle {
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    SetHP(target=Self, hp=1)
+  }
+
+  state Colosseum {
+    SetScale(gameObject=var "Music Control", vector=(unset), x=2, y=2, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  var Fireball Level: int = 0
+  var Quake Level: int = 0
+  var SP: int = 1
+  var Scream Level: int = 0
+
+  var Distance: float = 0
+  var Distance From Start: float = 0
+  var Hero Y: float = 0
+  var Max Roam: float = 25
+  var Scale: float = 0
+  var Shade Y: float = 0
+  var X Speed: float = 0
+  var Y Speed: float = 0
+  var HP: int = 0
+  var Royal Charm State: int = 0
+  var Special Type: int = 0
+  var nailDamage: int = 0
+  var Can See Hero: bool = false
+  var Friendly: bool = false
+  var In Alert Range: bool = false
+  var In Slash Range: bool = false
+  var Quake Range: bool = false
+  var Same Y: bool = false
+  var Scream Range: bool = false
+  var Will Quake: bool = false
+  var Will Scream: bool = false
+  var Map Zone: string = ""
+  var Current Pos: vector3 = (0, 0, 0)
+  var Quake Return Pos: vector3 = (0, 0, 0)
+  var Start Pos: vector3 = (0, 0, 0)
+  var Velocity: vector3 = (0, 0, 0)
+  var Alert Range Lake: gameObject = <null>
+  var Alerter: gameObject = <null>
+  var Charge Effect: gameObject = <null>
+  var Corpse: gameObject = <null>
+  var Effect: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Music Control: gameObject = <null>
+  var Quake Blast: gameObject = <null>
+  var Quake Hit: gameObject = <null>
+  var Quake Particles: gameObject = <null>
+  var Quake Pillar: gameObject = <null>
+  var Reform Particles: gameObject = <null>
+  var Retreat Particles: gameObject = <null>
+  var Scream Blast: gameObject = <null>
+  var Scream Hit: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shade Jar: gameObject = <null>
+  var Shade Particles: gameObject = <null>
+  var Slash: gameObject = Hollow Shade:0/Slash
+  var Terrain Buffer: gameObject = Hollow Shade:0/Terrain Buffer
+}

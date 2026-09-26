@@ -1,0 +1,119 @@
+# Animation
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Reserve Bind
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Reserve Bind
+
+fsm Animation {
+  start Wait For HP
+
+  sequence state Inert {
+    SetBoolValue(boolVariable=var "Appear Instant", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on TOOL EQUIPS CHANGED → Equipped?
+  }
+
+  state Appear {
+    ActivateGameObject(gameObject=var "Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Appear Instant", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CheckHudVisible(trueEvent=(none), falseEvent=(none), storeValue=var "Hud Visible", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Hud Visible", floatVariable=var "Volume", falseValue=0, trueValue=1, everyFrame=false)
+    PlayAudioEvent(audioClip=ui_hud_reserve_bind_appear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=var "Volume", audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Reserve Bind Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on TOOL EQUIPS CHANGED → Equipped?
+    on FINISHED → Full?
+  }
+
+  state Full {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Reserve Bind Full", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    EnableFsmSelf(SetEnabled=false)
+    on TOOL EQUIPS CHANGED → Unequipped or Emptied?
+    on RESERVE BIND USED → Unequipped or Emptied?
+  }
+
+  sequence state Disappear {
+    Tk2dPlayAnimationWait(Target=var "Sprite", ClipName="Reserve Bind Disappear", AnimationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Inert
+    on TOOL EQUIPS CHANGED → Unequipped or Emptied?
+    on INVENTORY OPEN COMPLETE → Inert
+  }
+
+  sequence state Use {
+    PlayParticleEmitter(gameObject=_GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Reserve Bind/Break Pt, emit=0, resetIfPlaying=true)
+    Tk2dPlayAnimationWait(Target=var "Sprite", ClipName="Reserve Bind Use", AnimationCompleteEvent=(none))
+    on FINISHED → Empty
+    on TOOL EQUIPS CHANGED → Unequipped or Emptied?
+    on USE → Empty
+  }
+
+  sequence state Restore {
+    CheckHudVisible(trueEvent=(none), falseEvent=(none), storeValue=var "Hud Visible", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Hud Visible", floatVariable=var "Volume", falseValue=0, trueValue=1, everyFrame=false)
+    PlayAudioEvent(audioClip=ui_hud_reserve_bind_reappear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=var "Volume", audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=var "Sprite", ClipName="Reserve Bind Restore", AnimationCompleteEvent=(none))
+    on FINISHED → Full
+    on TOOL EQUIPS CHANGED → Unequipped or Restored?
+  }
+
+  state Equipped? {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Inert
+    on TRUE → Appear
+  }
+
+  state Full? {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=1, trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Empty
+    on TRUE → Full
+  }
+
+  state Empty {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Reserve Bind Empty", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    EnableFsmSelf(SetEnabled=false)
+    on TOOL EQUIPS CHANGED → Unequipped or Restored?
+  }
+
+  state Unequipped or Emptied? {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=→"TRUE", storeValue=(unset))
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=1, trueEvent=→"FALSE", falseEvent=→"USE", storeValue=(unset))
+    on FALSE → Full
+    on USE → Use
+    on TRUE → Disappear
+  }
+
+  state Unequipped or Restored? {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=→"TRUE", storeValue=(unset))
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=1, trueEvent=→"RESTORE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Empty
+    on RESTORE → Restore
+    on TRUE → Disappear
+  }
+
+  state Wait {
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    on TOOL EQUIPS CHANGED → Equipped?
+    on FINISHED → Equipped?
+    on INVENTORY OPEN COMPLETE → Appear Instant
+  }
+
+  sequence state Wait For HP {
+    SetBoolValue(boolVariable=var "Appear Instant", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    EnableFsmSelf(SetEnabled=false)
+    on LAST HP ADDED → Wait
+    on INVENTORY OPEN COMPLETE → Appear Instant
+  }
+
+  state Appear Instant {
+    SetBoolValue(boolVariable=var "Appear Instant", boolValue=true, everyFrame=false)
+    on FINISHED → Equipped?
+  }
+
+  var Volume: float = 0
+  var Appear Instant: bool = false
+  var Hud Visible: bool = false
+  var Sprite: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Reserve Bind/Reserve Bind Sprite
+  var Tool: object = Reserve Bind (dataassets_assets_assets/dataassets/tools/toolitems.bundle)
+}

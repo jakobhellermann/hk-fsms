@@ -1,0 +1,457 @@
+# Control
+# 1 location(s):
+#   Bonetown / Black Thread States/Normal World/Aspid Collector (3)
+
+fsm Control {
+  start Pause
+  on ZERO HP → Death Glob  // from any state
+  on UNALERT DOWN → Unalert Down  // from any state
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Berry Sprite")
+    SetParent(gameObject=var "Route", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ArrayLength(array=var "Route Points", length=var "Final Index", everyFrame=false)
+    IntAdd(intVariable=var "Final Index", add=-1, everyFrame=false)
+    BoolTest(boolVariable=var "Wall", isTrue=→"WALL", isFalse=(none), everyFrame=false)
+    RandomFloat(min=1, max=4, storeResult=var "Call Timer")
+    BoolTest(boolVariable=var "Patrolling", isTrue=→"PATROL", isFalse=→"IDLE", everyFrame=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Fly In", equalEvent=→"AMBUSH", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on PATROL → Get Next Point
+    on IDLE → 
+    on WALL → Wall
+    on AMBUSH → Fly In Ready
+  }
+
+  state Get Next Point {
+    ArrayGetNext(array=var "Route Points", startIndex=0, endIndex=0, loopEvent=(none), resetFlag=var "Reset Route", finishedEvent=(none), result=var "Next Point", currentIndex=var "Current Index")
+    IntCompare(integer1=var "Current Index", integer2=var "Final Index", equal=→"LAST POINT", lessThan=(none), greaterThan=→"LAST POINT", everyFrame=false)
+    on FINISHED → Travel To
+    on LAST POINT → Reset Route
+  }
+
+  state Reset Route {
+    SetBoolValue(boolVariable=var "Reset Route", boolValue=true, everyFrame=false)
+    on FINISHED → Travel To
+  }
+
+  state Travel To {
+    ChaseObject(gameObject=Self, target=var "Next Point", speedMax=4, acceleration=0.3, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0, offsetX=0, offsetY=0)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", everyFrame=true, pauseBetweenTurns=false, pauseTime=0.4)
+    GetDistance(gameObject=Self, target=var "Next Point", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=1.5, tolerance=0, equal=→"NEXT", lessThan=→"NEXT", greaterThan=(none), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=(unset), sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    FloatAdd(floatVariable=var "Call Timer", add=-1, everyFrame=true, perSecond=true)  // disabled
+    FloatCompare(float1=var "Call Timer", float2=0, tolerance=0, equal=(none), lessThan=→"CALL", greaterThan=(none), everyFrame=true)  // disabled
+    on NEXT → Get Next Point
+    on TOOK DAMAGE → Flea?
+    on ALERT → Startle Glob
+    on SING → Sing Berry
+    on CALL → Call
+  }
+
+  state Choice {
+    SendEvent(eventTarget=Self, sendEvent=→"CHOMP", delay=0, everyFrame=false)
+    SendRandomEventV4(events=[→"SPIT", →"CHOMP"], weights=[0.35, 0.65], eventMax=[1, 3], missedMax=[3, 1], activeBool=(unset))
+    on SPIT → Distance
+    on CHOMP → Chase
+  }
+
+  state Startle {
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[aspid_collector_antic_1 (sfxstatic_assets_areamoss.bundle), aspid_collector_antic_2 (sfxstatic_assets_areamoss.bundle), aspid_collector_antic_3 (sfxstatic_assets_areamoss.bundle)], weights=[1, 1, 1], pitchMin=0.85, pitchMax=1.15, stopPreviousSound=true)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Recover
+  }
+
+  state Idle {
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=3, accelerationMin=5, accelerationMax=15, roamingRangeX=2, roamingRangeY=2, manualStartPos=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=(unset), sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    on ALERT → Startle
+    on TOOK DAMAGE → Choice
+    on GO UP → Go Up 2
+  }
+
+  state Chase End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.75, brakeOnExit=false)
+    on FINISHED → Idle
+  }
+
+  state Wall {
+    SetAudioClip(gameObject=Self, audioClip=aspid_collector_munching_loop (sfxstatic_assets_areamoss.bundle), autoPlay=true, stopOnExit=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wall Collect")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=(unset), sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=(unset), sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    PlayParticleEmitterInState(gameObject=var "Pt WallChomp")
+    on ALERT → Deparent?
+    on TOOK DAMAGE → Deparent?
+    on SHAKE → Deparent?
+  }
+
+  state Flea? {
+    BoolTest(boolVariable=var "Flea Carrier", isTrue=→"FLEA", isFalse=(none), everyFrame=false)
+    on FINISHED → Choice
+    on FLEA → Flea Escape
+  }
+
+  state Flea Escape {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    ChaseObject(gameObject=Self, target=var "Hero", speedMax=7, acceleration=-0.175, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0, offsetX=0, offsetY=0)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Travel To
+  }
+
+  state Die {
+    FindChild(gameObject=Self, childName="Mossberry Pickup", storeResult=var "Berry")
+    ActivateGameObject(gameObject=var "Berry", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Berry", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    BoolTest(boolVariable=var "Flea Carrier", isTrue=→"FLEA", isFalse=(none), everyFrame=false)
+    on FLEA → Rescue Flea
+  }
+
+  state Rescue Flea {
+    FindChild(gameObject=Self, childName="Flea Rescue", storeResult=var "Flea Rescue")
+    SetParent(gameObject=var "Flea Rescue", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Flea Rescue", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Wall Startle {
+    SetAudioSource(gameObject=Self, active=false)
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[aspid_collector_antic_1 (sfxstatic_assets_areamoss.bundle), aspid_collector_antic_2 (sfxstatic_assets_areamoss.bundle), aspid_collector_antic_3 (sfxstatic_assets_areamoss.bundle)], weights=[1, 1, 1], pitchMin=0.85, pitchMax=1.15, stopPreviousSound=true)
+    FireAtTarget(gameObject=Self, target=var "Kickoff Point", speed=-15, position=(0, 0, 0), spread=0, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=15, ySpeed=(unset), everyFrame=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetParent(gameObject=var "Glob Drop", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Glob Drop", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Recover
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Has Flea?
+  }
+
+  state Sing {
+    FindNamedChild(gameObject=Self, storeResult=var "Chomp Range")
+    SetCircleCollider(gameObject=var "Chomp Range", active=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=aspid_collector_sing_loop (sfxdynamic_assets_areamoss.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    IdleBuzzV4(gameObject=Self, waitMin=0.5, waitMax=0.75, speedMax=2, deceleration=0.8, accelerationMin=5, accelerationMax=5, roamingRangeX=0.15, roamingRangeY=0.15, manualStartPos=(unset))
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioStop(gameObject=var "Audio Loop Voice", fadeTime=0.15)
+    on FINISHED → Choice
+  }
+
+  state Has Glob? {
+    BoolTest(boolVariable=var "z_HasGlob", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ActivateGameObject(gameObject=var "Glob", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CreateObject(gameObject=Aspid Collector Glob (localpoolprefabs_assets_areamoss.bundle), spawnPoint=var "Glob", position=(unset), rotation=(unset), storeObject=var "Glob Drop")
+    SetParent(gameObject=var "Glob Drop", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Glob Drop", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Startle Glob {
+    BoolTest(boolVariable=var "z_HasGlob", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ActivateGameObject(gameObject=var "Glob", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "z_HasGlob", boolValue=false, everyFrame=false)
+    SetParent(gameObject=var "Glob Drop", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Glob Drop", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Startle
+  }
+
+  state Death Glob {
+    BoolTest(boolVariable=var "z_HasGlob", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ActivateGameObject(gameObject=var "Glob", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "z_HasGlob", boolValue=false, everyFrame=false)
+    SetParent(gameObject=var "Glob Drop", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Glob Drop", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Die
+  }
+
+  state Sing Berry {
+    FindChild(gameObject=Self, childName="Fake Pickup", storeResult=var "Fake Pickup")
+    ActivateGameObject(gameObject=var "Fake Pickup", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Mossberry Pickup", storeResult=var "Berry")
+    GameObjectIsNull(gameObject=var "Berry", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Berry", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Berry", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Berry Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Sing Flea?
+  }
+
+  state Fly In Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Ambush Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on BATTLE START → Fly In
+    on WAKE → Fly In
+  }
+
+  state Check Pos {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=8, tolerance=0, equal=(none), lessThan=→"SHIFT", greaterThan=(none), everyFrame=false)
+    on SHIFT → Shift
+    on FINISHED → Fly In
+  }
+
+  state Shift {
+    SetParent(gameObject=var "Spawn Pos Alt", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Spawn Pos Alt", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    on FINISHED → Fly In
+  }
+
+  state Fly In {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=10, z=-15, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, -10, 15), time=0.55, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.55)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    on FINISHED → Startle
+  }
+
+  state Go Up {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=3, everyFrame=false)
+    on FINISHED → Choice
+  }
+
+  state Go Up 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=3, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Chomp Pause {
+    WaitRandom(timeMin=0, timeMax=0.1, finishEvent=→"FINISHED", realTime=false)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=6, accelerationForce=10, offsetX=0, offsetY=0.7)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    on FINISHED → Chomp Antic
+  }
+
+  state Chomp Antic {
+    SetIntValue(intVariable=var "Chomps", intValue=4, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.87, brakeOnExit=false)
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=-8, position=(0, 0, 0), spread=0, everyFrame=false)
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[aspid_collector_charge_1 (sfxstatic_assets_areaboneareacrawl.bundle), aspid_collector_charge_2 (sfxstatic_assets_areaboneareacrawl.bundle), aspid_collector_charge_3 (sfxstatic_assets_areaboneareacrawl.bundle), aspid_collector_charge_4 (sfxstatic_assets_areaboneareacrawl.bundle), aspid_collector_charge_5 (sfxstatic_assets_areaboneareacrawl.bundle)], weights=[1, 1, 1, 1, 1], pitchMin=0.85, pitchMax=1.15, stopPreviousSound=true)
+    on FINISHED → Chomp Fire
+  }
+
+  state Chomp {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Chomp")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToChomp", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=12, accelerationForce=12, offsetX=0, offsetY=0.7)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Chomp Loop
+    on SING → Sing Berry
+  }
+
+  state Chomp Loop {
+    IntAdd(intVariable=var "Chomps", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Chomps", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"REPEAT", everyFrame=false)
+    on REPEAT → Chomp
+    on FINISHED → Chomp End
+  }
+
+  state Chomp End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Chomp End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Recover
+  }
+
+  state Chomp Fire {
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=5, position=(0, 0.7, 0), spread=0, everyFrame=false)
+    on FINISHED → Chomp
+  }
+
+  state Chase {
+    SetAudioSource(gameObject=Self, active=true)
+    SetAudioClip(gameObject=Self, audioClip=aspid_collector_fly_loop (sfxstatic_assets_areamoss.bundle), autoPlay=true, stopOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Aggro")
+    SetFloatValue(floatVariable=var "Range Out Timer", floatValue=0, everyFrame=false)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=6, accelerationForce=10, offsetX=0, offsetY=0.7)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    UnalertTimer(alertRange=var "Unalert Range Obj", timerVariable=var "Range Out Timer", unalertTime=4, eventTarget=Self, unalertEvent=→"UNALERT", resetOnStateEntry=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Chomp Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    RandomFloat(min=-0.5, max=0, storeResult=var "Attack Pause")
+    FloatAdd(floatVariable=var "Attack Pause", add=1, everyFrame=true, perSecond=true)
+    FloatTestToBool(float1=var "Attack Pause", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Attack Ready", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Attack Ready", var "In Attack Range"], sendEvent=→"CHOMP", storeResult=(unset), everyFrame=true)
+    WaitRandom(timeMin=2, timeMax=5, finishEvent=→"SWAP", realTime=false)
+    on UNALERT → Chase End
+    on SING → Sing Berry
+    on GO UP → Go Up
+    on CHOMP → Chomp Pause
+    on SWAP → 
+  }
+
+  state Distance {
+    SetAudioSource(gameObject=Self, active=true)
+    SetAudioClip(gameObject=Self, audioClip=aspid_collector_fly_loop (sfxstatic_assets_areamoss.bundle), autoPlay=true, stopOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Aggro")
+    SetFloatValue(floatVariable=var "Range Out Timer", floatValue=0, everyFrame=false)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=9, speedMax=6, acceleration=0.5, targetsHeight=true, height=5, minAboveHero=(unset))
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=true, everyFrame=true)
+    UnalertTimer(alertRange=var "Unalert Range Obj", timerVariable=var "Range Out Timer", unalertTime=4, eventTarget=Self, unalertEvent=→"UNALERT", resetOnStateEntry=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Spit Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    RandomFloat(min=-0.5, max=0, storeResult=var "Attack Pause")
+    FloatAdd(floatVariable=var "Attack Pause", add=1, everyFrame=true, perSecond=true)
+    FloatTestToBool(float1=var "Attack Pause", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Attack Ready", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Attack Ready", var "In Attack Range"], sendEvent=→"SPIT", storeResult=(unset), everyFrame=true)
+    WaitRandom(timeMin=2, timeMax=5, finishEvent=→"SWAP", realTime=false)
+    on UNALERT → Chase End
+    on SING → Sing Berry
+    on GO UP → Go Up
+    on SPIT → Spit Antic
+    on SWAP → Chase
+  }
+
+  state Spit Antic {
+    SetIntValue(intVariable=var "Chomps", intValue=4, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spit Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.87, brakeOnExit=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0.7, storeAngle=var "Angle", pause=0, everyFrame=false)
+    on FINISHED → Spit
+  }
+
+  state Spit {
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FlingObjectsFromGlobalPool(gameObject=Glob Bullet (localpoolprefabs_assets_areamoss.bundle), spawnPoint=var "Spit Point", position=(unset), spawnMin=1, spawnMax=1, speedMin=20, speedMax=20, angleMin=var "Angle", angleMax=var "Angle", originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.87, brakeOnExit=false)
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=-8, position=(0, 0, 0), spread=0, everyFrame=false)
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    DistanceFly(gameObject=Self, target=var "Hero", distance=4.5, speedMax=4, acceleration=0.4, targetsHeight=false, height=(unset), minAboveHero=(unset))
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    on FINISHED → Choice
+    on TOOK DAMAGE → Choice
+  }
+
+  state Has Flea? {
+    BoolTest(boolVariable=var "Flea Carrier", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Alert Range")
+    ActivateGameObject(gameObject=var "Alert Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Flea", storeResult=var "Flea Sprite")
+    ActivateGameObject(gameObject=var "Flea Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GameObjectCompare(gameObjectVariable=var "Flea Sprite", compareTo=<null>, equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "z_HasGlob", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CheckQuestPdSceneBool(QuestTarget=FleasCollected Target (dataassets_assets_assets/dataassets/questsystem/proxies.bundle), ExpectedValue=false, trueEvent=(none), falseEvent=(none), storeValue=var "Flea Carrier")
+    BoolTest(boolVariable=var "Flea Carrier", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ActivateGameObject(gameObject=var "Flea Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Deparent? {
+    BoolTest(boolVariable=var "Deparent on Startle", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Wall Startle
+  }
+
+  state Unalert Down {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ChaseObject(gameObject=Self, target=var "Go Down Marker", speedMax=4, acceleration=0.3, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0, offsetX=0, offsetY=0)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", everyFrame=true, pauseBetweenTurns=false, pauseTime=0.4)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+    on TOOK DAMAGE → Startle
+  }
+
+  state Sing Flea? {
+    BoolTest(boolVariable=var "Flea Carrier", isTrue=→"FLEA", isFalse=(none), everyFrame=false)
+    on FLEA → Save Flea
+    on FINISHED → Sing
+  }
+
+  state Save Flea {
+    FindChild(gameObject=Self, childName="Flea Rescue", storeResult=var "Flea Rescue")
+    SetParent(gameObject=var "Flea Rescue", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Flea Rescue", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Flea")
+    ActivateGameObject(gameObject=var "Flea", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Flea Carrier", boolValue=false, everyFrame=false)
+    on FINISHED → Sing
+  }
+
+  state Call {
+    RandomFloat(min=1, max=4, storeResult=var "Call Timer")
+    BoolTest(boolVariable=var "Flea Carrier", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=aspid_collector_short_alert (sfxdynamic_assets_areaboneareacrawl.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on CANCEL → Travel To
+    on FINISHED → Travel To
+  }
+
+  var Flea Carrier: bool = true
+  var Patrolling: bool = true
+  var Wall: bool = false
+  var z_HasGlob: bool = false
+  var Route Points: array = var "Route Points"
+
+  var Distance: float = 0
+  var Range Out Timer: float = 0
+  var Attack Pause: float = 0
+  var Angle: float = 0
+  var Call Timer: float = 0
+  var Current Index: int = 0
+  var Final Index: int = 0
+  var Chomps: int = 0
+  var Reset Route: bool = false
+  var In Attack Range: bool = false
+  var Attack Ready: bool = false
+  var Deparent on Startle: bool = false
+  var Clip: string = ""
+  var Alert Range: gameObject = <null>
+  var Audio Loop Voice: gameObject = Black Thread States/Normal World/Aspid Collector (3)/Audio Loop Voice
+  var Berry: gameObject = <null>
+  var Berry Sprite: gameObject = <null>
+  var Chomp Range: gameObject = <null>
+  var Fake Pickup: gameObject = <null>
+  var Flea: gameObject = <null>
+  var Flea Rescue: gameObject = <null>
+  var Flea Sprite: gameObject = <null>
+  var Glob: gameObject = Black Thread States/Normal World/Aspid Collector (3)/Glob
+  var Glob Drop: gameObject = <null>
+  var Go Down Marker: gameObject = Black Thread States/Normal World/Aspid Collector (3)/Go Down Marker
+  var Kickoff Point: gameObject = Black Thread States/Normal World/Aspid Collector (3)/Kickoff Point
+  var Next Point: gameObject = <null>
+  var Pt WallChomp: gameObject = Black Thread States/Normal World/Aspid Collector (3)/Pt WallChomp
+  var Route: gameObject = Black Thread States/Normal World/Aspid Collector (3)/Route
+  var Self: gameObject = Black Thread States/Normal World/Aspid Collector (3)
+  var Spawn Pos Alt: gameObject = Understore Thrower/Spawn Pos Alt (localpoolprefabs_assets_areaboneareacrawlareamoss.bundle)
+  var Spit Effect: gameObject = Black Thread States/Normal World/Aspid Collector (3)/Spit Effect
+  var Spit Point: gameObject = Black Thread States/Normal World/Aspid Collector (3)/Spit Point
+  var Unalert Range Obj: object = Black Thread States/Normal World/Aspid Collector (3)/Unalert Range@AlertRange
+}

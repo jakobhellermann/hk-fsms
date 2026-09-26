@@ -1,0 +1,119 @@
+# Ascend Control
+# 1 location(s):
+#   Crossroads_01 / Ascender Crossroads
+
+fsm Ascend Control {
+  start Init
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Prompt", storeResult=var "Prompt")
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    FindGameObject(objectName="", withTag="MainCamera", store=var "Main Camera")
+    on FINISHED → Visited Check
+  }
+
+  state Idle {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="", collideLayer="", sendEvent=→"IN RANGE", storeCollider=var "")
+    on IN RANGE → In Range
+  }
+
+  state In Range {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="UP", delay=0, everyFrame=false)
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="", collideLayer="", sendEvent=→"OUT OF RANGE", storeCollider=var "")
+    GetAxis(axisName="Vertical", multiplier=1, store=var "Axis Vert", everyFrame=true)
+    FloatCompare(float1=var "Axis Vert", float2=0.6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UP PRESSED", everyFrame=true)
+    on OUT OF RANGE → Idle
+    on UP PRESSED → Can Ascend?
+  }
+
+  state Can Ascend? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanInput", parameters=[], storeResult=var "Can Input")
+    BoolTest(boolVariable=var "Can Input", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["onGround"], storeResult=var "On Ground")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["attacking"], storeResult=var "Attacking")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["upAttacking"], storeResult=var "Attacking Up")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["downAttacking"], storeResult=var "Attacking Down")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["dashing"], storeResult=var "Dashing")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["backDashing"], storeResult=var "Backdashing")
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolAnyTrue(boolVariables=[var "Attacking", var "Attacking Down", var "Attacking Up", var "Backdashing", var "Dashing"], sendEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Fade Music
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Range
+  }
+
+  state Ascend {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Enter")
+    SendEventByName(eventTarget=GameObject(var "Main Camera"), sendEvent="JUST FADE", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Change Scene
+  }
+
+  state Change Scene {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="ChangeToScene", parameters=[var "New Scene", var "Entry Gate", var "Entry Pause"], storeResult=(unset var))
+  }
+
+  state Visited Check {
+    GetPlayerDataBool(boolName="visitedCrossroads", storeValue=var "Visited Crossroads")
+    BoolTest(boolVariable=var "Visited Crossroads", isTrue=→"VISITED", isFalse=→"UNVISITED", everyFrame=false)
+    on VISITED → Visited
+    on UNVISITED → Unvisited
+  }
+
+  state Visited {
+    Wait(time=3.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Unvisited {
+    Wait(time=9, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state fade Atmos {
+    FindChild(gameObject=var "GameManager", childName="Atmos", storeResult=var "Atmos Folder")
+    FindChild(gameObject=var "Atmos Folder", childName="Atmos Cave Wind", storeResult=var "Atmos Cave Wind")
+    SendEventByName(eventTarget=GameObjectFSM(var "Atmos Cave Wind", fsm="Atmos Control"), sendEvent="STOP", delay=0, everyFrame=false)
+    on FINISHED → Ascend
+  }
+
+  state Fade Music {
+    FindChild(gameObject=var "GameManager", childName="Music", storeResult=var "Music Folder")
+    FindChild(gameObject=var "Music Folder", childName="Track 1", storeResult=var "Track 1")
+    SetFsmFloat(gameObject=var "Track 1", fsmName="Music Player", variableName="Fade Vol End", setValue=0, everyFrame=false)
+    SetFsmFloat(gameObject=var "Track 1", fsmName="Music Player", variableName="Fade Time", setValue=0.4, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Track 1"), sendEvent="FADE", delay=0, everyFrame=false)
+    on FINISHED → fade Atmos
+  }
+
+  var Cave Wind: bool = false
+  var Entry Gate: string = "bot1"
+  var New Scene: string = "Town"
+
+  var Axis Vert: float = 0
+  var Entry Pause: float = 0
+  var Attacking: bool = false
+  var Attacking Down: bool = false
+  var Attacking Up: bool = false
+  var Backdashing: bool = false
+  var Can Input: bool = false
+  var Dashing: bool = false
+  var On Ground: bool = false
+  var Visited Crossroads: bool = false
+  var Atmos Cave Wind: gameObject = <null>
+  var Atmos Folder: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Main Camera: gameObject = <null>
+  var Music Folder: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Self: gameObject = <null>
+  var Track 1: gameObject = <null>
+}

@@ -1,0 +1,164 @@
+# Control
+# 1 location(s):
+#   Room_temple / Final Boss Door
+
+fsm Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Init
+  }
+
+  state Init {
+    FindChild(gameObject=Self, childName="door1", storeResult=var "door1")
+    FindChild(gameObject=Self, childName="Barrier Flash", storeResult=var "Barrier Flash")
+    FindChild(gameObject=Self, childName="White Flash", storeResult=var "White Flash")
+    FindChild(gameObject=Self, childName="Orange Mist", storeResult=var "Orange Mist")
+    FindChild(gameObject=Self, childName="Quake Flash", storeResult=var "Quake Flash")
+    FindChild(gameObject=Self, childName="Pt Linger", storeResult=var "Pt Linger")
+    FindChild(gameObject=Self, childName="Debris", storeResult=var "Debris")
+    FindChild(gameObject=Self, childName="Debris 2", storeResult=var "Debris 2")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="openedBlackEggDoor", isTrue=→"OPENED", isFalse=(none))
+    GetPlayerDataInt(gameObject=var "GameManager", intName="guardiansDefeated", storeValue=var "Guardians Defeated")
+    IntCompare(integer1=var "Guardians Defeated", integer2=3, equal=→"READY", lessThan=→"FINISHED", greaterThan=→"READY", everyFrame=false)
+    on OPENED → Opened
+    on READY → Ready
+    on FINISHED → Idle
+  }
+
+  state Opened {
+    ActivateGameObject(gameObject=var "Door", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Return Debris", storeResult=var "Return Debris")
+    ActivateGameObject(gameObject=var "Return Debris", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Ready {
+    ActivateGameObject(gameObject=var "door1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    SetCollider(gameObject=var "door1", active=true)
+    Trigger2dEvent(trigger=OnTriggerEnter2D, collideTag="", collideLayer="", sendEvent=→"ENTER", storeCollider=var "")
+    FindChild(gameObject=Self, childName="CameraLockArea", storeResult=var "CameraLockArea")
+    on ENTER → Take Control
+  }
+
+  state Idle {
+    ActivateGameObject(gameObject=var "door1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on HERO CAST SPELL → Quake Flash
+  }
+
+  state Quake Flash {
+    ActivateGameObject(gameObject=var "Quake Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+    on HERO CAST SPELL → Requake
+  }
+
+  state Requake {
+    ActivateGameObject(gameObject=var "Quake Flash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Quake Flash
+  }
+
+  state Take Control {
+    TransitionToAudioSnapshot(snapshot=Silent (resources.assets), transitionTime=2)
+    ActivateGameObject(gameObject=var "CameraLockArea", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPlayerDataBool(boolName="openedBlackEggDoor", value=true)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=var "CameraLockArea", delivery=SendMessage, options=1, functionCall=StopAnimationControl())  // disabled
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight(true))
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC CONVO START", delay=0, everyFrame=false)
+    on FINISHED → Shake
+  }
+
+  state Shake {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=white_seal_1 (sharedassets19.assets), pitchMin=0.75, pitchMax=0.75, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=white_seal_1 (sharedassets19.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=dream_ghost_appear (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)  // disabled
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Door", animLibName="", clipName="Shake")
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Barrier Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Blow
+  }
+
+  state Barrier Flash {
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Door", animLibName="", clipName="Idle")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Barrier Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Blow
+  }
+
+  state Blow {
+    AudioStop(gameObject=Self)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=false_knight_ceiling_break (sharedassets19.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=boss_explode_clean (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Door", clipName="Break", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pt Linger", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Debris", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Debris 2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FlingObjects(containerObject=var "Debris", adjustPosition=(0, 0, 0), randomisePosition=false, speedMin=15, speedMax=30, angleMin=30, angleMax=150)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Freeze
+  }
+
+  state Door Off {
+    ActivateGameObject(gameObject=var "Door", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=blizzard_start (sharedassets19.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Roar
+  }
+
+  state End {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())
+    ActivateGameObject(gameObject=var "CameraLockArea", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=var "door1", active=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HORNET ACTIVE", delay=0, everyFrame=false)
+  }
+
+  state Freeze {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(0))
+    Tk2dWatchAnimationEvents(gameObject=var "Door", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Door Off
+  }
+
+  state Roar {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hollow_knight_scream_v1 (sharedassets19.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Orange Mist", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Roar End
+  }
+
+  state Roar End {
+    SendEventByName(eventTarget=GameObject(var "Roar Emitter"), sendEvent="END", delay=0, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  var Guardians Defeated: int = 0
+  var Barrier Flash: gameObject = <null>
+  var CameraLockArea: gameObject = <null>
+  var Debris: gameObject = <null>
+  var Debris 2: gameObject = <null>
+  var Door: gameObject = Final Boss Door/Door
+  var Orange Mist: gameObject = <null>
+  var Pt Linger: gameObject = <null>
+  var Quake Flash: gameObject = <null>
+  var Return Debris: gameObject = <null>
+  var Roar Emitter: gameObject = <null>
+  var Self: gameObject = <null>
+  var White Flash: gameObject = <null>
+  var door1: gameObject = <null>
+}

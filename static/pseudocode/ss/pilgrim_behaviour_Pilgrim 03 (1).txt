@@ -1,0 +1,576 @@
+# pilgrim_behaviour
+# 1 location(s):
+#   Bone_11 / Pilgrim 03 (1)
+
+// uses template: pilgrim_behaviour
+fsm pilgrim_behaviour {
+  start Sleep Collider
+  on DORMANT → Dormant  // from any state
+  on START FALL → Falling  // from any state
+  on MEMORY SPAWN → Set Memory Spawn  // from any state
+
+  state Init {
+    BoolTest(boolVariable=var "z1 CorpseAmbush", isTrue=→"CORPSE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Ambush", isTrue=→"AMBUSH", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Dropper", isTrue=→"DROP", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Battler", isTrue=→"BATTLE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Praying", isTrue=→"PRAY", isFalse=(none), everyFrame=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep 1", equalEvent=→"SLEEP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep 2", equalEvent=→"SLEEP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Spawn Wake", equalEvent=→"SPAWN WAKE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Start Walk
+    on PRAY → Spawn Silk
+    on AMBUSH → Ambush Ready
+    on BATTLE → Battle Setup
+    on DROP → Drop Pause
+    on SLEEP → Off Plane?
+    on SPAWN WAKE → Spawn Wake
+    on CORPSE → Idle Thread?
+  }
+
+  state Walk {
+    CheckCanSeeHero(storeResult=var "Can See Hero", sendEvent="", eventTarget=Self, everyFrame=true)
+    SetRandomAudioClipFromTable(Table=var "Audio Table Idle", AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0.75)
+    BoolTest(boolVariable=var "Can See Hero", isTrue=→"ATTACK", isFalse=(none), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Attack
+    on NEEDOLIN → Needolin
+    on TOOK DAMAGE → Dmg Response Check
+  }
+
+  state Start Walk {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CAN FALL", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=0, y=(unset), everyFrame=false)
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Walk
+  }
+
+  state Pray {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=var "Wake", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=var "Alert", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    StopWalker(target=Self, everyFrame=false)
+    BoolTest(boolVariable=var "Alert", isTrue=→"WAKE", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Wake", isTrue=→"WAKE", isFalse=(none), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pray")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"WAKE", ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    PlayParticleEmitterInState(gameObject=var "Pr Pray")
+    SetBoolValue(boolVariable=var "Do Sing", boolValue=var "Quick Wake", everyFrame=false)
+    BoolFlip(boolVariable=var "Do Sing")
+    SetRandomAudioClipFromTable(Table=var "Audio Table Idle", AudioSource=var "Audio Loop Voice", AutoPlay=false, delay=0)
+    AudioPlayInState(gameObject=var "Audio Loop Voice", volume=(unset))
+    AudioPlayInStateConditional(gameObject=var "Audio Loop Voice", volume=1, activeBool=var "Do Sing")  // disabled
+    on WAKE → Possess
+    on TOOK DAMAGE → Possess
+    on BATTLE START → Possess
+  }
+
+  state Pray End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack?
+  }
+
+  state Possess {
+    FindChild(gameObject=Self, childName="Wake Range", storeResult=var "Wake Range")
+    ActivateGameObject(gameObject=var "Wake Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Quick Wake", isTrue=→"QUICK", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"QUICK", isFalse=(none))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=var "Audio Table Alert", pitchOffset=0, stopPreviousSound=true, forcePlay=false)  // disabled
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="PlayPossess", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Possess Shake
+    on QUICK → Pray End Q
+  }
+
+  state Spawn Silk {
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"FINISHED", isFalse=(none))
+    BoolTest(boolVariable=var "Quick Wake", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    SetParent(gameObject=var "Silk", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)  // disabled
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Pray
+  }
+
+  state Possess Shake {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashArmoured())
+    on FINISHED → Pray End
+  }
+
+  state Pray End Q {
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    BoolTest(boolVariable=var "Attack Instantly", isTrue=→"ATTACK", isFalse=(none), everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray End Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack?
+    on ATTACK → Attack
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Attack {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Attack"), sendEvent="ATTACK", delay=0, everyFrame=false)
+    on ATTACK END → Attack Recover
+  }
+
+  state Attack Recover {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CAN FALL", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=0, y=(unset), everyFrame=false)
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Walk
+    on NEEDOLIN → Needolin
+  }
+
+  state Attack? {
+    BoolTest(boolVariable=var "Attack Instantly", isTrue=→"ATTACK", isFalse=(none), everyFrame=false)
+    on FINISHED → Start Walk
+    on ATTACK → Attack
+  }
+
+  state Ambush Ready {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=(unset), sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    StopWalker(target=Self, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Dust")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Smoke")
+    StopParticleEmitter(gameObject=var "Pt Smoke")
+    BoolTest(boolVariable=var "Memory Spawn", isTrue=→"WAKE", isFalse=(none), everyFrame=false)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on WAKE → Ambush Antic
+    on BATTLE START → Battle Pause
+  }
+
+  state Ambush 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ambush", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetMeshRenderer(gameObject=Self, active=true)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_emerge (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=var "Audio Table Alert", pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Ambush 2
+  }
+
+  state Ambush Antic {
+    PlayParticleEmitter(gameObject=var "Pt Bone", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Pt Dust", emit=0, resetIfPlaying=false)
+    ConvertBoolToFloat(boolVariable=var "z QuickAmbush", floatVariable=var "Ambush Antic Time", falseValue=0.75, trueValue=0.25, everyFrame=false)
+    Wait(time=var "Ambush Antic Time", finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Alert Range", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_antic (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Ambush 1
+  }
+
+  state Ambush 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    StopParticleEmitter(gameObject=var "Pt Bone")
+    StopParticleEmitter(gameObject=var "Pt Dust")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    PlayParticleEmitter(gameObject=var "Pt Smoke", emit=0, resetIfPlaying=false)
+    SendEventToRegister(eventName="PILGRIM AMBUSH")
+    ActivateGameObject(gameObject=var "Damage Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Attack?
+  }
+
+  state Needolin {
+    StopWalker(target=Self, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pray")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.7, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=var "Audio Table Sing", noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    PlayParticleEmitterInState(gameObject=var "Pr Pray")
+    SetBoolValue(boolVariable=var "Currently Singing", boolValue=true, everyFrame=false)
+    on END → Needolin End
+    on SING DURATION END → Needolin End
+  }
+
+  state Needolin End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray End Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Currently Singing", boolValue=false, everyFrame=false)
+    on FINISHED → Start Walk
+  }
+
+  state Battle Setup {
+    ActivateGameObject(gameObject=var "Alert Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Ambush Ready
+  }
+
+  state Drop Pause {
+    FindNamedChild(gameObject=Self, storeResult=var "Damage Collider")
+    ActivateGameObject(gameObject=var "Damage Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    StopWalker(target=Self, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=(unset), sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on BATTLE START → Spawn Pause
+    on WAKE → Drop Antic
+  }
+
+  state Drop Antic {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    FindChild(gameObject=Self, childName="Drop Dust", storeResult=var "Drop Dust")
+    PlayParticleEmitterInState(gameObject=var "Drop Dust")
+    on FINISHED → Drop
+  }
+
+  state Spawn Pause {
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Drop Antic
+  }
+
+  state Drop {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack Air")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on LAND → Land Check
+  }
+
+  state Land 1 {
+    SetVelocityByScale(gameObject=Self, speed=-8, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Land", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    on FINISHED → Land 2
+  }
+
+  state Land 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.875, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Attack Recover
+  }
+
+  state Battle Pause {
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ambush Antic
+  }
+
+  state Dormant {
+    SetBoolValue(boolVariable=var "Currently Singing", boolValue=false, everyFrame=false)
+    on ATTACK END → Start Walk
+  }
+
+  state Land Check {
+    BoolTest(boolVariable=var "Attack Instantly", isTrue=→"SIMPLE", isFalse=(none), everyFrame=false)
+    on FINISHED → Land 1
+    on SIMPLE → Simple Land
+  }
+
+  state Simple Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Recover
+  }
+
+  state Falling {
+    SetBoolValue(boolVariable=var "Currently Singing", boolValue=false, everyFrame=false)
+    on END FALL → Start Walk
+  }
+
+  state Off Plane? {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    FloatCompare(float1=var "Z Pos", float2=1, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"BG", everyFrame=false)
+    FloatCompare(float1=var "Z Pos", float2=-1, tolerance=0, equal=(none), lessThan=→"FG", greaterThan=(none), everyFrame=false)
+    on FINISHED → Sleep
+    on BG → BG
+    on FG → FG
+  }
+
+  state Sleep {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on BATTLE START → Battle Wake
+    on WAKE → Wake Pause
+    on TOOK DAMAGE → Wake Thread
+  }
+
+  state Wake Pause {
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wake Antic
+  }
+
+  state FG {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    CallMethodProper(gameObject=Self, behaviour="SetZ", methodName="CancelSetZ", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Sleep
+  }
+
+  state BG {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="SetZ", methodName="CancelSetZ", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0.75, 0.75, 0.75, 1), everyframe=false)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Sleep
+  }
+
+  state Wake Thread {
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"BLACK THREAD", isFalse=(none))
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="PlayPossess", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wake 2
+    on BLACK THREAD → Black Thread Wake
+  }
+
+  state Wake 2 {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Target")
+    EaseFloat(fromValue=var "Z Pos", toValue=var "Z Target", floatVariable=var "Z Tween", time=0.2, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Tween", space=0, everyFrame=true, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=var "Audio Table Alert", pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.2)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    WaitRandom(timeMin=0.75, timeMax=0.95, finishEvent=→"NEXT", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on NEXT → Set Correct Z Position
+    on TOOK DAMAGE → Set Correct Z Position
+  }
+
+  state Battle Wake {
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"BLACK THREAD", isFalse=(none))
+    ObjectJitter(gameObject=Self, x=0.1, y=(unset), z=(unset), allowMovement=false, limitFps=30)
+    WaitRandom(timeMin=0.9, timeMax=1.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wake Thread
+    on BLACK THREAD → Black Thread Wake
+  }
+
+  state Spawn Wake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spawn Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=var "Audio Table Alert", pitchOffset=0, stopPreviousSound=true, forcePlay=false)  // disabled
+    on FINISHED → Attack
+    on TOOK DAMAGE → Attack
+  }
+
+  state Sleep Collider {
+    GetCurrentTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep 1", equalEvent=(none), notEqualEvent=(none), storeResult=var "Sleep 1", everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep 2", equalEvent=(none), notEqualEvent=(none), storeResult=var "Sleep 2", everyFrame=false)
+    BoolNoneTrue(boolVariables=[var "Sleep 1", var "Sleep 2"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    FloatInRange(floatVariable=var "Z Pos", lowerValue=-1, upperValue=1, boolVariable=(unset), trueEvent=→"FINISHED", falseEvent=(none), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    on FINISHED → Get Refs
+  }
+
+  state Corpse Ready {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    Tk2dSpriteSetColor(gameObject=Self, color=(0.7075472, 0.7075472, 0.7075472, 1), everyframe=false)
+    StopWalker(target=Self, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    ActivateGameObject(gameObject=var "Damage Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on WAKE → Spawn Thread?
+  }
+
+  state Corpse Wake Antic {
+    ObjectJitter(gameObject=Self, x=0.1, y=(unset), z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Corpse Thread
+  }
+
+  state Corpse Wake {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=var "Audio Table Alert", pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pray")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    SendMessage(gameObject=var "Threads", delivery=BroadcastMessage, options=1, functionCall=ThreadEnd())
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashArmoured())
+    ActivateGameObject(gameObject=var "Damage Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Corpse Wake End
+  }
+
+  state Corpse Wake End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray End Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack?
+  }
+
+  state Corpse Wake Pause {
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Corpse Wake Antic
+  }
+
+  state Corpse Thread {
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="PlayPossess", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Corpse Wake
+  }
+
+  state Idle Thread? {
+    BoolTest(boolVariable=var "z2 NoIdleThread", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Corpse Anim
+  }
+
+  state Spawn Thread? {
+    BoolTest(boolVariable=var "z2 NoIdleThread", isTrue=(none), isFalse=→"AMBUSH", everyFrame=false)
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"BLACK THREAD", isFalse=(none))
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    PlayAudioEvent(audioClip=silk_threads_tighten (sfxstatic_assets_areacradle.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEventRandom(audioClips=[enemy_bone_crack_1 (sfxstatic_assets_areabone.bundle), enemy_bone_crack_2 (sfxstatic_assets_areabone.bundle)], pitchMin=0.85, pitchMax=1.15, volume=0.85, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Thread Antic
+    on AMBUSH → Corpse Wake Pause
+    on BLACK THREAD → Black Thread Wake 2
+  }
+
+  state Thread Antic {
+    ObjectJitter(gameObject=Self, x=0.1, y=(unset), z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Corpse Thread
+  }
+
+  state Dmg Response Check {
+    BoolTest(boolVariable=var "z3 AlwaysAttackWhenDamaged", isTrue=→"ATTACK", isFalse=(none), everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=10, tolerance=0, equal=(none), lessThan=→"ATTACK", greaterThan=(none), everyFrame=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=(none), notFacingEvent=→"TURN", facingBool=(unset), notFacingBool=(unset))
+    on FINISHED → Walk
+    on ATTACK → Attack
+    on TURN → Turn
+  }
+
+  state Set Memory Spawn {
+    SetBoolValue(boolVariable=var "Memory Spawn", boolValue=true, everyFrame=false)
+    on FINISHED → Battle Setup
+  }
+
+  state Corpse Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Land")
+    CheckCurrentMapZone(mapZone="JUDGE_STEPS", equalEvent=(none), notEqualEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Sandy")
+    on FINISHED → Corpse Ready
+  }
+
+  state Turn {
+    StopWalker(target=Self, everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Walk
+  }
+
+  state Wake End {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Target", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Pray End Q
+  }
+
+  state Wake Antic {
+    GetOwner(storeGameObject=var "Self")
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"BLACK THREAD", isFalse=(none))
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    SetParent(gameObject=var "Silk", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    ObjectJitter(gameObject=Self, x=0.15, y=(unset), z=(unset), allowMovement=false, limitFps=30)
+    WaitRandom(timeMin=0.5, timeMax=0.6, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=silk_threads_tighten (sfxstatic_assets_areacradle.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Wake Thread
+    on BLACK THREAD → Black Thread Wake
+  }
+
+  state Black Thread Wake {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=BecomeThreadedNoSing())
+    ObjectJitter(gameObject=Self, x=0.05, y=0.05, z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wake 2
+  }
+
+  state Black Thread Wake 2 {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=BecomeThreadedNoSing())
+    ObjectJitter(gameObject=Self, x=0.05, y=0.05, z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Corpse Wake
+  }
+
+  state Set Correct Z Position {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Target", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Wake End
+  }
+
+  state Get Refs {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Pt Bone", storeResult=var "Pt Bone")
+    FindChild(gameObject=Self, childName="Pt Pray", storeResult=var "Pr Pray")
+    FindChild(gameObject=Self, childName="Pt Dust", storeResult=var "Pt Dust")
+    FindChild(gameObject=Self, childName="Alert Range", storeResult=var "Alert Range")
+    FindChild(gameObject=Self, childName="Audio Loop Voice", storeResult=var "Audio Loop Voice")
+    FindChild(gameObject=Self, childName="Damage Collider", storeResult=var "Damage Collider")
+    on FINISHED → Pause
+  }
+
+  var Ambush: bool = false
+  var Attack Instantly: bool = false
+  var Battler: bool = false
+  var Dropper: bool = false
+  var Praying: bool = true
+  var Quick Wake: bool = false
+  var z QuickAmbush: bool = false
+  var z1 CorpseAmbush: bool = false
+  var z2 NoIdleThread: bool = false
+  var z3 AlwaysAttackWhenDamaged: bool = false
+  var Audio Table Alert: object = Pilgrim_Groveller_Attack (sfxdynamic_assets_pilgrimslower.bundle)
+  var Audio Table Idle: object = Pilgrim_Groveller_Idle (sfxdynamic_assets_pilgrimslower.bundle)
+  var Audio Table Sing: object = Pilgrim_Groveller_Sing (sfxdynamic_assets_pilgrimslower.bundle)
+
+  var Z Pos: float = 0
+  var Z Target: float = 0
+  var Z Tween: float = 0
+  var Ambush Antic Time: float = 0
+  var Distance: float = 0
+  var Alert: bool = false
+  var Can See Hero: bool = false
+  var Wake: bool = false
+  var Sleep 2: bool = false
+  var Sleep 1: bool = false
+  var Memory Spawn: bool = false
+  var Currently Singing: bool = false
+  var Do Sing: bool = false
+  var Clip: string = ""
+  var Alert Range: gameObject = <null>
+  var Audio Loop Voice: gameObject = <null>
+  var Damage Collider: gameObject = <null>
+  var Drop Dust: gameObject = <null>
+  var Pr Pray: gameObject = <null>
+  var Pt Bone: gameObject = <null>
+  var Pt Dust: gameObject = <null>
+  var Pt Smoke: gameObject = <null>
+  var Self: gameObject = <null>
+  var Silk: gameObject = <null>
+  var Threads: gameObject = <null>
+  var Wake Range: gameObject = <null>
+}

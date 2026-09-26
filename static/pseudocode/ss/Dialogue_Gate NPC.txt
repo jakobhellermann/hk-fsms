@@ -1,0 +1,152 @@
+# Dialogue
+# 1 location(s):
+#   Coral_Judge_Arena / Boss Scene/Pilgrims/Gate NPC
+
+fsm Dialogue {
+  start Init
+  on STOP REACT → Stop React  // from any state
+
+  state Init {
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Queue Needolin Scene", boolValue=false, everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.4, MaxReactDelay=2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Check
+    on SING → Sing
+    on STARTLE → Startle
+  }
+
+  state Check {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stand Idle Right")
+    PlayerDataBoolTest(boolName="metGatePilgrim", isTrue=(none), isFalse=→"MEET")
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REPEAT", isFalse=→"REMEET", everyFrame=false)
+    on MEET → Meet
+    on REMEET → Remeet Check
+    on REPEAT → Repeat
+  }
+
+  state Meet {
+    SetPlayerDataBool(boolName="metGatePilgrim", value=true)
+    GetPlayerDataBool(boolName="visitedCitadel", storeValue=var "Visited Citadel")
+    ConvertBoolToString(boolVariable=var "Visited Citadel", stringVariable=var "Convo Key", falseString="GATE_PILGRIM_MEET", trueString="GATE_PILGRIM_MEET_ALT", everyFrame=false)
+    RunDialogue(Sheet="Pilgrims", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Shrines?
+  }
+
+  state Shrines? {
+    CallMethodProper(gameObject=var "Gate Lock", behaviour="BellShrineGateLock", methodName="GetIsAllUnlocked", parameters=[], storeResult=var "All Unlocked", EveryFrame=false)
+    BoolTest(boolVariable=var "All Unlocked", isTrue=→"SHRINES COMPLETE", isFalse=→"SHRINES INCOMPLETE", everyFrame=false)
+    on SHRINES COMPLETE → Meet Shrines
+    on SHRINES INCOMPLETE → Meet Shrines Incomplete
+  }
+
+  state Meet Shrines {
+    SetBoolValue(boolVariable=var "Queue Needolin Scene", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Pilgrims", Key="GATE_PILGRIM_MEET_SHRINES", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Meet Shrines Incomplete {
+    SetPlayerDataBool(boolName="gatePilgrimNoNeedolinConvo", value=true)
+    RunDialogue(Sheet="Pilgrims", Key="GATE_PILGRIM_MEET_NO_SHRINES", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Repeat {
+    CallMethodProper(gameObject=var "Gate Lock", behaviour="BellShrineGateLock", methodName="GetIsAllUnlocked", parameters=[], storeResult=var "All Unlocked", EveryFrame=false)
+    ConvertBoolToString(boolVariable=var "All Unlocked", stringVariable=var "Convo Key", falseString="GATE_PILGRIM_REPEAT_NO_SHRINES", trueString="GATE_PILGRIM_REPEAT_SHRINES", everyFrame=false)
+    RunDialogue(Sheet="Pilgrims", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  sequence state End Dialogue {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stand Idle Left")
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    PlayerDataBoolTest(boolName="citadelWoken", isTrue=→"CITADEL WOKEN", isFalse=(none))
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=→"FINISHED", CompletedEvent=→"FINISHED", Quest=Grand Gate Bellshrines (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle))
+    BeginQuestV2(ShowPrompt=true, Quest=Grand Gate Bellshrines (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle))
+    on FINISHED → Send Event?
+    on CITADEL WOKEN → Silent Complete?
+  }
+
+  state Remeet Check {
+    CallMethodProper(gameObject=var "Gate Lock", behaviour="BellShrineGateLock", methodName="GetIsAllUnlocked", parameters=[], storeResult=var "All Unlocked", EveryFrame=false)
+    BoolTest(boolVariable=var "All Unlocked", isTrue=(none), isFalse=→"SHRINES INCOMPLETE", everyFrame=false)
+    PlayerDataBoolTest(boolName="gatePilgrimNoNeedolinConvo", isTrue=→"TRUE", isFalse=→"FALSE")
+    on SHRINES INCOMPLETE → Remeet Shrines Incomplete
+    on TRUE → Remeet Got Shrines
+    on FALSE → Remeet Shrines Complete
+  }
+
+  state Remeet Got Shrines {
+    SetPlayerDataBool(boolName="gatePilgrimNoNeedolinConvo", value=false)
+    SetBoolValue(boolVariable=var "Queue Needolin Scene", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Pilgrims", Key="GATE_PILGRIM_REMEET_GOT_SHRINES", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Remeet Shrines Incomplete {
+    RunDialogue(Sheet="Pilgrims", Key="GATE_PILGRIM_REMEET_NO_SHRINES", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Remeet Shrines Complete {
+    SetBoolValue(boolVariable=var "Queue Needolin Scene", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Pilgrims", Key="GATE_PILGRIM_REMEET_SHRINES", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  sequence state Send Event? {
+    SetBoolValue(boolVariable=var "Return HUD", boolValue=var "Queue Needolin Scene", everyFrame=false)
+    BoolFlip(boolVariable=var "Return HUD")
+    EndDialogue(ReturnControl=true, ReturnHUD=var "Return HUD", Target=Self, UseChildren=false)
+    BoolTest(boolVariable=var "Queue Needolin Scene", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventToRegister(eventName="DO NEEDOLIN SCENE")
+    on FINISHED → Idle
+  }
+
+  state Sing {
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stand Sing")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=gate_pilgrim_sing (sfxdynamic_assets_areacoral.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stand Sing End")
+    on FINISHED → Idle
+  }
+
+  state Startle {
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stand Sing")
+    Wait(time=0.45, finishEvent=→"CANCEL", realTime=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=gate_pilgrim_alert (sfxdynamic_assets_areacoral.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on CANCEL → Sing End
+  }
+
+  state Stop React {
+    on START REACT → Idle
+  }
+
+  state Silent Complete? {
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=→"FINISHED", CompletedEvent=→"FINISHED", Quest=Grand Gate Bellshrines (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle))
+    EndQuestV2(ConsumeCurrency=false, ShowPrompt=false, Quest=Grand Gate Bellshrines (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle))
+    on FINISHED → Send Event?
+  }
+
+  var Gate Lock: gameObject = Boss Scene/Great Gate/Gate/Gate/Gate Bells
+
+  var Spoken: bool = false
+  var Queue Needolin Scene: bool = false
+  var Return HUD: bool = false
+  var Visited Citadel: bool = false
+  var All Unlocked: bool = false
+  var Convo Key: string = ""
+  var Audio Loop Voice: gameObject = Boss Scene/Pilgrims/Gate NPC/Audio Loop Voice
+}

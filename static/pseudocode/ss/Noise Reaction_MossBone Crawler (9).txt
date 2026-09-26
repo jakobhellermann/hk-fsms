@@ -1,0 +1,122 @@
+# Noise Reaction
+# 1 location(s):
+#   Tut_02 / Black Thread States Thread Only Variant/Normal World/MossBone Crawler (9)
+
+fsm Noise Reaction {
+  start Init
+  on EXTRACT → Extract  // from any state
+
+  state Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=(none), ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on WAKE → Type
+  }
+
+  state Type {
+    CallMethodProper(gameObject=Self, behaviour="Crawler", methodName="EndAmbientIdle", parameters=[], storeResult=(unset var), EveryFrame=false)
+    GetCrawlerType(StoreType=var "Crawler Type", Target=Self)
+    EnumSwitch(enumVariable=var "Crawler Type", compareTo=[Crawler+CrawlerTypes(0)], sendEvent=[→"FLOOR"], everyFrame=false)
+    on FINISHED → Active
+    on FLOOR → Wake Directional
+  }
+
+  state Wake Directional {
+    StopCrawler(Target=Self, WaitForTurn=false)
+    GetDirection2D(From=Self, To=var "Hero", StoreVector=(unset), StoreX=var "Direction To Hero", StoreY=(unset), EveryFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignToBool(Value=var "Direction To Hero", StoreIsPositive=var "Hero Is Right", EveryFrame=false)
+    FloatSignToBool(Value=var "Scale X", StoreIsPositive=var "Facing Left", EveryFrame=false)
+    BoolTestMulti(boolVariables=[var "Hero Is Right", var "Facing Left"], boolStates=[true, true], trueEvent=(none), falseEvent=(none), storeResult=var "Should Turn Right", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Hero Is Right", var "Facing Left"], boolStates=[false, false], trueEvent=(none), falseEvent=(none), storeResult=var "Should Turn Left", everyFrame=false)
+    BoolAnyTrue(boolVariables=[var "Should Turn Left", var "Should Turn Right"], sendEvent=(none), storeResult=var "Should Turn", everyFrame=false)
+    StartCrawler(Target=Self, ScheduleTurn=var "Should Turn")
+    on FINISHED → Active
+  }
+
+  state Active {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=→"FINISHED", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Idle
+    on SING → Sing
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    StopCrawler(Target=Self, WaitForTurn=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=mossbone_crawler_sing (sfxdynamic_assets_areamoss.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Return Control
+  }
+
+  state Return Control {
+    StartCrawler(Target=Self, ScheduleTurn=false)
+    on FINISHED → Idle
+  }
+
+  state Extract {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    StopCrawler(Target=Self, WaitForTurn=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Extract")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Rotation", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Offset", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Rotation", multiplyBy=-90, everyFrame=false)
+    FloatMultiply(floatVariable=var "Offset", multiplyBy=0.25, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    FindChild(gameObject=var "Hero", childName="Tool Effects/Extract Point", storeResult=var "Extract Point")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Extract Point", xOffset=var "Offset", yOffset=0, zOffset=(unset), overrideZ=0.003, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlashingMossExtract())
+    on EXTRACT FINISH → Kill Dir
+  }
+
+  state Init {
+    GetHero(storeResult=var "Hero")
+    on FINISHED → Idle
+  }
+
+  state Extract Kill {
+    InstaDeath(target=Self, direction=var "Kill Angle")
+  }
+
+  state Kill Dir {
+    SetFloatValue(floatVariable=var "Kill Angle", floatValue=0, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    SetFloatValue(floatVariable=var "Kill Angle", floatValue=180, everyFrame=false)
+    on FINISHED → Extract Kill
+  }
+
+  state Floor Startle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Startle")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToStartle", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → State 1
+  }
+
+  state State 1 {
+  }
+
+  var Direction To Hero: float = 0
+  var Scale X: float = 0
+  var Z Pos: float = 0
+  var Rotation: float = 0
+  var Offset: float = 0
+  var Kill Angle: float = 0
+  var Facing Left: bool = false
+  var Hero Is Right: bool = false
+  var Should Turn: bool = false
+  var Should Turn Left: bool = false
+  var Should Turn Right: bool = false
+  var Hero: gameObject = <null>
+  var Extract Point: gameObject = <null>
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Normal World/MossBone Crawler (9)/Audio Loop Voice
+  var Crawler Type: enum = Crawler+CrawlerTypes(0)
+}

@@ -1,0 +1,192 @@
+# Control
+# 2 location(s):
+#   Belltown_04 / Quest Bell Dropper (5)
+#   Belltown_basement_03 / Quest Bell Dropper (5)
+
+fsm Control {
+  start Init
+  on PICKED UP → Silver Picked Up  // from any state
+
+  state Init {
+    GetPosition2d(gameObject=var "Min X", vector_2d=(unset), x=var "Spawn Min X", y=(unset), space=0, everyFrame=false)
+    GetPosition2d(gameObject=var "Max X", vector_2d=(unset), x=var "Spawn Max X", y=(unset), space=0, everyFrame=false)
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=(unset), y=var "Spawn Y", space=0, everyFrame=false)
+    GetPosition2d(gameObject=var "Floor Point", vector_2d=(unset), x=(unset), y=var "Floor Y", space=0, everyFrame=false)
+    FloatOperator(float1=var "Floor Y", float2=2, operation=Add, storeResult=var "Phys Y", everyFrame=false)
+    FloatOperator(float1=var "Floor Y", float2=1, operation=Subtract, storeResult=var "Disappear Y", everyFrame=false)
+    ActivateGameObject(gameObject=var "Drop Bell", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Silver Bell", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateAllChildren(gameObject=var "Standard Bell Folder", activate=false)
+    on FINISHED → Quest Active?
+  }
+
+  state Drop Type {
+    SendEvent(eventTarget=Self, sendEvent=→"SILVER", delay=0, everyFrame=false)  // disabled
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="NoSilver Range", storeResult=false, sendEvent="STANDARD", outOfRangeEvent="", everyFrame=false)
+    CheckIfToolEquipped(Tool=Magnetite Dice (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=(none), storeValue=var "Dice Equipped")
+    SendRandomEventV4(events=[→"STANDARD", →"SILVER"], weights=[0.7, 0.3], eventMax=[4, 3], missedMax=[3, 4], activeBool=var "Dice Equipped")
+    SendRandomEventV4(events=[→"STANDARD", →"SILVER"], weights=[0.75, 0.25], eventMax=[4, 2], missedMax=[2, 4], activeBool=(unset))
+    on STANDARD → Standard
+    on SILVER → Silver
+  }
+
+  state Standard {
+    GetRandomChild(gameObject=var "Standard Bell Folder", storeResult=var "Bell Current")
+    ActivateGameObject(gameObject=var "Bell Current", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGameObject(variable=var "Collider", gameObject=var "Bell Current", everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=8, everyFrame=false)  // disabled
+    SetFloatValue(floatVariable=var "Drop Cancel Time", floatValue=8, everyFrame=false)
+    on FINISHED → Drop Pause
+  }
+
+  state Reset {
+    SetVelocity2d(gameObject=var "Drop Bell", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetAngularVelocity2d(gameObject=var "Drop Bell", angularVelocity=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Drop Bell", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Silver Bell", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateAllChildren(gameObject=var "Standard Bell Folder", activate=false)
+    on FINISHED → Drop Type
+  }
+
+  state Drop Antic {
+    RandomFloat(min=var "Spawn Min X", max=var "Spawn Max X", storeResult=var "Spawn X")
+    SetPosition2d(gameObject=var "Pt Drop Antic", vector=(unset), x=var "Spawn X", y=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Pt Drop Antic", emit=0, resetIfPlaying=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    SetCollider2dIsTrigger(gameObject=var "Collider", isTrigger=true, setAllColliders=false)
+    on FINISHED → Drop Bell
+  }
+
+  state Silver {
+    SetSpriteRenderer(gameObject=var "Silver Bell", active=true)
+    ActivateGameObject(gameObject=var "Silver Bell", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGameObject(variable=var "Collider", gameObject=var "Silver Bell", everyFrame=false)
+    GetName(gameObject=var "Self", storeName=var "Name", everyFrame=false)
+    BuildString(stringParts=[var "Name", " dropped a Silver Bell!"], separator="", addToEnd=true, storeResult=var "Log", everyFrame=false)
+    DebugLogConsole(logLevel=0, text=var "Log", sendToUnityLog=true)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=15, everyFrame=false)  // disabled
+    SetFloatValue(floatVariable=var "Drop Cancel Time", floatValue=10, everyFrame=false)
+    on FINISHED → Quest Pickup
+  }
+
+  state Drop Bell {
+    ActivateGameObject(gameObject=var "Silver Pickup", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition2d(gameObject=var "Drop Bell", vector=(unset), x=var "Spawn X", y=var "Spawn Y", space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Drop Bell", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=-50, max=50, storeResult=var "Angular Velocity")
+    SetAngularVelocity2d(gameObject=var "Drop Bell", angularVelocity=var "Angular Velocity", everyFrame=false)
+    CheckYPosition(gameObject=var "Drop Bell", compareTo=var "Phys Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"NEXT", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    SetGravity2dScale(gameObject=var "Drop Bell", gravityScale=1)
+    SetCollider2dIsTrigger(gameObject=var "Collider", isTrigger=true, setAllColliders=false)
+    Wait(time=2, finishEvent=→"TIME OUT", realTime=false)
+    on NEXT → Bell Phys
+    on TIME OUT → Force Drop
+  }
+
+  state Bell Phys {
+    SetCollider2dIsTrigger(gameObject=var "Collider", isTrigger=false, setAllColliders=false)
+    Wait(time=8, finishEvent=→"FINISHED", realTime=false)
+    SetIsKinematic2d(gameObject=var "Drop Bell", isKinematic=false)
+    SetGravity2dScale(gameObject=var "Drop Bell", gravityScale=1)
+    on FINISHED → Drop Away Wait
+  }
+
+  state Drop Away {
+    SetCollider2dIsTrigger(gameObject=var "Collider", isTrigger=true, setAllColliders=false)
+    CheckYPosition(gameObject=var "Drop Bell", compareTo=var "Disappear Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"NEXT", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    Wait(time=1, finishEvent=→"NEXT", realTime=false)
+    on NEXT → Dropped Away
+  }
+
+  state Dropped Away {
+    ActivateGameObject(gameObject=var "Drop Bell", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Redrop Pause
+  }
+
+  state Drop Away Wait {
+    GetDistance(gameObject=var "Drop Bell", target=var "Hero", storeResult=var "Distance", everyFrame=true)  // disabled
+    FloatCompare(float1=var "Distance", float2=15, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"NEXT", everyFrame=true)  // disabled
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="NoDropAway Range", storeResult=false, sendEvent="", outOfRangeEvent="NEXT", everyFrame=true)
+    on NEXT → Drop Away
+  }
+
+  state Drop Pause {
+    GetDistance(gameObject=var "Drop Bell", target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=14, tolerance=0, equal=(none), lessThan=→"NEXT", greaterThan=(none), everyFrame=true)
+    Wait(time=var "Drop Cancel Time", finishEvent=→"CANCEL", realTime=false)  // disabled
+    Wait(time=15, finishEvent=→"NEXT", realTime=false)
+    on NEXT → Drop Antic
+    on CANCEL → Reset
+  }
+
+  state Redrop Pause {
+    WaitRandom(timeMin=5, timeMax=8, finishEvent=→"NEXT", realTime=false)
+    GetDistance(gameObject=var "Drop Bell", target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=35, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"NEXT", everyFrame=true)
+    on NEXT → Reset
+  }
+
+  state Start Pause {
+    Wait(time=var "Start Pause", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reset
+  }
+
+  state Quest Pickup {
+    ActivateGameObject(gameObject=var "Silver Pickup", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Drop Pause
+  }
+
+  state Silver Picked Up {
+    SetSpriteRenderer(gameObject=var "Silver Bell", active=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reset Pickup
+  }
+
+  state Reset Pickup {
+    SendMessage(gameObject=var "Silver Pickup", delivery=BroadcastMessage, options=1, functionCall=SetActivation(false))
+    on FINISHED → Dropped Away
+  }
+
+  state Quest Active? {
+    CheckQuestStateV2(NotTrackedEvent=→"NOT ACTIVE", IncompleteEvent=→"FINISHED", CompletedEvent=→"NOT ACTIVE", Quest=Shiny Bell Goomba (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    SetSpriteRendererColor(TintColor=(0.6981132, 0.6981132, 0.6981132, 1), Target=var "Silver Bell")
+    on FINISHED → Start Pause
+    on NOT ACTIVE → Not Active
+  }
+
+  state Not Active {
+  }
+
+  state Force Drop {
+    SetPosition2d(gameObject=var "Drop Bell", vector=(unset), x=(unset), y=var "Phys Y", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Bell Phys
+  }
+
+  var Start Pause: float = 0
+
+  var Angular Velocity: float = 0
+  var Disappear Y: float = 0
+  var Distance: float = 0
+  var Drop Cancel Time: float = 0
+  var Floor Y: float = 0
+  var Idle Time: float = 0
+  var Phys Y: float = 0
+  var Spawn Max X: float = 0
+  var Spawn Min X: float = 0
+  var Spawn X: float = 0
+  var Spawn Y: float = 0
+  var Dice Equipped: bool = false
+  var Name: string = ""
+  var Log: string = ""
+  var Drop Bell: gameObject = Quest Bell Dropper (5)/Drop Bell
+  var Silver Bell: gameObject = Quest Bell Dropper (5)/Drop Bell/Silver
+  var Standard Bell Folder: gameObject = Quest Bell Dropper (5)/Drop Bell/Standard
+  var Floor Point: gameObject = Quest Bell Dropper (5)/Floor Point
+  var Min X: gameObject = Quest Bell Dropper (5)/Min X
+  var Max X: gameObject = Quest Bell Dropper (5)/Max X
+  var Pt Drop Antic: gameObject = Quest Bell Dropper (5)/Pt Drop Antic
+  var Bell Current: gameObject = <null>
+  var Collider: gameObject = <null>
+  var Self: gameObject = Quest Bell Dropper (5)
+  var Silver Pickup: gameObject = Quest Bell Dropper (5)/Drop Bell/Silver/Collectable Item Pickup Child
+}

@@ -1,0 +1,195 @@
+# Control
+# 1 location(s):
+#   Memory_Coral_Tower / Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)
+
+fsm Control {
+  start Init
+
+  state Init {
+    BoolTest(boolVariable=var "Idle Patrol", isTrue=→"IDLE", isFalse=(none), everyFrame=false)
+    on FINISHED → Spawn Antic
+    on IDLE → Idle Start
+  }
+
+  state Idle {
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=5, accelerationMin=5, accelerationMax=10, roamingRangeX=2, roamingRangeY=1, manualStartPos=var "Start Pos")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    on ALERT → Chase
+    on TOOK DAMAGE → Chase
+  }
+
+  state Chase {
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=3.5, acceleration=0.1, targetsHeight=false, height=0, minAboveHero=(unset))
+    ShoveFromWall(gameObject=Self, shoveForce=10, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    ShoveFromWall(gameObject=Self, shoveForce=10, rayLength=8, checkUp=false, checkDown=true, checkLeft=false, checkRight=false, everyFrame=true)
+    ShoveFromBouncer(gameObject=Self, shoveForce=10, rayLength=6, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    RandomFloat(min=1, max=1.7, storeResult=var "Attack Timer")
+    SetBoolValueAtTime(BoolVariable=var "Attack Ready", BoolValue=true, Time=var "Attack Timer", SetOppositeOnStateEntry=true)
+    SetBoolValueAtTime(BoolVariable=var "Unalert Timer", BoolValue=true, Time=3, SetOppositeOnStateEntry=true)  // disabled
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Attack Ready", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Unalert", var "Unalert Timer"], sendEvent=→"UNALERT", storeResult=(unset), everyFrame=true)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on ATTACK → Charge Antic
+    on UNALERT → Idle
+    on JELLYFISH ATTACKING → Let Partner Attack
+  }
+
+  state Charge Antic {
+    SendEventToRegisterV2(EventName="JELLYFISH ATTACKING", ExcludeTarget=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=1, storeAngle=var "Angle", pause=0.25, everyFrame=false)
+    PlayAudioEvent(audioClip=tar_slug_death_antic (sfxstatic_assets_areadocks.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=bloat_roach_antic (sfxstatic_assets_areaswamp.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Charge Pullback
+    on JELLYFISH ATTACKING → Let Partner Attack
+  }
+
+  state Charge {
+    CheckCollisionSideV2(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"HIT TOP", rightHitEvent=→"HIT RIGHT", bottomHitEvent=→"HIT BOT", leftHitEvent=→"HIT LEFT", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false, ignoreBodyVelocity=false)
+    CheckCollisionSideEnterV2(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"HIT TOP", rightHitEvent=→"HIT RIGHT", bottomHitEvent=→"HIT BOT", leftHitEvent=→"HIT LEFT", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false, velocity2D=(unset))
+    CheckCollisionSideV2(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"HIT TOP", rightHitEvent=→"HIT RIGHT", bottomHitEvent=→"HIT BOT", leftHitEvent=→"HIT LEFT", otherLayer=false, otherLayerNumber=15, ignoreTriggers=true, ignoreBodyVelocity=false)
+    CheckCollisionSideEnterV2(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"HIT TOP", rightHitEvent=→"HIT RIGHT", bottomHitEvent=→"HIT BOT", leftHitEvent=→"HIT LEFT", otherLayer=false, otherLayerNumber=15, ignoreTriggers=true, velocity2D=(unset))
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Breaker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    EnableFSM(gameObject=Self, fsmName="Break Spikes", enable=true, resetOnExit=true)
+    on FINISHED → Charge End
+    on HIT TOP → Bonk Top
+    on HIT RIGHT → Bonk Right
+    on HIT BOT → Bonk Bot
+    on HIT LEFT → Bonk Left
+  }
+
+  state Charge End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Bonk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="BREAK END", delay=0, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Bonk Top {
+    ActivateGameObject(gameObject=var "Slam Effect U", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-20, everyFrame=false)
+    on FINISHED → Bonk
+  }
+
+  state Bonk {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=false_knight_land_1st_time (sfxstatic_assets_enemyheavy.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    EnableFSM(gameObject=Self, fsmName="Break Spikes", enable=true, resetOnExit=true)
+    on FINISHED → Charge End
+  }
+
+  state Bonk Right {
+    ActivateGameObject(gameObject=var "Slam Effect R", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-20, y=(unset), everyFrame=false)
+    on FINISHED → Bonk
+  }
+
+  state Bonk Bot {
+    ActivateGameObject(gameObject=var "Slam Effect D", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=20, everyFrame=false)
+    on FINISHED → Bonk
+  }
+
+  state Bonk Left {
+    ActivateGameObject(gameObject=var "Slam Effect L", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=20, y=(unset), everyFrame=false)
+    on FINISHED → Bonk
+  }
+
+  state Idle Start {
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Idle Start Pos", xOffset=0, yOffset=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Can Unalert", boolValue=true, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Idle
+  }
+
+  state Charge Pullback {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    FloatOperator(float1=var "Angle", float2=180, operation=Add, storeResult=var "Pullback Angle", everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Pullback Angle", speed=10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.88, brakeOnExit=false)
+    on FINISHED → Charge Start
+  }
+
+  state Spawn Antic {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Roof Point", xOffset=0, yOffset=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    PlayParticleEmitterInState(gameObject=var "Pt EntryAntic")
+    WaitRandom(timeMin=1, timeMax=1.2, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayInState(gameObject=var "Audio Loop EntryAntic", volume=1)
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.15)
+    on FINISHED → Spawn
+  }
+
+  state Spawn {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=breakable_wall_death (sfxstatic_assets_shared.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    PlayAudioEvent(audioClip=skull_king_charge_burst (sfxstatic_assets_areabone.bundle), pitchMin=1.05, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatePositionTo(gameObject=Self, toValue=var "Start Pos", localSpace=false, time=0.5, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → First Idle
+  }
+
+  state Charge Start {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="BREAK START", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=skull_king_charge_burst (sfxstatic_assets_areabone.bundle), pitchMin=1.05, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=25, everyFrame=false)
+    on FINISHED → Charge
+  }
+
+  state Let Partner Attack {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Chase
+  }
+
+  state First Idle {
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=3.5, acceleration=0.1, targetsHeight=false, height=0, minAboveHero=(unset))
+    ShoveFromWall(gameObject=Self, shoveForce=10, rayLength=3, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    ShoveFromWall(gameObject=Self, shoveForce=10, rayLength=8, checkUp=false, checkDown=true, checkLeft=false, checkRight=false, everyFrame=true)
+    ShoveFromBouncer(gameObject=Self, shoveForce=10, rayLength=6, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    RandomFloat(min=1, max=1.7, storeResult=var "Attack Timer")
+    SetBoolValueAtTime(BoolVariable=var "Attack Ready", BoolValue=true, Time=var "Attack Timer", SetOppositeOnStateEntry=true)
+    SetBoolValueAtTime(BoolVariable=var "Unalert Timer", BoolValue=true, Time=3, SetOppositeOnStateEntry=true)  // disabled
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Attack Ready", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Unalert", var "Unalert Timer"], sendEvent=→"UNALERT", storeResult=(unset), everyFrame=true)  // disabled
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Chase
+  }
+
+  var Idle Patrol: bool = false
+  var Idle Start Pos: gameObject = <null>
+
+  var Angle: float = 0
+  var Pullback Angle: float = 0
+  var Attack Timer: float = 0
+  var Attack Ready: bool = false
+  var In Attack Range: bool = false
+  var Can Unalert: bool = false
+  var Unalert Timer: bool = false
+  var Start Pos: vector3 = (0, 0, 0)
+  var Slam Effect L: gameObject = Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)/Slam Effect L
+  var Slam Effect R: gameObject = Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)/Slam Effect R
+  var Slam Effect U: gameObject = Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)/Slam Effect U
+  var Slam Effect D: gameObject = Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)/Slam Effect D
+  var Breaker: gameObject = Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)/Breaker
+  var Pt EntryAntic: gameObject = Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)/Pt EntryAntic
+  var Roof Point: gameObject = Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)/Roof Point
+  var Audio Loop EntryAntic: gameObject = Battle Scenes/Battle Scene Chamber 3/Wave 15b - double jellyfish/Coral Big Jellyfish (1)/Audio Loop EntryAntic
+}

@@ -1,0 +1,256 @@
+# Mozzie
+# 6 location(s):
+#   Fungus1_02 / Mosquito
+#   Fungus1_05 / Mosquito
+#   Fungus1_06 / Mosquito
+#   Fungus1_07 / Mosquito
+#   Fungus1_17 / Mosquito
+#   Fungus1_22 / Mosquito
+
+fsm Mozzie {
+  start Initiate
+  on GO UP → Go Up  // from any state
+
+  state Initiate {
+    GetOwner(storeGameObject=var "Self")
+    GetHero(storeResult=var "Hero")
+    BoolTest(boolVariable=var "Start Alert", isTrue=→"ALERT", isFalse=(none), everyFrame=false)
+    FindAlertRange(target=Self, storeResult=var "Alert range", childName="Alert Range New")
+    on FINISHED → Idle
+    on ALERT → Chase Start
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=true, lateUpdate=false)
+    IdleBuzz(gameObject=var "Self", waitMin=0.75, waitMax=1, speedMax=3, accelerationMax=19, roamingRange=1)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRange(alertRange=var "Alert range", storeResult=var "In Alert Range", everyFrame=true)
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    BoolTest(boolVariable=var "startAlert", isTrue=→"ALERT", isFalse=(none), everyFrame=false)
+    on ALERT → Startle
+  }
+
+  state Chase Start {
+    SetAudioPitch(gameObject=var "Self", pitch=1.2, everyFrame=false)
+    on FINISHED → Chase - In Sight
+  }
+
+  state Chase - In Sight {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=true, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=5.5, acceleration=0.1, targetsHeight=true, height=1)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=10, tolerance=0, equal=→"ATTACK", lessThan=→"ATTACK", greaterThan=(none), everyFrame=false)
+    NextFrameEvent(sendEvent=→"WAIT")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on WAIT → Chase - Out of Sight
+    on ATTACK → Attack Pause
+  }
+
+  state Chase - Out of Sight {
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=5.5, acceleration=0.1, targetsHeight=true, height=1)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRange(alertRange=var "Alert range", storeResult=var "In Alert Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    Wait(time=var "Attention Span", finishEvent=→"WAIT", realTime=false)
+    on ALERT → Chase - In Sight
+    on WAIT → Stop
+  }
+
+  state Stop {
+    SetAudioPitch(gameObject=var "Self", pitch=1, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Decelerate(gameObject=var "Self", deceleration=0.3)
+    Wait(time=0.75, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Idle
+  }
+
+  state Attack Antic {
+    ActivateGameObject(gameObject=var "Tile Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mosquito_charge_prepare (sharedassets27.assets))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=1, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Attack Aim
+  }
+
+  state Lunge L {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Attack Angle", speed=var "Lunge Speed", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    FaceAngle(gameObject=Self, angleOffset=180, everyFrame=false)
+    on FINISHED → Lunging
+  }
+
+  state Pull Out {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mosquito_wall_hit (sharedassets27.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    GetRotation(gameObject=var "Thunk Effect", quaternion=(unset), vector=var "Thunk rotate", xAngle=(unset), yAngle=(unset), zAngle=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=var "Thunk Effect", vector=var "Thunk Scale", xScale=(unset), yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Thunk Effect R (resources.assets), spawnPoint=var "Thunk Effect", position=(unset), rotation=var "Thunk rotate", storeObject=var "Thunk Instance")
+    SetScale(gameObject=var "Thunk Instance", vector=var "Thunk Scale", x=(unset), y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Point Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=20)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Death Air", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    FloatMultiply(floatVariable=var "X Speed", multiplyBy=-0.3, everyFrame=false)
+    FloatMultiply(floatVariable=var "Y Speed", multiplyBy=-0.3, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Y Speed", everyFrame=false)
+    Decelerate(gameObject=Self, deceleration=0.2)
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    on FINISHED → Chase - In Sight
+  }
+
+  state Check Dir {
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=1.25, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mosquito_charge_charge (sharedassets27.assets))
+    ActivateGameObject(gameObject=var "Point Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    SetFsmFloat(gameObject=Self, fsmName="recoil", variableName="Recoil per second", setValue=0, everyFrame=false)  // disabled
+    FloatCompare(float1=var "Attack Angle", float2=90, tolerance=0, equal=(none), lessThan=→"RIGHT", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Attack Angle", float2=270, tolerance=0, equal=→"LEFT", lessThan=→"LEFT", greaterThan=→"RIGHT", everyFrame=false)
+    on RIGHT → Lunge R
+    on LEFT → Lunge L
+  }
+
+  state Lunge R {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Attack Angle", speed=var "Lunge Speed", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    FaceAngle(gameObject=Self, angleOffset=0, everyFrame=false)
+    on FINISHED → Lunging
+  }
+
+  state Hit Right {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=0.5, everyFrame=false)
+    RandomFloat(min=-5, max=5, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=0, everyFrame=false)
+    on FINISHED → Lunging
+  }
+
+  state Lunging {
+    CreateObject(gameObject=Impact Lines (sharedassets27.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Speed Lines", networkInstantiate=false, networkGroup=0)
+    SetFloatValue(floatVariable=var "Line Angle", floatValue=var "Attack Angle", everyFrame=false)
+    FloatSubtract(floatVariable=var "Line Angle", subtract=191, everyFrame=false, perSecond=false)
+    SetRotation(gameObject=var "Speed Lines", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Line Angle", space=0, everyFrame=false, lateUpdate=false)
+    Collision2dEvent(collision=0, collideTag="", sendEvent=→"HIT WALL", storeCollider=var "", storeForce=(unset))
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Y Speed", space=0, everyFrame=true)
+    Wait(time=var "Lunge Wait", finishEvent=→"END", realTime=false)
+    on HIT WALL → Pull Out
+    on HIT RIGHT → Hit Right
+    on HIT LEFT → Hit Left
+    on HIT UP → Hit Up
+    on HIT DOWN → Hit Down
+    on END → Recover
+    on DIR MSG → Recover
+  }
+
+  state Hit Left {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=0.5, everyFrame=false)
+    RandomFloat(min=175, max=185, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=180, everyFrame=false)
+    on FINISHED → Lunging
+  }
+
+  state Hit Up {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=0.5, everyFrame=false)
+    RandomFloat(min=85, max=95, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=180, everyFrame=false)
+    on FINISHED → Lunging
+  }
+
+  state Hit Down {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=0.5, everyFrame=false)
+    RandomFloat(min=265, max=275, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=180, everyFrame=false)
+    on FINISHED → Lunging
+  }
+
+  state Attack Pause {
+    DistanceFly(gameObject=Self, target=var "Hero", distance=8, speedMax=5.5, acceleration=0.1, targetsHeight=true, height=1)
+    WaitRandom(timeMin=0.25, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=true)
+    on FINISHED → Still In Range?
+  }
+
+  state Still In Range? {
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=false)
+    CheckAlertRange(alertRange=var "Alert range", storeResult=var "In Alert Range", everyFrame=false)
+    BoolTest(boolVariable=var "In Alert Range", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Can See Hero", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on FINISHED → Attack Antic
+    on CANCEL → Chase - In Sight
+  }
+
+  state Go Up {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  state Startle {
+    SendEventByName(eventTarget=GameObject(var "Buddy"), sendEvent="ALERT", delay=0, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[fluke_fairy_call (sharedassets27.assets)], weights=[1], pitchMin=1.15, pitchMax=1.25, volume=1, delay=0, storePlayer=<null>)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mosquito_charge_prepare (sharedassets27.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    on FINISHED → Chase Start
+  }
+
+  state Attack Aim {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=-0.5, storeAngle=var "Attack Angle", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=1, everyFrame=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Check Dir
+  }
+
+  var Attention Span: float = 8
+  var Buddy: gameObject = <null>
+
+  var Angle: float = 0
+  var Attack Angle: float = 0
+  var Distance: float = 0
+  var Line Angle: float = 0
+  var Lunge Speed: float = 18
+  var Lunge Wait: float = 0
+  var Thunk X Scale: float = 0
+  var X Speed: float = 0
+  var Y Speed: float = 0
+  var Can See Hero: bool = false
+  var In Alert Range: bool = false
+  var Start Alert: bool = false
+  var startAlert: bool = false
+  var Thunk Scale: vector3 = (0, 0, 0)
+  var Thunk rotate: vector3 = (0, 0, 0)
+  var Alerter: gameObject = Mosquito/Alert Range New
+  var Hero: gameObject = <null>
+  var Point Box: gameObject = <null>
+  var Self: gameObject = <null>
+  var Speed Lines: gameObject = <null>
+  var Thunk Effect: gameObject = Mosquito/Thunk Effect
+  var Thunk Instance: gameObject = <null>
+  var Tile Detector: gameObject = Mosquito/TileDetector
+  var Alert range: object = <null>
+}

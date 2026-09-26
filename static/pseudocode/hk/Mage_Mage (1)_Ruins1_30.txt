@@ -1,0 +1,310 @@
+# Mage
+# 2 location(s):
+#   Ruins1_30 / Mage (1)
+#   Ruins1_25 / Mage (1)
+
+fsm Mage {
+  start Init
+
+  state Init {
+    GetHero(storeResult=var "Hero")
+    FindChild(gameObject=Self, childName="Firing Range", storeResult=var "Firing Range Obj")
+    FindChild(gameObject=Self, childName="Orb Spinner", storeResult=var "Orb Spinner")
+    GetOwner(storeGameObject=var "Self")
+    GetPosition(gameObject=Self, vector=var "Init Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Zero Point", vector=(unset), x=0, y=0, z=0, space=0, everyFrame=false, lateUpdate=false)
+    SetParent(gameObject=var "Zero Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Sleep
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Return To Idle", boolValue=true, everyFrame=false)
+    DistanceFlySmooth(gameObject=Self, target=var "Hero", distance=7, speedMax=4.5, accelerationForce=30, targetRadius=1, deceleration=0.9, offset=(0, 0, 0))
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn To Idle", resetFrame=true, everyFrame=true)
+    WaitRandom(timeMin=2, timeMax=3, finishEvent=→"SUMMON", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Orb Spinner"), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    BoolTest(boolVariable=var "Roam Range", isTrue=(none), isFalse=→"LOST HERO", everyFrame=true)
+    on SUMMON → Summon Choice
+    on LOST HERO → Tele Away
+    on GO UP → Select Target
+  }
+
+  state Summon Start {
+    DistanceFlySmooth(gameObject=Self, target=var "Hero", distance=7, speedMax=3, accelerationForce=15, targetRadius=1, deceleration=0.9, offset=(0, 0, 0))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_summon_projectiles (sharedassets34.assets))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Summon 3
+  }
+
+  state Summon 3 {
+    SetBoolValue(boolVariable=var "Got Orb", boolValue=true, everyFrame=false)
+    DistanceFlySmooth(gameObject=Self, target=var "Hero", distance=7, speedMax=3, accelerationForce=15, targetRadius=1, deceleration=0.9, offset=(0, 0, 0))
+    SpawnObjectFromGlobalPool(gameObject=Mage Orb (sharedassets34.assets), spawnPoint=var "Self", position=(0, 2.4, -0.0005), rotation=(unset), storeObject=var "Orb 3")
+    SendEventByName(eventTarget=GameObject(var "Orb 3"), sendEvent="ORBIT", delay=0, everyFrame=false)
+    SetParent(gameObject=var "Orb 3", parent=var "Orb Spinner", resetLocalPosition=false, resetLocalRotation=false)
+    SendEventByName(eventTarget=GameObject(var "Orb Spinner"), sendEvent="SPIN", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Cast End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Summoned
+  }
+
+  state Summoned {
+    SetBoolValue(boolVariable=var "Return To Idle", boolValue=false, everyFrame=false)
+    DistanceFlySmooth(gameObject=Self, target=var "Hero", distance=9, speedMax=4.25, accelerationForce=30, targetRadius=1, deceleration=0.9, offset=(0, 0, 0))
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn To Idle", resetFrame=true, everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    WaitRandom(timeMin=0.7, timeMax=1, finishEvent=→"ATTACK", realTime=false)
+    BoolTest(boolVariable=var "Roam Range", isTrue=(none), isFalse=→"LOST HERO", everyFrame=true)
+    on ATTACK → Line of Sight?
+    on LOST HERO → Tele Away
+    on GO UP → Select Target
+  }
+
+  state Attack Antic {
+    GetPosition(gameObject=var "Fire Point", vector=var "Fire Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fire Start")
+    DecelerateV2(gameObject=Self, deceleration=0.9)
+    on FINISHED → Fire
+  }
+
+  state Fire {
+    SpawnObjectFromGlobalPool(gameObject=Mage Orb (sharedassets34.assets), spawnPoint=var "Self", position=(0, 1, 0), rotation=(unset), storeObject=var "Next Orb")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_knight_projectile_shoot (sharedassets34.assets))
+    ActivateGameObject(gameObject=var "Fire Point", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetIsKinematic2d(gameObject=var "Next Orb", isKinematic=false)
+    FireAtTarget(gameObject=var "Next Orb", target=var "Hero", speed=20, position=(0, 0, 0), spread=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fire", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Next Orb"), sendEvent="FIRE", delay=0, everyFrame=false)
+    on FINISHED → Summoned
+  }
+
+  state One Left {
+    SetGameObject(variable=var "Next Orb", gameObject=var "Orb 3", everyFrame=false)
+    on FINISHED → Summoned
+  }
+
+  state Two Left {
+    SetGameObject(variable=var "Next Orb", gameObject=var "Orb 2", everyFrame=false)
+    on FINISHED → Summoned
+  }
+
+  state Remaining Check {
+    IntOperator(integer1=var "Balls", integer2=1, operation=Subtract, storeResult=var "Balls", everyFrame=false)
+    IntSwitch(intVariable=var "Balls", compareTo=[0, 1, 2], sendEvent=[→"NONE LEFT", →"ONE LEFT", →"TWO LEFT"], everyFrame=false)
+    on NONE LEFT → Idle
+    on ONE LEFT → One Left
+    on TWO LEFT → Two Left
+  }
+
+  state Summon Choice {
+    SetIntValue(intVariable=var "Tele Attempts", intValue=0, everyFrame=false)
+    SendRandomEventV2(events=[→"SUMMON", →"TELEPORT"], weights=[0.5, 0.5], trackingInts=[var "Count Summon", var "Count Teleport"], eventMax=[2, 2])
+    on SUMMON → Summon Start
+    on TELEPORT → Select Target
+  }
+
+  state Select Target {
+    IntAdd(intVariable=var "Tele Attempts", add=1, everyFrame=false)
+    GetRandomObject(withTag="Teleplane", storeResult=var "Teleplane", everyFrame=false)
+    GetColliderRange(gameObject=var "Teleplane", minX=var "X Min", maxX=var "X Max", minY=var "Y Min", maxY=var "Y Max", everyFrame=false)
+    RandomFloat(min=var "X Min", max=var "X Max", storeResult=var "Tele X")
+    RandomFloat(min=var "Y Min", max=var "Y Max", storeResult=var "Tele Y")
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=0.006, everyFrame=false)
+    SetVector2XY(vector2Variable=var "Tele Point 2D", vector2Value=(unset), x=var "Tele X", y=var "Tele Y", everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Tele Distance", point1=var "Teleport Point", point2=var "Hero Pos", ignoreZ=false, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance From Self", point1=var "Teleport Point", point2=var "Self Pos", ignoreZ=false, everyFrame=false)
+    FloatInRange(floatVariable=var "Tele Distance", lowerValue=var "Tele Distance Min", upperValue=var "Tele Distance Max", boolVariable=var "Far from hero", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Self", lowerValue=8, upperValue=99999, boolVariable=var "Far from self", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    LineCast2d(fromGameObject=var "Zero Point", fromPosition=var "Tele Point 2D", toGameObject=var "Hero", toPosition=(0, -0.5), minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Can See Hero", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlip(boolVariable=var "Can See Hero")
+    BoolAllTrue(boolVariables=[var "Far from hero", var "Far from self", var "Can See Hero"], sendEvent=→"TELEPORT", storeResult=(unset), everyFrame=false)
+    IntCompare(integer1=var "Tele Attempts", integer2=50, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on TELEPORT → Teleport
+    on CANCEL → Idle or Summoned?
+    on FINISHED → Try Again!
+  }
+
+  state Teleport {
+    SetPosition(gameObject=Self, vector=var "Teleport Point", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    RandomFloat(min=0.00501, max=0.00699, storeResult=var "Random Z")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Random Z", space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_appear (sharedassets34.assets))
+    ActivateGameObject(gameObject=var "Tele Out Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Appear Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Tele Out Anim", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=var "Tele Out Anim", vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    on FINISHED → Tele Line
+  }
+
+  state Try Again! {
+    on FINISHED → Select Target
+  }
+
+  state Tele Line {
+    Vector3Lerp(fromVector=var "Teleport Point", toVector=var "Self Pos", amount=0.5, storeResult=var "Line Pos", everyFrame=false)
+    GetAngleBetweenPoints(point1=var "Teleport Point", point2=var "Self Pos", storeAngle=var "Tele Angle", everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Final Tele Distance", point1=var "Self Pos", point2=var "Teleport Point", ignoreZ=false, everyFrame=false)
+    CreateObject(gameObject=Tele Line (sharedassets34.assets), spawnPoint=var "", position=var "Line Pos", rotation=(unset), storeObject=var "Tele Line", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Tele Line", vector=(unset), x=var "Final Tele Distance", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=var "Tele Line", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tele Angle", space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Tele Line", emit=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Teleport In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle or Summoned?
+  }
+
+  state Line of Sight? {
+    BoolTest(boolVariable=var "Firing Range", isTrue=→"IN RANGE", isFalse=→"OUT OF RANGE", everyFrame=false)
+    on OUT OF RANGE → Out of Range
+    on IN RANGE → Fire or Tele?
+  }
+
+  state Out of Range {
+    SendRandomEvent(events=[→"TELEPORT", →"WAIT"], weights=[1, 1], delay=0)
+    on TELEPORT → Select Target
+    on WAIT → Summoned 2
+  }
+
+  state Idle After Tele {
+    SetBoolValue(boolVariable=var "Return To Idle", boolValue=true, everyFrame=false)
+    DistanceFlySmooth(gameObject=Self, target=var "Hero", distance=7, speedMax=4.5, accelerationForce=30, targetRadius=1, deceleration=0.9, offset=(0, 0, 0))
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn To Idle", resetFrame=true, everyFrame=true)
+    WaitRandom(timeMin=1, timeMax=2, finishEvent=→"SUMMON", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Orb Spinner"), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    BoolTest(boolVariable=var "Roam Range", isTrue=(none), isFalse=→"LOST HERO", everyFrame=true)
+    on SUMMON → Summon Choice
+    on LOST HERO → Tele Away
+  }
+
+  state Idle or Summoned? {
+    SetFloatValue(floatVariable=var "Tele Distance Max", floatValue=13, everyFrame=false)
+    SetIntValue(intVariable=var "Tele Attempts", intValue=0, everyFrame=false)
+    BoolTest(boolVariable=var "Got Orb", isTrue=→"SUMMON", isFalse=→"IDLE", everyFrame=false)
+    on IDLE → Summon Start
+    on SUMMON → Summoned
+  }
+
+  state Fire or Tele? {
+    SendRandomEventV2(events=[→"ATTACK", →"TELEPORT"], weights=[0.75, 0.25], trackingInts=[var "Count Ball Fire", var "Count Ball Tele"], eventMax=[2, 2])
+    on TELEPORT → Select Target
+    on ATTACK → Attack Antic
+  }
+
+  state Sleep {
+    BoolTest(boolVariable=var "Manual Appear", isTrue=→"MANUAL", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Firing Range", isTrue=→"IN RANGE", isFalse=(none), everyFrame=true)
+    on IN RANGE → Wake
+    on MANUAL → Manual Sleep
+  }
+
+  state Wake {
+    ActivateGameObject(gameObject=var "Firing Range Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=20, max=30, storeResult=var "Translate X")
+    RandomFloat(min=20, max=30, storeResult=var "Translate Y")
+    Translate(gameObject=Self, vector=(unset), x=var "Translate X", y=var "Translate Y", z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetCollider(gameObject=Self, active=true)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Select Target
+  }
+
+  state Manual Sleep {
+    SetBoolValue(boolVariable=var "Roam Range", boolValue=true, everyFrame=false)
+    on WAKE → Wake
+    on UNMANUAL → Sleep
+  }
+
+  state Summoned 2 {
+    SetBoolValue(boolVariable=var "Return To Idle", boolValue=false, everyFrame=false)
+    DistanceFlySmooth(gameObject=Self, target=var "Hero", distance=9, speedMax=4.25, accelerationForce=30, targetRadius=1, deceleration=0.9, offset=(0, 0, 0))
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn To Idle", resetFrame=true, everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    WaitRandom(timeMin=0.1, timeMax=0.5, finishEvent=→"ATTACK", realTime=false)
+    BoolTest(boolVariable=var "Roam Range", isTrue=(none), isFalse=→"LOST HERO", everyFrame=true)
+    on ATTACK → Line of Sight?
+    on LOST HERO → Tele Away
+  }
+
+  state Tele Away {
+    SetBoolValue(boolVariable=var "Return To Idle", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Got Orb", boolValue=false, everyFrame=false)
+    SetIntValue(intVariable=var "Balls", intValue=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tele Out Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPosition(gameObject=Self, vector=var "Current Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Tele Out Anim", vector=var "Current Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetParent(gameObject=var "Tele Out Anim", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=Self, vector=var "Init Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetCollider(gameObject=Self, active=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Orb 1"), sendEvent="DESTROY", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Orb 2"), sendEvent="DESTROY", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Orb 3"), sendEvent="DESTROY", delay=0, everyFrame=false)
+    SetParent(gameObject=var "Orb 1", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Orb 2", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Orb 3", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Sleep
+  }
+
+  var Manual Appear: bool = false
+
+  var Distance From Self: float = 0
+  var Final Tele Distance: float = 0
+  var Random Z: float = 0
+  var Tele Angle: float = 0
+  var Tele Distance: float = 0
+  var Tele Distance Max: float = 8
+  var Tele Distance Min: float = 5.65
+  var Tele X: float = 0
+  var Tele Y: float = 0
+  var Translate X: float = 0
+  var Translate Y: float = 0
+  var X Max: float = 0
+  var X Min: float = 0
+  var Y Max: float = 0
+  var Y Min: float = 0
+  var Balls: int = 0
+  var Count Ball Fire: int = 0
+  var Count Ball Tele: int = 0
+  var Count Summon: int = 0
+  var Count Teleport: int = 0
+  var Tele Attempts: int = 0
+  var Can See Hero: bool = false
+  var Far from hero: bool = false
+  var Far from self: bool = false
+  var Firing Range: bool = false
+  var Got Orb: bool = false
+  var Return To Idle: bool = true
+  var Roam Range: bool = false
+  var Tele Point 2D: vector2 = (0, 0)
+  var Current Pos: vector3 = (0, 0, 0)
+  var Fire Pos: vector3 = (0, 0, 0)
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Init Pos: vector3 = (0, 0, 0)
+  var Line Pos: vector3 = (0, 0, 0)
+  var Self Pos: vector3 = (0, 0, 0)
+  var Teleport Point: vector3 = (0, 0, 0)
+  var Appear Flash: gameObject = <null>
+  var Fire Point: gameObject = Mage (1)/Fire Effect
+  var Firing Range Obj: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Next Orb: gameObject = <null>
+  var Orb 1: gameObject = <null>
+  var Orb 2: gameObject = <null>
+  var Orb 3: gameObject = <null>
+  var Orb Spinner: gameObject = Mage (1)/Orb Spinner
+  var Self: gameObject = <null>
+  var Tele Line: gameObject = <null>
+  var Tele Out Anim: gameObject = Mage (1)/Tele Out Anim
+  var Teleplane: gameObject = <null>
+  var White Flash: gameObject = Mage (1)/White Flash
+  var Zero Point: gameObject = Mage (1)/Zero Point
+}

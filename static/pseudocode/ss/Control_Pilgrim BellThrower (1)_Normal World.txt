@@ -1,0 +1,319 @@
+# Control
+# 1 location(s):
+#   Greymoor_13 / Black Thread States Thread Only Variant/Normal World/Pilgrim BellThrower (1)
+
+fsm Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetHP(target=Self, storeValue=var "Init HP")
+    FindChild(gameObject=Self, childName="Shot Point", storeResult=var "Shot Point")
+    BoolTest(boolVariable=var "z_Ambusher", isTrue=→"AMBUSH", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Praying", isTrue=→"PRAY", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Sniper", isTrue=→"SNIPE", isFalse=(none), everyFrame=false)
+    on FINISHED → Patrol
+    on PRAY → Black Thread?
+    on SNIPE → Snipe
+    on AMBUSH → Ambush Ready
+  }
+
+  state Spawn Silk {
+    BoolTest(boolVariable=var "Quick Wake", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Pray
+  }
+
+  state Pray {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=var "Wake", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "Alert", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    StopWalker(target=Self, everyFrame=false)
+    BoolTest(boolVariable=var "Alert", isTrue=→"WAKE", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Wake", isTrue=→"WAKE", isFalse=(none), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pray")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"WAKE", ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    PlayEnemySingAudio(gameObject=Self, singAudioTable=pilgrim_old_female_sing (sfxdynamic_assets_pilgrimslower.bundle))
+    on WAKE → Possess
+  }
+
+  state Possess {
+    BoolTest(boolVariable=var "Quick Wake", isTrue=→"QUICK", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="PlayPossess", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Possess Shake
+    on QUICK → Pray End Q
+  }
+
+  state Possess Shake {
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    on FINISHED → Pray End
+  }
+
+  state Pray End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    on FINISHED → Patrol
+  }
+
+  state Pray End Q {
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray End Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    on FINISHED → Patrol
+  }
+
+  state Patrol {
+    CheckIsCharacterGrounded(Target=Self, RayCount=var "Check Ground Ray Count", GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"IN AIR", EveryFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    BoolTest(boolVariable=var "Sniper", isTrue=→"SNIPE", isFalse=(none), everyFrame=false)
+    WalkLeftRight(gameObject=Self, walkSpeed=2, spriteFacesLeft=true, groundLayer="Terrain", turnDelay=0.5, wallLookAhead=0, walkAnimName="Walk", turnAnimName="Turn", moveWhileTurning=true, startLeft=false, startRight=false, keepDirection=true, flipBeforeTurn=true, turnAudioClipTable=<null>)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Escape Range", storeResult=(unset), sendEvent="ESCAPE", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=(unset), sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    PlayEnemySingAudio(gameObject=Self, singAudioTable=pilgrim_old_female_idle_loop (sfxdynamic_assets_pilgrimslower.bundle))
+    on ATTACK → Throw Antic
+    on ESCAPE → Escape Antic
+    on SNIPE → Snipe Extra Recover
+    on IN AIR → Not Grounded
+    on NEEDOLIN → Needolin 
+    on TOOK DAMAGE → Escape Antic
+  }
+
+  state Throw Antic {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    PlayAudioEventRandom(audioClips=[small_bell_movement_1 (sfxstatic_assets_areabell.bundle), small_bell_movement_2 (sfxstatic_assets_areabell.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEventRandom(audioClips=[song_pilgrim_03_antic (sfxstatic_assets_areasong.bundle)], pitchMin=0.75, pitchMax=0.95, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Throw Antic")
+    Wait(time=0.4, finishEvent=→"NEXT", realTime=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Spit X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Spit X", subtract=var "Self X", everyFrame=false, perSecond=false)
+    FloatMultiply(floatVariable=var "Spit X", multiplyBy=1, everyFrame=false)
+    RandomFloat(min=-1, max=1, storeResult=var "Random")
+    FloatAdd(floatVariable=var "Spit X", add=var "Random", everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Spit X", minValue=-15, maxValue=15, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pilgrim_old_female_attack (sfxdynamic_assets_pilgrimslower.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on NEXT → Throw
+    on NEEDOLIN → Needolin 
+  }
+
+  state Throw {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEventRandom(audioClips=[pilgrim_bell_thrower_throw (sfxstatic_assets_areabell.bundle), pilgrim_bell_thrower_throw_2 (sfxstatic_assets_areabell.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SpawnObjectFromGlobalPool(gameObject=Throwing Bell (localpoolprefabs_assets_areasong.bundle), spawnPoint=var "Shot Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    SetDamageHeroAmount(target=var "Projectile", damageDealt=1)
+    SetGravity2dScale(gameObject=var "Projectile", gravityScale=1)
+    SetVelocity2d(gameObject=var "Projectile", vector=(unset), x=var "Spit X", y=22, everyFrame=false)
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    WaitRandom(timeMin=0.4, timeMax=0.6, finishEvent=→"NEXT", realTime=false)  // disabled
+    WalkLeftRight(gameObject=Self, walkSpeed=2, spriteFacesLeft=true, groundLayer="Terrain", turnDelay=0.25, wallLookAhead=0, walkAnimName="Walk", turnAnimName="Turn", moveWhileTurning=false, startLeft=false, startRight=false, keepDirection=true, flipBeforeTurn=false, turnAudioClipTable=<null>)  // disabled
+    Wait(time=0.16, finishEvent=→"NEXT", realTime=false)
+    on NEXT → Patrol
+    on TOOK DAMAGE → Patrol
+  }
+
+  state Escape Antic {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    CheckIsCharacterGrounded(Target=Self, RayCount=var "Check Ground Ray Count", GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"IN AIR", EveryFrame=false)
+    SetBoolValue(boolVariable=var "Sniper", boolValue=false, everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetGroundPointClampedToEdge(Source=Self, TargetDistance=-6, MinJumpDistance=var "Min Jump Distance", DefaultFacingRight=false, ReductionDistance=var "Jump Reduction Distance", MaxGroundDistance=var "Max Edge Ground Distance", GroundRayHeight=var "Ground Ray Height", DidFindGroundPoint=var "Did Find Ground Point", GroundPoint=var "Ground Point", EveryFrame=false)
+    BoolTest(boolVariable=var "Did Find Ground Point", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on FINISHED → Jump Away
+    on CANCEL → Attempt Larger Jump
+    on IN AIR → Not Grounded
+    on NEEDOLIN → Needolin 
+  }
+
+  state Jump Away {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    PlayAudioEvent(audioClip=pilgrim_bell_thrower_jump (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    CalculateProjectileVelocity(Target=Self, TargetPosition=var "Ground Point", FireAngle=60, ImpulseVelocity=var "Target Velocity", EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=var "Target Velocity", x=(unset), y=(unset), everyFrame=false)
+    GetVector2XY(vector2Variable=var "Target Velocity", storeX=var "Jump Speed X", storeY=(unset), everyFrame=false)
+    on FINISHED → Jump Air
+  }
+
+  state Jump Air {
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump Speed X", y=(unset), everyFrame=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pilgrim_old_female_attack (sfxdynamic_assets_pilgrimslower.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on LAND → Land
+  }
+
+  state Land {
+    PlayAudioEvent(audioClip=pilgrim_bell_thrower_land (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Throw Antic
+  }
+
+  state Snipe {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Escape Range", storeResult=(unset), sendEvent="ESCAPE", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Snipe Range", storeResult=(unset), sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CompareHP(enemy=var "Self", integer2=var "Init HP", equal=(none), lessThan=→"TOOK DAMAGE", greaterThan=(none), everyFrame=false)
+    on ATTACK → Throw Antic
+    on ESCAPE → Escape Antic
+    on TOOK DAMAGE → Escape Antic
+  }
+
+  state Snipe Extra Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=1, finishEvent=→"NEXT", realTime=false)
+    on FINISHED → Snipe
+  }
+
+  state Attempt Larger Jump {
+    GetGroundPointClampedToEdge(Source=Self, TargetDistance=-8, MinJumpDistance=var "Min Jump Distance", DefaultFacingRight=false, ReductionDistance=var "Jump Reduction Distance", MaxGroundDistance=var "Max Edge Ground Distance", GroundRayHeight=var "Ground Ray Height", DidFindGroundPoint=var "Did Find Ground Point", GroundPoint=var "Ground Point", EveryFrame=false)
+    BoolTest(boolVariable=var "Did Find Ground Point", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on FINISHED → Jump Away
+    on CANCEL → Attempt Hop Up
+  }
+
+  state Not Grounded {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Patrol
+  }
+
+  state Needolin  {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pray")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=pilgrim_old_female_sing (sfxdynamic_assets_pilgrimslower.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Pray End
+    on SING DURATION END → Pray End
+  }
+
+  state Ambush Ready {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=(unset), sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    StopWalker(target=Self, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on WAKE → Ambush Antic
+    on BATTLE START → Battle Pause
+  }
+
+  state Ambush 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ambush", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetMeshRenderer(gameObject=Self, active=true)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pilgrim_old_female_attack (sfxdynamic_assets_pilgrimslower.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_emerge (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Ambush 2
+  }
+
+  state Ambush Antic {
+    PlayParticleEmitter(gameObject=var "Pt Bone", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Pt Dust", emit=0, resetIfPlaying=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Alert Range", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_antic (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Ambush 1
+  }
+
+  state Ambush 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    StopParticleEmitter(gameObject=var "Pt Bone")
+    StopParticleEmitter(gameObject=var "Pt Dust")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Patrol
+  }
+
+  state Battle Pause {
+    WaitRandom(timeMin=0.5, timeMax=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ambush Antic
+  }
+
+  state Flip Jump Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Flip Jump
+  }
+
+  state Flip Jump {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=pilgrim_bell_thrower_jump (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap F")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Jump Speed X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump Speed X", multiplyBy=-8, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump Speed X", y=15, everyFrame=false)
+    on FINISHED → Jump Air
+  }
+
+  state Attempt Hop Up {
+    RayCast2dV2(fromGameObject=var "Ray Pt HopUp A", fromPosition=(unset), direction=(1, 0), space=1, distance=5.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Ray Pt HopUp B", fromPosition=(unset), direction=(0, -1), space=1, distance=1.75, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Hop Up
+    on CANCEL → Flip Jump Antic
+  }
+
+  state Hop Up {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=pilgrim_bell_thrower_jump (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Jump Speed X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump Speed X", multiplyBy=10, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump Speed X", y=20, everyFrame=false)
+    on FINISHED → Jump Air
+  }
+
+  state Black Thread? {
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=(none), isFalse=→"FINISHED")
+    SetBoolValue(boolVariable=var "Quick Wake", boolValue=true, everyFrame=false)
+    on FINISHED → Spawn Silk
+  }
+
+  var Praying: bool = true
+  var Quick Wake: bool = true
+  var Sniper: bool = false
+  var z_Ambusher: bool = false
+
+  var Escape Speed: float = 8
+  var Ground Ray Height: float = 1.2
+  var Jump Reduction Distance: float = 1
+  var Max Edge Ground Distance: float = 1.5
+  var Min Jump Distance: float = 2
+  var Random: float = 0
+  var Self X: float = 0
+  var Spit X: float = 0
+  var Jump Speed X: float = 0
+  var Check Ground Ray Count: int = 3
+  var Init HP: int = 0
+  var Alert: bool = false
+  var Did Find Ground Point: bool = false
+  var Wake: bool = false
+  var Ground Point: vector2 = (0, 0)
+  var Target Velocity: vector2 = (0, 0)
+  var Alert Range: gameObject = <null>
+  var Projectile: gameObject = <null>
+  var Pt Bone: gameObject = Black Thread States Thread Only Variant/Normal World/Pilgrim BellThrower (1)/Pt Bone
+  var Pt Dust: gameObject = Black Thread States Thread Only Variant/Normal World/Pilgrim BellThrower (1)/Pt Dust
+  var Self: gameObject = <null>
+  var Shot Point: gameObject = <null>
+  var Silk: gameObject = <null>
+  var Spit Burst Damager: gameObject = <null>
+  var Ray Pt HopUp A: gameObject = Black Thread States Thread Only Variant/Normal World/Pilgrim BellThrower (1)/Ray Pt HopUp A
+  var Ray Pt HopUp B: gameObject = Black Thread States Thread Only Variant/Normal World/Pilgrim BellThrower (1)/Ray Pt HopUp B
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Normal World/Pilgrim BellThrower (1)/Audio Loop Voice
+}

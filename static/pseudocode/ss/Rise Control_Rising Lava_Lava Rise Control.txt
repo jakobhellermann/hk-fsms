@@ -1,0 +1,382 @@
+# Rise Control
+# 1 location(s):
+#   Abyss_09 / Lava Rise Control/Rising Lava
+
+fsm Rise Control {
+  start Init
+  on COMPLETED → Already Completed  // from any state
+
+  state Init {
+    SetPosition2d(gameObject=Self, vector=(unset), x=15.37, y=340.16, space=1, everyFrame=false, lateUpdate=false)
+    GetOwner(storeGameObject=var "Self")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Rising")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt End")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Updraft")
+    FindNamedChild(gameObject=Self, storeResult=var "Enemy Recoil Blocker")
+    FindNamedChild(gameObject=Self, storeResult=var "Cam Controller")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Superjump Plate")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Superjump Resume")
+    FindNamedChild(gameObject=Self, storeResult=var "Audio Loop Superjump")
+    FindNamedChild(gameObject=Self, storeResult=var "lava_chamber_audio")
+    FindNamedChild(gameObject=Self, storeResult=var "lava_rise_audio")
+    FindNamedChild(gameObject=Self, storeResult=var "lava_settle_audio")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Updraft Region")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Camera Locks Descent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "CamLock Updraft")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "after_lava_smoke_set")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "after_lava_smoke_set initial")
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=false)
+    on FINISHED → Check Entry
+  }
+
+  state Rise Normal {
+    AccelerateToY(gameObject=Self, accelerationFactor=0.1, targetSpeed=6)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatOperator(float1=var "Hero Y", float2=var "Min Below Hero", operation=Add, storeResult=var "Self Min Y", everyFrame=true)
+    CheckYPositionV2(gameObject=var "Hero", compareTo=420, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=var "Hero In Lower Shaft", greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    FloatTestToBool(float1=var "Self Y", float2=var "Self Min Y", tolerance=0, equalBool=(unset), lessThanBool=var "Below Catchup Distance", greaterThanBool=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hero In Lower Shaft", var "Below Catchup Distance"], boolStates=[false, true], trueEvent=→"CATCHUP", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Self Min Y", tolerance=0, equal=(none), lessThan=→"CATCHUP", greaterThan=(none), everyFrame=true)  // disabled
+    GetYDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true, allowNegatives=false)
+    FloatCompare(float1=var "Distance", float2=var "Near Distance", tolerance=0, equal=(none), lessThan=→"NEAR", greaterThan=(none), everyFrame=true)
+    CheckYPosition(gameObject=Self, compareTo=var "End Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"END", everyFrame=true, space=0, activeBool=(unset))
+    CheckYPositionV2(gameObject=Self, compareTo=var "Mid Explode Wall Y", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=(none), greaterThanBool=var "Near Mid Explode Wall", everyFrame=true, space=0, activeBool=(unset))
+    CheckYPositionV2(gameObject=Self, compareTo=var "Top Explode Wall Y", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=(none), greaterThanBool=var "Near Top Explode Wall", everyFrame=true, space=0, activeBool=(unset))
+    BoolTestMulti(boolVariables=[var "Explode Wall Mid Destroyed", var "Near Mid Explode Wall"], boolStates=[false, true], trueEvent=→"MID EXPLODE WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Explode Wall Top Destroyed", var "Near Top Explode Wall"], boolStates=[false, true], trueEvent=→"TOP EXPLODE WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckYPositionV2(gameObject=Self, compareTo=var "Superjump Plate Y", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"NEAR SUPER JUMP", greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    on CATCHUP → Catchup
+    on NEAR → Rise Near
+    on LAVA DEATH → Damage Stop
+    on KNIGHT SPIKE HIT → Damage Stop
+    on END → End Effects
+    on MID EXPLODE WALL → Near Mid Explode Wall
+    on NEAR SUPER JUMP → Near Super Jump Plate
+    on TOP EXPLODE WALL → Near Top Explode Wall
+  }
+
+  state Catchup {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Hero Y", float2=var "Min Below Hero", operation=Add, storeResult=var "Self Y", everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Rise Normal
+  }
+
+  state Rise Near {
+    GetYDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true, allowNegatives=false)
+    FloatCompare(float1=var "Distance", float2=var "Near Distance", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FAR", everyFrame=true)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.1, targetSpeed=2.5)
+    CheckYPosition(gameObject=Self, compareTo=var "End Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"END", everyFrame=true, space=0, activeBool=(unset))
+    CheckYPositionV2(gameObject=Self, compareTo=var "Mid Explode Wall Y", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=(none), greaterThanBool=var "Near Mid Explode Wall", everyFrame=true, space=0, activeBool=(unset))
+    CheckYPositionV2(gameObject=Self, compareTo=var "Top Explode Wall Y", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=(none), greaterThanBool=var "Near Top Explode Wall", everyFrame=true, space=0, activeBool=(unset))
+    BoolTestMulti(boolVariables=[var "Explode Wall Mid Destroyed", var "Near Mid Explode Wall"], boolStates=[false, true], trueEvent=→"MID EXPLODE WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Explode Wall Top Destroyed", var "Near Top Explode Wall"], boolStates=[false, true], trueEvent=→"TOP EXPLODE WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckYPositionV2(gameObject=Self, compareTo=var "Superjump Plate Y", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"NEAR SUPER JUMP", greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    on FAR → Rise Normal
+    on LAVA DEATH → Damage Stop
+    on KNIGHT SPIKE HIT → Damage Stop
+    on END → End Effects
+    on MID EXPLODE WALL → Near Mid Explode Wall
+    on NEAR SUPER JUMP → Near Super Jump Plate
+    on TOP EXPLODE WALL → Near Top Explode Wall
+  }
+
+  state Hazard Respawn {
+    Wait(time=var "Restart Pause", finishEvent=→"FINISHED", realTime=false)
+    SetDamageHero(Target=var "Lava Box", Enabled=true)  // disabled
+    ActivateGameObject(gameObject=var "Lava Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Rise Near
+  }
+
+  state Damage Stop {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Lava Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetDamageHero(Target=var "Lava Box", Enabled=false)  // disabled
+    on HAZARD RESPAWN RESET → Set Restart Time
+  }
+
+  state Set Restart Time {
+    PlayParticleEmitter(gameObject=var "Pt Rising", emit=0, resetIfPlaying=false)
+    GetPlayerDataVariable(VariableName="hazardRespawnLocation", StoreValue=var "Haz Respawn Location")
+    GetVector3XYZ(vector3Variable=var "Haz Respawn Location", storeX=(unset), storeY=var "Haz Respawn Y", storeZ=(unset), everyFrame=false)
+    FloatCompare(float1=var "Haz Respawn Y", float2=800, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"END", everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Self Y", add=-4, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Self Y", minValue=2.65, maxValue=9999, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Restart Pause", floatValue=1, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "MainCamera", targetObject=var "Cam Controller", xOffset=0, yOffset=0, everyFrame=false)
+    CheckYPosition(gameObject=Self, compareTo=5, compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false, space=0, activeBool=(unset))  // disabled
+    SetFloatValue(floatVariable=var "Restart Pause", floatValue=1.5, everyFrame=false)  // disabled
+    PlayParticleEmitter(gameObject=var "Pt Rising", emit=0, resetIfPlaying=false)  // disabled
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Medium Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Lava Chase Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    CallMethodProper(gameObject=Self, behaviour="CurveRotationAnimation", methodName="StartAnimation", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Medium Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    AudioStop(gameObject=var "Audio Loop Superjump", fadeTime=0)
+    StopParticleEmitter(gameObject=var "Pt Superjump Plate")
+    on FINISHED → Wait
+    on END → Reset Lava Box
+  }
+
+  state End {
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Lava Chase Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    ActivateGameObject(gameObject=var "lava_chamber_audio", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "lava_rise_audio", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "lava_settle_audio", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "End Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Rising")
+    SendEventByName(eventTarget=GameObject(var "Cam Controller"), sendEvent="CAM END", delay=0, everyFrame=false)  // disabled
+    AudioStop(gameObject=var "Antic Loop Player", fadeTime=0)
+    CallMethodProper(gameObject=Self, behaviour="CurveRotationAnimation", methodName="StopAtCurrentPoint", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetAnimatorBool(gameObject=var "Lava Set", parameter="Is Active", Value=false, everyFrame=false, everyFrameOption=0)
+    SetAnimatorBool(gameObject=var "Lava Set", parameter="Is Intense", Value=false, everyFrame=false, everyFrameOption=0)
+    iTweenRotateTo(gameObject=Self, id="", transformRotation=var "", vectorRotation=(0, 0, 0), time=3, delay=0, speed=(unset), easeType=2, loopType=0, space=0, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=false)
+    on KNIGHT SPIKE HIT → Damage Stop
+    on LAVA DEATH → Damage Stop
+  }
+
+  state Reset Camlocks {
+    ActivateGameObject(gameObject=var "Camera Locks Descent", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "CamLock Updraft", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    CallMethodProper(gameObject=Self, behaviour="CurveRotationAnimation", methodName="StopAtCurrentPoint", parameters=[], storeResult=(unset var), EveryFrame=false)
+    iTweenRotateTo(gameObject=Self, id="", transformRotation=var "", vectorRotation=(0, 0, 0), time=3, delay=0, speed=(unset), easeType=2, loopType=0, space=0, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=false)
+    SendEventToRegister(eventName="LAVA CHALLENGE COMPLETE")
+  }
+
+  state Hidden {
+    ActivateGameObject(gameObject=var "Lava Set", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1, finishEvent=→"EXPLODE", realTime=false)  // disabled
+    on EXPLODE → Start Particles
+  }
+
+  state Already Completed {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "CamLock Updraft")
+    FadeNestedFadeGroup(Target=var "Haze Group", ToAlpha=1, FadeTime=0)
+    ActivateGameObject(gameObject=var "Haze Group", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "CamLock Updraft", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "after_lava_smoke_set", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+  }
+
+  state Wait {
+    CallMethodProper(gameObject=Self, behaviour="CurveRotationAnimation", methodName="StartAnimation", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on HAZARD RESPAWNED → Hazard Respawn
+  }
+
+  state Rise Start {
+    PlayAudioEvent(audioClip=enemy_death_in_lava (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=lavafall_hit_lava_03 (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "lava_chamber_audio", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Rising", emit=0, resetIfPlaying=false)
+    CallMethodProper(gameObject=Self, behaviour="CurveRotationAnimation", methodName="StartAnimation", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Lava Set", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetAnimatorBool(gameObject=var "Lava Set", parameter="Is Active", Value=true, everyFrame=false, everyFrameOption=0)
+    SetAnimatorBool(gameObject=var "Lava Set", parameter="Is Intense", Value=false, everyFrame=false, everyFrameOption=0)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Lava Chase Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Rise Normal
+  }
+
+  state Near Mid Explode Wall {
+    AccelerateToY(gameObject=Self, accelerationFactor=0.1, targetSpeed=2)
+    BoolTest(boolVariable=var "Explode Wall Mid Destroyed", isTrue=→"END", isFalse=(none), everyFrame=true)
+    CheckYPosition(gameObject=var "Hero", compareTo=505, compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"HERO ESCAPED", everyFrame=true, space=0, activeBool=(unset))
+    on LAVA DEATH → Damage Stop
+    on KNIGHT SPIKE HIT → Damage Stop
+    on END → Rise Near
+    on HERO ESCAPED → Escaped Mid
+  }
+
+  state Escaped Mid {
+    SetBoolValue(boolVariable=var "Explode Wall Mid Destroyed", boolValue=true, everyFrame=false)
+    on FINISHED → Rise Near
+  }
+
+  state Near Super Jump Plate {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.075, targetSpeed=0.15)
+    CheckYPosition(gameObject=var "Hero", compareTo=var "Super Jump Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"HERO SUPER JUMPING", everyFrame=true, space=0, activeBool=(unset))
+    PlayParticleEmitter(gameObject=var "Pt Superjump Plate", emit=0, resetIfPlaying=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Superjump", volume=1, oneShotClip=<null>)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Lava Chase Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=skull_king_land (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Pt Superjump Plate", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CallMethodProper(gameObject=Self, behaviour="CurveRotationAnimation", methodName="StopAtCurrentPoint", parameters=[], storeResult=(unset var), EveryFrame=false)
+    iTweenRotateTo(gameObject=Self, id="", transformRotation=var "", vectorRotation=(0, 0, 0), time=0.25, delay=0, speed=(unset), easeType=13, loopType=0, space=0, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=false)
+    Wait(time=5, finishEvent=→"RESUME", realTime=false)
+    on LAVA DEATH → Damage Stop
+    on KNIGHT SPIKE HIT → Damage Stop
+    on HERO SUPER JUMPING → Superjump Chase Start
+    on RESUME → Superjump Resume
+  }
+
+  state Super Jump Chase {
+    ActivateGameObject(gameObject=var "lava_chamber_audio", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "lava_rise_audio", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Medium Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=true)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Lava Chase Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle))
+    CheckYPosition(gameObject=Self, compareTo=var "End Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"END", everyFrame=true, space=0, activeBool=(unset))
+    AccelerateToY(gameObject=Self, accelerationFactor=0.1, targetSpeed=1.5)
+    EaseFloat(fromValue=-6, toValue=-1.2, floatVariable=var "Min Y Tweener", time=8, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    GetPosition2d(gameObject=var "Hero", vector_2d=(unset), x=(unset), y=var "Self Min Y", space=0, everyFrame=true)
+    FloatAdd(floatVariable=var "Self Min Y", add=var "Min Y Tweener", everyFrame=true, perSecond=false)
+    FloatClamp(floatVariable=var "Self Y", minValue=var "Self Min Y", maxValue=9999, everyFrame=true)
+    SetPosition2d(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", space=0, everyFrame=true, lateUpdate=false)
+    GetVelocity2d(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Velocity Y", space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Velocity Y", float2=30, tolerance=0, equal=(none), lessThan=→"SUPERJUMP END", greaterThan=(none), everyFrame=true)
+    on LAVA DEATH → Damage Stop
+    on KNIGHT SPIKE HIT → Damage Stop
+    on END → End Effects
+    on SUPERJUMP END → Super Jump End
+  }
+
+  state End Effects {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Big Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt End", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=false_knight_land_1st_time (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=enemy_death_in_lava (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=moss_crumble_plat_crumbled (sfxstatic_assets_areamoss.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Medium Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Lava Chase Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    AudioStop(gameObject=var "Audio Loop Superjump", fadeTime=0)
+    StopParticleEmitter(gameObject=var "Pt Superjump Plate")
+    on FINISHED → Set Death Respawn
+  }
+
+  state Check Entry {
+    GetEntryGateName(StoreValue=var "Entry Gate")
+    StringCompare(stringVariable=var "Entry Gate", compareTo="top1", equalEvent=→"TOP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Entry Gate", compareTo="Death Respawn Marker", equalEvent=→"TOP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on TOP → Completed
+    on FINISHED → Hidden
+  }
+
+  state Completed {
+    ActivateGameObject(gameObject=var "Lava Set", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → End
+  }
+
+  state Near Top Explode Wall {
+    AccelerateToY(gameObject=Self, accelerationFactor=0.1, targetSpeed=2)
+    BoolTest(boolVariable=var "Explode Wall Top Destroyed", isTrue=→"END", isFalse=(none), everyFrame=true)
+    CheckYPosition(gameObject=var "Hero", compareTo=547.4, compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"HERO ESCAPED", everyFrame=true, space=0, activeBool=(unset))
+    on LAVA DEATH → Damage Stop
+    on KNIGHT SPIKE HIT → Damage Stop
+    on END → Rise Near
+    on HERO ESCAPED → Escaped Top
+  }
+
+  state Escaped Top {
+    SetBoolValue(boolVariable=var "Explode Wall Top Destroyed", boolValue=true, everyFrame=false)
+    on FINISHED → Rise Near
+  }
+
+  state Start Particles {
+    PlayParticleEmitterChildren(gameObject=Lava Rise Control/First Rumble/Lava Drip, resetTimeIfPlaying=false, stopOnStateExit=false)
+    PlayParticleEmitterChildren(gameObject=Lava Rise Control/First Rumble/Rubble, resetTimeIfPlaying=false, stopOnStateExit=false)
+    PlayParticleEmitterChildren(gameObject=Lava Rise Control/Drop Rock Extra Effects, resetTimeIfPlaying=false, stopOnStateExit=false)
+    on FINISHED → Rise Start
+  }
+
+  state Superjump Chase Start {
+    SetAnimatorBool(gameObject=var "Lava Set", parameter="Is Intense", Value=true, everyFrame=false, everyFrameOption=0)
+    PlayParticleEmitter(gameObject=var "Pt Superjump Resume", emit=0, resetIfPlaying=false)
+    CallMethodProper(gameObject=Self, behaviour="CurveRotationAnimation", methodName="StartAnimation", parameters=[], storeResult=(unset var), EveryFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=explode_wall_explode (sfxstatic_assets_areawilds.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=moss_crumble_plat_crumbled (sfxstatic_assets_areamoss.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Super Jump Chase
+  }
+
+  state Superjump Resume {
+    PlayParticleEmitter(gameObject=var "Pt Superjump Resume", emit=0, resetIfPlaying=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.25, targetSpeed=10)
+    CallMethodProper(gameObject=Self, behaviour="CurveRotationAnimation", methodName="StartAnimation", parameters=[], storeResult=(unset var), EveryFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=explode_wall_explode (sfxstatic_assets_areawilds.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=moss_crumble_plat_crumbled (sfxstatic_assets_areamoss.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CheckYPosition(gameObject=var "Hero", compareTo=var "Super Jump Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"HERO SUPER JUMPING", everyFrame=true, space=0, activeBool=(unset))
+    on LAVA DEATH → Damage Stop
+    on KNIGHT SPIKE HIT → Damage Stop
+    on HERO SUPER JUMPING → Super Jump Chase
+  }
+
+  state Super Jump End {
+    CheckYPosition(gameObject=Self, compareTo=var "End Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"END", everyFrame=true, space=0, activeBool=(unset))
+    AccelerateToY(gameObject=Self, accelerationFactor=1, targetSpeed=30)
+    on LAVA DEATH → Damage Stop
+    on KNIGHT SPIKE HIT → Damage Stop
+    on END → End Effects
+  }
+
+  state Set Death Respawn {
+    SetDeathRespawn(gameManager=var "GameManager", respawnMarkerName="Death Respawn Marker", respawnType=0, respawnFacingRight=false)
+    SaveGame()
+    on FINISHED → End
+  }
+
+  state Reset Lava Box {
+    ActivateGameObject(gameObject=var "Lava Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → End
+  }
+
+  var Hero Y: float = 0
+  var Self Min Y: float = 0
+  var Self Y: float = 0
+  var Distance: float = 0
+  var Restart Pause: float = 0
+  var End Y: float = 973.84
+  var Near Distance: float = 8
+  var Mid Explode Wall Y: float = 480
+  var Min Below Hero: float = -16.5
+  var Superjump Plate Y: float = 725
+  var Min Y Tweener: float = 0
+  var Haz Respawn Y: float = 0
+  var Top Explode Wall Y: float = 528.7
+  var Super Jump Y: float = 742
+  var Hero Velocity Y: float = 0
+  var Explode Wall Mid Destroyed: bool = false
+  var Near Mid Explode Wall: bool = false
+  var Near Superjump Plate: bool = false
+  var Explode Wall Top Destroyed: bool = false
+  var Near Top Explode Wall: bool = false
+  var Hero In Lower Shaft: bool = false
+  var Below Catchup Distance: bool = false
+  var Entry Gate: string = ""
+  var Haz Respawn Location: vector3 = (0, 0, 0)
+  var Pt Rising: gameObject = <null>
+  var Enemy Recoil Blocker: gameObject = <null>
+  var Cam Controller: gameObject = <null>
+  var Pt End: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Updraft Region: gameObject = <null>
+  var Pt Updraft: gameObject = <null>
+  var Camera Locks Descent: gameObject = <null>
+  var Haze Group: gameObject = <null>
+  var CamLock Updraft: gameObject = <null>
+  var Antic Loop Player: gameObject = <null>
+  var Self: gameObject = <null>
+  var after_lava_smoke_set: gameObject = <null>
+  var after_lava_smoke_set initial: gameObject = <null>
+  var Lava Set: gameObject = Lava Rise Control/Rising Lava/Rising Lava Set
+  var Lava Box: gameObject = Lava Rise Control/Rising Lava/Rising Lava Set/Lava Box
+  var Pt Superjump Plate: gameObject = Lava Rise Control/Rising Lava/Pt Superjump Plate
+  var Pt Superjump Resume: gameObject = <null>
+  var Audio Loop Superjump: gameObject = <null>
+  var lava_chamber_audio: gameObject = <null>
+  var lava_rise_audio: gameObject = <null>
+  var lava_settle_audio: gameObject = <null>
+}

@@ -1,0 +1,165 @@
+# Behaviour
+# 1 location(s):
+#   Coral_Judge_Arena / Caravan_Set/Caravan/Active/Caravan Troup Member Short Pot
+
+fsm Behaviour {
+  start Init
+  on CARAVAN TRAVEL START → Fade Out Caudron  // from any state
+
+  state Idle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    CheckTrackTriggerCount(target=var "Track Trigger Enter", count=0, test=MoreThan, everyFrame=true, successEvent=→"ALERT")
+  }
+
+  state Alert Anim {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="CS Greet", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Reactivate
+  }
+
+  state Pending Idle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    CheckTrackTriggerCount(target=var "Track Trigger Exit", count=0, test=MoreThan, everyFrame=true, successEvent=→"ALERT")
+    Wait(time=5, finishEvent=→"CANCEL", realTime=false)
+    on ALERT → Keep Alert
+    on CANCEL → Idle
+  }
+
+  state Keep Alert {
+    CheckTrackTriggerCount(target=var "Track Trigger Exit", count=0, test=LessThanOrEqual, everyFrame=true, successEvent=→"CANCEL")  // disabled
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on CANCEL → Pending Idle
+    on INTERACT → Brew?
+    on INTERACT POT → Pot
+  }
+
+  state Reactivate {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=false, Target=Self)
+    on FINISHED → Pending Idle
+  }
+
+  state Brew? {
+    GetToolEquipInfo(Tool=Flea Brew (dataassets_assets_assets/dataassets/tools/toolitems.bundle), StoreIsEquipped=(unset), StoreIsUnlocked=var "Brew unlocked", StoreAmountLeft=(unset), StoreMaxAmount=(unset), SomeLeftEquippedEvent=(none), NoneLeftEquippedEvent=(none), EveryFrame=false)
+    BoolTest(boolVariable=var "Brew unlocked", isTrue=(none), isFalse=→"BREW", everyFrame=false)
+    StringCompare(stringVariable=var "Area Meet Cell", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Activated", isTrue=(none), isFalse=→"MEET", everyFrame=false)
+    CaravanLocationSwitch(Locations=[{Location=CaravanTroupeLocations(3), MatchEvent=→"FLEATOPIA"}])
+    BoolTest(boolVariable=var "Allow Hints", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)  // disabled
+    on BREW → Meet Brew
+    on MEET → Meet Area
+    on HINT LECH → Lech Hint
+    on HINT HUNTER → Hunter Hint
+    on FINISHED → Repeat Dlg
+    on FLEATOPIA → Fleatopia Act3
+  }
+
+  sequence state End Dialogue {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=true)
+    on FINISHED → Keep Alert
+  }
+
+  state Meet Brew {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_MEMBER_SHORT_MEET_BREW", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Give Brew
+  }
+
+  state Brew Full Dlg {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_MEMBER_SHORT_BREW_FULL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Brew Full? {
+    GetProperty(targetProperty=ToolItemStatesLiquid.IsFull on Flea Brew (dataassets_assets_assets/dataassets/tools/toolitems.bundle), everyFrame=false)
+    BoolTest(boolVariable=var "Chooser", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Refill?
+    on TRUE → Brew Full Dlg
+  }
+
+  sequence state Refill? {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=true)
+    GetCostFromReference(Reference=Flea Brew Refill (dataassets_assets_assets/dataassets/costs.bundle), StoreValue=var "Refill Cost")
+    DialogueYesNoV2(TranslationSheet="Caravan", TranslationKey="BREW_REFILL_PROMPT", UseCurrency=true, CurrencyCost=var "Refill Cost", CurrencyType=Money, ConsumeCurrency=true, WillGetItem=<null>, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → End Dialogue
+    on TRUE → Refill.
+  }
+
+  state Refill. {
+    SetToolUnlocked(Tool=Flea Brew (dataassets_assets_assets/dataassets/tools/toolitems.bundle), WaitForTutorialMsgEnd=true)
+    on FINISHED → End Dialogue
+  }
+
+  state Pot {
+    on FINISHED → Met? 2
+  }
+
+  sequence state Give Brew {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=true)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SetToolUnlocked(Tool=Flea Brew (dataassets_assets_assets/dataassets/tools/toolitems.bundle), WaitForTutorialMsgEnd=true)
+    on FINISHED → End Dialogue
+  }
+
+  state Repeat Dlg {
+    RunDialogue(Sheet="Caravan", Key=var "Area Repeat Cell", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Met? 2 {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="NPC Title"), sendEvent="SHOW TITLE", delay=0, everyFrame=false)
+    GetToolEquipInfo(Tool=Flea Brew (dataassets_assets_assets/dataassets/tools/toolitems.bundle), StoreIsEquipped=(unset), StoreIsUnlocked=var "Brew unlocked", StoreAmountLeft=(unset), StoreMaxAmount=(unset), SomeLeftEquippedEvent=(none), NoneLeftEquippedEvent=(none), EveryFrame=false)
+    BoolTest(boolVariable=var "Brew unlocked", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Meet Brew
+    on TRUE → Brew Full?
+  }
+
+  state Meet Area {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key=var "Area Meet Cell", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Init {
+    GetPlayerDataVariable(VariableName="CaravanLechSaved", StoreValue=var "Do Lech Hint")
+    BoolFlip(boolVariable=var "Do Lech Hint")
+    GetPlayerDataVariable(VariableName="MetTroupeHunterWild", StoreValue=var "Do Hunter Hint")
+    BoolFlip(boolVariable=var "Do Hunter Hint")
+    on FINISHED → Keep Alert
+  }
+
+  state Lech Hint {
+    SetBoolValue(boolVariable=var "Do Lech Hint", boolValue=false, everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key="TROUPE_SHORT_FLEATOPIA_HINT_LECH", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Hunter Hint {
+    SetBoolValue(boolVariable=var "Do Hunter Hint", boolValue=false, everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key="TROUPE_SHORT_FLEATOPIA_HINT_HUNTER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Fleatopia Act3 {
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=(none), isFalse=→"CANCEL")
+    RunDialogue(Sheet="Caravan", Key="TROUPE_MEMBER_SHORT_REPEAT_FLEATOPIA_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Repeat Dlg
+    on CONVO_END → End Dialogue
+  }
+
+  state Fade Out Caudron {
+    FadeAudio(gameObject=Caravan_Set/Caravan/Active/Caravan Troup Member Short Pot/Pot/flea_brew_pot/Audio Bubbling, startVolume=1, endVolume=0, time=2)
+    on FINISHED → Keep Alert
+  }
+
+  var Allow Hints: bool = false
+  var Area Meet Cell: string = "TROUPE_MEMBER_SHORT_MEET_JUDGE"
+  var Area Repeat Cell: string = "TROUPE_MEMBER_SHORT_REPEAT_JUDGE"
+
+  var Refill Cost: int = 0
+  var Brew unlocked: bool = false
+  var Chooser: bool = false
+  var Activated: bool = false
+  var Do Lech Hint: bool = false
+  var Do Hunter Hint: bool = false
+  var Track Trigger Enter: gameObject = Caravan_Set/Caravan/Active/Caravan Troup Member Short Pot/Enter Detector
+  var Track Trigger Exit: gameObject = Caravan_Set/Caravan/Active/Caravan Troup Member Short Pot/Exit Detector
+}

@@ -1,0 +1,255 @@
+# Control
+# 1 location(s):
+#   Abyss_09 / Siblings/Shade Sibling (8)
+
+fsm Control {
+  start Pause
+  on ZERO HP → Journal Entry?  // from any state
+  on REMOVE → Force End  // from any state
+
+  state Init {
+    SelectRandomString(strings=[" 1", " 2", " 3", " 4"], weights=[1, 1, 1, 1], storeString=var "Number")
+    BuildString(stringParts=["Fly", var "Number"], separator="", addToEnd=true, storeResult=var "Fly Anim", everyFrame=false)
+    BuildString(stringParts=["Startle", var "Number"], separator="", addToEnd=true, storeResult=var "Startle Anim", everyFrame=false)
+    BuildString(stringParts=["TurnToFly", var "Number"], separator="", addToEnd=true, storeResult=var "Turn Anim", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blob")
+    GetOwner(storeGameObject=var "Self")
+    SetCollider(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Enemy Pusher", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetSpriteRenderer(gameObject=var "Light", active=true)
+    BoolTest(boolVariable=var "No Spawn", isTrue=→"NO SPAWN", isFalse=(none), everyFrame=false)
+    on FINISHED → Blob Up
+    on NO SPAWN → Audio
+  }
+
+  state Blob Up {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blob")
+    RandomFloat(min=6, max=7, storeResult=var "Tween Distance")
+    RandomFloat(min=0.75, max=1.25, storeResult=var "Tween Time")
+    SetVector3XYZ(vector3Variable=var "Tween Vector", vector3Value=(unset), x=(unset), y=var "Tween Distance", z=(unset), everyFrame=false)
+    iTweenMoveBy(gameObject=Self, id="", vector=var "Tween Vector", time=var "Tween Time", delay=0, speed=(unset), easeType=easeOutCubic, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hollow_shade_startle (resources.assets), pitchMin=0.8, pitchMax=0.9, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=shadow_gate_pass_through (sharedassets208.assets), pitchMin=1.1, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Form
+  }
+
+  state Form {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Form", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    RandomFloat(min=0.005, max=0.009, storeResult=var "zPos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "zPos", space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Fly Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=1.75, accelerationMin=5, accelerationMax=20, roamingRangeX=3, roamingRangeY=3, manualStartPos=(unset))
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip=var "Turn Anim", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    SetCollider(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Enemy Pusher", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Block", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Alert Range", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    on ALERT → Startle
+  }
+
+  state Startle {
+    BoolTest(boolVariable=var "Friendly", isTrue=→"FRIENDLY", isFalse=(none), everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Startle Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFloatValue(floatVariable=var "Unalert Timer", floatValue=0, everyFrame=false)
+    BehaviourListAdd(owner=Self)
+    on FINISHED → Chase
+    on FRIENDLY → F Approach
+  }
+
+  state Chase {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Fly Anim")
+    RandomFloat(min=3.5, max=5, storeResult=var "Max Speed")
+    ChaseObject(gameObject=Self, target=var "Hero", speedMax=var "Max Speed", acceleration=0.2, targetSpread=1, spreadResetTimeMin=1, spreadResetTimeMax=3)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip=var "Turn Anim", resetFrame=true, everyFrame=true)
+    SetBoolValue(boolVariable=var "Out of Alert", boolValue=var "Alert Range", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Out of Alert", everyFrame=true)
+    FloatAddV2(floatVariable=var "Unalert Timer", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "Out of Alert")
+    FloatCompare(float1=var "Unalert Timer", float2=8, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UNALERT", everyFrame=true)
+    on UNALERT → Chase End
+  }
+
+  state Chase End {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip=var "Turn Anim", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85)
+    BoolTest(boolVariable=var "Alert Range", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    on FINISHED → Remove From List
+    on ALERT → Loop Pause
+  }
+
+  state Death {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blob")
+    ActivateGameObject(gameObject=var "Terrain Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Light"), sendEvent="DOWN", delay=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Disable Collider
+  }
+
+  state Retreat {
+    iTweenMoveBy(gameObject=Self, id="", vector=(0, -50, 0), time=2, delay=0, speed=(unset), easeType=easeInCubic, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    on FINISHED → Recycle
+  }
+
+  state Recycle {
+    BoolTest(boolVariable=var "No Spawn", isTrue=→"NO SPAWN", isFalse=(none), everyFrame=false)
+    SetHP(target=Self, hp=20)
+    RecycleSelf()
+    on NO SPAWN → Destroy
+  }
+
+  state Journal Entry? {
+    BuildString(stringParts=["killed", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "PD Killed Name", isTrue=→"FINISHED", isFalse=(none))
+    SetPlayerDataBool(boolName=var "PD Killed Name", value=true)
+    BuildString(stringParts=["newData", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    SetPlayerDataBool(boolName=var "PD Killed Name", value=true)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=(none), isFalse=→"FINISHED")
+    BuildString(stringParts=["kills", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName=var "PD Killed Name", storeValue=var "PD Kills")
+    IntCompare(integer1=var "PD Kills", integer2=1, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DESTROY JOURNAL MSG", delay=0, everyFrame=false)
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="journalEntriesCompleted")
+    CreateObject(gameObject=Journal Update Msg (resources.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    on FINISHED → Journal Update?
+  }
+
+  state Journal Update? {
+    BuildString(stringParts=["kills", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName=var "PD Killed Name", storeValue=var "PD Kills")
+    IntCompare(integer1=var "PD Kills", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    IntAdd(intVariable=var "PD Kills", add=-1, everyFrame=false)
+    SetPlayerDataInt(intName=var "PD Killed Name", value=var "PD Kills")
+    IntCompare(integer1=var "PD Kills", integer2=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    BuildString(stringParts=["newData", var "PlayerData Name"], separator="", addToEnd=true, storeResult=var "PD Killed Name", everyFrame=false)
+    SetPlayerDataBool(boolName=var "PD Killed Name", value=true)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=(none), isFalse=→"FINISHED")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DESTROY JOURNAL MSG", delay=0, everyFrame=false)
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="journalNotesCompleted")
+    CreateObject(gameObject=Journal Update Msg (resources.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Msg", networkInstantiate=false, networkGroup=0)
+    SetFsmBool(gameObject=var "Msg", fsmName="Journal Msg", variableName="Full", setValue=true, everyFrame=false)
+    on FINISHED → Explode
+  }
+
+  state Disable Collider {
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CANCEL RECOIL", delay=0, everyFrame=false)
+    on FINISHED → Retreat
+  }
+
+  state Destroy {
+    DestroySelf(detachChildren=false)
+  }
+
+  state Pause {
+    ActivateGameObject(gameObject=var "Enemy Pusher", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Friendly?
+  }
+
+  state Friendly? {
+    SetHP(target=Self, hp=20)
+    SetBoolValue(boolVariable=var "Friendly", boolValue=false, everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="royalCharmState", storeValue=var "Royal Charm State")
+    IntCompare(integer1=var "Royal Charm State", integer2=4, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    SetScale(gameObject=var "Alert Range Obj", vector=(unset), x=0.5, y=0.5, z=0.5, everyFrame=false, lateUpdate=false)
+    SetHP(target=Self, hp=1)
+    SetBoolValue(boolVariable=var "Friendly", boolValue=true, everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state F Approach {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Fly Anim")
+    DecelerateV2(gameObject=Self, deceleration=0.85)
+    RandomFloat(min=2.5, max=3.5, storeResult=var "Max Speed")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip=var "Turn Anim", resetFrame=true, everyFrame=true)
+    SetBoolValue(boolVariable=var "Out of Alert", boolValue=var "Alert Range", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Out of Alert", everyFrame=true)
+    FloatAddV2(floatVariable=var "Unalert Timer", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "Out of Alert")
+    on UNALERT → Approach End
+    on FINISHED → Unform
+  }
+
+  state Approach End {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip=var "Turn Anim", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85)
+    on FINISHED → Idle
+  }
+
+  state Explode {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Death Wave", emit=0)
+    AudioStop(gameObject=Self)
+    on FINISHED → Death
+  }
+
+  state Unform {
+    ActivateGameObject(gameObject=var "Terrain Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Unform", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioStop(gameObject=Self)
+    on FINISHED → Death
+  }
+
+  state Audio {
+    RandomFloat(min=0.005, max=0.009, storeResult=var "zPos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "zPos", space=0, everyFrame=false, lateUpdate=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Idle
+  }
+
+  state Loop Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Chase
+  }
+
+  state Force End {
+    SetBoolValue(boolVariable=var "Alert Range", boolValue=false, everyFrame=false)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Remove From List {
+    BehaviourListRemove(owner=Self)
+    on FINISHED → Idle
+  }
+
+  var No Spawn: bool = false
+
+  var Max Speed: float = 0
+  var Tween Distance: float = 0
+  var Tween Time: float = 0
+  var Unalert Timer: float = 0
+  var zPos: float = 0
+  var PD Kills: int = 0
+  var Royal Charm State: int = 0
+  var Alert Range: bool = false
+  var Friendly: bool = false
+  var Out of Alert: bool = false
+  var Fly Anim: string = ""
+  var Number: string = ""
+  var PD Killed Name: string = ""
+  var PlayerData Name: string = "Sibling"
+  var Startle Anim: string = ""
+  var Turn Anim: string = ""
+  var Tween Vector: vector3 = (0, 0, 0)
+  var Alert Range Obj: gameObject = Siblings/Shade Sibling (8)/Alert Range
+  var Death Wave: gameObject = Siblings/Shade Sibling (8)/Death Wave
+  var Enemy Pusher: gameObject = Siblings/Shade Sibling (8)/Enemy Pusher
+  var Light: gameObject = Siblings/Shade Sibling (8)/Light
+  var Msg: gameObject = <null>
+  var Pt Emerge: gameObject = Siblings/Shade Sibling (8)/Pt Emerge
+  var Self: gameObject = <null>
+  var Shade Particles: gameObject = Siblings/Shade Sibling (8)/Shade Particles
+  var Terrain Block: gameObject = Siblings/Shade Sibling (8)/Terrain Block
+}

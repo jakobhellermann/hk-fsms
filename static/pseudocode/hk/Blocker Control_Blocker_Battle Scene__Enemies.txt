@@ -1,0 +1,232 @@
+# Blocker Control
+# 1 location(s):
+#   Crossroads_11_alt / _Enemies/Battle Scene/Blocker
+
+fsm Blocker Control {
+  start Pause
+  on TOOK DAMAGE → Hit Pause  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetPosition(gameObject=Self, vector=var "INitial Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    FindChild(gameObject=Self, childName="Alert Range New", storeResult=var "Alerter")
+    FindChild(gameObject=Self, childName="Attack Range", storeResult=var "Attack Alerter")
+    FindChild(gameObject=Self, childName="Spit Effect", storeResult=var "Spit Effect")
+    FindChild(gameObject=Self, childName="Pt Close", storeResult=var "Pt Close")
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Closed")
+    on FINISHED → Direction
+  }
+
+  state Dormant {
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    BoolTest(boolVariable=var "In Alert Range", isTrue=→"ALERT", isFalse=(none), everyFrame=true)
+    on ALERT → Get Fireball
+  }
+
+  state Open {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=blocker_open (resources.assets), pitchMin=0.85, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Open")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    FloatAdd(floatVariable=var "Spawned Time", add=1, everyFrame=true, perSecond=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    SetPosition(gameObject=Self, vector=var "INitial Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    BoolTest(boolVariable=var "In Attack Range", isTrue=→"CLOSE", isFalse=(none), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    WaitRandom(timeMin=0.8, timeMax=1.2, finishEvent=→"ATTACK", realTime=false)
+    BoolTest(boolVariable=var "Unalert Range", isTrue=(none), isFalse=→"UNALERT", everyFrame=false)
+    on CLOSE → Close
+    on ATTACK → Attack Choose
+    on UNALERT → Sleep 1
+  }
+
+  state Close {
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=(unset))
+    SetPosition(gameObject=Self, vector=var "INitial Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=blocker_close (resources.assets), pitchMin=0.85, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Close1")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Close2
+  }
+
+  state Close2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Close2")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Pt Close", emit=0)
+    on FINISHED → Closed
+  }
+
+  state Closed {
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolTest(boolVariable=var "In Attack Range", isTrue=(none), isFalse=→"FAR", everyFrame=true)
+    on FAR → Open
+  }
+
+  state Attack Choose {
+    SendRandomEvent(events=[→"GOOP", →"ROLLER"], weights=[0.5, 0.5], delay=0)
+    on GOOP → Goop
+    on ROLLER → Can Roller?
+  }
+
+  state Goop {
+    SetBoolValue(boolVariable=var "Rollering", boolValue=false, everyFrame=false)
+    SetGameObject(variable=var "Projectile", gameObject=Shot Mawlek (sharedassets32.assets), everyFrame=false)
+    on FINISHED → Shot Antic
+  }
+
+  state Shot Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Shoot Antic")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fire
+  }
+
+  state Fire {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[mawlek_spit (sharedassets33.assets), mawlek_spit_b (sharedassets34.assets)], weights=[1, 1], pitchMin=1.15, pitchMax=1.35, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "Spit Effect"), sendEvent="PLAY", delay=0, everyFrame=false)
+    RandomFloat(min=var "X Speed Min", max=var "X Speed Max", storeResult=var "Chooser")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Shoot CD")
+    SpawnObjectFromGlobalPool(gameObject=var "Projectile", spawnPoint=var "Self", position=var "Shot Origin", rotation=(unset), storeObject=var "Shot Instance")
+    SetVelocity2d(gameObject=var "Shot Instance", vector=(unset), x=var "Chooser", y=var "Shot Y Speed", everyFrame=false)
+    SetFloatValue(floatVariable=var "Choose Min", floatValue=var "Chooser", everyFrame=false)
+    SetFloatValue(floatVariable=var "Choose Max", floatValue=var "Chooser", everyFrame=false)
+    FloatAdd(floatVariable=var "Choose Max", add=10, everyFrame=false, perSecond=false)
+    FloatSubtract(floatVariable=var "Choose Min", subtract=10, everyFrame=false, perSecond=false)
+    FlingObjectsFromGlobalPool(gameObject=Spatter Orange (resources.assets), spawnPoint=var "Self", position=var "Shot Origin", spawnMin=8, spawnMax=10, speedMin=18, speedMax=22, angleMin=-20, angleMax=70, originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Roller Assign
+  }
+
+  state Direction {
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on RIGHT → Right
+    on LEFT → Left
+  }
+
+  state Right {
+    SetVector3XYZ(vector3Variable=var "Shot Origin", vector3Value=(unset), x=2.76, y=0.78, z=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=50, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=75, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Speed Min", floatValue=3, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Speed Max", floatValue=15, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Left {
+    SetVector3XYZ(vector3Variable=var "Shot Origin", vector3Value=(unset), x=-2.76, y=0.78, z=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Min", floatValue=45, everyFrame=false)
+    SetFloatValue(floatVariable=var "Angle Max", floatValue=85, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Speed Min", floatValue=-1, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Speed Max", floatValue=-15, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Roller {
+    SetBoolValue(boolVariable=var "Rollering", boolValue=true, everyFrame=false)
+    SetGameObject(variable=var "Projectile", gameObject=Spawn Roller v2 (sharedassets50.assets), everyFrame=false)
+    SetFloatValue(floatVariable=var "Spawned Time", floatValue=0, everyFrame=false)
+    on FINISHED → Shot Antic
+    on GOOP → Goop
+  }
+
+  state Roller Assign {
+    BoolTest(boolVariable=var "Rollering", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetFsmBool(gameObject=var "Shot Instance", fsmName="Roller", variableName="Moving Right", setValue=var "Facing Right", everyFrame=false)
+    on FINISHED → Shot Anim End
+  }
+
+  state Shot Anim End {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolTest(boolVariable=var "In Attack Range", isTrue=→"CLOSE", isFalse=(none), everyFrame=true)
+    on FINISHED → Idle
+    on CLOSE → Close
+  }
+
+  state Hit {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashInfectedLong())
+    ObjectJitter(gameObject=Self, x=0.05, y=0.05, z=(unset), allowMovement=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+    on CLOSE → Close
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Hit Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BLOCKER DAMAGED", delay=0, everyFrame=false)
+    on FINISHED → Hit
+  }
+
+  state Can Roller? {
+    IntCompare(integer1=var "Fireball Level", integer2=0, equal=→"GOOP", lessThan=→"GOOP", greaterThan=(none), everyFrame=false)
+    FindGameObject(objectName="Spawn Roller v2(Clone)", withTag="Untagged", store=var "Roller Check")
+    GameObjectIsNull(gameObject=var "Roller Check", isNull=→"FINISHED", isNotNull=→"GOOP", storeResult=(unset), everyFrame=false)
+    on FINISHED → Roller
+    on GOOP → Goop
+  }
+
+  state Action? {
+    BoolTest(boolVariable=var "Action Audio", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=Action (resources.assets), transitionTime=2)
+    on FINISHED → Open
+  }
+
+  state Sleep 1 {
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=(unset))
+    SetPosition(gameObject=Self, vector=var "INitial Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=blocker_close (resources.assets), pitchMin=0.85, pitchMax=1.1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Close1")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Sleep 2
+  }
+
+  state Sleep 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Close2")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Pt Close", emit=0)
+    on FINISHED → Dormant
+  }
+
+  state Get Fireball {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="fireballLevel", storeValue=var "Fireball Level")
+    on FINISHED → Action?
+  }
+
+  var Shot Y Speed: float = 20
+  var X Speed Max: float = 15
+  var X Speed Min: float = 3
+  var Action Audio: bool = true
+  var Facing Right: bool = true
+  var Unalert Range: bool = false
+
+  var Angle Max: float = 0
+  var Angle Min: float = 0
+  var Choose Max: float = 0
+  var Choose Min: float = 0
+  var Chooser: float = 0
+  var Spawned Time: float = 0
+  var Fireball Level: int = 0
+  var Spawned: int = 0
+  var In Alert Range: bool = false
+  var In Attack Range: bool = false
+  var Rollering: bool = false
+  var INitial Pos: vector3 = (0, 0, 0)
+  var Shot Origin: vector3 = (0, 0, 0)
+  var Alerter: gameObject = <null>
+  var Attack Alerter: gameObject = <null>
+  var Projectile: gameObject = <null>
+  var Pt Close: gameObject = <null>
+  var Roller Check: gameObject = <null>
+  var Roller Type: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shot Instance: gameObject = <null>
+  var Spit Effect: gameObject = <null>
+}

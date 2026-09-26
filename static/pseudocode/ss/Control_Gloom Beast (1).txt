@@ -1,0 +1,443 @@
+# Control
+# 1 location(s):
+#   Abyss_02b / Gloom Beast (1)
+
+fsm Control {
+  start Init
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    FindAlertRange(target=Self, storeResult=var "Patrol Range", childName="Patrol Range")
+    FindAlertRange(target=Self, storeResult=var "Wake Range", childName="Wake Range")
+    SetParent(gameObject=var "Patrol Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Wake Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Home", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Spawn Gloomflies
+  }
+
+  state Spit Antic 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Spit
+  }
+
+  state Spit {
+    PlayAudioEvent(audioClip=coral_goomba_large_vox_medium_2 (sfxstatic_assets_areacoral.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=coral_goomba_large_vox_medium_4 (sfxstatic_assets_areacoral.bundle), pitchMin=0.8, pitchMax=0.8, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=gloombeast_vommit (sfxstatic_assets_areaabyss.bundle))
+    Wait(time=1.2, finishEvent=→"NEXT", realTime=false)
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Collider Spit", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt Spit", resetTimeIfPlaying=false, stopOnStateExit=true)
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.15)
+    on NEXT → Spit End 1
+  }
+
+  state Spit End 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spit End", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Spit End 2
+  }
+
+  state Retreat {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Retreat")
+    SetVelocityByScale(gameObject=Self, speed=12, ySpeed=(unset), everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Collider Retreat", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on FINISHED → Retreat End
+  }
+
+  state Idle {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateGameObject(gameObject=var "Collider Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    WaitRandom(timeMin=1.5, timeMax=2, finishEvent=→"TURN", realTime=false)
+    on ALERT → Turn To Hero?
+    on TOOK DAMAGE → Turn To Hero?
+    on TURN → Turn To Patrol
+  }
+
+  state Hatch Antic 1 {
+    SetGameObject(variable=var "Gloomfly", gameObject=<null>, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatch", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Collider Antic", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[gloombeast_foley_eg_stop_walk_1 (sfxstatic_assets_areaabyss.bundle), gloombeast_foley_eg_stop_walk_2 (sfxstatic_assets_areaabyss.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlaySimple(gameObject=var "Audio Loop VoiceHatch", volume=1, oneShotClip=<null>)
+    on FINISHED → Hatch Antic 2
+  }
+
+  state Hatch Antic 2 {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Collider Hatch", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=gloombeast_open_back (sfxstatic_assets_areaabyss.bundle))
+    AudioPlaySimple(gameObject=var "Hatching Loop", volume=1, oneShotClip=<null>)
+    on FINISHED → Hatch 1
+  }
+
+  state Attack Choice {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    GetFsmBool(gameObject=var "Hero", fsmName="Roar and Wound States", variableName="Is Grabbed", storeValue=var "Hero Is Grabbed", everyFrame=false)
+    BoolTest(boolVariable=var "Hero Is Grabbed", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"CHARGE", delay=0, everyFrame=false)  // disabled
+    GetChildCount(gameObject=var "Hatchlings", storeResult=var "Hatchlings Ready")
+    IntCompare(integer1=var "Hatchlings Ready", integer2=2, equal=(none), lessThan=→"SPIT", greaterThan=(none), everyFrame=false)  // disabled
+    IntTestToBool(int1=var "Hatchlings Ready", int2=2, equalBool=(unset), lessThanBool=var "Cannot Spit", greaterThanBool=(unset), everyFrame=false)
+    SendRandomEventV4(events=[→"SPIT", →"CHARGE"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=var "Cannot Spit")
+    SendRandomEventV4(events=[→"SPIT", →"HATCH", →"CHARGE"], weights=[0.5, 0.5, 0.5], eventMax=[2, 1, 2], missedMax=[3, 4, 3], activeBool=(unset))
+    on SPIT → Spit Antic 1
+    on HATCH → Hatch Antic 1
+    on CANCEL → Recover 1
+    on CHARGE → Charge Antic 1
+  }
+
+  state Turn To Hero? {
+    SetStringValue(stringVariable=var "Next Event", stringValue="CHASE", everyFrame=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=→"TURN", facingBool=(unset), notFacingBool=(unset))
+    on FINISHED → Startle?
+    on TURN → Turn 1
+  }
+
+  state Turn 1 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Collider Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Turn 2
+  }
+
+  state Turn 2 {
+    ActivateGameObject(gameObject=var "Collider Turn1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Turn 3
+  }
+
+  state Turn 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Turn 4
+  }
+
+  state Turn 4 {
+    ActivateGameObject(gameObject=var "Collider Turn2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScaleOnExit(gameObject=Self, flipHorizontally=true, flipVertically=false)
+    on FINISHED → Turn End
+  }
+
+  state Spit Antic 1 {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=gloombeast_vommit_antic (sfxstatic_assets_areaabyss.bundle))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spit", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Collider Spit Antic", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetAudioVolume(gameObject=var "Audio Loop Voice", volume=1, everyFrame=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Voice", volume=1, oneShotClip=fluke_mother_roar (sfxstatic_assets_areaabyss.bundle))
+    on FINISHED → Spit Antic 2
+  }
+
+  state Spit End 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Collider Spit Antic", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.5, cancelOnEarlyExit=false)
+    on FINISHED → Turn To Hero? 2
+  }
+
+  state Recover 2 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateGameObject(gameObject=var "Collider Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEventRandom(audioClips=[gloombeast_foley_eg_stop_walk_1 (sfxstatic_assets_areaabyss.bundle), gloombeast_foley_eg_stop_walk_2 (sfxstatic_assets_areaabyss.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Unalert?
+  }
+
+  state Chase {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    SetVelocityByScale(gameObject=Self, speed=-16, ySpeed=(unset), everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Run")
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(30, 20), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.15)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    ActivateGameObject(gameObject=var "Collider Run", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Ray Pt Chase", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"EDGE", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=false, DistancePast=0, StoreResult=(unset), PassedEvent=→"PASSED HERO", NotPassedEvent=(none), EveryFrame=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on ATTACK → Attack Choice
+    on EDGE → Recover 1
+    on PASSED HERO → Recover 1
+  }
+
+  state Patrol Run {
+    RandomFloat(min=5, max=12, storeResult=var "Roam Distance")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Run")
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(30, 20), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.15)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    ActivateGameObject(gameObject=var "Collider Run", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    CheckPassedTarget(Self=Self, Target=var "Home", IsActive=true, DefaultFacingRight=false, DistancePast=var "Roam Distance", StoreResult=(unset), PassedEvent=→"END", NotPassedEvent=(none), EveryFrame=true)
+    AudioPlayInState(gameObject=Self, volume=1)
+    on ALERT → Turn To Hero?
+    on TOOK DAMAGE → Turn To Hero?
+    on END → Stop Run
+  }
+
+  state Turn To Patrol {
+    CheckFacingTarget(facingObject=Self, target=var "Home", spriteFacesRight=false, everyFrame=false, facingEvent=→"CANCEL", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    SetStringValue(stringVariable=var "Next Event", stringValue="IDLE", everyFrame=false)
+    on FINISHED → Turn 1
+    on CANCEL → Patrol Run
+  }
+
+  state Turn End {
+    SendEventByName(eventTarget=Self, sendEvent=var "Next Event", delay=0, everyFrame=false)
+    on IDLE → Patrol Run
+    on FINISHED → Idle
+    on CHASE → Chase
+    on RECOVER → Recover 1
+  }
+
+  state Recover 1 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateGameObject(gameObject=var "Collider Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Retreat?
+    on TOOK DAMAGE → Retreat?
+  }
+
+  state Retreat? {
+    RayCast2dV2(fromGameObject=var "Ray Pt Retreat", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=(none), notFacingEvent=→"FINISHED", facingBool=(unset), notFacingBool=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=var "In Alert Range", sendEvent="ALERT", outOfRangeEvent="", everyFrame=false)
+    SendRandomEventV4(events=[→"RETREAT", (none)], weights=[0.5, 0.5], eventMax=[1, 2], missedMax=[2, 1], activeBool=var "In Alert Range")
+    on FINISHED → Recover 2
+    on RETREAT → Retreat
+  }
+
+  state Retreat End {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=false)
+    on ATTACK → Attack Choice
+    on FINISHED → Recover 2
+  }
+
+  state Unalert? {
+    CheckAlertRange(alertRange=var "Patrol Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"UNALERT", OutOfRangeDelay=0, everyFrame=false)
+    on FINISHED → Turn To Hero?
+    on UNALERT → Idle
+  }
+
+  state Spawn Gloomflies {
+    SetParent(gameObject=var "Hatchlings", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    CreateObject(gameObject=Gloomfly (localpoolprefabs_assets_areaabyss.bundle), spawnPoint=var "Hatchlings", position=(unset), rotation=(unset), storeObject=var "Gloomfly")
+    SetFsmBool(gameObject=var "Gloomfly", fsmName="Control", variableName="Respawner", setValue=true, everyFrame=false)
+    SetFsmGameObject(gameObject=var "Gloomfly", fsmName="Control", variableName="Respawn Folder", setValue=var "Hatchlings", everyFrame=false)
+    CreateObject(gameObject=Gloomfly (localpoolprefabs_assets_areaabyss.bundle), spawnPoint=var "Hatchlings", position=(unset), rotation=(unset), storeObject=var "Gloomfly")
+    SetFsmBool(gameObject=var "Gloomfly", fsmName="Control", variableName="Respawner", setValue=true, everyFrame=false)
+    SetFsmGameObject(gameObject=var "Gloomfly", fsmName="Control", variableName="Respawn Folder", setValue=var "Hatchlings", everyFrame=false)
+    CreateObject(gameObject=Gloomfly (localpoolprefabs_assets_areaabyss.bundle), spawnPoint=var "Hatchlings", position=(unset), rotation=(unset), storeObject=var "Gloomfly")
+    SetFsmBool(gameObject=var "Gloomfly", fsmName="Control", variableName="Respawner", setValue=true, everyFrame=false)
+    SetFsmGameObject(gameObject=var "Gloomfly", fsmName="Control", variableName="Respawn Folder", setValue=var "Hatchlings", everyFrame=false)
+    CreateObject(gameObject=Gloomfly (localpoolprefabs_assets_areaabyss.bundle), spawnPoint=var "Hatchlings", position=(unset), rotation=(unset), storeObject=var "Gloomfly")
+    SetFsmBool(gameObject=var "Gloomfly", fsmName="Control", variableName="Respawner", setValue=true, everyFrame=false)
+    SetFsmGameObject(gameObject=var "Gloomfly", fsmName="Control", variableName="Respawn Folder", setValue=var "Hatchlings", everyFrame=false)
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Check Start Pos
+  }
+
+  state Hatch 1 {
+    GetRandomChild(gameObject=var "Hatchlings", storeResult=var "Gloomfly")
+    GameObjectIsNull(gameObject=var "Gloomfly", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=slab_fly_large_spit (sfxstatic_assets_areaslab.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetPositionToObject2D(gameObject=var "Gloomfly", targetObject=var "Hatch Point 2", xOffset=0, yOffset=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Gloomfly"), sendEvent="HATCH", delay=0, everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Collider Hatch", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Hatch 2
+  }
+
+  state Hatch 2 {
+    GetRandomChild(gameObject=var "Hatchlings", storeResult=var "Gloomfly")
+    GameObjectIsNull(gameObject=var "Gloomfly", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=slab_fly_large_spit (sfxstatic_assets_areaslab.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetPositionToObject2D(gameObject=var "Gloomfly", targetObject=var "Hatch Point 1", xOffset=0, yOffset=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Gloomfly"), sendEvent="HATCH", delay=0, everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Collider Hatch", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Hatch End
+  }
+
+  state Hatch 3 {
+    GetRandomChild(gameObject=var "Hatchlings", storeResult=var "Gloomfly")
+    GameObjectIsNull(gameObject=var "Gloomfly", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=slab_fly_large_spit (sfxstatic_assets_areaslab.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetPositionToObject2D(gameObject=var "Gloomfly", targetObject=var "Hatch Point 3", xOffset=0, yOffset=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Gloomfly"), sendEvent="HATCH", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Collider Hatch", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Hatch End
+  }
+
+  state Startle? {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"CHASE", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Startled", isTrue=→"CHASE", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Startled", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Turn To Hero?
+    on CHASE → Chase
+  }
+
+  state Turn To Hero? 2 {
+    SetStringValue(stringVariable=var "Next Event", stringValue="RECOVER", everyFrame=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=→"TURN", facingBool=(unset), notFacingBool=(unset))
+    on FINISHED → Recover 1
+    on TURN → Turn 1
+  }
+
+  state Dormant {
+    CheckAlertRange(alertRange=var "Wake Range", storeResult=(unset), InRangeEvent=→"WAKE", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    on WAKE → Idle
+    on TOOK DAMAGE → Idle
+  }
+
+  state Check Start Pos {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"START L", leftEvent=→"START R", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"START R", delay=0, everyFrame=false)
+    on START L → Start L
+    on START R → Start R
+  }
+
+  state Start L {
+    SetPosition2d(gameObject=Self, vector=(unset), x=var "Start Pos L", y=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dormant
+  }
+
+  state Start R {
+    SetPosition2d(gameObject=Self, vector=(unset), x=var "Start Pos R", y=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dormant
+  }
+
+  state Hatch End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatch End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=gloombeast_close_back (sfxstatic_assets_areaabyss.bundle))
+    AudioStop(gameObject=var "Hatching Loop", fadeTime=0)
+    AudioStopV2(gameObject=var "Audio Loop VoiceHatch", fadeTime=0.25, cancelOnEarlyExit=false)
+    on FINISHED → Turn To Hero? 2
+  }
+
+  state Stop Run {
+    PlayAudioEventRandom(audioClips=[gloombeast_foley_eg_stop_walk_1 (sfxstatic_assets_areaabyss.bundle), gloombeast_foley_eg_stop_walk_2 (sfxstatic_assets_areaabyss.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle
+  }
+
+  state Death {
+    SetParent(gameObject=var "Pt Spit", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    StopParticleEmitter(gameObject=var "Pt Spit")
+    ActivateGameObject(gameObject=var "Patrol Range Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Charge Antic 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEventRandom(audioClips=[gloombeast_foley_eg_stop_walk_1 (sfxstatic_assets_areaabyss.bundle), gloombeast_foley_eg_stop_walk_2 (sfxstatic_assets_areaabyss.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=coral_goomba_large_vox_medium_1 (sfxstatic_assets_areacoral.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=coral_goomba_large_vox_medium_3 (sfxstatic_assets_areacoral.bundle), pitchMin=0.8, pitchMax=0.8, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocityByScale(gameObject=Self, speed=18, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=var "Charge Decel", decelerationY=(unset), brakeOnExit=false)
+    RayCast2dV2(fromGameObject=var "Ray Pt ChargeAntic", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "No Ground Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlipEveryFrame(boolVariable=var "No Ground Behind", everyFrame=true)
+    DecelerateXYConditional(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=false, conditionalBool=var "No Ground Behind")
+    AudioPlayInState(gameObject=Self, volume=1)
+    PlayAudioEvent(audioClip=skull_king_jump (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Charge Antic 2
+  }
+
+  state Charge Antic 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=var "Charge Decel", decelerationY=(unset), brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Collider ChargeAntic1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Ray Pt ChargeAntic", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "No Ground Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlipEveryFrame(boolVariable=var "No Ground Behind", everyFrame=true)
+    DecelerateXYConditional(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=false, conditionalBool=var "No Ground Behind")
+    on FINISHED → Charge Antic 3
+  }
+
+  state Charge Antic 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=var "Charge Decel", decelerationY=(unset), brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Collider ChargeAntic2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Ray Pt ChargeAntic", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "No Ground Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlipEveryFrame(boolVariable=var "No Ground Behind", everyFrame=true)
+    DecelerateXYConditional(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=false, conditionalBool=var "No Ground Behind")
+    on FINISHED → Charge
+  }
+
+  state Charge {
+    ActivateGameObject(gameObject=var "Collider Charge", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AccelerateToXByScale(gameObject=Self, accelerationFactor=1, targetSpeed=-20)
+    PlayParticleEmitterInState(gameObject=var "Pt Run")
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(30, 20), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.15)
+    ActivateGameObject(gameObject=var "Collider Run", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge Attack")
+    AudioPlayInState(gameObject=Self, volume=1)
+    PlayAudioEvent(audioClip=skull_king_skid (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=skull_king_charge_burst (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValueAtTime(BoolVariable=var "Can Stop", BoolValue=true, Time=0.75, SetOppositeOnStateEntry=true)
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=false, DistancePast=6, StoreResult=var "Passed Hero", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=true)
+    BoolAllTrue(boolVariables=[var "Passed Hero", var "Can Stop"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    RayCast2dV2(fromGameObject=var "Ray Pt Chase", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Charge End
+  }
+
+  state Charge End {
+    PlayAudioEvent(audioClip=skull_king_jump (sfxstatic_assets_areabone.bundle), pitchMin=1.15, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEventRandom(audioClips=[gloombeast_foley_eg_stop_walk_1 (sfxstatic_assets_areaabyss.bundle), gloombeast_foley_eg_stop_walk_2 (sfxstatic_assets_areaabyss.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    ActivateGameObject(gameObject=var "Collider Retreat", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  var Start Pos L: float = 36.46
+  var Start Pos R: float = 70.11
+
+  var Roam Distance: float = 0
+  var Charge Decel: float = 0.95
+  var Hatchlings Ready: int = 0
+  var Hero Is Grabbed: bool = false
+  var In Alert Range: bool = false
+  var No Ground Behind: bool = false
+  var Startled: bool = false
+  var Can Stop: bool = false
+  var Passed Hero: bool = false
+  var Cannot Spit: bool = false
+  var Next Event: string = ""
+  var Audio Loop Voice: gameObject = Gloom Beast (1)/Audio Loop Voice
+  var Audio Loop VoiceHatch: gameObject = Gloom Beast (1)/Audio Loop VoiceHatch
+  var Collider Antic: gameObject = Gloom Beast (1)/Collider Antic
+  var Collider Hatch: gameObject = Gloom Beast (1)/Collider Hatch
+  var Collider Idle: gameObject = Gloom Beast (1)/Collider Idle
+  var Collider Retreat: gameObject = Gloom Beast (1)/Collider Retreat
+  var Collider Run: gameObject = Gloom Beast (1)/Collider Run
+  var Collider Spit: gameObject = Gloom Beast (1)/Collider Spit
+  var Collider Spit Antic: gameObject = Gloom Beast (1)/Collider Spit Antic
+  var Collider Turn1: gameObject = Gloom Beast (1)/Collider Turn1
+  var Collider Turn2: gameObject = Gloom Beast (1)/Collider Turn2
+  var Gloomfly: gameObject = <null>
+  var Hatch Point 1: gameObject = Gloom Beast (1)/Hatch Point 1
+  var Hatch Point 2: gameObject = Gloom Beast (1)/Hatch Point 2
+  var Hatch Point 3: gameObject = Gloom Beast (1)/Hatch Point 3
+  var Hatching Loop: gameObject = Gloom Beast (1)/Hatching Loop
+  var Hatchlings: gameObject = Gloom Beast (1)/Hatchlings
+  var Home: gameObject = Gloom Beast (1)/Home
+  var Patrol Range Obj: gameObject = Gloom Beast (1)/Patrol Range
+  var Pt Run: gameObject = Gloom Beast (1)/Pt Run
+  var Pt Spit: gameObject = Gloom Beast (1)/Pt Spit
+  var Ray Pt Chase: gameObject = Gloom Beast (1)/Ray Pt Chase
+  var Ray Pt Retreat: gameObject = Gloom Beast (1)/Ray Pt Retreat
+  var Spit Effect: gameObject = Gloom Beast (1)/Spit Effect
+  var Wake Range Obj: gameObject = Gloom Beast (1)/Wake Range
+  var Collider ChargeAntic1: gameObject = Gloom Beast (1)/Collider ChargeAntic1
+  var Collider ChargeAntic2: gameObject = Gloom Beast (1)/Collider ChargeAntic2
+  var Ray Pt ChargeAntic: gameObject = Gloom Beast (1)/Ray Pt ChargeAntic
+  var Collider Charge: gameObject = Gloom Beast (1)/Collider Charge
+  var Patrol Range: object = <null>
+  var Wake Range: object = <null>
+}

@@ -1,0 +1,69 @@
+# FSM
+# 1 location(s):
+#   Last_Dive / Scene Control
+
+fsm FSM {
+  start Entry Wait
+  on DISABLE → Reset  // from any state
+
+  sequence state Entry Wait {
+    SetVibrationManagerStrength(strength=0, fadeDuration=0, resetOnExit=false, strengthOnExit=(unset), restoreFadeDuration=(unset), blockNextSceneAutoFade=true)
+    WaitForFinishedEnteringScene(sendEvent=(none))
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    on DOOR ENTRY FINISHED → Start Audio
+  }
+
+  state Start Cutscene {
+    StartPreloadingScene(SceneName="Abyss_Cocoon", LoadMode=LoadSceneMode(1))
+    SetAnimator(target=Scene Control/Abyss_Lake_dive, active=true)
+    AnimatorPlay(gameObject=Scene Control/Abyss_Lake_dive, stateName="Dive", layer=0, normalizedTime=0.04511278, everyFrame=false)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=2)
+    SetVibrationManagerStrength(strength=1, fadeDuration=4, resetOnExit=false, strengthOnExit=(unset), restoreFadeDuration=(unset), blockNextSceneAutoFade=false)
+    ListenForAnimationEvent(Target=Scene Control/Abyss_Lake_dive, Response=→"CUTSCENE")
+    on CUTSCENE → Cutscene
+  }
+
+  state Reset {
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+  }
+
+  state Cutscene {
+    CallMethodProper(gameObject=Scene Control/Cinematic Player, behaviour="CinematicPlayer", methodName="TriggerStartVideo", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on CINEMATIC END → Wait for audio end
+  }
+
+  state Wait for audio end {
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    TimeLimitCheck(storedValue=var "End Time", aboveEvent=→"FINISHED", belowEvent=(none), EveryFrame=true)
+    on FINISHED → Transition
+  }
+
+  state Start Audio {
+    SetVibrationManagerStrength(strength=0, fadeDuration=0, resetOnExit=false, strengthOnExit=(unset), restoreFadeDuration=(unset), blockNextSceneAutoFade=false)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    AnimatorPlay(gameObject=Scene Control/Abyss_Lake_dive, stateName="Dive", layer=0, normalizedTime=0, everyFrame=false)
+    SetAnimator(target=Scene Control/Abyss_Lake_dive, active=false)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    CallMethodProper(gameObject=var "MainCamera", behaviour="CameraController", methodName="SetAllowExitingSceneBounds", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    StartFreeCameraMode(StoreObject=var "Camera")
+    CameraRepositionToHero()
+    AudioPlaySimple(gameObject=Scene Control/Cutscene Audio, volume=1, oneShotClip=var "")
+    GetAudioClipDuration(Clip=Last Dive - Trimmed (sfxstatic_assets_areaabyss.bundle), StoreDuration=var "Audio Duration")
+    TimeLimitSet(timeDelay=var "Audio Duration", storeValue=var "End Time")
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)  // disabled
+    on FINISHED → Start Cutscene
+  }
+
+  state State 2 {
+  }
+
+  sequence state Transition {
+    Wait(time=0.1, finishEvent=(none), realTime=false)
+    BeginSceneTransition(sceneName="Abyss_Cocoon", entryGateName="door_entry", entryDelay=0, visualization=Default, preventCameraFadeOut=true)
+  }
+
+  var Audio Duration: float = 0
+  var End Time: float = 0
+  var Camera: gameObject = <null>
+}

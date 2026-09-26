@@ -1,0 +1,233 @@
+# Control
+# 1 location(s):
+#   Song_Enclave / Black Thread States/Black Thread World/Enclave Act 3/Sherma Caretaker
+
+fsm Control {
+  start Init
+
+  state Idle {
+    on INTERACT → Delivery?
+    on CHIME START → Force Chime Start
+  }
+
+  state Repeat {
+    GetPlayerDataBool(boolName="shermaCaretakerConvoFinal", storeValue=var "Did Final Convo")
+    ConvertBoolToString(boolVariable=var "Did Final Convo", stringVariable=var "Convo Key", falseString="SHERMA_CARETAKER_REPEAT", trueString="SHERMA_CARETAKER_REPEAT_FINAL", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state End Dialogue {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Start Asleep?
+  }
+
+  state Force Chime Start {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CHIME START", delay=0, everyFrame=false)
+    on CHIME STOP → Sing End
+  }
+
+  state Force Chime Sfx {
+    PlayAudioEventRandom(audioClips=[sherma_bell_ring_single_1 (sfxstatic_assets_sherma.bundle), sherma_bell_ring_single_2 (sfxstatic_assets_sherma.bundle), sherma_bell_ring_single_3 (sfxstatic_assets_sherma.bundle), sherma_bell_ring_single_4 (sfxstatic_assets_sherma.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Force Chime Loop Start
+    on CHIME STOP → Wait For Loop End
+  }
+
+  state Wait For Loop End {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Sing End
+  }
+
+  state Force Chime Loop Start {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Force Chime Loop")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))  // disabled
+    on CHIME STOP → Wait For Loop End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CHIME END", delay=0, everyFrame=false)
+    on FINISHED → Idle Anim
+  }
+
+  state Idle Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Idle
+  }
+
+  state Convo Check {
+    PlayerDataBoolTrueAndFalse(trueBool="HasWhiteFlower", falseBool="shermaCaretakerConvoFinal", isTrue=→"FINAL", isFalse=(none))
+    PlayerDataBoolTest(boolName="hasNeedolinMemoryPowerup", isTrue=(none), isFalse=→"REPEAT")
+    GetPlayerDataBool(boolName="shermaCaretakerConvoFinal", storeValue=var "Did Final Convo")
+    GetPlayerDataBool(boolName="shermaCaretakerConvo1", storeValue=var "Did Convo 1")
+    BoolTestMulti(boolVariables=[var "Did Convo 1", var "Did Final Convo"], boolStates=[false, false], trueEvent=→"CONVO 1", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"REPEAT", delay=0, everyFrame=false)
+    on CONVO 1 → Convo 1
+    on REPEAT → Repeat
+    on FINAL → Convo Final
+  }
+
+  state Convo 1 {
+    SetPlayerDataBool(boolName="shermaCaretakerConvo1", value=true)
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_CARETAKER_TALK1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  sequence state Delivery Quest End {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    EndQuest(ConsumeCurrency=true, Quest=Courier Delivery Songclave (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on FINISHED → Delivery Post
+  }
+
+  state Delivery {
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_CARETAKER_DELIVERY", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Delivery Quest End
+  }
+
+  state Delivery? {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="SHERMA")
+    CheckQuestStateV2(NotTrackedEvent=(none), IncompleteEvent=→"DELIVERY", CompletedEvent=(none), Quest=Courier Delivery Songclave (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on DELIVERY → Delivery
+    on FINISHED → Convo Check
+  }
+
+  sequence state Delivery Quest Reward {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    GetQuestRewardV2(StoreReward=var "Reward", StoreAmount=var "Reward Amount", Quest=Courier Delivery Songclave (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    SavedItemGetV2(Item=var "Reward", Amount=var "Reward Amount", ShowPopup=true)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Delivery Post {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="SHERMA")
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_CARETAKER_DELIVERY_POST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Delivery Quest Reward
+  }
+
+  state Convo Final {
+    SetPlayerDataBool(boolName="shermaCaretakerConvoFinal", value=true)
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_CARETAKER_FINAL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 2
+  }
+
+  state Start Asleep? {
+    PlayerDataBoolTest(boolName="visitedAbyss", isTrue=(none), isFalse=→"FINISHED")
+    SendRandomEvent(events=[→"FINISHED", →"SLEEP"], weights=[0.75, 0.25], delay=0)
+    on SLEEP → Sleep
+    on FINISHED → Idle
+  }
+
+  state Sleep {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sleep")
+    SetRandomAudioClipFromTable(Table=sherma_sleep_loop (sfxdynamic_assets_sherma.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=(none), ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Black Thread States/Black Thread World/Enclave Act 3/Sherma Caretaker@HeroPerformanceSingReaction, everyFrame=false)
+    on INTERACT → Interact Wake
+    on WAKE → Noise Wake
+  }
+
+  state Noise Wake {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTableV3(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=sherma_alert (sfxdynamic_assets_sherma.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Wake End
+  }
+
+  state Wake End {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Black Thread States/Black Thread World/Enclave Act 3/Sherma Caretaker@HeroPerformanceSingReaction, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Interact Wake {
+    PlayRandomAudioClipTableV3(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Wake End To Talk
+  }
+
+  state Wake End To Talk {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Black Thread States/Black Thread World/Enclave Act 3/Sherma Caretaker@HeroPerformanceSingReaction, everyFrame=false)
+    on FINISHED → Delivery?
+  }
+
+  state End Dialogue 2 {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Start Pray
+  }
+
+  state Start Pray {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Black Thread States/Black Thread World/Enclave Act 3/Sherma Caretaker@HeroPerformanceSingReaction, everyFrame=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetNPCSpeakingAudioTable(Target=Self, Table=sherma_talk_sing (sfxdynamic_assets_sherma.bundle))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CHIME START", delay=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetRangeCheckInner())
+    on FINISHED → Pray Voice Start
+  }
+
+  state Pray Voice Start {
+    SetRandomAudioClipFromTable(Table=sherma_sing (sfxdynamic_assets_sherma.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Pray Idle
+  }
+
+  state Pray Idle {
+    FaceObjectV4(ObjectA=Self, ObjectB=var "Hero", SpriteFacesRight=true, NewAnimationClip="TurnToSing", ResetFrame=true, PauseBetweenTurns=0.5, StoreDuration=(unset), turnAudioClipTable=small_movement_cloak (sfxdynamic_assets_shared.bundle), EveryFrame=true)
+    on INTERACT → Pray Talk
+    on STARTLE → Sing Startle
+  }
+
+  state Pray Talk {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_CARETAKER_FINAL_SONG", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 3
+  }
+
+  state End Dialogue 3 {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Pray Voice Start
+  }
+
+  state Sing Startle {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=sherma_alert (sfxdynamic_assets_sherma.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Pray
+  }
+
+  var Reward Amount: int = 0
+  var Did Final Convo: bool = false
+  var Did Convo 1: bool = false
+  var Convo Key: string = ""
+  var Audio Loop Voice: gameObject = Black Thread States/Black Thread World/Enclave Act 3/Sherma Caretaker/Audio Loop Voice
+  var Reward: object = <null>
+}

@@ -1,0 +1,853 @@
+# Control
+# 1 location(s):
+#   Room_CrowCourt / Battle Scene/Wave 3/Crowman
+
+fsm Control {
+  start RetreatAway Range?
+  on ZERO HP → Death  // from any state
+  on GO UP → Flap Up  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Wildslash/Hit 1", storeResult=var "WS Hit 1")
+    FindChild(gameObject=Self, childName="Wildslash/Hit 2", storeResult=var "WS Hit 2")
+    FindChild(gameObject=Self, childName="Wildslash/Hit 3", storeResult=var "WS Hit 3")
+    FindChild(gameObject=Self, childName="Wildslash/Hit 4", storeResult=var "WS Hit 4")
+    FindChild(gameObject=Self, childName="Wildslash/Hit 5", storeResult=var "WS Hit 5")
+    FindChild(gameObject=Self, childName="ChargeHit", storeResult=var "ChargeHit")
+    FindChild(gameObject=Self, childName="Throw Point", storeResult=var "Throw Point")
+    FindAlertRange(target=Self, storeResult=var "Throw Range", childName="Throw Range")
+    BoolTest(boolVariable=var "Spawner", isTrue=→"SPAWNER", isFalse=(none), everyFrame=false)
+    on FINISHED → Start Rest
+    on SPAWNER → Spawn Ready
+  }
+
+  state Start Rest {
+    RandomFloatEither(value1=-1.1, value2=1.1, storeResult=var "X Scale")
+    SetScale(gameObject=Self, vector=(unset), x=var "X Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SendRandomEvent(events=[→"L", →"R"], weights=[1, 1], delay=0)
+    on L → Play Audio L
+    on R → Play Audio R
+  }
+
+  state Roost L {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest RightToLeft")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    WaitRandom(timeMin=0.5, timeMax=5.5, finishEvent=→"TURN", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    on ALERT → Wake
+    on TOOK DAMAGE → Wake
+    on TURN → Play Audio R
+    on CROWMAN WAKE → Wake
+  }
+
+  state Wake {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=5)
+    SendEventToRegister(eventName="CROW CALL")
+    PlayAudioEvent(audioClip=crowman_actual_stab_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventToRegister(eventName="CROWMAN WAKE")  // disabled
+    ActivateGameObject(gameObject=var "Alert Range", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pt Rain", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Ground Idle
+  }
+
+  state Roost R {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest LeftToRight")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    WaitRandom(timeMin=0.5, timeMax=5.5, finishEvent=→"TURN", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    on ALERT → Wake
+    on TOOK DAMAGE → Wake
+    on TURN → Play Audio L
+    on CROWMAN WAKE → Wake
+    on FINISHED → 
+  }
+
+  state Ground Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CompareUnalertTime(alertRange=var "Throw Range", compareTo=8, lessThanOrEqualEvent=(none), greatherThanEvent=(none), greatherThanBool=var "Unalert Exceeded", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Battler", var "Unalert Exceeded"], boolStates=[false, true], trueEvent=→"UNALERT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="CLOSE", outOfRangeEvent="", everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    WaitRandom(timeMin=0.4, timeMax=0.75, finishEvent=→"FINISHED", realTime=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Velocity", float2=-0.1, tolerance=0, equal=(none), lessThan=→"DROP", greaterThan=(none), everyFrame=true)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.4, 0.6], delay=0)  // disabled
+    on FINISHED → Range Check
+    on TOOK DAMAGE → Range Check
+    on DROP → Drop
+    on CLOSE → Close
+    on SING → Sing
+    on UNALERT → Unalert Pause
+  }
+
+  state Wildslash Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetIntValue(intVariable=var "Slashes", intValue=0, everyFrame=false)
+    PlayAudioEvent(audioClip=crowman_actual_in_air_throw_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Wildslash Hop
+  }
+
+  state Wildslash 1 {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    PlayAudioEventRandom(audioClips=[crowman_actual_wildslash_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_4 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wildslash")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=0.8, brakeOnExit=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimation(gameObject=var "Wildslash Effect", animLibName="", clipName="Wildslash Effect")
+    Tk2dPlayFrame(gameObject=var "Wildslash Effect", frame=0)
+    SetMeshRenderer(gameObject=var "Wildslash Effect", active=true)
+    on FINISHED → Wildslash 2
+  }
+
+  state Wildslash 2 {
+    ActivateGameObject(gameObject=var "WS Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)  // disabled
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Wildslash 3
+  }
+
+  state Wildslash 3 {
+    ActivateGameObject(gameObject=var "WS Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)  // disabled
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Wildslash 4
+  }
+
+  state Wildslash 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEventRandom(audioClips=[crowman_actual_wildslash_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_4 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Wildslash 5
+  }
+
+  state Wildslash 5 {
+    ActivateGameObject(gameObject=var "WS Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)  // disabled
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Wildslash 6
+  }
+
+  state Wildslash 6 {
+    ActivateGameObject(gameObject=var "WS Hit 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)  // disabled
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Wildslash 7
+  }
+
+  state Wildslash 7 {
+    ActivateGameObject(gameObject=var "WS Hit 5", activate=true, recursive=false, resetOnExit=true, everyFrame=false)  // disabled
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Repeat?
+  }
+
+  state Wildslash Hop {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="HopToWildslash", animationTriggerEvent=(none), animationCompleteEvent=→"NEXT")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=true)
+    PlayAudioEventRandom(audioClips=[crowman_actual_hop_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_hop_2 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on NEXT → Wildslash New
+  }
+
+  state Repeat? {
+    IntAdd(intVariable=var "Slashes", add=1, everyFrame=false)
+    IntCompare(integer1=var "Slashes", integer2=2, equal=→"FINISHED", lessThan=→"REPEAT", greaterThan=→"FINISHED", everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=7, tolerance=0, equal=→"REPEAT", lessThan=→"REPEAT", greaterThan=→"FINISHED", everyFrame=false)
+    on REPEAT → Wildslash New 2
+    on FINISHED → Wildslash End
+  }
+
+  state Drop {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hop")
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Wait(time=0.75, finishEvent=→"FLY", realTime=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=→"FLY", belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=3, reverseIfNegativeScale=false, everyFrame=true)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    on LAND → Land
+    on FLY → Set Flap
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayAudioEventRandom(audioClips=[crowman_actual_land_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_land_2 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Ground Idle
+  }
+
+  state Wildslash End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wildslash End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Drop
+  }
+
+  state Charge Antic {
+    PlayAudioEvent(audioClip=crowman_actual_longer_dash_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Attack Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Velocity", float2=-0.1, tolerance=0, equal=(none), lessThan=→"DROP", greaterThan=(none), everyFrame=true)
+    on FINISHED → Charge
+    on DROP → Drop
+  }
+
+  state Charge {
+    PlayAudioEvent(audioClip=crowman_actual_longer_dash (sfxstatic_assets_areagreymoor.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge Attack")
+    ActivateGameObject(gameObject=var "ChargeHit", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-35, ySpeed=(unset), everyFrame=false)
+    Wait(time=0.25, finishEvent=→"NEXT", realTime=false)
+    on NEXT → Charge End
+  }
+
+  state Charge End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Attack End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.75, decelerationY=(unset), brakeOnExit=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Velocity", float2=-0.1, tolerance=0, equal=(none), lessThan=→"DROP", greaterThan=(none), everyFrame=true)
+    on FINISHED → After Charge
+    on DROP → Drop
+  }
+
+  state After Charge {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    on FINISHED → Ground Idle
+  }
+
+  state Range Check {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    CheckAlertRange(alertRange=var "RetreatAway Range", storeResult=(unset), InRangeEvent=→"RETREAT AWAY", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="CLOSE", outOfRangeEvent="", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Dash Range", storeResult=false, sendEvent="MID", outOfRangeEvent="FAR", everyFrame=false)
+    on CLOSE → Close
+    on MID → Mid
+    on FAR → Far
+    on RETREAT AWAY → Hop Away
+    on SING → Sing
+  }
+
+  state Close {
+    SendEvent(eventTarget=Self, sendEvent=→"WILDSLASH", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"WILDSLASH", →"STAB", →"HOP AWAY"], weights=[1, 1, 0.5], eventMax=[1, 3, 1], missedMax=[3, 2, 5], activeBool=(unset))
+    on WILDSLASH → Wildslash Antic
+    on STAB → Stab Antic
+    on HOP AWAY → Hop Away
+  }
+
+  state Hop Away {
+    SetFloatValue(floatVariable=var "Hop Speed", floatValue=12, everyFrame=false)
+    RandomInt(min=1, max=2, storeResult=var "Hops", inclusiveMax=true, noRepeat=false)
+    on FINISHED → Hop Antic
+  }
+
+  state Hop Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Hop Launch
+  }
+
+  state Hop Launch {
+    PlayAudioEventRandom(audioClips=[crowman_actual_hop_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_hop_2 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hop")
+    SetVelocityByScale(gameObject=Self, speed=var "Hop Speed", ySpeed=6, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Hop Air
+  }
+
+  state Hop Air {
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Wait(time=0.5, finishEvent=→"FLY", realTime=false)
+    on LAND → Hop Land
+    on FLY → Set Flap
+  }
+
+  state Hop Bounce {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="CLOSE", outOfRangeEvent="", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hop Bounce", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hop Launch
+    on CLOSE → Hop Attack?
+  }
+
+  state Hop Land {
+    IntAdd(intVariable=var "Hops", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Hops", integer2=0, equal=→"LAND", lessThan=→"LAND", greaterThan=→"BOUNCE", everyFrame=false)
+    on LAND → Hop Attack?
+    on BOUNCE → Hop Bounce
+  }
+
+  state Hop To {
+    SetFloatValue(floatVariable=var "Hop Speed", floatValue=-12, everyFrame=false)
+    RandomInt(min=2, max=3, storeResult=var "Hops", inclusiveMax=true, noRepeat=false)
+    on FINISHED → Hop Antic
+  }
+
+  state Mid {
+    SendRandomEventV4(events=[→"CHARGE", →"HOP TO", →"HOP AWAY", →"FLY"], weights=[1, 1, 0.5, 0.5], eventMax=[2, 1, 1, 1], missedMax=[3, 3, 6, 6], activeBool=(unset))
+    on HOP TO → Hop To
+    on CHARGE → Charge Antic
+    on HOP AWAY → Hop Away
+    on FLY → Launch Antic
+  }
+
+  state Far {
+    SendRandomEventV4(events=[→"HOP TO", →"FLY"], weights=[0.75, 0.25], eventMax=[3, 1], missedMax=[1, 3], activeBool=(unset))
+    on HOP TO → Hop To
+    on FLY → Launch Antic
+  }
+
+  state Hop Attack? {
+    CheckAlertRange(alertRange=var "RetreatAway Range", storeResult=var "In RetreatAway Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Hero Is R", leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "RetreatAway Point", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Retreat Point Is R", leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    BoolTestMulti(boolVariables=[var "In RetreatAway Range", var "Hero Is R", var "Retreat Point Is R"], boolStates=[true, true, true], trueEvent=→"UNALERT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "In RetreatAway Range", var "Hero Is R", var "Retreat Point Is R"], boolStates=[true, false, false], trueEvent=→"UNALERT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="CLOSE", outOfRangeEvent="", everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[1, 1], delay=0)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Dash Range", storeResult=false, sendEvent="CHARGE", outOfRangeEvent="", everyFrame=false)
+    on CLOSE → Close
+    on CHARGE → Charge Antic
+    on FINISHED → Land
+    on UNALERT → Unalert
+  }
+
+  state Launch Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Launch
+  }
+
+  state Launch {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Launch", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    RandomFloat(min=25, max=35, storeResult=var "Random")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Random", everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=true)
+    PlayAudioEventRandom(audioClips=[crowman_actual_flap_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_4 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_5 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.8, pitchMax=0.8, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Insta Throw?
+  }
+
+  state Flap {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    PlayAudioEventRandom(audioClips=[crowman_actual_flap_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_4 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_5 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "X Target", y=var "Y Target", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=var "Self Y", z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "X Target", add=var "X Offset", everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Y Target", add=var "Y Offset", everyFrame=false, perSecond=false)
+    GetAngleBetweenPointsV2(originX=var "Self X", originY=var "Self Y", targetX=var "X Target", targetY=var "Y Target", storeAngle=var "Angle", everyFrame=false)
+    RandomFloat(min=8, max=10, storeResult=var "Speed")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    RandomFloat(min=10, max=11, storeResult=var "Speed")
+    AddForce2d(gameObject=Self, forceMode=1, atPosition=(unset), vector=(unset), x=(unset), y=var "Speed", vector3=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "On Ground", boolValue=false, everyFrame=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=var "On Ground", leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=var "Hero Below", rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=4, reverseIfNegativeScale=false, everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Hero Below", var "On Ground"], sendEvent=→"LAND", storeResult=(unset), everyFrame=true)
+    on FINISHED → Flap End
+    on LAND → Land
+    on SING → Sing
+  }
+
+  state Flap End {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="CLOSE", outOfRangeEvent="", everyFrame=false)  // disabled
+    RayCast2dV2(fromGameObject=var "Ray Pt Centre", fromPosition=(unset), direction=(-1, 0), space=1, distance=1.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=var "Hero Below", rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=-4, reverseIfNegativeScale=false, everyFrame=false)
+    CheckAlertRange(alertRange=var "RetreatAway Range", storeResult=(unset), InRangeEvent=→"FINISHED", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Wall Ahead", var "Hero Below"], boolStates=[true, true], trueEvent=→"DROP", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    IntAdd(intVariable=var "Flaps", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Flaps", integer2=0, equal=(none), lessThan=(none), greaterThan=→"REPEAT", everyFrame=false)
+    on REPEAT → Flap
+    on CLOSE → To Wildslash
+    on FINISHED → Flap Move
+    on DROP → Downstab Launch
+  }
+
+  state Set Flap {
+    RandomInt(min=2, max=3, storeResult=var "Flaps", inclusiveMax=true, noRepeat=false)
+    RandomFloat(min=4, max=6, storeResult=var "Y Offset")
+    RandomFloat(min=6, max=10, storeResult=var "X Offset")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    FloatMultiply(floatVariable=var "X Offset", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Flap
+  }
+
+  state To Wildslash {
+    on FINISHED → Wildslash 1
+  }
+
+  state Flap Move {
+    CheckAlertRange(alertRange=var "RetreatAway Range", storeResult=(unset), InRangeEvent=→"DOWNSTAB", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    CompareUnalertTime(alertRange=var "Throw Range", compareTo=8, lessThanOrEqualEvent=(none), greatherThanEvent=(none), greatherThanBool=var "Unalert Exceeded", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Battler", var "Unalert Exceeded"], boolStates=[false, true], trueEvent=→"UNALERT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Throw Range", storeResult=false, sendEvent="", outOfRangeEvent="SHIFT", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="ADash Range", storeResult=var "In ADash Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0.5, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FloatInRange(floatVariable=var "Angle", lowerValue=45, upperValue=135, boolVariable=var "Wrong Angle Above", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Angle", lowerValue=225, upperValue=315, boolVariable=var "Wrong Angle Below", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "In ADash Range", var "Wrong Angle Above", var "Wrong Angle Below"], boolStates=[true, false, false], trueEvent=(none), falseEvent=(none), storeResult=var "Can ADash", everyFrame=false)
+    SendRandomEventV4(events=[→"SHIFT", →"DOWNSTAB", →"AIR DASH"], weights=[1, 0.5, 0.5], eventMax=[2, 1, 1], missedMax=[3, 3, 3], activeBool=var "Can ADash")
+    SendRandomEventV4(events=[→"SHIFT", →"DOWNSTAB"], weights=[1, 0.5], eventMax=[2, 1], missedMax=[3, 3], activeBool=(unset))
+    on SHIFT → Set Flap
+    on DOWNSTAB → Can Downstab?
+    on AIR DASH → Wildslash Instead?
+    on UNALERT → Unalert Drop
+  }
+
+  state Throw Antic {
+    PlayAudioEvent(audioClip=crowman_actual_in_air_throw_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.83, brakeOnExit=false)
+    GetAngleToTarget2D(gameObject=var "Throw Point", target=var "Hero", offsetX=0, offsetY=0.75, storeAngle=var "Angle", pause=0.3, everyFrame=false)
+    on FINISHED → Throw
+  }
+
+  state Throw {
+    PlayAudioEvent(audioClip=crowman_actual_in_air_throw (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlingObjectsFromGlobalPool(gameObject=PinSword Projectile (localpoolprefabs_assets_areagreymoor.bundle), spawnPoint=var "Throw Point", position=(unset), spawnMin=1, spawnMax=1, speedMin=30, speedMax=30, angleMin=var "Angle", angleMax=var "Angle", originVariationX=0, originVariationY=0, FSM="", FSMEvent="")
+    on FINISHED → Flap Away
+  }
+
+  state Flap Away {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    SetVelocityByScale(gameObject=Self, speed=6, ySpeed=6, everyFrame=false)
+    on FINISHED → Set Flap
+  }
+
+  state Insta Throw? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="ADash Range", storeResult=var "In ADash Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0.5, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FloatInRange(floatVariable=var "Angle", lowerValue=45, upperValue=135, boolVariable=var "Wrong Angle Above", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Angle", lowerValue=225, upperValue=315, boolVariable=var "Wrong Angle Below", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "In ADash Range", var "Wrong Angle Above", var "Wrong Angle Below"], boolStates=[true, false, false], trueEvent=(none), falseEvent=(none), storeResult=var "Can ADash", everyFrame=false)
+    BoolTest(boolVariable=var "Can ADash", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", →"AIR DASH"], weights=[1, 1], delay=0)
+    on AIR DASH → Wildslash Instead?
+    on FINISHED → Set Flap
+  }
+
+  state Can Downstab? {
+    CheckAlertRange(alertRange=var "RetreatAway Range", storeResult=(unset), InRangeEvent=→"FINISHED", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="ADash Range", storeResult=var "In ADash Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0.5, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FloatInRange(floatVariable=var "Angle", lowerValue=45, upperValue=135, boolVariable=var "Wrong Angle Above", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Angle", lowerValue=225, upperValue=315, boolVariable=var "Wrong Angle Below", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "In ADash Range", var "Wrong Angle Above", var "Wrong Angle Below"], boolStates=[true, false, false], trueEvent=(none), falseEvent=(none), storeResult=var "Can ADash", everyFrame=false)
+    BoolTest(boolVariable=var "Can ADash", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=→"AIR DASH", belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=-4, reverseIfNegativeScale=false, everyFrame=false)
+    on AIR DASH → Wildslash Instead?
+    on FINISHED → Downstab Launch
+  }
+
+  state Downstab Launch {
+    PlayAudioEvent(audioClip=crowman_actual_stab_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Downstab")
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=9, position=(unset), spread=(unset), everyFrame=false)
+    RandomFloat(min=26, max=28, storeResult=var "Speed")
+    AddForce2d(gameObject=Self, forceMode=1, atPosition=(unset), vector=(unset), x=(unset), y=var "Speed", vector3=(unset), everyFrame=false)
+    Wait(time=1, finishEvent=→"FLY", realTime=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Downstab Land
+    on FLY → Set Flap
+  }
+
+  state Downstab Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Downstab Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayAudioEventRandom(audioClips=[crowman_actual_land_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_land_2 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=crowman_actual_stab (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Ground Idle
+  }
+
+  state Stab Antic {
+    PlayAudioEvent(audioClip=crowman_actual_stab_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stab Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Velocity", float2=-0.1, tolerance=0, equal=(none), lessThan=→"DROP", greaterThan=(none), everyFrame=true)
+    on FINISHED → Stab
+  }
+
+  state Stab {
+    PlayAudioEvent(audioClip=crowman_actual_stab (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stab", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "ChargeHit", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-30, ySpeed=(unset), everyFrame=false)
+    on FINISHED → Stab End
+  }
+
+  state Stab End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stab End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.75, decelerationY=(unset), brakeOnExit=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Velocity", float2=-0.1, tolerance=0, equal=(none), lessThan=→"DROP", greaterThan=(none), everyFrame=true)
+    on FINISHED → Stab Hop
+  }
+
+  state Stab Hop {
+    SetFloatValue(floatVariable=var "Hop Speed", floatValue=12, everyFrame=false)
+    SetIntValue(intVariable=var "Hops", intValue=1, everyFrame=false)
+    on FINISHED → Hop Antic
+  }
+
+  state Flap Up {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.2, z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "ChargeHit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "WS Hit 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "WS Hit 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "WS Hit 3", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "WS Hit 4", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "WS Hit 5", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    RandomFloat(min=8, max=10, storeResult=var "Speed")
+    RandomFloat(min=100, max=80, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    RandomFloat(min=13, max=14, storeResult=var "Speed")
+    AddForce2d(gameObject=Self, forceMode=1, atPosition=(unset), vector=(unset), x=(unset), y=var "Speed", vector3=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "On Ground", boolValue=false, everyFrame=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=var "On Ground", leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=var "Hero Below", rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=4, reverseIfNegativeScale=false, everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Hero Below", var "On Ground"], sendEvent=→"LAND", storeResult=(unset), everyFrame=true)
+    on FINISHED → Flap
+  }
+
+  state Spawn Ready {
+    FindNamedChild(gameObject=Self, storeResult=var "Ambush Range")
+    FindAlertRange(target=Self, storeResult=var "Ambush Range Rng", childName="Ambush Range")
+    SetParent(gameObject=var "Ambush Range", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=1000, z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CheckAlertRange(alertRange=var "Ambush Range Rng", storeResult=(unset), InRangeEvent=→"AMBUSH", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    on BATTLE START → Set Battler
+    on AMBUSH → Swoop In
+  }
+
+  state Swoop In {
+    PlayAudioEvent(audioClip=crow_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_big_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=crow_fly_away_fg_bg_1 (sfxstatic_assets_areagreymoor.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-1000, z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    PlayParticleEmitter(gameObject=var "Rag Burst", emit=0, resetIfPlaying=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Y Target", z=var "Z Target", space=0, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=5, z=-10, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Flapping")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=var "Self Z", space=0, everyFrame=false)
+    EaseFloat(fromValue=var "Self Y", toValue=var "Y Target", floatVariable=var "Tween Y", time=0.7, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    EaseFloat(fromValue=var "Self Z", toValue=var "Z Target", floatVariable=var "Tween Z", time=0.7, speed=(unset), delay=(unset), easeType=12, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Tween Y", z=var "Tween Z", space=0, everyFrame=true, lateUpdate=false)
+    EaseColor(fromValue=(0, 0, 0, 1), toValue=(1, 1, 1, 1), colorVariable=var "Colour", time=0.5, speed=(unset), delay=0.2, easeType=12, reverse=false, finishEvent=(none), realTime=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=var "Colour", everyframe=true)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Drop
+  }
+
+  state Sing {
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=crawman_sing (sfxdynamic_assets_areagreymoor.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    SetVelocity2d(gameObject=Self, vector=(0, 6), x=(unset), y=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEventRandom(audioClips=[crowman_actual_flap_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_4 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_flap_5 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    on FINISHED → Sing Land?
+  }
+
+  state Death {
+    SetParent(gameObject=var "Pt Idle", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Rag Burst", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    StopParticleEmitter(gameObject=var "Pt Idle")
+    PlayParticleEmitter(gameObject=var "Rag Burst", emit=0, resetIfPlaying=false)
+  }
+
+  state Set Battler {
+    SetBoolValue(boolVariable=var "Battler", boolValue=true, everyFrame=false)
+    on FINISHED → Swoop In
+  }
+
+  state Unalert Drop {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hop")
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Land
+    on FLY → 
+  }
+
+  state Unalert {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="ToRest", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Rest
+  }
+
+  state Unalert Pause {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Unalert
+    on ALERT → Range Check
+    on TOOK DAMAGE → Range Check
+  }
+
+  state Wildslash New {
+    ActivateGameObject(gameObject=var "Wildslash Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wildslash Effect", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[crowman_actual_wildslash_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_4 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Wildslash Effect", audioClips=[crowman_actual_wildslash_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_4 (sfxstatic_assets_areagreymoor.bundle)], weights=[1, 1, 1, 1], pitchMin=0.85, pitchMax=1.15, volume=1, delay=0.2, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wildslash")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=0.8, brakeOnExit=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    EaseFloat(fromValue=0.8, toValue=1.2, floatVariable=var "Wildslash Scale", time=0.3, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Wildslash Effect", vector=(unset), x=var "Wildslash Scale", y=var "Wildslash Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    on FINISHED → Repeat?
+  }
+
+  state Wildslash New 2 {
+    ActivateGameObject(gameObject=var "Wildslash Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wildslash Effect", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    PlayAudioEventRandom(audioClips=[crowman_actual_wildslash_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_4 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Wildslash Effect", audioClips=[crowman_actual_wildslash_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_2 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_3 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_wildslash_4 (sfxstatic_assets_areagreymoor.bundle)], weights=[1, 1, 1, 1], pitchMin=0.85, pitchMax=1.15, volume=1, delay=0.2, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wildslash")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=0.8, brakeOnExit=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Repeat?
+  }
+
+  state RetreatAway Range? {
+    FindChild(gameObject=Self, childName="RetreatAway Range", storeResult=var "RetreatAway Range Obj")
+    GameObjectIsNull(gameObject=var "RetreatAway Range Obj", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    FindAlertRange(target=Self, storeResult=var "RetreatAway Range", childName="RetreatAway Range")
+    SetParent(gameObject=var "RetreatAway Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindNamedChild(gameObject=Self, storeResult=var "RetreatAway Point")
+    SetParent(gameObject=var "RetreatAway Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Init
+  }
+
+  state Air Dash Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=crowman_actual_in_air_throw_antic (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Air Dash Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.83, brakeOnExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Aim Lock
+  }
+
+  state Aim Lock {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0.5, storeAngle=var "Angle", pause=0, everyFrame=false)
+    ClampAngleByScale(gameObject=Self, space=0, angleVariable=var "Angle", positiveMinValue=135, positiveMaxValue=225, negativeMinValue=-45, negativeMaxValue=45, everyFrame=false)
+    on FINISHED → Air Dash Pullback
+  }
+
+  state Air Dash Pullback {
+    DecelerateV2(gameObject=Self, deceleration=0.83, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=-30, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Air Dash Launch
+  }
+
+  state Air Dash Launch {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Air Dash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=crowman_actual_longer_dash (sfxstatic_assets_areagreymoor.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=45, everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    ActivateGameObject(gameObject=var "AirDash Stab Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Air Dash
+  }
+
+  state Air Dash Recover {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Flap Away
+  }
+
+  state Air Dash Slam {
+    GetCollision2dInfo(gameObjectHit=var "", relativeVelocity=(unset), relativeSpeed=(unset), contactPoint=(unset), contactNormal=var "Contact Normal", shapeCount=(unset), physics2dMaterialName="")
+    GetVector3XYZ(vector3Variable=var "Contact Normal", storeX=var "Force X", storeY=var "Force Y", storeZ=(unset), everyFrame=false)
+    FloatMultiply(floatVariable=var "Force X", multiplyBy=30, everyFrame=false)
+    FloatMultiply(floatVariable=var "Force Y", multiplyBy=30, everyFrame=false)
+    AddForce2d(gameObject=Self, forceMode=1, atPosition=(unset), vector=(unset), x=var "Force X", y=var "Force Y", vector3=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Air Dash Bounce", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Flap Away
+  }
+
+  state Wildslash Instead? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Slash Range", storeResult=false, sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    SendRandomEventV4(events=[→"WILDSLASH", →"AIR DASH"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on FINISHED → Air Dash Antic
+    on WILDSLASH → Wildslash AirAntic
+  }
+
+  state Wildslash AirAntic {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="HopToWildslash", animationTriggerEvent=(none), animationCompleteEvent=→"NEXT")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=true)
+    PlayAudioEventRandom(audioClips=[crowman_actual_hop_1 (sfxstatic_assets_areagreymoor.bundle), crowman_actual_hop_2 (sfxstatic_assets_areagreymoor.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    on NEXT → Wildslash New
+  }
+
+  state Sing Land? {
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=1, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"FINISHED", NotGroundedEvent=→"FLY", EveryFrame=false)
+    on FINISHED → Ground Idle
+    on FLY → Set Flap
+  }
+
+  state Air Dash {
+    ActivateGameObjectDelay(gameObject=var "Air Dash Effect", activate=true, resetOnExit=false, delay=0.001)
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"BOUNCE", storeCollider=var "", storeForce=(unset))
+    ActivateGameObject(gameObject=var "AirDash Stab Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Air Dash Recover
+    on BOUNCE → Air Dash Slam
+  }
+
+  state Play Audio L {
+    RandomInt(min=0, max=10, storeResult=var "Audio Play Chance", inclusiveMax=false, noRepeat=true)
+    IntCompare(integer1=var "Audio Play Chance", integer2=4, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_small_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Roost L
+  }
+
+  state Play Audio R {
+    RandomInt(min=0, max=10, storeResult=var "Audio Play Chance", inclusiveMax=false, noRepeat=true)
+    IntCompare(integer1=var "Audio Play Chance", integer2=4, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_small_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=var "Voice Pitch Offset", stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Roost R
+  }
+
+  var Spawner: bool = true
+
+  var Angle: float = 0
+  var Distance: float = 0
+  var Gravity: float = 1
+  var Hop Speed: float = 0
+  var Random: float = 0
+  var Self X: float = 0
+  var Self Y: float = 0
+  var Self Z: float = 0
+  var Speed: float = 0
+  var Tween Y: float = 0
+  var Tween Z: float = 0
+  var Wildslash Scale: float = 0
+  var X Offset: float = 0
+  var X Scale: float = 0
+  var X Target: float = 0
+  var Y Offset: float = 0
+  var Y Target: float = 0
+  var Y Velocity: float = 0
+  var Z Target: float = 0
+  var Force X: float = 0
+  var Force Y: float = 0
+  var Voice Pitch Offset: float = 0.15
+  var Flaps: int = 0
+  var Hops: int = 0
+  var Slashes: int = 0
+  var Audio Play Chance: int = 0
+  var Battler: bool = false
+  var Hero Below: bool = false
+  var Hero Is R: bool = true
+  var In RetreatAway Range: bool = false
+  var On Ground: bool = false
+  var Unalert Exceeded: bool = false
+  var Retreat Point Is R: bool = false
+  var Within Distance: bool = false
+  var Wrong Angle Above: bool = false
+  var Wrong Angle Below: bool = false
+  var In ADash Range: bool = false
+  var Can ADash: bool = false
+  var Wall Ahead: bool = false
+  var Contact Normal: vector3 = (0, 0, 0)
+  var Colour: color = (0, 0, 0, 1)
+  var AirDash Stab Collider: gameObject = Battle Scene/Wave 3/Crowman/AirDash Stab Collider
+  var Alert Range: gameObject = Battle Scene/Wave 3/Crowman/Alert Range
+  var Ambush Range: gameObject = <null>
+  var ChargeHit: gameObject = <null>
+  var Pt Idle: gameObject = Battle Scene/Wave 3/Crowman/Pt Idle
+  var Rag Burst: gameObject = Battle Scene/Wave 3/Crowman/Rag Burst
+  var RetreatAway Point: gameObject = <null>
+  var RetreatAway Range Obj: gameObject = <null>
+  var Throw Point: gameObject = <null>
+  var WS Hit 1: gameObject = <null>
+  var WS Hit 2: gameObject = <null>
+  var WS Hit 3: gameObject = <null>
+  var WS Hit 4: gameObject = <null>
+  var WS Hit 5: gameObject = <null>
+  var Wildslash Effect: gameObject = Battle Scene/Wave 3/Crowman/Wildslash Effect
+  var Air Dash Effect: gameObject = Battle Scene/Wave 3/Crowman/Air Dash Effect
+  var Ray Pt Centre: gameObject = Battle Scene/Wave 3/Crowman/Ray Pt Centre
+  var Pt Rain: gameObject = Battle Scene/Wave 3/Crowman/Pt Rain
+  var Audio Loop Voice: gameObject = Battle Scene/Wave 3/Crowman/Audio Loop Voice
+  var Ambush Range Rng: object = <null>
+  var Throw Range: object = <null>
+  var RetreatAway Range: object = <null>
+}

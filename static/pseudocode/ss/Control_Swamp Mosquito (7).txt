@@ -1,0 +1,519 @@
+# Control
+# 1 location(s):
+#   Shadow_09 / Swamp Mosquito (7)
+
+fsm Control {
+  start Pause
+  on ZERO HP → Die  // from any state
+  on DROWN → Drown  // from any state
+  on EXTRACT → Extract  // from any state
+
+  state Init State {
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Wall Cling", equalEvent=→"WALL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on WALL → Wall Cling
+    on FINISHED → Start Idle
+  }
+
+  state Start Idle {
+    SetPositionToObject2D(gameObject=var "Idle Point", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Idle Dart
+  }
+
+  state Idle Dart {
+    GetAngleToTarget2D(gameObject=Self, target=var "Idle Point", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Angle", addMin=-25, addMax=25)
+    RandomFloat(min=2, max=3, storeResult=var "Speed")
+    FaceDirection(gameObject=Self, spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.975, brakeOnExit=false)
+    WaitRandom(timeMin=1.5, timeMax=2.5, finishEvent=→"FINISHED", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    GetDistance(gameObject=Self, target=var "Home Marker", storeResult=var "Distance From Node", everyFrame=true)
+    FloatTestToBool(float1=var "Distance From Node", float2=10, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Away From Node", everyFrame=true)
+    CheckOutOfCamera(gameObject=Self, margin=10, outsideEvent=(none), insideEvent=(none), insideBool=false, outsideBool=var "Out Of Camera", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Away From Node", var "Out Of Camera"], sendEvent=→"RETURN HOME", storeResult=(unset), everyFrame=true)
+    on FINISHED → Idle Dart
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+    on RETURN HOME → Return Home
+  }
+
+  state Wall Cling {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    ActivateGameObject(gameObject=var "Terrain Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on TOOK DAMAGE → Wall Wake
+    on ALERT → Wall Wake
+  }
+
+  state Startle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=swamp_mosquito_notice_hero (sfxstatic_assets_areaswamp.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Chase
+  }
+
+  state Chase {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.25)
+    DistanceFlyV3(gameObject=Self, target=var "Hero", distance=3, speedMax=5.5, acceleration=0.25, targetsHeight=true, height=(unset), minHeightAboveHero=2, maxHeight=(unset), maxHeightPrecedence=false, stayLeft=false, stayRight=false)
+    RandomFloat(min=0.4, max=0.75, storeResult=var "Attack Time")
+    SetBoolValueAtTime(BoolVariable=var "Can Attack", BoolValue=true, Time=var "Attack Time", SetOppositeOnStateEntry=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Attack", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Unalert Range", storeResult=var "In Unalert Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    SetFloatValueV2(floatVariable=var "Unalert Timer", floatValue=0, everyFrame=false, activeBool=var "In Unalert Range")
+    FloatAdd(floatVariable=var "Unalert Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Unalert Timer", float2=6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UNALERT", everyFrame=true)
+    on ATTACK → Juke
+    on UNALERT → Unalert
+    on SING → Sing
+    on GO UP → Go Up
+  }
+
+  state Stab Antic {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Attack Angle", pause=0, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Attack Angle", speed=-10, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stab Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    PlayAudioEvent(audioClip=swamp_mosquito_antic (sfxstatic_assets_areaswamp.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Stab 1
+    on SING → Sing
+    on GO UP → Go Up
+  }
+
+  state Stab 1 {
+    ActivateGameObject(gameObject=var "Stab Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Bouncer", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stab", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityAsAngle(gameObject=Self, angle=var "Attack Angle", speed=25, everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=0, angleOffsetIfMirrored=180, otherGameObject=<null>, everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Ray Centre", fromPosition=(unset), direction=(1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"NOSE BONK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Bonk Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Ray High", fromPosition=(unset), direction=(1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"NOSE BONK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Bonk Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Ray Low", fromPosition=(unset), direction=(1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"NOSE BONK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Bonk Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"BONK", storeCollider=var "", storeForce=(unset))  // disabled
+    PlayAudioEvent(audioClip=swamp_mosquito_attack (sfxstatic_assets_areaswamp.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Stab 2
+    on BONK → Get Body Point
+    on NOSE BONK → Get Nose Point
+    on GO UP → Go Up
+  }
+
+  state Stab 2 {
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Collision2dEvent(gameObject=Self, collision=1, collideTag="", sendEvent=→"BONK", storeCollider=var "", storeForce=(unset))
+    on FINISHED → Drift Away
+    on BONK → Bonk
+    on GO UP → Go Up
+  }
+
+  state Wall Wake {
+    FindNamedChild(gameObject=Self, storeResult=var "Wake Range")
+    ActivateGameObject(gameObject=var "Wake Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    PlayAudioEvent(audioClip=swamp_mosquito_notice_hero (sfxstatic_assets_areaswamp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Chase
+  }
+
+  state Unalert {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Start Idle
+    on BATTLER → Chase
+  }
+
+  state Bonk {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Attack Angle", speed=-20, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Drift Away
+  }
+
+  state Drift Away {
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    DistanceFlyV3(gameObject=Self, target=var "Hero", distance=8, speedMax=7, acceleration=0.35, targetsHeight=true, height=(unset), minHeightAboveHero=3, maxHeight=(unset), maxHeightPrecedence=false, stayLeft=false, stayRight=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.5, 0.5], delay=0)
+    WaitRandom(timeMin=0.5, timeMax=0.75, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.25)
+    on TOOK DAMAGE → Chase
+    on FINISHED → Chase
+    on GO UP → Go Up
+  }
+
+  state Juke {
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.5, 0.5], delay=0)
+    DistanceFlyV3(gameObject=Self, target=var "Hero", distance=10, speedMax=6, acceleration=0.5, targetsHeight=true, height=(unset), minHeightAboveHero=3, maxHeight=(unset), maxHeightPrecedence=false, stayLeft=false, stayRight=false)
+    WaitRandom(timeMin=0.3, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.25)
+    on FINISHED → Stab Antic
+    on TOOK DAMAGE → Stab Antic
+    on GO UP → Go Up
+  }
+
+  state Die {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetIsDead(target=Self, setValue=true)
+    SetPlayerDataBool(boolName="hasKilled", value=true)
+    SetParent(gameObject=var "My Node", parent=var "Node Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetGameObject(variable=var "My Node", gameObject=<null>, everyFrame=false)
+    ActivateGameObject(gameObject=var "Bouncer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    BlackThreadStateReset(Target=Self)  // disabled
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=5, finishEvent=→"FINISHED", realTime=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    AudioStop(gameObject=var "Audio Player", fadeTime=0)
+    AudioStop(gameObject=Self, fadeTime=0)
+    SetParent(gameObject=var "My Node", parent=var "Node Folder", resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Pick New Node
+  }
+
+  state Place and wait for distance {
+    SetPosition2D(GameObject=Self, Vector=var "Spawn Point", X=0, Y=0, Space=0, EveryFrame=false)
+    GetDistanceV2(gameObject=Self, target=var "Hero", targetOffsetX=0, targetOffsetY=0, storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=8, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RESPAWN", everyFrame=true)
+    on RESPAWN → Respawn PreAntic
+  }
+
+  state Respawn Pos {
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetMeshRenderer(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Bouncer", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(-1, 0), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL L", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Wall Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL R", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Wall Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Start Idle
+    on WALL L → Stick to Wall L
+    on WALL R → Stick to Wall R
+  }
+
+  state Start at Node? {
+    ActivateGameObject(gameObject=var "Stab Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CreateEmptyObject(gameObject=<null>, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Home Marker")
+    BoolTest(boolVariable=var "Battler", isTrue=→"BATTLER", isFalse=(none), everyFrame=false)
+    FindGameObject(objectName="", withTag="Orb Target", store=var "Node Folder")
+    SetParent(gameObject=var "Idle Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    CheckXPosition(gameObject=Self, compareTo=0, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"NODE", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    on FINISHED → Init State
+    on NODE → Get Node
+    on BATTLER → Battle Ready
+  }
+
+  state Node Check {
+    SetPosition2D(GameObject=Self, Vector=var "Spawn Point", X=0, Y=0, Space=0, EveryFrame=false)
+    SetPosition2D(GameObject=var "Home Marker", Vector=var "Spawn Point", X=0, Y=0, Space=0, EveryFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(-1, 0), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL L", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Wall Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL R", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Wall Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on WALL L → Stick to Wall L
+    on WALL R → Stick to Wall R
+    on FINISHED → Start Idle
+  }
+
+  state Stick to Wall L {
+    SetPosition2D(GameObject=Self, Vector=var "Wall Point", X=0, Y=0, Space=0, EveryFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wall Cling")
+    Translate(gameObject=Self, vector=(unset), x=0.65, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Wall Cling
+  }
+
+  state Stick to Wall R {
+    SetPosition2D(GameObject=Self, Vector=var "Wall Point", X=0, Y=0, Space=0, EveryFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wall Cling")
+    Translate(gameObject=Self, vector=(unset), x=-0.65, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Wall Cling
+  }
+
+  state Go Up {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    Decelerate(gameObject=Self, deceleration=0.9)
+    on FINISHED → Chase
+  }
+
+  state Pick New Node {
+    Comment(comment="Make Sure to Return Node Before Requesting a new one")
+    SetParent(gameObject=var "My Node", parent=var "Node Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetGameObject(variable=var "My Node", gameObject=<null>, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Node Folder"), sendEvent="REQUEST NODE", delay=0, everyFrame=false)
+    on NODE ASSIGNED → Node Alt?
+  }
+
+  state Get Node {
+    Comment(comment="Make Sure to Return Node Before Requesting a new one")
+    SetParent(gameObject=var "My Node", parent=var "Node Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetGameObject(variable=var "My Node", gameObject=<null>, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Node Folder"), sendEvent="REQUEST NODE", delay=0, everyFrame=false)
+    on NODE ASSIGNED → Node Alt? 2
+  }
+
+  state Battle Ready {
+    SetSpecialDeath(target=Self, hasSpecialDeath=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Bouncer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on BATTLE START → Spawn Pause
+  }
+
+  state Spawn Pause {
+    WaitRandom(timeMin=0, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Pos
+  }
+
+  state Check Pos {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"SHIFT", greaterThan=(none), everyFrame=false)
+    on SHIFT → Shift
+    on FINISHED → Fly In
+  }
+
+  state Shift {
+    SetParent(gameObject=var "Spawn Pos Alt", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Spawn Pos Alt", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    on FINISHED → Fly In
+  }
+
+  state Fly In {
+    PlayRandomAudioClipTable(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=10, z=-15, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, -10, 15), time=0.75, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.55)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    ActivateGameObject(gameObject=var "Bouncer", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Respawn Antic {
+    SetIsDead(target=Self, setValue=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spawn", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Respawn
+  }
+
+  state Respawn {
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitterChildren(gameObject=var "Spawn Particles", resetTimeIfPlaying=false, stopOnStateExit=false)
+    PlayAudioEvent(audioClip=great_chef_projectile_explode (sfxstatic_assets_areadust.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=swamp_mosquito_notice_hero (sfxstatic_assets_areaswamp.bundle), pitchMin=0.75, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStop(gameObject=var "Audio Player", fadeTime=0)
+    StopParticleEmitter(gameObject=var "Pt Spawn Antic")
+    on FINISHED → Respawn Pos
+  }
+
+  state Respawn PreAntic {
+    PlayParticleEmitter(gameObject=var "Pt Spawn Antic", emit=0, resetIfPlaying=true)
+    PlayAudioEvent(audioClip=dust_chef_bubbling_pots_loop (sfxstatic_assets_areadust.bundle), pitchMin=1.3, pitchMax=1.6, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Respawn Antic
+  }
+
+  state Drown {
+    RecordJournalKill(Record=Swamp Mosquito (dataassets_assets_assets/dataassets/enemyjournal/journalrecords.bundle))
+    BoolTest(boolVariable=var "Battler", isTrue=→"DIE", isFalse=(none), everyFrame=false)
+    SetIsDead(target=Self, setValue=true)
+    SetParent(gameObject=var "My Node", parent=var "Node Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetGameObject(variable=var "My Node", gameObject=<null>, everyFrame=false)
+    ActivateGameObject(gameObject=var "Bouncer", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    AudioStop(gameObject=var "Audio Player", fadeTime=0)
+    AudioStop(gameObject=Self, fadeTime=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Drown")
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, -3, 0), time=0.5, speed=(unset), delay=(unset), easeType=12, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Drown Pause
+    on DIE → Insta Kill
+  }
+
+  state Drown Pause {
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Pick New Node
+  }
+
+  state Return Home {
+    on FINISHED → Node Check
+  }
+
+  state Insta Kill {
+    InstaDeath(target=Self, direction=270)
+  }
+
+  state Extract {
+    EnemyDeathEffectsRegular+SimulateDeathNoCorpse(Target=Self)
+    SetPlayerDataBool(boolName="hasKilled", value=true)
+    Comment(comment="Make Sure to Return Node Before Requesting a new one")
+    SetParent(gameObject=var "My Node", parent=var "Node Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetGameObject(variable=var "My Node", gameObject=<null>, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Air 3")
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Rotation", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Offset", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Rotation", multiplyBy=-90, everyFrame=false)
+    FloatMultiply(floatVariable=var "Offset", multiplyBy=0.25, everyFrame=false)
+    FindChild(gameObject=var "Hero", childName="Tool Effects/Extract Point", storeResult=var "Extract Point")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Extract Point", xOffset=var "Offset", yOffset=0, zOffset=(unset), overrideZ=0.003, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlashingSwampExtract())
+    on EXTRACT FINISH → Extract Kill
+  }
+
+  state Extract Kill {
+    ActivateGameObject(gameObject=var "Swamp Extract Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    RecordJournalKill(Record=Swamp Mosquito (dataassets_assets_assets/dataassets/enemyjournal/journalrecords.bundle))
+    SetMeshRenderer(gameObject=Self, active=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Drown Pause
+  }
+
+  state Thunk {
+    SpawnObjectFromGlobalPool(gameObject=Nail Terrain Hit Effect (globalpoolprefabs_assets_all.bundle), spawnPoint=var "", position=var "Bonk Point v3", rotation=(unset), storeObject=var "")
+    on FINISHED → Bonk
+  }
+
+  state Get Body Point {
+    GetCollision2dInfo(gameObjectHit=var "", relativeVelocity=(unset), relativeSpeed=(unset), contactPoint=var "Bonk Point v3", contactNormal=(unset), shapeCount=(unset), physics2dMaterialName="")
+    on FINISHED → Thunk
+  }
+
+  state Get Nose Point {
+    GetVector2XY(vector2Variable=var "Bonk Point", storeX=var "Bonk X", storeY=var "Bonk Y", everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Bonk Point v3", vector3Value=(unset), x=var "Bonk X", y=var "Bonk Y", z=0.0049, everyFrame=false)
+    on FINISHED → Thunk
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Start at Node?
+  }
+
+  state Sing {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=mosquito_sing (sfxdynamic_assets_areaswamp.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase
+  }
+
+  state Node Alt? {
+    GetPosition2D(gameObject=var "My Node", vector=var "Spawn Point", x=(unset), y=(unset), space=0, everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.5, 0.5], delay=0)
+    FindNamedChild(gameObject=var "My Node", storeResult=var "Alt Point")
+    GetPosition2D(gameObject=var "Alt Point", vector=var "Spawn Point", x=(unset), y=(unset), space=0, everyFrame=false)
+    on FINISHED → Place and wait for distance
+  }
+
+  state Node Alt? 2 {
+    GetPosition2D(gameObject=var "My Node", vector=var "Spawn Point", x=(unset), y=(unset), space=0, everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.5, 0.5], delay=0)
+    FindNamedChild(gameObject=var "My Node", storeResult=var "Alt Point")
+    GetPosition2D(gameObject=var "Alt Point", vector=var "Spawn Point", x=(unset), y=(unset), space=0, everyFrame=false)
+    on FINISHED → Node Check
+  }
+
+  var Battler: bool = false
+
+  var Angle: float = 0
+  var Speed: float = 0
+  var Attack Time: float = 0
+  var Unalert Timer: float = 0
+  var Attack Angle: float = 0
+  var Bonk X: float = 0
+  var Bonk Y: float = 0
+  var Distance: float = 0
+  var Pitch: float = 0
+  var Distance From Node: float = 0
+  var Offset: float = 0
+  var Rotation: float = 0
+  var Z Pos: float = 0
+  var Can Attack: bool = false
+  var In Attack Range: bool = false
+  var In Unalert Range: bool = false
+  var Out Of Camera: bool = false
+  var Away From Node: bool = false
+  var Clip: string = ""
+  var Bonk Point: vector2 = (0, 0)
+  var Wall Point: vector2 = (0, 0)
+  var Spawn Point: vector2 = (0, 0)
+  var Bonk Point v3: vector3 = (0, 0, 0)
+  var Terrain Box: gameObject = Swamp Mosquito (7)/Terrain Box
+  var Idle Point: gameObject = Swamp Mosquito (7)/Idle Point
+  var Self: gameObject = Swamp Mosquito (7)
+  var Wake Range: gameObject = <null>
+  var Ray Centre: gameObject = Swamp Mosquito (7)/Ray Centre
+  var Stab Collider: gameObject = Swamp Mosquito (7)/Stab Collider
+  var Bouncer: gameObject = Swamp Mosquito (7)/Bouncer
+  var Node Folder: gameObject = <null>
+  var My Node: gameObject = <null>
+  var Alt Point: gameObject = <null>
+  var Spawn Pos Alt: gameObject = Swamp Mosquito (7)/Spawn Pos Alt
+  var Spawn Particles: gameObject = Swamp Mosquito (7)/Spawn Particles
+  var Audio Player: gameObject = <null>
+  var Pt Spawn Antic: gameObject = Swamp Mosquito (7)/Pt Spawn Antic
+  var Home Marker: gameObject = <null>
+  var Swamp Extract Burst: gameObject = <null>
+  var Bum Collider: gameObject = <null>
+  var Extract Point: gameObject = <null>
+  var Ray Low: gameObject = Swamp Mosquito (7)/Ray Low
+  var Ray High: gameObject = Swamp Mosquito (7)/Ray High
+  var Audio Loop Voice: gameObject = Swamp Mosquito (7)/Audio Loop Voice
+}

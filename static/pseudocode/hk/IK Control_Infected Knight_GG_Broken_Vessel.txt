@@ -1,0 +1,688 @@
+# IK Control
+# 1 location(s):
+#   GG_Broken_Vessel / Infected Knight
+
+fsm IK Control {
+  start Pause
+  on STUN → Stun Start  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Stun Hitbox", storeResult=var "Stun Hitbox")
+    GGCheckIfBossScene(bossSceneEvent=→"ACTIVE", regularSceneEvent=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="infectedKnightEncountered", isTrue=→"ACTIVE", isFalse=(none))
+    FindChild(gameObject=Self, childName="Stun Hitbox", storeResult=var "Stun Hitbox")
+    on FINISHED → Sleep
+    on ACTIVE → Repause
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    on FINISHED → Init
+  }
+
+  state Sleep {
+    on BATTLE START → Start Pause
+  }
+
+  state Start Pause {
+    SetPlayerDataBool(boolName="infectedKnightEncountered", value=true)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Corpse Inspect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Rumble Start
+  }
+
+  state Rumble Start {
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    SetAudioClip(gameObject=Self, audioClip=brkn_wand_room_shake_loop (sharedassets343.assets))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Summon Grass", emit=0)
+    on FINISHED → Spawning 1
+  }
+
+  state Spawning 1 {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SCUTTLER SPAWN START", delay=0, everyFrame=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spawning 2
+  }
+
+  state Spawning 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wake 1")
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spawning 3
+  }
+
+  state Spawning 3 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wake 2")
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spawning 4
+  }
+
+  state Spawning 4 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wake 3")
+    Wait(time=0, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stop Spawning
+  }
+
+  state Check Final {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check
+  }
+
+  state Check {
+    FindGameObject(objectName="Orange Scuttler IK(Clone)", withTag="Untagged", store=var "Scuttler Check")
+    GameObjectIsNull(gameObject=var "Scuttler Check", isNull=→"ROAR", isNotNull=→"FINISHED", storeResult=(unset), everyFrame=false)
+    on FINISHED → Check Final
+    on ROAR → Roar Start
+  }
+
+  state Stop Spawning {
+    AudioStop(gameObject=Self)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SCUTTLER SPAWN END", delay=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Summon Grass")
+    on FINISHED → Check Final
+  }
+
+  state Roar Start {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetActive(false))
+    ActivateGameObject(gameObject=var "Shadow", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Music
+  }
+
+  state Roar {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar Loop")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hollow_knight_scream_v1 (sharedassets19.assets))
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    SetFsmGameObject(gameObject=var "Hero", fsmName="Roar Lock", variableName="Roar Object", setValue=var "Self", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR ENTER", delay=0, everyFrame=false)
+    Wait(time=2.4, finishEvent=→"FINISHED", realTime=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="Visited", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="INFECTED_KNIGHT", everyFrame=false)
+    on FINISHED → Roar End
+  }
+
+  state Roar End {
+    SendEventByName(eventTarget=GameObject(var "Roar Emitter"), sendEvent="END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR EXIT", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="START SPAWN", delay=0, everyFrame=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    SetCollider(gameObject=Self, active=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → First Counter
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Downstabbing", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Walk")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToWalk", resetFrame=true, everyFrame=true)
+    RandomFloat(min=0.5, max=1.25, storeResult=var "Walk Speed")
+    RandomlyFlipFloat(storeResult=var "Walk Speed")
+    WaitRandom(timeMin=1, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed", y=(unset), everyFrame=false)
+    FloatSubtract(floatVariable=var "Idle Counter", subtract=1, everyFrame=true, perSecond=true)
+    BoolTest(boolVariable=var "Do Shake", isTrue=→"SHAKE", isFalse=(none), everyFrame=false)
+    FloatCompare(float1=var "Idle Counter", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Will Evade", var "Evade Range"], sendEvent=→"EVADE", storeResult=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Will Ohead", var "Ohead Range"], sendEvent=→"OHEAD", storeResult=(unset), everyFrame=false)
+    on DOWNSTAB → Set Dstab
+    on JUMP → Jump Antic
+    on DASH → Air Dash?
+    on OHEAD → Ohead Antic
+    on EVADE → Evade Antic
+    on SHAKE → Jump Antic 2
+    on FINISHED → Attack Choice
+    on TOOK DAMAGE → Damage Response
+  }
+
+  state Set Dstab {
+    SetBoolValue(boolVariable=var "Downstabbing", boolValue=true, everyFrame=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Jump {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_jump (sharedassets34.assets))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Jump")
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    RandomFloat(min=55, max=55, storeResult=var "Jump Y")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=var "Jump Y", everyFrame=false)
+    Wait(time=0.05, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Self Y", float2=var "Min Dstab Height", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Over Min Height", everyFrame=true)
+    FloatTestToBool(float1=var "Self Y", float2=var "Air Dash Height", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Above Air Dash Height", everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Downstabbing", var "Dstab Range", var "Over Min Height"], sendEvent=→"DOWNSTAB", storeResult=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Above Air Dash Height", var "Will Air Dash"], sendEvent=→"AIRDASH", storeResult=(unset), everyFrame=true)
+    on LAND → Land
+    on DOWNSTAB → Dstab Antic
+    on AIRDASH → Set Height
+  }
+
+  state Jump Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Air Dash", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Jump Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    on FINISHED → Jump Check
+  }
+
+  state Land {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_land (sharedassets32.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    on FINISHED → To Attack?
+  }
+
+  state Aim Jump {
+    RandomFloat(min=var "Left X", max=var "Right X", storeResult=var "Jump X")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Jump X", subtract=var "Self X", everyFrame=false, perSecond=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.25, everyFrame=false)
+    on FINISHED → Jump
+  }
+
+  state Aim Dstab {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Hero X", float2=var "Self X", operation=Subtract, storeResult=var "Jump X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=2.5, everyFrame=false)
+    on FINISHED → Jump
+  }
+
+  state Dstab Antic {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_down_stab_prepare (sharedassets343.assets))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Downstab Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Dstab Fall
+  }
+
+  state Dstab Fall {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_down_stab_dash (sharedassets209.assets))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Downstab")
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-40, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    ActivateGameObject(gameObject=var "Dstab Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on LAND → Dstab Land
+  }
+
+  state Dstab Land {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_down_stab_impact (sharedassets209.assets))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dstab Slam", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Downstab Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=IK Projectile DS (sharedassets343.assets), spawnPoint=var "Self", position=(0, -0.5, 0), rotation=(unset), storeObject=var "Projectile")
+    SetVelocity2d(gameObject=var "Projectile", vector=(unset), x=10, y=(unset), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=IK Projectile DS (sharedassets343.assets), spawnPoint=var "Self", position=(0, -0.5, 0), rotation=(unset), storeObject=var "Projectile")
+    SetVelocity2d(gameObject=var "Projectile", vector=(unset), x=19, y=(unset), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=IK Projectile DS (sharedassets343.assets), spawnPoint=var "Self", position=(0, -0.5, 0), rotation=(unset), storeObject=var "Projectile")
+    SetVelocity2d(gameObject=var "Projectile", vector=(unset), x=-10, y=(unset), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=IK Projectile DS (sharedassets343.assets), spawnPoint=var "Self", position=(0, -0.5, 0), rotation=(unset), storeObject=var "Projectile")
+    SetVelocity2d(gameObject=var "Projectile", vector=(unset), x=-19, y=(unset), everyFrame=false)
+    on FINISHED → Dstab Recover
+  }
+
+  state Attack Choice {
+    SendRandomEventV3(events=[→"DOWNSTAB", →"JUMP", →"DASH"], weights=[1, 0.5, 1], trackingInts=[var "Dstab Ct", var "Jump Ct", var "Dash Ct"], eventMax=[2, 1, 2], trackingIntsMissed=[var "DStab Ms", var "Jump Ms", var "Dash Ms"], missedMax=[3, 5, 3])
+    on DOWNSTAB → Set Dstab
+    on JUMP → Jump Antic
+    on DASH → Air Dash?
+  }
+
+  state Jump Check {
+    BoolTest(boolVariable=var "Downstabbing", isTrue=→"DOWNSTAB", isFalse=→"JUMP", everyFrame=false)
+    on JUMP → Aim Jump
+    on DOWNSTAB → Aim Dstab
+  }
+
+  state Dash Antic {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_horizontal_dash_prepare (sharedassets343.assets))
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Antic 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Dash Speed Crt", floatValue=var "Dash Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Speed Crt", multiplyBy=var "X Scale", everyFrame=false)
+    SetFloatValue(floatVariable=var "Dash Reverse Crt", floatValue=var "Dash Reverse", everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Reverse Crt", multiplyBy=var "X Scale", everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Reverse Crt", multiplyBy=-1, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Dash Reverse Crt", y=0, everyFrame=true)
+    on FINISHED → Dash Antic 2
+  }
+
+  state Dash Attack {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_horizontal_dash_dash (sharedassets243.assets))
+    ActivateGameObject(gameObject=var "Dash Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Attack 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Dash Speed Crt", y=(unset), everyFrame=true)
+    on FINISHED → Dash Attack 2
+  }
+
+  state Dash Recover {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    BoolTest(boolVariable=var "Will Air Dash", isTrue=→"FALL", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Set Counter
+    on FALL → Fall
+  }
+
+  state Dash Attack 2 {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_horizontal_sword (sharedassets343.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Attack 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Dash Speed Crt", y=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Dash Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Slash Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Dash Attack 3
+  }
+
+  state Dash Attack 3 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Attack 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Dash Speed Crt", y=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Dash Slash Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Dash Recover
+  }
+
+  state Dstab Recover {
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Set Counter
+  }
+
+  state Ohead Antic {
+    SetBoolValue(boolVariable=var "Will Ohead", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Overhead Antic")
+    Wait(time=0.65, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Ohead Slashing
+  }
+
+  state Ohead Slashing {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=brkn_wand_sword (sharedassets343.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=brkn_wand_sword (sharedassets343.assets), pitchMin=1, pitchMax=1, volume=1, delay=0.25, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=brkn_wand_sword (sharedassets343.assets), pitchMin=1, pitchMax=1, volume=1, delay=0.5, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=brkn_wand_sword (sharedassets343.assets), pitchMin=1, pitchMax=1, volume=1, delay=0.75, storePlayer=<null>)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Overhead Slashing", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Overhead Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Overhead Slash", animLibName="", clipName="Overhead Slash")
+    Tk2dPlayFrame(gameObject=var "Overhead Slash", frame=0)
+    on FINISHED → Ohead Recover
+  }
+
+  state Ohead Recover {
+    AudioStop(gameObject=Self)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Overhead Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    ActivateGameObject(gameObject=var "Overhead Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Set Counter
+  }
+
+  state Evade Antic {
+    BoolTest(boolVariable=var "Evade Check", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Evade Speed Crt", floatValue=var "Evade Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Evade Speed Crt", multiplyBy=var "X Scale", everyFrame=false)
+    FloatMultiply(floatVariable=var "Evade Speed Crt", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Evade Dash
+    on CANCEL → Jump Antic
+  }
+
+  state Evade Dash {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Evade Speed Crt", y=(unset), everyFrame=true)
+    Wait(time=0.19, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hornet_small_jump (sharedassets15.assets))
+    on FINISHED → Evade Recover
+  }
+
+  state Evade Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hornet_ground_land (sharedassets28.assets))
+    on FINISHED → To Attack?
+  }
+
+  state Shake Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Shake Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Shaking Start
+  }
+
+  state Shaking Start {
+    SetAudioClip(gameObject=Self, audioClip=brkn_wand_headbanging_loop (sharedassets343.assets))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Shake Loop")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Shake Gas", emit=0)
+    on FINISHED → Shaking Spawn
+  }
+
+  state Shaking Spawn {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SHAKE START", delay=0, everyFrame=false)
+    WaitRandom(timeMin=4, timeMax=4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Shake End
+  }
+
+  state Dash Antic 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Antic 2", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Wait(time=0.65, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Dash Antic 3
+  }
+
+  state Dash Antic 3 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Antic 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dash Attack
+  }
+
+  state Air Dash? {
+    BoolTest(boolVariable=var "Dash Range", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Will Air Dash", boolValue=false, everyFrame=false)
+    SendRandomEvent(events=[(none), →"DASH"], weights=[0.3, 0.7], delay=0)
+    SetBoolValue(boolVariable=var "Will Air Dash", boolValue=true, everyFrame=false)
+    on DASH → Dash Antic
+    on FINISHED → Jump Antic
+    on CANCEL → Inc Dstab
+  }
+
+  state Fall {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    SetBoolValue(boolVariable=var "Will Air Dash", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Air Dash", boolValue=true, everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  state Set Height {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Air Dash Height", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_horizontal_dash_prepare (sharedassets343.assets))
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Antic 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Dash Speed Crt", floatValue=var "Dash Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Speed Crt", multiplyBy=var "X Scale", everyFrame=false)
+    SetFloatValue(floatVariable=var "Dash Reverse Crt", floatValue=var "Dash Reverse", everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Reverse Crt", multiplyBy=var "X Scale", everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Reverse Crt", multiplyBy=-1, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    on FINISHED → Dash Antic 2
+  }
+
+  state Set Counter {
+    RandomFloat(min=0.5, max=0.75, storeResult=var "Idle Counter")
+    RandomFloat(min=0, max=100, storeResult=var "Ran Float")
+    FloatTestToBool(float1=var "Ran Float", float2=55, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Will Evade", everyFrame=false)
+    RandomFloat(min=0, max=100, storeResult=var "Ran Float")
+    FloatTestToBool(float1=var "Ran Float", float2=75, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Will Ohead", everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Damage Response {
+    SendRandomEvent(events=[→"EVADE", →"JUMP", →"DASH", →"FINISHED"], weights=[0.3, 0.2, 0.3, 0.2], delay=0)
+    on FINISHED → Idle
+    on JUMP → Jump Antic
+    on DASH → Air Dash?
+    on EVADE → Evade Antic
+  }
+
+  state To Attack? {
+    BoolTest(boolVariable=var "Angry", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BoolTest(boolVariable=var "Did Air Dash", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", →"DASH", →"DOWNSTAB"], weights=[0.65, 0, 0.35], delay=0)
+    on FINISHED → Set Counter
+    on DASH → Air Dash?
+    on DOWNSTAB → Set Dstab
+  }
+
+  state Jump Antic 2 {
+    SetBoolValue(boolVariable=var "Do Shake", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Air Dash", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Jump Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Aim Jump 2
+  }
+
+  state Aim Jump 2 {
+    RandomFloat(min=25.5, max=27.5, storeResult=var "Jump X")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Jump X", subtract=var "Self X", everyFrame=false, perSecond=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.25, everyFrame=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    on FINISHED → Jump 2
+  }
+
+  state Jump 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Jump")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_jump (sharedassets34.assets))
+    NextFrameEvent(sendEvent=→"FINISHED")
+    RandomFloat(min=50, max=50, storeResult=var "Jump Y")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=var "Jump Y", everyFrame=false)
+    on FINISHED → In Air 2
+  }
+
+  state In Air 2 {
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    FaceDirection(gameObject=Self, spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP SPAWN", delay=0, everyFrame=false)
+    on LAND → Land 2
+  }
+
+  state Land 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_land (sharedassets32.assets))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    on FINISHED → Shake Antic
+  }
+
+  state Shake End {
+    AudioStop(gameObject=Self)
+    Wait(time=1.4, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Shake End")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SHAKE END", delay=0, everyFrame=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="START SPAWN", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state First Counter {
+    RandomFloat(min=0.75, max=0.75, storeResult=var "Idle Counter")
+    on FINISHED → Idle
+  }
+
+  state Shake? {
+    SendRandomEvent(events=[→"SHAKE", →"CANCEL"], weights=[0.5, 0.5], delay=0)
+    on SHAKE → Jump Antic 2
+    on CANCEL → Attack Choice
+  }
+
+  state Inc Dstab {
+    IntAdd(intVariable=var "Dash Ct", add=1, everyFrame=false)
+    on FINISHED → Set Dstab
+  }
+
+  state Stun Start {
+    SpawnObjectFromGlobalPool(gameObject=Stun Effect (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="START SPAWN", delay=0, everyFrame=false)
+    AudioStop(gameObject=Self)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Stun Push Crt", floatValue=var "Stun Push", everyFrame=false)
+    FloatMultiply(floatVariable=var "Stun Push Crt", multiplyBy=var "X Scale", everyFrame=false)
+    FloatMultiply(floatVariable=var "Stun Push Crt", multiplyBy=-1, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Air")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SHAKE END", delay=0, everyFrame=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    StopParticleEmitter(gameObject=var "Shake Gas")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Stun Push Crt", y=20, everyFrame=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    ActivateGameObject(gameObject=var "Dash Slash Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Overhead Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on LAND → Stunned
+  }
+
+  state Stunned {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun")
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Stun Hitbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    on TOOK DAMAGE → Stun Recover
+    on FINISHED → Stun Recover
+  }
+
+  state Stun Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Stun Hitbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true)
+    on FINISHED → Attack Choice
+  }
+
+  state Waiting {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateGameObject(gameObject=var "Shadow", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=Self, fsmName="health_manager_enemy", variableName="Invincible", setValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Rewake Range", isTrue=→"BATTLE START", isFalse=(none), everyFrame=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BG QUICK CLOSE", delay=0, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "Corpse Inspect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    GGCheckIfBossScene(bossSceneEvent=→"GG BOSS", regularSceneEvent=(none))
+    on BATTLE START → Close Gates
+    on GG BOSS → GG Wait
+  }
+
+  state Repause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Waiting
+  }
+
+  state Close Gates {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BG CLOSE", delay=0, everyFrame=false)
+    SetCollider(gameObject=Self, active=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Set Pos
+  }
+
+  state Intro Fall {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_jump (sharedassets34.assets))
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetFsmBool(gameObject=Self, fsmName="health_manager_enemy", variableName="Invincible", setValue=false, everyFrame=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    on LAND → Intro Land
+  }
+
+  state Intro Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=brkn_wand_land (sharedassets32.assets))
+    on FINISHED → Roar Start
+  }
+
+  state Music {
+    GGCheckIfBossScene(bossSceneEvent=→"FINISHED", regularSceneEvent=(none))
+    ApplyMusicCue(musicCue=BossIK (sharedassets343.assets), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (resources.assets), transitionTime=0)
+    on FINISHED → Roar
+  }
+
+  state Set Pos {
+    GGCheckIfBossScene(bossSceneEvent=→"FINISHED", regularSceneEvent=(none))
+    SetPosition(gameObject=Self, vector=(unset), x=21.04, y=41.82, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Intro Fall
+  }
+
+  state GG Wait {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Close Gates
+  }
+
+  var Left X: float = 16.06
+  var Right X: float = 36.53
+
+  var Air Dash Height: float = 31.5
+  var Dash Reverse: float = 20
+  var Dash Reverse Crt: float = 0
+  var Dash Speed: float = 32
+  var Dash Speed Crt: float = 0
+  var Evade Speed: float = 25
+  var Evade Speed Crt: float = 0
+  var Gravity: float = 2.5
+  var Hero X: float = 16.06
+  var Idle Counter: float = 0
+  var Jump X: float = 36.53
+  var Jump Y: float = 16.06
+  var Min Dstab Height: float = 33.31
+  var Multiplier: float = 0
+  var Ohead Time: float = 0
+  var Ran Float: float = 0
+  var Self X: float = 0
+  var Self Y: float = 0
+  var Stun Push: float = 10
+  var Stun Push Crt: float = 0
+  var Walk Speed: float = 0
+  var X Scale: float = 0
+  var Y Velocity: float = 0
+  var DStab Ms: int = 0
+  var Dash Ct: int = 0
+  var Dash Ms: int = 0
+  var Dstab Ct: int = 0
+  var Jump Ct: int = 0
+  var Jump Ms: int = 0
+  var Above Air Dash Height: bool = false
+  var Angry: bool = false
+  var Dash Range: bool = false
+  var Did Air Dash: bool = false
+  var Do Shake: bool = false
+  var Downstabbing: bool = false
+  var Dstab Range: bool = false
+  var Evade Check: bool = false
+  var Evade Range: bool = false
+  var Falling: bool = false
+  var First Idle: bool = false
+  var Ohead Range: bool = false
+  var Over Min Height: bool = false
+  var Rewake Range: bool = false
+  var Will Air Dash: bool = true
+  var Will Evade: bool = false
+  var Will Ohead: bool = false
+  var Area Title: gameObject = <null>
+  var Corpse Inspect: gameObject = Infected Knight/Corpse Inspect
+  var Dash Burst: gameObject = Infected Knight/Dash Burst
+  var Dash Slash: gameObject = Infected Knight/Dash Slash
+  var Dash Slash Hit: gameObject = Infected Knight/Dash Slash Hit
+  var Dstab Burst: gameObject = Infected Knight/Dstab Burst
+  var Dstab Slam: gameObject = Infected Knight/Dstab Slam
+  var Overhead Slash: gameObject = Infected Knight/Overhead Slash
+  var Projectile: gameObject = <null>
+  var Roar Emitter: gameObject = <null>
+  var Scuttler Check: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shadow: gameObject = Infected Knight/Shadow
+  var Shake Gas: gameObject = Infected Knight/Shake Gas
+  var Stun Hitbox: gameObject = <null>
+  var Summon Grass: gameObject = Infected Knight/Summon Grass
+}

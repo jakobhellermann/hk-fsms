@@ -1,0 +1,125 @@
+# Control
+# 1 location(s):
+#   Cog_08 / Song Automaton Goomba (5)
+
+fsm Control {
+  start Init
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    RandomlyFlipScale(gameObject=Self)
+    GetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=(unset), z=(unset), space=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="SetXMin", parameters=[var "X Pos"], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="SetXMax", parameters=[var "X Pos"], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ConstrainPosition", methodName="StartConstrainX", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Walk {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WALK START", delay=0, everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=var "In Alert Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Can Attack", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "In Alert Range", var "Can Attack"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    CheckOutOfCamera(gameObject=Self, margin=12, outsideEvent=→"SLEEP", insideEvent=(none), insideBool=false, outsideBool=false, everyFrame=true)
+    on BLOCKED DOWN → Attack Antic
+    on ATTACK → Attack Check
+    on SING → Sing
+    on SLEEP → Dormant
+  }
+
+  state Attack Antic {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=song_automaton_goomba_antic (sfxstatic_assets_areacog.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WALK STOP", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Wait(time=0.4, finishEvent=→"NEXT", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spike Antic")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=automaton_creature_chirp (sfxdynamic_assets_areacog.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on NEXT → Spike Up 1
+  }
+
+  state Spike Up 1 {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=song_automaton_goomba_spikes (sfxstatic_assets_areacog.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spike Up", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Spike Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)  // disabled
+    PreventInvincibleEffect(target=Self, preventEffect=true)
+    on FINISHED → Spike Up 2
+  }
+
+  state Spike Down 1 {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=song_automaton_goomba_spikes_retract (sfxstatic_assets_areacog.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    ActivateGameObject(gameObject=var "Spike Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spike Down", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Spike Down 2
+  }
+
+  state Spike Recover {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spike Antic")
+    PreventInvincibleEffect(target=Self, preventEffect=false)
+    on FINISHED → Walk
+  }
+
+  state Sing {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WALK STOP", delay=0, everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=automaton_creature_sing (sfxdynamic_assets_areacog.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Walk
+  }
+
+  state Spike Up 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Spike Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Spike Up 3
+  }
+
+  state Spike Up 3 {
+    ActivateGameObject(gameObject=var "Spike Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spike Down 1
+  }
+
+  state Spike Down 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Spike Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Spike Recover
+  }
+
+  state Attack Check {
+    RayCast2dV2(fromGameObject=var "Spike Check 1", fromPosition=(unset), direction=(0, 1), space=1, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Spike Check 2", fromPosition=(unset), direction=(0, 1), space=1, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Attack Antic
+    on CANCEL → Attack Cancel
+  }
+
+  state Attack Cancel {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Walk
+  }
+
+  state Dormant {
+    CheckOutOfCamera(gameObject=Self, margin=5, outsideEvent=(none), insideEvent=→"WAKE", insideBool=false, outsideBool=false, everyFrame=true)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WALK STOP", delay=0, everyFrame=false)
+    on WAKE → Walk
+  }
+
+  var X Pos: float = 0
+  var In Alert Range: bool = false
+  var Can Attack: bool = false
+  var Spike Hit 1: gameObject = Song Automaton Goomba (5)/Spike Hit 1
+  var Spike Hit 2: gameObject = Song Automaton Goomba (5)/Spike Hit 2
+  var Spike Hit 3: gameObject = Song Automaton Goomba (5)/Spike Hit 3
+  var Spike Check 1: gameObject = Song Automaton Goomba (5)/Spike Check 1
+  var Spike Check 2: gameObject = Song Automaton Goomba (5)/Spike Check 2
+  var Audio Loop Voice: gameObject = Song Automaton Goomba (5)/Audio Loop Voice
+}

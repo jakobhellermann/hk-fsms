@@ -1,0 +1,934 @@
+# Bench Control
+# 1 location(s):
+#   Bone_East_Weavehome / RestBench
+
+// uses template: bench_control
+fsm Bench Control {
+  start Pre Pause Reset
+  on RESPAWN → Check Start State 2  // from any state
+  on CANCEL BENCH → Canceled  // from any state
+  on HERO DAMAGED → Is Active?  // from any state
+  on DISABLE → Reset Activate Wait  // from any state
+  on PREPARE HERO RESPAWNING HERE → Set Custom Wake Up?  // from any state
+
+  state Init {
+    SetBoolValue(boolVariable=var "Waiting To Activate", boolValue=false, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=var "Was Interactable Active", AllowQueueing=false, UseChildren=false)
+    FindChild(gameObject=Self, childName="Lit", storeResult=var "Lit")
+    FindGameObject(objectName="", withTag="Hud Camera", store=var "HUD Camera")
+    FindGameObject(objectName="", withTag="Inventory Top", store=var "Inventory")
+    FindChild(gameObject=Self, childName="Detect Range", storeResult=var "Detect Range")
+    FindChild(gameObject=Self, childName="Heal Anim", storeResult=var "Burst Anim")
+    FindChild(gameObject=Self, childName="Particle Rest", storeResult=var "Particle Rest")
+    FindChild(gameObject=var "HUD Canvas", childName="Health", storeResult=var "Health")
+    GetHero(storeResult=var "Hero")
+    on FINISHED → Check Inactive
+  }
+
+  state Idle {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO SIT END", delay=0, everyFrame=false)
+    on UP PRESSED → Hide Prompt
+  }
+
+  state Start Rest {
+    BoolTest(boolVariable=var "No Sit Tween", isTrue=→"NO TWEEN", isFalse=(none), everyFrame=false)
+    SetStateTransitionAnimator(SetState=true, IsInstant=false, Target=Self)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="AT THIS BENCH", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="BENCHREST START")
+    SendEventToRegister(eventName="REMINDER INTERACT END")
+    SetStaticVariable(variableName="openToolsPane", setValue=true, sceneTransitionsLimit=0)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ResetTauntEffects", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RigidBody2DGetPosition(Target=var "Hero", Position=var "Hero Physics Pos", EveryFrame=false)
+    SetPosition2D(GameObject=var "Hero", Vector=var "Hero Physics Pos", X=0, Y=0, Space=0, EveryFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Sit Vector", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Sit Vector", vector3Value=(unset), x=var "Self X", y=(unset), z=(unset), everyFrame=false)
+    Vector3Add(vector3Variable=var "Sit Vector", addVector=var "Adjust Vector", everyFrame=false, perSecond=false)
+    iTweenMoveTo(gameObject=var "Hero", id="", transformPosition=var "", vectorPosition=var "Sit Vector", time=0.2, delay=0, speed=(unset), space=0, easeType=13, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.3, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Fake?
+    on NO TWEEN → Start Rest NoTween
+  }
+
+  state Rest Burst {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BENCHREST", delay=0, everyFrame=false)  // disabled
+    FindChild(gameObject=var "Hero", childName="Charm Effects", storeResult=var "Charm Effects")  // disabled
+    FindChild(gameObject=var "Charm Effects", childName="Blocker Shield", storeResult=var "Blocker Shield")  // disabled
+    SendEventByName(eventTarget=GameObject(var "Blocker Shield"), sendEvent="HERO REVIVED", delay=0, everyFrame=false)  // disabled
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=ResetSemiPersistentItems())
+    SetBoolValue(boolVariable=var "Sleeping", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetSceneNameString", parameters=[], storeResult=var "Scene Name", EveryFrame=false)  // disabled
+    GetName(gameObject=var "Self", storeName=var "Spawn Name", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Set Respawn", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)  // disabled
+    SetPlayerDataString(gameObject=var "GameManager", stringName="respawnMarkerName", value=var "Spawn Name")  // disabled
+    SetPlayerDataString(gameObject=var "GameManager", stringName="respawnScene", value=var "Scene Name")  // disabled
+    SetPlayerDataInt(intName="respawnType", value=1)  // disabled
+    SetPlayerDataBool(boolName="respawnFacingRight", value=var "Facing Right")  // disabled
+    EnumCompare(enumVariable=var "MapZone Override", compareTo=NONE, equalEvent=→"CURRENT", notEqualEvent=→"OVERRIDE", storeResult=(unset), everyFrame=false)  // disabled
+    on FINISHED → Update Map
+  }
+
+  state Resting {
+    RemoveHeroInputBlocker(Blocker=Self)
+    SetPlayerDataBool(boolName="atBench", value=true)
+    RestBenchHelperState(Target=Self, HeroOnBench=true)
+    BoolTest(boolVariable=var "Can Replenish Tools", isTrue=→"CRAFT TOOLS", isFalse=(none), everyFrame=false)
+    ListenForJump(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForAttack(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    ListenForUp(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), queueBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForLeft(eventTarget=Self, wasPressed=→"GET LEFT", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=→"GET RIGHT", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForQuickMap(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"OPEN MAP", isNotPressed=(none))
+    ListenForDreamNail(eventTarget=Self, wasPressed=→"NEEDOLIN", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    on GET UP → Game Paused?
+    on GET LEFT → Get Left
+    on GET RIGHT → Get Right
+    on OPEN MAP → Open Map
+    on NEEDOLIN → Pause Bench Rest
+    on ANIM END → Idle Anim
+    on CRAFT TOOLS → Craft Tools Anim
+    on INVENTORY CLOSED → Try Craft Tools
+    on BENCH RELINQUISH CONTROL → Relinquished
+  }
+
+  state Get Off {
+    RemoveHeroInputBlocker(Blocker=Self)
+    SendEventToRegister(eventName="BENCHREST OFF")
+    PlayRandomAudioClipTable(Table=hornet_run_start (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetRotation(gameObject=var "Hero", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetPlayerDataBool(boolName="atBench", value=false)
+    SetBoolValue(boolVariable=var "At This Bench", boolValue=false, everyFrame=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Get Off", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetStateTransitionAnimator(SetState=false, IsInstant=false, Target=Self)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="OFF THIS BENCH", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AffectedByGravity", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="RESTBENCH END", delay=0, everyFrame=false)
+    on FINISHED → Regain Control
+    on HERO DAMAGED → Reactivate
+  }
+
+  state Regain Control {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndInteractEvents(Target=Self)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ForceSoftLanding", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControlToIdle", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.5, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Reactivate
+  }
+
+  state Reactivate {
+    RestBenchHelperState(Target=Self, HeroOnBench=false)
+    SetBoolValue(boolVariable=var "At This Bench", boolValue=false, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="BENCHREST END", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="BENCHREST END")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="OFF THIS BENCH", delay=0, everyFrame=false)
+    SetParticleEmission(gameObject=var "Particle F", emission=true, resetOnExit=false)
+    SetParticleEmission(gameObject=var "Particle B", emission=true, resetOnExit=false)
+    GetFsmBool(gameObject=var "Burst Anim", fsmName="Detect Hero", variableName="Hero In Range", storeValue=var "Hero In Range", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Hero In Range", isTrue=→"IN RANGE", isFalse=→"OUT OF RANGE", everyFrame=false)  // disabled
+    on FINISHED → Idle
+    on IN RANGE → Idle
+    on OUT OF RANGE → Idle
+  }
+
+  state Get Right {
+    GetFsmBool(gameObject=var "Inventory", fsmName="Inventory Control", variableName="Open", storeValue=var "Inv Open", everyFrame=false)
+    BoolTest(boolVariable=var "Inv Open", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Game Paused?
+    on CANCEL → Cancel Frame 2
+  }
+
+  state Get Left {
+    GetFsmBool(gameObject=var "Inventory", fsmName="Inventory Control", variableName="Open", storeValue=var "Inv Open", everyFrame=false)
+    BoolTest(boolVariable=var "Inv Open", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Game Paused?
+    on CANCEL → Cancel Frame 2
+  }
+
+  state Init Resting {
+    RestBenchHelperState(Target=Self, HeroOnBench=true)
+    SetStateTransitionAnimator(SetState=true, IsInstant=true, Target=Self)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="AT THIS BENCH INIT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="AT THIS BENCH", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckAllAchievements", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=ResetSemiPersistentItems())
+    SetPlayerDataBool(boolName="atBench", value=true)
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="BENCHREST START", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="MaxHealth", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetSilkRegenBlocked", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit Fall Asleep")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="UPDATE BLUE HEALTH", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO REVIVED", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    SetIsKinematic2d(gameObject=var "Hero", isKinematic=true)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Replenish Tools Silently
+  }
+
+  state Check Start State {
+    BoolTest(boolVariable=var "Is Canceled", isTrue=→"START IDLE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "RespawnResting", isTrue=→"START SITTING", isFalse=→"START IDLE", everyFrame=false)
+    on START IDLE → Idle Start Pause
+    on START SITTING → Kinemetise
+  }
+
+  state Pause Frame {
+    ActivateGameObject(gameObject=var "Craw Summons Pin", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    SetBoolValue(boolVariable=var "Waiting To Activate", boolValue=true, everyFrame=false)
+    GetIsInteractableActive(Target=Self, StoreIsActive=var "Was Interactable Active Pre")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetBoolValue(boolVariable=var "Was Interactable Active", boolValue=var "Was Interactable Active Pre", everyFrame=false)
+    FindChild(gameObject=Self, childName="Lit", storeResult=var "Lit")
+    FindGameObject(objectName="", withTag="Hud Camera", store=var "HUD Camera")
+    FindGameObject(objectName="", withTag="Inventory Top", store=var "Inventory")
+    FindChild(gameObject=Self, childName="Detect Range", storeResult=var "Detect Range")
+    FindChild(gameObject=Self, childName="Heal Anim", storeResult=var "Burst Anim")
+    FindChild(gameObject=Self, childName="Particle Rest", storeResult=var "Particle Rest")
+    FindChild(gameObject=var "HUD Canvas", childName="Health", storeResult=var "Health")
+    GetHero(storeResult=var "Hero")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Craw Summons Instant?
+  }
+
+  state Start Get Off {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit Idle")
+    SetStringValue(stringVariable=var "Get Off Anim", stringValue="Get Off", everyFrame=false)
+    SetIsKinematic2d(gameObject=var "Hero", isKinematic=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Replenish Tools Non Silent?
+  }
+
+  state Open Map {
+    SetFloatValue(floatVariable=var "Map Open Time", floatValue=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanQuickMapBench", parameters=[], storeResult=var "Can Quick Map", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Quick Map", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    GetFsmBool(gameObject=var "Inventory", fsmName="Inventory Control", variableName="Open", storeValue=var "Inv Open", everyFrame=false)
+    BoolTest(boolVariable=var "Inv Open", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit Map Open")
+    SendEventToRegister(eventName="MAP OPENED")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAP OPENED", delay=0, everyFrame=false)  // disabled
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    PlayAudioEvent(audioClip=hornet_map_open_2d (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"INV MAP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    Wait(time=0.05, finishEvent=→"FINISHED", realTime=false)
+    on CANCEL → Resting
+    on INVENTORY OPENED → Close Map
+    on FINISHED → Map Idle
+    on INV MAP → Inv Map Open
+  }
+
+  state Close Map {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CLOSE QUICK MAP", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    PlayAudioEvent(audioClip=hornet_map_close_2d (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Sit Map Close", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Close Anim
+  }
+
+  state Save Game {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckAllAchievements", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=TimePasses())
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_rest(var "PD Bool Name"))  // disabled
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveGame())  // disabled
+    SaveGame()
+    on FINISHED → Rest Burst New
+  }
+
+  state Game Paused? {
+    GetFsmBool(gameObject=var "Inventory", fsmName="Inventory Control", variableName="Open", storeValue=var "Inv Open", everyFrame=false)
+    BoolTest(boolVariable=var "Inv Open", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CallStaticMethod(className="GenericMessageCanvas", methodName="get_IsActive", parameters=[], storeResult=var "Blocked", everyFrame=false)
+    BoolTest(boolVariable=var "Blocked", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Charm Msg Down
+    on CANCEL → Cancel Frame 2
+  }
+
+  state Charm Msg Down {
+    SendEventByName(eventTarget=GameObject(var "Charm Msg"), sendEvent="BENCH CLOSE", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="BENCHREST ENDING")
+    on FINISHED → Wait for control?
+  }
+
+  state Cancel Frame 2 {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Resting
+  }
+
+  state Inactive {
+    RemoveHeroInputBlocker(Blocker=Self)
+    on BENCH ACTIVE → Init Idle
+    on UP PRESSED → Extra Bench Behaviour
+  }
+
+  state Check Inactive {
+    StringCompare(stringVariable=var "Check For PD Bool", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName=var "Check For PD Bool", isTrue=→"FINISHED", isFalse=→"INACTIVE")
+    on INACTIVE → Inactive
+    on FINISHED → Init Idle
+  }
+
+  state Update Map Anim {
+    BoolTest(boolVariable=var "Map Updated", isTrue=(none), isFalse=→"NO MAP", everyFrame=false)
+    CreateObject(gameObject=Map Update Msg (localpoolprefabs_assets_shared.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "")
+    PlayerDataBoolTest(boolName="hasQuill", isTrue=(none), isFalse=→"NO MAP")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Map Update", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Sit Idle
+    on NO MAP → Resting Init
+  }
+
+  state Sit Idle {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit Idle")
+    on FINISHED → Resting Init
+  }
+
+  state Resting Init {
+    RestBenchHelperState(Target=Self, HeroOnBench=true)
+    SetPlayerDataBool(boolName="atBench", value=true)
+    ResetCutsceneBools()
+    FindGameObject(objectName="", withTag="Inventory Top", store=var "Inventory")
+    TryReplenishTools(DoReplenish=false, Method=Bench, trueEvent=(none), falseEvent=(none), storeValue=var "Can Replenish Tools")
+    PlayerDataBoolTrueAndFalse(trueBool="SeenToolGetPrompt", falseBool="SeenToolUsePrompt", isTrue=(none), isFalse=→"FINISHED")
+    PlayerDataBoolTest(boolName="SeenToolEquipPrompt", isTrue=→"FINISHED", isFalse=(none))
+    CallStaticMethod(className="InventoryPaneList", methodName="SetNextOpen", parameters=["Tools"], storeResult=(unset var), everyFrame=false)
+    ShowControlReminderSingle(AppearEvent="", DisappearEvent="BENCHREST ENDING", PlayerDataBool="SeenToolEquipPrompt", FadeInDelay=1, FadeInTime=1, FadeOutTime=0.5, Text={Sheet="Prompts", Key="THROW_EQUIP_GENERIC"}, Prompt={Sheet="", Key=""}, Button=INVENTORY, DisappearOnButtonPress=true)
+    on FINISHED → Start Rest Anim
+  }
+
+  state Update Map Non Silent? {
+    PlayerDataBoolTest(boolName="hasQuill", isTrue=(none), isFalse=→"FINISHED")
+    PlayerDataVariableTest(VariableName="HasAnyMap", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="UpdateGameMap", parameters=[], storeResult=var "Map Updated", EveryFrame=false)
+    CallMethodProper(gameObject=var "Game Map", behaviour="GameMap", methodName="SetupMap", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Map Updated", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CreateObject(gameObject=Map Update Msg (localpoolprefabs_assets_shared.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "")
+    on FINISHED → Resting
+  }
+
+  state Tilter? {
+    HasComponent(gameObject=var "Self", component="RestBenchTilt", removeOnExit=false, trueEvent=(none), falseEvent=→"FINISHED", store=(unset), everyFrame=false)
+    CallMethodProper(gameObject=var "Self", behaviour="RestBenchTilt", methodName="GetTilt", parameters=[], storeResult=var "Tilt Amount", EveryFrame=false)
+    SetBoolValue(boolVariable=var "Tilter", boolValue=true, everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Start Tilt? {
+    BoolTest(boolVariable=var "Tilter", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetRotation(gameObject=var "Hero", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tilt Amount", space=0, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=var "Hero", vector=(unset), x=-0.25, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Save Frame
+  }
+
+  state Tilt translate {
+    BoolTest(boolVariable=var "Tilter", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Translate(gameObject=var "Hero", vector=(unset), x=0.25, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Get Off
+  }
+
+  state Init Tilt {
+    BoolTest(boolVariable=var "Tilter", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetRotation(gameObject=var "Hero", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tilt Amount", space=0, everyFrame=false, lateUpdate=false)
+    Translate(gameObject=var "Hero", vector=(unset), x=-0.25, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Init Resting
+  }
+
+  sequence state Idle Start Pause {
+    GetIsInteractableActive(Target=Self, StoreIsActive=var "Was Interactable Active Pre")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetBoolValue(boolVariable=var "Was Interactable Active", boolValue=var "Was Interactable Active Pre", everyFrame=false)
+    Wait(time=0.05, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=var "Was Interactable Active", AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Close Anim {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Sit Map Close", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Re-enable Pause
+    on OPEN INVENTORY MAP → Reclose
+  }
+
+  state Reclose {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Close Anim
+  }
+
+  state Kinemetise {
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    SetIsKinematic2d(gameObject=var "Hero", isKinematic=true)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Translate(gameObject=var "Hero", vector=var "Adjust Vector", x=(unset), y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Init Tilt
+  }
+
+  state Pause 2 {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Pause 3
+  }
+
+  state Pause 3 {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Tilter?
+  }
+
+  state Check Start State 2 {
+    FindChild(gameObject=Self, childName="Particle B", storeResult=var "Particle B")
+    FindChild(gameObject=Self, childName="Particle F", storeResult=var "Particle F")
+    BoolTest(boolVariable=var "Is Canceled", isTrue=→"START IDLE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "RespawnResting", isTrue=→"START SITTING", isFalse=→"START IDLE", everyFrame=false)
+    on START IDLE → Pause 2
+    on START SITTING → Init Resting 2
+  }
+
+  state Init Resting 2 {
+    AddHeroInputBlocker(Blocker=Self)
+    SetFloatValue(floatVariable=var "Craw Pin Appear Chance", floatValue=0.5, everyFrame=false)
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE OUT", delay=0, everyFrame=false)  // disabled
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckAllAchievements", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    RestBenchHelperState(Target=Self, HeroOnBench=true)
+    SetPlayerDataBool(boolName="atBench", value=true)
+    SetBoolValue(boolVariable=var "At This Bench", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="MaxHealth", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit Fall Asleep")
+    SetParticleEmission(gameObject=var "Particle F", emission=false, resetOnExit=false)
+    SetParticleEmission(gameObject=var "Particle B", emission=false, resetOnExit=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="UPDATE BLUE HEALTH", delay=0, everyFrame=false)  // disabled
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO REVIVED", delay=0, everyFrame=false)  // disabled
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))  // disabled
+    SetIsKinematic2d(gameObject=var "Hero", isKinematic=true)  // disabled
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)  // disabled
+    Wait(time=1.2, finishEvent=→"FINISHED", realTime=false)  // disabled
+    on FINISHED → State 2
+  }
+
+  state Map Idle {
+    ListenForQuickMap(eventTarget=Self, wasPressed=(none), wasReleased=→"CLOSE MAP", isPressed=(none), isNotPressed=→"CLOSE MAP")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="OPEN QUICK MAP", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="OPEN QUICK MAP")
+    FloatAdd(floatVariable=var "Map Open Time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Map Open Time", minValue=0, maxValue=1, everyFrame=true)
+    on CLOSE MAP → Quick Map Check Delay
+    on INVENTORY OPENED → Close Map
+  }
+
+  state Inv Map Open {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    FindGameObject(objectName="", withTag="Inventory Top", store=var "Inventory")
+    SendEventToRegister(eventName="OPEN INVENTORY MAP")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="OPEN INVENTORY MAP", delay=0, everyFrame=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Sit Map Close", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Wait(time=0.42, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Resting
+  }
+
+  state Save Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Maggoted?
+  }
+
+  state Hide Prompt {
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="BENCHREST START", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Canceled", boolValue=false, everyFrame=false)
+    CheckSceneName(sceneName="Town", equalEvent=(none), notEqualEvent=→"FINISHED")
+    SendEventToRegister(eventName="HIDE INTERACT REMINDER")
+    on FINISHED → Fake? Pre
+  }
+
+  state Re-enable Pause {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    on FINISHED → Idle Anim
+  }
+
+  state Pause {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Update Map Anim
+  }
+
+  state Current Map Zone {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SetCurrentMapZoneAsRespawn())
+    on FINISHED → Start Rest
+  }
+
+  state Override Map Zone {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SetOverrideMapZoneAsRespawn(var "MapZone Override"))
+    on FINISHED → Start Rest
+  }
+
+  state Idle Anim {
+    SelectRandomString(strings=["Sit Idle", "SitLook 1", "SitLook 2", "SitLook 3", "SitLook 4"], weights=[0.5, 0.125, 0.125, 0.125, 0.125], storeString=var "Sit Anim")
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName=var "Sit Anim")
+    on FINISHED → Resting
+  }
+
+  state Craft Tools Anim {
+    SetBoolValue(boolVariable=var "Can Replenish Tools", boolValue=false, everyFrame=false)
+    FindChild(gameObject=var "Hero", childName="Tool Effects", storeResult=var "Tool Effects")
+    FindChild(gameObject=var "Tool Effects", childName="Craft Silk", storeResult=var "Craft Silk")
+    ActivateGameObject(gameObject=var "Craft Silk", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Craft Silk", clipName="Sit Craft Silk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=var "Craft Silk", frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Sit Craft", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=craft (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV3(vibrationDataAsset=craft (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    on FINISHED → Replenish Tools
+  }
+
+  sequence state Try Craft Tools {
+    NextFrameEvent(sendEvent=(none))
+    TryReplenishTools(DoReplenish=false, Method=Bench, trueEvent=→"CRAFT TOOLS", falseEvent=(none), storeValue=(unset))
+    on FINISHED → Resting
+    on CRAFT TOOLS → Craft Tools Anim
+    on BENCH RELINQUISH CONTROL → Relinquished 2
+  }
+
+  state Replenish Tools {
+    TryReplenishTools(DoReplenish=true, Method=Bench, trueEvent=(none), falseEvent=(none), storeValue=(unset))
+    FindChild(gameObject=var "Tool Effects", childName="Craft Flash", storeResult=var "Craft Flash")
+    ActivateGameObject(gameObject=var "Craft Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.25, finishEvent=(none), realTime=false)
+    on FINISHED → Resting
+  }
+
+  state Canceled {
+    SetBoolValue(boolVariable=var "Is Canceled", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="atBench", value=false)
+    SetBoolValue(boolVariable=var "At This Bench", boolValue=false, everyFrame=false)
+    EndInteractEvents(Target=Self)
+    RestBenchHelperState(Target=Self, HeroOnBench=false)
+    on FINISHED → Init Idle
+  }
+
+  state Extra Bench Behaviour {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="EXTRA BENCH SIT", delay=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Inactive
+  }
+
+  state Relinquished {
+    on BENCH REGAIN CONTROL → Start Rest Anim
+  }
+
+  state Start Rest Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit Idle")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO SIT START", delay=0, everyFrame=false)
+    on FINISHED → Craw summons check
+  }
+
+  state Regen Silk {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetSilkRegenBlocked", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="MaxRegenSilk", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WAKE END", delay=0, everyFrame=false)
+    on FINISHED → Update Map Non Silent?
+  }
+
+  state At Bench {
+    BoolTest(boolVariable=var "z_FakeBench", isTrue=→"FAKE", isFalse=(none), everyFrame=false)
+    SetPlayerDataBool(boolName="atBench", value=true)
+    SetPlayerDataBool(boolName="disableInventory", value=true)
+    SetBoolValue(boolVariable=var "At This Bench", boolValue=true, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=bench_rest (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FAKE → Set Spawn Location
+    on FINISHED → Set Spawn Location
+  }
+
+  state Fake? {
+    SetPosition(gameObject=var "Hero", vector=var "Sit Vector", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    PlayVibrationV3(vibrationDataAsset=bench_rest (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    BoolTest(boolVariable=var "z_FakeBench", isTrue=→"FAKE", isFalse=(none), everyFrame=false)
+    on FAKE → Fake Bench Sit
+    on FINISHED → Start Tilt?
+  }
+
+  state Fake Bench Sit {
+    SetParticleEmission(gameObject=var "Particle F", emission=false, resetOnExit=false)
+    SetParticleEmission(gameObject=var "Particle B", emission=false, resetOnExit=false)
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="FAKE BENCH SIT", delay=0, everyFrame=false)
+    SendEventByNameUpwards(Target=Self, EventName="FAKE BENCH SIT")
+  }
+
+  state Needolin Sub {
+    RunFSM(fsmTemplateControl=template=2444689135500095999 in[Just Cancel<-false], finishEvent=→"FINISHED", everyFrame=false)
+    on CANCEL → Needolin Cancel
+    on FINISHED → Finish Bench Action
+  }
+
+  state Craw summons check {
+    GameObjectCompare(gameObjectVariable=var "Craw Summons Pin", compareTo=<null>, equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    GetPlayerDataVariable(VariableName="CrowSummonsAppearedScene", StoreValue=var "Craw Summons Scene")
+    StringCompare(stringVariable=var "Craw Summons Scene", compareTo="", equalEvent=(none), notEqualEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    RunFSM(fsmTemplateControl=template=-1239025876567723182 in[Craw Pin Appear Chance<-var "Craw Pin Appear On Sit Chance", Checked Craw Summons<-var "Checked Craw Summons"] out[Checked Craw Summons->var "Checked Craw Summons"] events[CANCEL->CANCEL], finishEvent=→"FINISHED", everyFrame=false)
+    on CANCEL → Resting
+    on FINISHED → Spawn Craw Summons
+  }
+
+  state Spawn Craw Summons {
+    ActivateGameObject(gameObject=var "Craw Summons Pin", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Craw Summons Pin"), sendEvent="APPEAR", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetSceneNameString", parameters=[], storeResult=var "Scene Name", EveryFrame=false)
+    SetPlayerDataVariable(VariableName="CrowSummonsAppearedScene", SetValue=var "Scene Name")
+    on FINISHED → Resting
+  }
+
+  sequence state Craw Summons? {
+    BoolTest(boolVariable=var "Queued Craw Summons Fade", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Start Locked?
+    on FINISHED → Craw Summons In Black
+  }
+
+  state Maggoted? {
+    GetHeroCState(VariableName="isMaggoted", StoreValue=var "Is Hero Maggoted", EveryFrame=false)
+    SetHeroMaggoted(Value=false)
+    BoolTest(boolVariable=var "Is Hero Maggoted", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Maggot_Bench_Burst (localpoolprefabs_assets_bench.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    PlayAudioEvent(audioClip=swamp_maggots_cleanse_pop (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Lifeblood State?
+  }
+
+  state Damaged {
+    BoolTest(boolVariable=var "At This Bench", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SetBoolValue(boolVariable=var "At This Bench", boolValue=false, everyFrame=false)
+    SetPlayerDataBool(boolName="atBench", value=false)
+    SetPlayerDataBool(boolName="disableInventory", value=false)
+    SetRotation(gameObject=var "Hero", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetStateTransitionAnimator(SetState=false, IsInstant=false, Target=Self)
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    on FINISHED → Reactivate
+    on CANCEL → Not this bench
+  }
+
+  state Not this bench {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Init Idle {
+    RemoveHeroInputBlocker(Blocker=Self)
+    on FINISHED → Check Start State
+  }
+
+  state Is Active? {
+    StringCompare(stringVariable=var "Check For PD Bool", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName=var "Check For PD Bool", isTrue=→"FINISHED", isFalse=→"INACTIVE")
+    on INACTIVE → Inactive
+    on FINISHED → Damaged
+  }
+
+  state Wait for control? {
+    BoolTest(boolVariable=var "Waiting For Control", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Tilt translate
+  }
+
+  state Start Locked? {
+    SendEventToRegister(eventName="BENCHREST INIT")
+    BoolTest(boolVariable=var "Waiting For Control", isTrue=→"WAIT", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → First Level?
+    on WAIT → Starting Locked
+  }
+
+  sequence state Startle First {
+    Wait(time=1.2, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=Small Wake Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Wake To Sit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Get Off
+  }
+
+  state Starting Locked {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit Idle")
+    BoolTest(boolVariable=var "Waiting For Control", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Start Get Off
+  }
+
+  state Update Map {
+    SetBoolValue(boolVariable=var "Map Updated", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="UpdateGameMap", parameters=[], storeResult=var "Map Updated", EveryFrame=false)
+    on FINISHED → Save Game
+  }
+
+  state Quick Map Check Delay {
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    FloatTestToBool(float1=var "Open Time", float2=0.1, tolerance=0, equalBool=(unset), lessThanBool=var "Can Do Shortcut", greaterThanBool=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Can Do Shortcut", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Map Idle")
+    AudioStopV2(gameObject=var "Spawned Audio Player", fadeTime=0, cancelOnEarlyExit=false)  // disabled
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))  // disabled
+    ListenForQuickMapV2(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=var "Can Do Shortcut")
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on BUTTON DOWN → Inv Map Open
+    on FINISHED → Close Map
+  }
+
+  state Lifeblood State? {
+    RunFSM(fsmTemplateControl=template=-4017992051520581587, finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → Rest Burst
+  }
+
+  state Rest Burst New {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=flashBenchRest())
+    FindChild(gameObject=var "Hero", childName="Focus Effects", storeResult=var "Focus Effects")
+    SetStringValue(stringVariable=var "Get Off Anim", stringValue="Get Off", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=White Flash (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(0, 0, -0.2), rotation=(unset), storeObject=var "")
+    ActivateGameObject(gameObject=var "Burst Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="MaxHealth", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="MaxRegenSilk", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Health"), sendEvent="UPDATE BLUE HEALTH", delay=0, everyFrame=false)
+    SetParticleEmission(gameObject=var "Particle F", emission=false, resetOnExit=false)
+    SetParticleEmission(gameObject=var "Particle B", emission=false, resetOnExit=false)
+    PlayParticleEmitter(gameObject=var "Particle Rest", emit=0, resetIfPlaying=false)
+    SendEventToRegister(eventName="BENCHREST")
+    on FINISHED → Pause
+  }
+
+  state Replenish Tools Silently {
+    CheckIsFirstLevelForPlayer(trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    TryReplenishTools(DoReplenish=true, Method=BenchSilent, trueEvent=(none), falseEvent=(none), storeValue=(unset))
+    on FINISHED → Update Map Silently
+  }
+
+  state Relinquished 2 {
+    on BENCH REGAIN CONTROL → Try Craft Tools
+  }
+
+  state Reset Activate Wait {
+    RemoveHeroInputBlocker(Blocker=Self)
+    SetBoolValue(boolVariable=var "RespawnResting", boolValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Waiting To Activate", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Waiting To Activate", boolValue=false, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=var "Was Interactable Active", AllowQueueing=false, UseChildren=false)
+    on FINISHED → State 1
+  }
+
+  state State 1 {
+  }
+
+  state Replenish Tools Non Silent? {
+    TryReplenishTools(DoReplenish=false, Method=Bench, trueEvent=(none), falseEvent=(none), storeValue=var "Can Replenish Tools")
+    on FINISHED → Regen Silk
+  }
+
+  state Update Map Silently {
+    SetBoolValue(boolVariable=var "Map Updated", boolValue=false, everyFrame=false)
+    CheckIsFirstLevelForPlayer(trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    PlayerDataBoolTest(boolName="hasQuill", isTrue=(none), isFalse=→"FINISHED")
+    PlayerDataVariableTest(VariableName="HasAnyMap", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="UpdateGameMap", parameters=[], storeResult=var "Map Updated", EveryFrame=false)
+    CallMethodProper(gameObject=var "Game Map", behaviour="GameMap", methodName="SetupMap", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Craw Summons?
+  }
+
+  state Pause Bench Rest {
+    SendEventToRegister(eventName="BENCH REST ACTION START")
+    BoolTest(boolVariable=var "Waiting For Control", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Needolin Sub
+  }
+
+  state Finish Bench Action {
+    SendEventToRegister(eventName="BENCH REST ACTION END")
+    BoolTest(boolVariable=var "Waiting For Control", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Idle Anim
+  }
+
+  state Needolin Cancel {
+    SendEventToRegister(eventName="BENCH REST ACTION END")
+    BoolTest(boolVariable=var "Waiting For Control", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Resting
+  }
+
+  sequence state State 2 {
+    NextFrameEvent(sendEvent=(none))
+    SendEventToRegister(eventName="RESPAWN_AT_BENCH")
+    on FINISHED → Pause 2
+  }
+
+  state Pre Pause Reset {
+    SetBoolValue(boolVariable=var "Queued Craw Summons Fade", boolValue=false, everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Was Interactable Active Pre", var "Was Interactable Active"], boolStates=[false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Pause Frame
+  }
+
+  state Fake? Pre {
+    BoolTest(boolVariable=var "z_FakeBench", isTrue=→"FAKE", isFalse=(none), everyFrame=false)
+    on FAKE → Fake Bench Check
+    on FINISHED → At Bench
+  }
+
+  state Fake Bench Check {
+    SendEventByNameUpwards(Target=Self, EventName="FAKE BENCH CHECK")
+    on FINISHED → At Bench
+  }
+
+  state Craw Summons Instant? {
+    GetPlayerDataVariable(VariableName="CrowSummonsAppearedScene", StoreValue=var "Craw Summons Scene")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetSceneNameString", parameters=[], storeResult=var "Scene Name", EveryFrame=false)
+    StringCompare(stringVariable=var "Craw Summons Scene", compareTo=var "Scene Name", equalEvent=(none), notEqualEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Craw Summons Pin", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Craw Summons Pin"), sendEvent="APPEAR INSTANT", delay=0, everyFrame=false)
+    on FINISHED → Check Start State 2
+  }
+
+  state Craw Summons In Black {
+    AddEventRegister(target=Self, eventName="CRAW SUMMONS END")
+    ActivateGameObject(gameObject=var "Craw Summons Pin", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Craw Summons Pin"), sendEvent="APPEAR QUICK", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetSceneNameString", parameters=[], storeResult=var "Scene Name", EveryFrame=false)
+    SetPlayerDataVariable(VariableName="CrowSummonsAppearedScene", SetValue=var "Scene Name")
+    on CRAW SUMMONS END → Start Locked?
+  }
+
+  sequence state Set Custom Wake Up? {
+    SetBoolValue(boolVariable=var "Queued Craw Summons Fade", boolValue=false, everyFrame=false)
+    GameObjectCompare(gameObjectVariable=var "Craw Summons Pin", compareTo=<null>, equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckIsFirstLevelForPlayer(trueEvent=(none), falseEvent=→"CANCEL", storeValue=(unset))
+    RunFSM(fsmTemplateControl=template=-1239025876567723182 in[Craw Pin Appear Chance<-var "Craw Pin Appear Chance", Checked Craw Summons<-false] out[Checked Craw Summons->var "Checked Craw Summons"] events[CANCEL->CANCEL], finishEvent=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Queued Craw Summons Fade", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="RespawnMarker", methodName="SetCustomWakeUp", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    on FINISHED → Check Start State 2
+    on CANCEL → Craw Summons Instant?
+  }
+
+  state First Level? {
+    CheckIsFirstLevelForPlayer(trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on TRUE → Startle First
+    on FALSE → Startle Death
+  }
+
+  sequence state Startle Death {
+    Wait(time=1.2, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=Hornet_small_wake_sharp (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Wake To Sit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Get Off
+  }
+
+  state Set Spawn Location {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetSceneNameString", parameters=[], storeResult=var "Scene Name", EveryFrame=false)
+    GetName(gameObject=var "Self", storeName=var "Spawn Name", everyFrame=false)
+    BoolTest(boolVariable=var "Set Respawn", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "z_FakeBench", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetPlayerDataString(gameObject=var "GameManager", stringName="respawnMarkerName", value=var "Spawn Name")
+    SetPlayerDataString(gameObject=var "GameManager", stringName="respawnScene", value=var "Scene Name")
+    SetPlayerDataInt(intName="respawnType", value=1)
+    EnumCompare(enumVariable=var "MapZone Override", compareTo=NONE, equalEvent=→"CURRENT", notEqualEvent=→"OVERRIDE", storeResult=(unset), everyFrame=false)
+    on CURRENT → Current Map Zone
+    on OVERRIDE → Override Map Zone
+    on CANCEL → Start Rest
+  }
+
+  state Start Rest NoTween {
+    SetStateTransitionAnimator(SetState=true, IsInstant=false, Target=Self)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="AT THIS BENCH", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="BENCHREST START")
+    SendEventToRegister(eventName="REMINDER INTERACT END")
+    SetStaticVariable(variableName="openToolsPane", setValue=true, sceneTransitionsLimit=0)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ResetTauntEffects", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Sit")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RigidBody2DGetPosition(Target=var "Hero", Position=var "Hero Physics Pos", EveryFrame=false)
+    SetPosition2D(GameObject=var "Hero", Vector=var "Hero Physics Pos", X=0, Y=0, Space=0, EveryFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Sit Vector", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Sit Vector", vector3Value=(unset), x=var "Self X", y=(unset), z=(unset), everyFrame=false)
+    Vector3Add(vector3Variable=var "Sit Vector", addVector=var "Adjust Vector", everyFrame=false, perSecond=false)
+    Wait(time=0.3, finishEvent=→"WAIT", realTime=false)
+    on WAIT → NoTween Sit
+  }
+
+  state NoTween Sit {
+    PlayVibrationV3(vibrationDataAsset=bench_rest (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    on FINISHED → Start Tilt?
+  }
+
+  var Facing Right: bool = true
+  var Set Respawn: bool = true
+  var z_FakeBench: bool = false
+  var Check For PD Bool: string = ""
+  var Adjust Vector: vector3 = (0, 0.21, 0)
+  var Craw Summons Pin: gameObject = <null>
+  var MapZone Override: enum = MapZone(16)
+
+  var Craw Pin Appear Chance: float = 0.12
+  var Map Open Time: float = 0
+  var Other Chance: float = 1
+  var Pin X Move: float = 0
+  var Self X: float = 0
+  var Tilt Amount: float = 0
+  var Open Time: float = 0
+  var Craw Pin Appear On Sit Chance: float = 0.04
+  var At This Bench: bool = false
+  var Blocked: bool = false
+  var Can Do Shortcut: bool = false
+  var Can Quick Map: bool = false
+  var Can Replenish Tools: bool = false
+  var Checked Craw Summons: bool = false
+  var Has Map: bool = false
+  var Hero In Range: bool = false
+  var Inv Open: bool = false
+  var Is Canceled: bool = false
+  var Is Hero Maggoted: bool = false
+  var Map Updated: bool = false
+  var RespawnResting: bool = false
+  var Sleeping: bool = false
+  var Tilter: bool = false
+  var Waiting For Control: bool = false
+  var Waiting To Activate: bool = false
+  var Was Interactable Active: bool = false
+  var Was Interactable Active Pre: bool = false
+  var Queued Craw Summons Fade: bool = false
+  var No Sit Tween: bool = false
+  var Get Off Anim: string = ""
+  var PD Bool Name: string = ""
+  var Scene Name: string = ""
+  var Sit Anim: string = ""
+  var Spawn Name: string = ""
+  var Craw Summons Scene: string = ""
+  var Hero Physics Pos: vector2 = (0, 0)
+  var Pos: vector2 = (0, 0)
+  var Sit Vector: vector3 = (0, 0, 0)
+  var Blocker Shield: gameObject = <null>
+  var Burst Anim: gameObject = <null>
+  var Charm Effects: gameObject = <null>
+  var Charm Msg: gameObject = <null>
+  var Craft Flash: gameObject = <null>
+  var Craft Silk: gameObject = <null>
+  var Detect Range: gameObject = <null>
+  var Focus Effects: gameObject = <null>
+  var Health: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Inventory: gameObject = <null>
+  var Lit: gameObject = <null>
+  var Particle B: gameObject = <null>
+  var Particle F: gameObject = <null>
+  var Particle Rest: gameObject = <null>
+  var Self: gameObject = <null>
+  var Tool Effects: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Spawned Audio Player: gameObject = <null>
+  var Threads: gameObject = <null>
+}

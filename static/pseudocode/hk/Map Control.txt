@@ -1,0 +1,265 @@
+# Map Control
+# 2 location(s):
+#   Knight_Pickup / Knight
+#   resources.assets / Knight:1
+
+fsm Map Control {
+  start Pause
+  on NO INV → No Inv  // from any state
+  on HERO DAMAGED → Cancel All  // from any state
+  on LEAVING SCENE → Cancel All  // from any state
+  on FSM CANCEL → Cancel All  // from any state
+
+  state Inactive {
+    SetBoolValue(boolVariable=var "In Control", boolValue=false, everyFrame=false)
+    FloatAdd(floatVariable=var "Open time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Open time", minValue=0, maxValue=3, everyFrame=true)
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on BUTTON DOWN → Button Down Check
+  }
+
+  state Button Down Check {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="disablePause", isTrue=→"CANCEL", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasMap", isTrue=(none), isFalse=→"CANCEL")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="atBench", isTrue=→"CANCEL", isFalse=(none))
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="CanQuickMap", parameters=[], storeResult=var "Return Bool")
+    BoolTest(boolVariable=var "Return Bool", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    Wait(time=var "Button Down Time", finishEvent=→"MAP START", realTime=false)
+    on BUTTON UP → Check Double
+    on MAP START → Button Still Down?
+    on CANCEL → Inactive
+    on BUTTON DOWN → Double!
+  }
+
+  state Open Map {
+    FloatAdd(floatVariable=var "Open time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Open time", minValue=0, maxValue=3, everyFrame=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAP OPENED", delay=0, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    SetPlayerDataBool(boolName="atMapPrompt", value=false)
+    FindGameObject(objectName="", withTag="Hud Camera", store=var "HUD Camera")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="OPEN QUICK MAP", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="STOP HERO EXIT", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "In Control", boolValue=true, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetBoolValue(boolVariable=var "Disabled Animation", boolValue=true, everyFrame=false)
+    ListenForQuickMap(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Map Open", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on BUTTON UP → Close Map
+    on LEFT GROUND → Quick Cancel
+    on INVENTORY OPENED → Close Map
+    on FINISHED → Map Idle
+  }
+
+  state Regain Control {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="atBench", isTrue=→"FINISHED", isFalse=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetBoolValue(boolVariable=var "Disabled Animation", boolValue=false, everyFrame=false)
+    on FINISHED → Reset Timer
+  }
+
+  state Close Map {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CLOSE QUICK MAP", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Map Away", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on ANIM END → Regain Control
+    on BUTTON DOWN → Close Doub Check
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindGameObject(objectName="", withTag="Inventory Top", store=var "Inventory")
+    SetFloatValue(floatVariable=var "Walk Speed Neg", floatValue=var "Walk Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Walk Speed Neg", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Reset Timer
+  }
+
+  state Has Map? {
+    SetFloatValue(floatVariable=var "Open time", floatValue=0, everyFrame=false)
+    GetPlayerDataBool(boolName="atMapPrompt", storeValue=var "At Map Prompt")
+    BoolTest(boolVariable=var "At Map Prompt", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    GetPlayerDataBool(boolName="hasMap", storeValue=var "Has Map")
+    BoolTest(boolVariable=var "Has Map", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Reset Timer
+    on FINISHED → Open Map
+  }
+
+  state Cancel All {
+    SendEventByName(eventTarget=GameObject(var "HUD Camera"), sendEvent="CLOSE QUICK MAP", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    BoolTest(boolVariable=var "In Control", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetBoolValue(boolVariable=var "Disabled Animation", boolValue=false, everyFrame=false)
+    on FINISHED → Reset Timer
+  }
+
+  state Can QuickMap? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="disablePause", isTrue=→"CANCEL", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="atMapPrompt", isTrue=→"FINISHED", isFalse=(none))
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="CanQuickMap", parameters=[], storeResult=var "Return Bool")
+    BoolTest(boolVariable=var "Return Bool", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Reset Timer
+    on FINISHED → Has Map?
+  }
+
+  state Button Still Down? {
+    ListenForQuickMap(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"BUTTON DOWN", isNotPressed=→"CANCEL")
+    on BUTTON DOWN → Can QuickMap?
+    on CANCEL → Check Double
+    on FINISHED → Check Double
+  }
+
+  state Double! {
+    GameObjectIsNull(gameObject=var "Inventory", isNull=→"GET INVENTORY", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="disablePause", isTrue=→"CANCEL", isFalse=(none))
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="CanQuickMap", parameters=[], storeResult=var "Return Bool")
+    BoolTest(boolVariable=var "Return Bool", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="OPEN INVENTORY MAP", delay=0, everyFrame=false)
+    on FINISHED → Restore Anim Control
+    on GET INVENTORY → Get Inventory
+    on CANCEL → Restore Anim Control
+  }
+
+  state Reset Timer {
+    SetFloatValue(floatVariable=var "Open time", floatValue=0, everyFrame=false)
+    on FINISHED → Inactive
+  }
+
+  state Check Double {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on FINISHED → Reset Timer
+    on BUTTON DOWN → Double!
+  }
+
+  state Close Doub Check {
+    FloatCompare(float1=var "Open time", float2=0.25, tolerance=0, equal=→"DOUBLE", lessThan=→"DOUBLE", greaterThan=→"CANCEL", everyFrame=false)
+    on DOUBLE → Extra Check
+    on CANCEL → Double Fail
+  }
+
+  state Double Fail {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Regain Control
+  }
+
+  state Map Idle {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAPWALK END", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="MAPWALK END")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Map Idle")
+    ListenForQuickMap(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP")
+    FloatAdd(floatVariable=var "Open time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Open time", minValue=0, maxValue=3, everyFrame=true)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"WALK RIGHT", isNotPressed=(none))
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"WALK LEFT", isNotPressed=(none))
+    on INVENTORY OPENED → Close Map
+    on LEFT GROUND → Quick Cancel
+    on BUTTON UP → Close Map
+    on WALK LEFT → Turn L?
+    on WALK RIGHT → Turn R?
+  }
+
+  state Walk Left {
+    ForceHeroFootstepSound(forceFootstepSound=Walk, endOnStateExit=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Map Walk")
+    SendEventToRegister(eventName="MAPWALK START")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAPWALK START", delay=0, everyFrame=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed Neg", y=(unset), everyFrame=true)
+    ListenForQuickMap(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP")
+    FloatAdd(floatVariable=var "Open time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Open time", minValue=0, maxValue=3, everyFrame=true)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"STOP WALK")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on INVENTORY OPENED → Close Map
+    on BUTTON UP → Close Map
+    on LEFT GROUND → Quick Cancel
+    on STOP WALK → Map Idle
+  }
+
+  state Walk Right {
+    ForceHeroFootstepSound(forceFootstepSound=Walk, endOnStateExit=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Map Walk")
+    ForceHeroFootstepSound(forceFootstepSound=Walk, endOnStateExit=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAPWALK START", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="MAPWALK START")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed", y=(unset), everyFrame=true)
+    ListenForQuickMap(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP")
+    FloatAdd(floatVariable=var "Open time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Open time", minValue=0, maxValue=3, everyFrame=true)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"STOP WALK")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceRight())
+    on INVENTORY OPENED → Close Map
+    on BUTTON UP → Close Map
+    on LEFT GROUND → Quick Cancel
+    on STOP WALK → Map Idle
+  }
+
+  state Quick Cancel {
+    SendEventByName(eventTarget=GameObject(var "HUD Camera"), sendEvent="CLOSE QUICK MAP", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    on FINISHED → Regain Control
+  }
+
+  state Turn L? {
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Map Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Walk Left
+  }
+
+  state Turn R? {
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=(none), negativeEvent=→"FINISHED", space=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Map Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Walk Right
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Get Inventory {
+    FindGameObject(objectName="", withTag="Inventory Top", store=var "Inventory")
+    on FINISHED → Regain Control
+  }
+
+  state No Inv {
+    on LEVEL LOADED → Reset Timer
+  }
+
+  state Extra Check {
+    GameObjectIsNull(gameObject=var "Inventory", isNull=→"GET INVENTORY", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="OPEN INVENTORY MAP", delay=0, everyFrame=false)
+    on FINISHED → Restore Anim Control
+  }
+
+  state Restore Anim Control {
+    BoolTest(boolVariable=var "Disabled Animation", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetBoolValue(boolVariable=var "Disabled Animation", boolValue=false, everyFrame=false)
+    on FINISHED → Reset Timer
+  }
+
+  var Walk Speed: float = 4
+
+  var Button Down Time: float = 0.1
+  var Open time: float = 0
+  var Walk Speed Neg: float = 0
+  var At Map Prompt: bool = false
+  var Disabled Animation: bool = false
+  var Has Map: bool = false
+  var In Control: bool = false
+  var Return Bool: bool = false
+  var HUD Camera: gameObject = <null>
+  var Inventory: gameObject = <null>
+  var Self: gameObject = <null>
+}

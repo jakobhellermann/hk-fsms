@@ -1,0 +1,84 @@
+# FSM
+# 1 location(s):
+#   Room_Forge / _NPCs/Forge Conversation Manager
+
+fsm FSM {
+  start Init
+  on WORKER HIT → Reset  // from any state
+  on WORKER HIT COMBO → Reset  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Forge Daughter")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Forge Worker")
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"ACT 3", isFalse=(none))
+    on FINISHED → Idle
+    on ACT 3 → Act 3
+  }
+
+  state Idle {
+    IntCompare(integer1=var "Unproductive Loops", integer2=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    IntOperator(integer1=var "Unproductive Loops", integer2=1, operation=Add, storeResult=var "Unproductive Loops", everyFrame=false)
+    BoolNoneTrue(boolVariables=[var "Daughter Blocking", var "Worker Blocking"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    SetBoolValue(boolVariable=var "Force Worker Talk", boolValue=true, everyFrame=false)
+    SetIntValue(intVariable=var "Unproductive Loops", intValue=0, everyFrame=false)
+    on FINISHED → Talk
+    on CANCEL → Wait
+  }
+
+  state Reset {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Talk {
+    BoolTest(boolVariable=var "Force Worker Talk", isTrue=→"WORKER", isFalse=(none), everyFrame=false)
+    SendRandomEventFair(Events=[{SendEvent=→"WORKER", Probability=0.8}, {SendEvent=→"DAUGHTER", Probability=0.2}], TrackingArray=var "Talk Tracking Array", MissedMultiplier=2)
+    on WORKER → Worker Talk
+    on DAUGHTER → Daughter Talk
+  }
+
+  state Worker Talk {
+    SetBoolValue(boolVariable=var "Force Worker Talk", boolValue=false, everyFrame=false)
+    SendEventToGameObjectOptimized(target=var "Forge Worker", sendEvent="IDLE TALK", everyFrame=false)
+    BoolTest(boolVariable=var "Worker Blocking", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Daughter Talk React
+    on WORKER TALK → Worker Talk Next
+  }
+
+  state Daughter Talk {
+    SendEventToGameObjectOptimized(target=var "Forge Daughter", sendEvent="IDLE TALK", everyFrame=false)
+    BoolTest(boolVariable=var "Daughter Blocking", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Worker Talk Next
+  }
+
+  state Daughter Talk React {
+    SendEventToGameObjectOptimized(target=var "Forge Daughter", sendEvent="TALK REACT", everyFrame=false)
+    BoolTest(boolVariable=var "Daughter Blocking", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Reset
+  }
+
+  state Worker Talk Next {
+    SetBoolValue(boolVariable=var "Force Worker Talk", boolValue=true, everyFrame=false)
+    on FINISHED → Reset
+  }
+
+  state Wait {
+    SetIntValue(intVariable=var "Unproductive Loops", intValue=0, everyFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    on FINISHED → Talk
+  }
+
+  state Act 3 {
+  }
+
+  var Unproductive Loops: int = 0
+  var Daughter Blocking: bool = false
+  var Force Worker Talk: bool = false
+  var Worker Blocking: bool = false
+  var Forge Daughter: gameObject = _NPCs/Forge Daughter
+  var Forge Worker: gameObject = <null>
+  var Talking Audio: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Talk Tracking Array: array = var "Talk Tracking Array"
+}

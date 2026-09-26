@@ -1,0 +1,99 @@
+# Control
+# 1 location(s):
+#   Bone_East_11 / Song Trapdoor/Updraft Before
+
+// component disabled: this FSM does not run until something enables it
+// uses template: updraft_region
+fsm Control {
+  start Init
+  on DISABLE → Force Exit  // from any state
+  on DEACTIVATE → Force Exit  // from any state
+  on UPDRAFTS END → Force Exit  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Wind Sound", storeResult=var "Audio Source")
+    ActivateGameObject(gameObject=var "Audio Source", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Enter Region", storeResult=var "Enter Region")
+    FindChild(gameObject=Self, childName="wind_column", storeResult=var "Particle Parent")
+    BoolTest(boolVariable=var "Start Inactive", isTrue=(none), isFalse=→"ACTIVATE", everyFrame=false)
+    on FINISHED → Inactive
+    on ACTIVATE → Active
+  }
+
+  state Active {
+    ActivateGameObject(gameObject=var "Audio Source", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=Self, ToAlpha=1, FadeTime=0)
+    ActivateGameObject(gameObject=var "Particle Parent", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckTrackTriggerCount(target=var "Enter Region", count=0, test=MoreThan, everyFrame=true, successEvent=→"ENTER")
+    Trigger2dEvent(gameObject=var "Enter Region", trigger=0, collideTag="", sendEvent=→"ENTER", storeCollider=var "")  // disabled
+    CreateObject(gameObject=Air Blow Region Updraft (localpoolprefabs_assets_areawilds.bundle), spawnPoint=var "Self", position=(0, 1.5, 0), rotation=(unset), storeObject=var "Air Blow Region")
+    SetParent(gameObject=var "Air Blow Region", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetScale(gameObject=var "Air Blow Region", vector=(unset), x=1, y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    GetBoxCollider2DSizeVector(gameObject1=var "Enter Region", size=var "Region Collider Size", offset=var "Region Collider Offset")
+    SetBoxCollider2DSizeVector(gameObject1=var "Air Blow Region", size=var "Region Collider Size", offset=var "Region Collider Offset")
+    on ENTER → Enter
+  }
+
+  state Enter {
+    CheckTrackTriggerCount(target=var "Enter Region", count=0, test=Equal, everyFrame=true, successEvent=→"EXIT")
+    SetBoolValue(boolVariable=var "Is Inside", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="EnterUpdraft", parameters=[var "Speed"], storeResult=(unset var), EveryFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Wind Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=true, Delay=0)
+    on EXIT → Exit
+  }
+
+  sequence state Wait For Enter {
+    NextFrameEvent(sendEvent=(none))
+    CheckTrackTriggerCount(target=var "Enter Region", count=0, test=MoreThan, everyFrame=true, successEvent=→"ENTER")
+    on ENTER → Enter
+  }
+
+  state Force Exit {
+    BoolTest(boolVariable=var "Is Inside", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Inside", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ExitUpdraft", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Deactivate
+  }
+
+  state Inactive {
+    FadeNestedFadeGroup(Target=Self, ToAlpha=0, FadeTime=0)
+    ActivateGameObject(gameObject=var "Particle Parent", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on ACTIVATE → Activate
+  }
+
+  state Activate {
+    ActivateGameObject(gameObject=var "Audio Source", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Particle Parent", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=Self, ToAlpha=1, FadeTime=0.4)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Active
+  }
+
+  state Deactivate {
+    ActivateGameObject(gameObject=var "Audio Source", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=Self, ToAlpha=0, FadeTime=0.2)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Inactive
+  }
+
+  state Exit {
+    SetBoolValue(boolVariable=var "Is Inside", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ExitUpdraft", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CheckTrackTriggerCount(target=var "Enter Region", count=0, test=Equal, everyFrame=true, successEvent=→"EXIT")
+    CheckTrackTriggerCount(target=var "Enter Region", count=0, test=Equal, everyFrame=true, successEvent=→"EXIT")
+    on EXIT → Wait For Enter
+  }
+
+  var Speed: float = 18
+  var Start Inactive: bool = false
+
+  var Is Inside: bool = false
+  var Region Collider Size: vector2 = (0, 0)
+  var Region Collider Offset: vector2 = (0, 0)
+  var Air Blow Region: gameObject = <null>
+  var Audio Source: gameObject = <null>
+  var Enter Region: gameObject = <null>
+  var Particle Parent: gameObject = <null>
+  var Self: gameObject = <null>
+}

@@ -1,0 +1,130 @@
+# Shiny Control
+# 1 location(s):
+#   GG_Waterways / Godseeker Waterways/Shiny Item Godfinder
+
+fsm Shiny Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Init {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    GetOwner(storeGameObject=var "Self")
+    BoolTest(boolVariable=var "Activated", isTrue=→"ACTIVATE", isFalse=(none), everyFrame=false)
+    FindChild(gameObject=Self, childName="Inspect Region", storeResult=var "Inspect Region")
+    FindChild(gameObject=Self, childName="Appear Trail", storeResult=var "Trail")
+    on FINISHED → PD Bool?
+    on ACTIVATE → Destroy
+  }
+
+  state PD Bool? {
+    StringCompare(stringVariable=var "PD Bool Name", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "PD Bool Name", isTrue=→"COLLECTED", isFalse=(none))
+    on FINISHED → Fling R
+    on COLLECTED → Destroy
+  }
+
+  state Idle {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopBounce())
+    SetFsmBool(gameObject=var "Inspect Region", fsmName="inspect", variableName="Inspectable", setValue=true, everyFrame=false)
+    on START INSPECT → Hero Down
+  }
+
+  state Destroy {
+    DestroySelf(detachChildren=false)
+  }
+
+  state Hero Down {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 1")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=var "", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Big Get Flash
+    on HERO DAMAGED → Idle
+  }
+
+  state Hero Up {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect Normal 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Finish
+    on HERO DAMAGED → Finish
+  }
+
+  state Finish {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckCharmAchievements", parameters=[], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Inspect Region", fsmName="inspect", variableName="Inspectable", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Tute Msg"), sendEvent="CLOSE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Inspect Region"), sendEvent="END INSPECT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHINY PICKED UP", delay=0, everyFrame=false)
+    FindChild(gameObject=Self, childName="Extra Art", storeResult=var "Extra Art")
+    ActivateGameObject(gameObject=var "Extra Art", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Fling R {
+    SetRigidbodySimulated2D(gameObject=Self, isSimulated=true)
+    FlingObject(flungObject=Self, speedMin=25, speedMax=25, angleMin=82, angleMax=86)
+    on FINISHED → Wait
+  }
+
+  state Fling L {
+    SetRigidbodySimulated2D(gameObject=Self, isSimulated=true)
+    FlingObject(flungObject=Self, speedMin=20, speedMax=20, angleMin=98, angleMax=102)
+    on FINISHED → Wait
+  }
+
+  state In Air {
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=true)
+    FloatCompare(float1=var "Speed", float2=1, tolerance=0, equal=(none), lessThan=→"STOPPED", greaterThan=(none), everyFrame=true)
+    on STOPPED → Land
+  }
+
+  state Land {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Trail")
+    ActivateGameObject(gameObject=Godseeker Waterways/Shiny Item Godfinder/Inspect Region, activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Big Get Flash {
+    SpawnObjectFromGlobalPool(gameObject=Item Get Effect R (resources.assets), spawnPoint=var "Hero", position=(0, -0.76, -1), rotation=(unset), storeObject=var "")
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=shiny_item_pickup (resources.assets))
+    SetSpriteRenderer(gameObject=var "Self", active=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 2")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="KINGS BRAND", delay=0, everyFrame=false)
+    on FINISHED → Godfinder
+  }
+
+  state Godfinder {
+    SetPlayerDataBool(boolName="hasGodfinder", value=true)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=var "Icon Sprite")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Godfinder", everyFrame=false)
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Wait {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → In Air
+  }
+
+  var Fling On Start: bool = true
+  var PD Bool Name: string = "hasGodfinder"
+  var Icon Sprite: object = gg_IU_Godfinder_prompt (sharedassets225.assets)
+
+  var Speed: float = 0
+  var Activated: bool = false
+  var Fling L: bool = false
+  var Slug Fling: bool = false
+  var Tag: string = ""
+  var Extra Art: gameObject = <null>
+  var Inspect Region: gameObject = <null>
+  var Self: gameObject = <null>
+  var Trail: gameObject = <null>
+  var Tute Msg: gameObject = <null>
+  var UI Msg: gameObject = <null>
+}

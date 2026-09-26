@@ -1,0 +1,501 @@
+# Shiny Control
+# 1 location(s):
+#   Room_Wyrm / Shiny Item Stand
+
+fsm Shiny Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    BoolTest(boolVariable=var "Activated", isTrue=→"ACTIVATE", isFalse=(none), everyFrame=false)
+    FindChild(gameObject=Self, childName="Inspect Region", storeResult=var "Inspect Region")
+    FindChild(gameObject=Self, childName="Appear Trail", storeResult=var "Trail")
+    on FINISHED → PD Bool?
+    on ACTIVATE → Destroy
+  }
+
+  state PD Bool? {
+    StringCompare(stringVariable=var "PD Bool Name", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "PD Bool Name", isTrue=→"COLLECTED", isFalse=(none))
+    on FINISHED → Fling?
+    on COLLECTED → Destroy
+  }
+
+  state Idle {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopBounce())
+    SetFsmBool(gameObject=var "Inspect Region", fsmName="inspect", variableName="Inspectable", setValue=true, everyFrame=false)
+    on START INSPECT → Hero Down
+  }
+
+  state Destroy {
+    DestroySelf(detachChildren=false)
+  }
+
+  state Charm? {
+    BoolTest(boolVariable=var "Charm", isTrue=→"CHARM", isFalse=(none), everyFrame=false)
+    on CHARM → Get Charm
+    on FINISHED → Big Item?
+  }
+
+  state Hero Down {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect SD 1")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Charm?
+    on HERO DAMAGED → Idle
+  }
+
+  state Flash {
+    CreateObject(gameObject=Item Get Effect (sharedassets7.assets), spawnPoint=var "Hero", position=(0, -0.76, -1), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=shiny_item_pickup (resources.assets))
+    SetSpriteRenderer(gameObject=var "Self", active=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    FindChild(gameObject=Self, childName="Extra Art", storeResult=var "Extra Art")
+    ActivateGameObject(gameObject=var "Extra Art", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Hero Up
+    on HERO DAMAGED → Finish
+  }
+
+  state Hero Up {
+    BoolTest(boolVariable=var "Exit Dream", isTrue=→"DREAM EXIT", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect SD 1 Back", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Tute Msg"), sendEvent="CLOSE", delay=0, everyFrame=false)
+    on FINISHED → Finish
+    on HERO DAMAGED → Finish
+    on DREAM EXIT → Fade Pause
+  }
+
+  state Finish {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckCharmAchievements", parameters=[], storeResult=(unset var))
+    SetFsmBool(gameObject=var "Inspect Region", fsmName="inspect", variableName="Inspectable", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Tute Msg"), sendEvent="CLOSE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Inspect Region"), sendEvent="END INSPECT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHINY PICKED UP", delay=0, everyFrame=false)
+    FindChild(gameObject=Self, childName="Extra Art", storeResult=var "Extra Art")
+    ActivateGameObject(gameObject=var "Extra Art", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Get Charm {
+    SetPlayerDataBool(boolName=var "PD Bool Name", value=true, gameObject=var "GameManager")
+    on FINISHED → Show Tute?
+  }
+
+  state Show Tute? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasCharm", isTrue=→"FINISHED", isFalse=(none))
+    SetPlayerDataBool(boolName="hasCharm", value=true)
+    BoolTest(boolVariable=var "Show Charm Tute", isTrue=→"TUTE", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Normal Msg
+    on TUTE → Tute
+  }
+
+  state Normal Msg {
+    CreateObject(gameObject=Charm Get Msg (sharedassets6.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Msg", networkInstantiate=false, networkGroup=0)
+    SetFsmInt(gameObject=var "Msg", fsmName="Charm Msg", variableName="ID", setValue=var "Charm ID", everyFrame=false)
+    on FINISHED → Flash
+  }
+
+  state Tute {
+    CreateObject(gameObject=Charm Tutorial Msg (sharedassets6.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Tute Msg", networkInstantiate=false, networkGroup=0)
+    FindChild(gameObject=var "Tute Msg", childName="Charm Get Msg", storeResult=var "Msg")
+    SetFsmInt(gameObject=var "Msg", fsmName="Charm Msg", variableName="ID", setValue=var "Charm ID", everyFrame=false)
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=shiny_item_pickup (resources.assets))
+    CreateObject(gameObject=Item Get Effect (sharedassets7.assets), spawnPoint=var "Hero", position=(0, -0.76, -1), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    SetSpriteRenderer(gameObject=var "Self", active=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 2")  // disabled
+    Wait(time=4.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wait for Input
+    on HERO DAMAGED → Finish
+  }
+
+  state Wait for Input {
+    ListenForInventory(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForCast(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)
+    ListenForAttack(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForJump(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on HERO DAMAGED → Finish
+    on BUTTON DOWN → Hero Up
+  }
+
+  state Fling? {
+    BoolTest(boolVariable=var "Fling On Start", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Trail", emit=0)
+    SetFsmBool(gameObject=var "Inspect Region", fsmName="inspect", variableName="Inspectable", setValue=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0.85)
+    BoolTest(boolVariable=var "Slug Fling", isTrue=→"SLUG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Fling L", isTrue=→"FLING L", isFalse=(none), everyFrame=false)
+    SendRandomEvent(events=[→"FLING L", →"FLING R"], weights=[1, 1], delay=0)
+    on FINISHED → Idle
+    on FLING L → Fling L
+    on FLING R → Fling R
+    on SLUG → Slug Fling
+  }
+
+  state Fling R {
+    FlingObject(flungObject=Self, speedMin=25, speedMax=25, angleMin=82, angleMax=86)
+    on FINISHED → In Air
+  }
+
+  state Fling L {
+    FlingObject(flungObject=Self, speedMin=20, speedMax=20, angleMin=98, angleMax=102)
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=true)
+    FloatCompare(float1=var "Speed", float2=1, tolerance=0, equal=(none), lessThan=→"STOPPED", greaterThan=(none), everyFrame=true)
+    on STOPPED → Land
+  }
+
+  state Land {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Trail")
+    on FINISHED → Idle
+  }
+
+  state Big Item? {
+    BoolTest(boolVariable=var "Dash Cloak", isTrue=→"BIG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Mantis Claw", isTrue=→"BIG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Journal", isTrue=→"BIG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Super Dash", isTrue=→"BIG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Quake", isTrue=→"BIG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Pure Seed", isTrue=→"BIG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "King's Brand", isTrue=→"BIG", isFalse=(none), everyFrame=false)
+    on BIG → Big Get Flash
+    on FINISHED → Trinket?
+  }
+
+  state Dash {
+    SetPlayerDataBool(boolName="hasDash", value=true)
+    SetPlayerDataBool(boolName="canDash", value=true)
+    SetPlayerDataBool(boolName="corn_greenpathLeft", value=true)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=var "Icon Sprite")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Dash", everyFrame=false)
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Big Get Flash {
+    CreateObject(gameObject=Item Get Effect (sharedassets7.assets), spawnPoint=var "Hero", position=(0, -0.76, -1), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=shiny_item_pickup (resources.assets))
+    SetSpriteRenderer(gameObject=var "Self", active=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 2")  // disabled
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="KINGS BRAND", delay=0, everyFrame=false)
+    FindChild(gameObject=Self, childName="Extra Art", storeResult=var "Extra Art")
+    ActivateGameObject(gameObject=var "Extra Art", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Item Choice
+  }
+
+  state Item Choice {
+    BoolTest(boolVariable=var "Dash Cloak", isTrue=→"DASH", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Mantis Claw", isTrue=→"WALLJUMP", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Journal", isTrue=→"JOURNAL", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Super Dash", isTrue=→"S DASH", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Quake", isTrue=→"QUAKE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Pure Seed", isTrue=→"QUAKE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "King's Brand", isTrue=→"KINGS BRAND", isFalse=(none), everyFrame=false)
+    on DASH → Dash
+    on WALLJUMP → Zote Event
+    on JOURNAL → Journal
+    on S DASH → Super Dash
+    on QUAKE → Quake
+    on PURE SEED → Pure Seed
+    on KINGS BRAND → King's Brand
+  }
+
+  state Trinket? {
+    IntCompare(integer1=var "Trinket Num", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"TRINKET", everyFrame=false)
+    on TRINKET → Trink Flash
+    on FINISHED → 
+  }
+
+  state Trinket Type {
+    IntSwitch(intVariable=var "Trinket Num", compareTo=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], sendEvent=[→"TRINK 1", →"TRINK 2", →"TRINK 3", →"TRINK 4", →"ODD KEY", →"TRAMPASS", →"WATERWAY KEY", →"STORE KEY", →"CITY KEY", →"LOVE KEY", →"EGG", →"SIMPLE KEY", →"NOTCH", →"ORE"], everyFrame=false)
+    on TRINK 1 → Trink 1
+    on TRINK 2 → Trink 2
+    on TRINK 3 → Trink 3
+    on TRINK 4 → Trink 4
+    on ODD KEY → Odd Key
+    on TRAMPASS → Tram pass
+    on WATERWAY KEY → Waterway Key
+    on STORE KEY → Store Key
+    on CITY KEY → City Key
+    on LOVE KEY → Love Key
+    on EGG → Egg
+    on SIMPLE KEY → Simple Key
+    on NOTCH → Notch
+    on ORE → Ore
+  }
+
+  state Trink Flash {
+    CreateObject(gameObject=Item Get Effect (sharedassets7.assets), spawnPoint=var "Hero", position=(0, -0.76, -1), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=shiny_item_pickup (resources.assets))
+    SetSpriteRenderer(gameObject=var "Self", active=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 2")  // disabled
+    CreateObject(gameObject=Relic Get Msg (resources.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Msg", networkInstantiate=false, networkGroup=0)
+    FindChild(gameObject=var "Msg", childName="Text", storeResult=var "Msg Text")
+    FindChild(gameObject=var "Msg", childName="Icon", storeResult=var "Msg Icon")
+    FindChild(gameObject=Self, childName="Extra Art", storeResult=var "Extra Art")
+    ActivateGameObject(gameObject=var "Extra Art", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Trinket Type
+  }
+
+  state Trink 1 {
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="trinket1")
+    SetPlayerDataBool(boolName="foundTrinket1", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__0013_wanderers-journal (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_TRINKET1", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_acquired("Wanderer's Journal"))
+    on FINISHED → Trink Pause
+  }
+
+  state Trink 2 {
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="trinket2")
+    SetPlayerDataBool(boolName="foundTrinket2", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__0012_hallownest-seal (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_TRINKET2", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_acquired("Hallownest Seal"))
+    on FINISHED → Trink Pause
+  }
+
+  state Trink 3 {
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="trinket3")
+    SetPlayerDataBool(boolName="foundTrinket3", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__0010_Kings_idol (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_TRINKET3", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_acquired("King's Idol"))
+    on FINISHED → Trink Pause
+  }
+
+  state Trink 4 {
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="trinket4")
+    SetPlayerDataBool(boolName="foundTrinket4", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__0011_arcane-egg (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_TRINKET4", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_acquired("Ancient Egg"))
+    on FINISHED → Trink Pause
+  }
+
+  state Trink Pause {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Hero Up
+    on HERO DAMAGED → Finish
+  }
+
+  state Walljump {
+    SetPlayerDataBool(boolName="canWallJump", value=true)
+    SetPlayerDataBool(boolName="hasWalljump", value=true)
+    SetPlayerDataBool(boolName="corn_fungalWastesLeft", value=true)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=var "Icon Sprite")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Walljump", everyFrame=false)
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Journal {
+    SetPlayerDataBool(boolName="hasJournal", value=true)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=var "Icon Sprite")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Journal", everyFrame=false)
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Super Dash {
+    SetPlayerDataBool(boolName="hasSuperDash", value=true)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=var "Icon Sprite")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Super Dash", everyFrame=false)
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Odd Key {
+    SetPlayerDataBool(boolName="hasMenderKey", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__0005_mender_key (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_MENDERKEY", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    on FINISHED → Trink Pause
+  }
+
+  state Quake {
+    SetPlayerDataInt(intName="quakeLevel", value=1)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=var "Icon Sprite")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Quake", everyFrame=false)
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Tram pass {
+    SetPlayerDataBool(boolName="hasTramPass", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__0001_tram_pass (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_TRAM_PASS", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_acquired("Tram Pass"))
+    on FINISHED → Trink Pause
+  }
+
+  state Waterway Key {
+    SetPlayerDataBool(boolName="hasWaterwaysKey", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_Waterways_Key (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_WATERWAYSKEY", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    on FINISHED → Trink Pause
+  }
+
+  state Store Key {
+    SetPlayerDataBool(boolName="hasSlykey", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__0002_storeroom_key (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_STOREKEY", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_acquired("Shopkeeper's Key"))
+    on FINISHED → Trink Pause
+  }
+
+  state City Key {
+    SetPlayerDataBool(boolName="hasCityKey", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item_city_key (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_CITYKEY", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_acquired("City Key"))
+    on FINISHED → Trink Pause
+  }
+
+  state Pure Seed {
+    SetPlayerDataBool(boolName="hasAcidArmour", value=false)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=var "Icon Sprite")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Pure Seed", everyFrame=false)
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Love Key {
+    SetPlayerDataBool(boolName="hasLoveKey", value=true)
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_Love_Key (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_LOVEKEY", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    on FINISHED → Trink Pause
+  }
+
+  state King's Brand {
+    SetPlayerDataBool(boolName="hasKingsBrand", value=true)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (sharedassets6.assets), storeObject=var "UI Msg", sprite=var "Icon Sprite")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Kings Brand", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetBenchRespawn", parameters=["Death Respawn Marker", "Room_Wyrm", 0, true], storeResult=(unset var))
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveGame())
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=TimePasses())
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Fade Out {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetFsmFloat(gameObject=var "HUD Blanker White", fsmName="Blanker Control", variableName="Fade Time", setValue=0.9, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → New Scene
+  }
+
+  state New Scene {
+    SetFsmBool(gameObject=var "MainCamera", fsmName="CameraFade", variableName="No Fade", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Hero", fsmName="Dream Return", variableName="Dream Returning", setValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="EnterWithoutInput", parameters=[true], storeResult=(unset var))
+    GetPlayerDataString(gameObject=var "GameManager", stringName="dreamReturnScene", storeValue=var "Return Scene")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="ChangeToScene", parameters=[var "Return Scene", var "Return Door", 0], storeResult=(unset var))
+  }
+
+  state Fade Pause {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fade Out
+  }
+
+  state Slug Fling {
+    FlingObject(flungObject=Self, speedMin=20, speedMax=20, angleMin=70, angleMax=70)
+    on FINISHED → In Air
+  }
+
+  state Egg {
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="rancidEggs")
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_rancid_egg (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_RANCIDEGG", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    on FINISHED → Trink Pause
+  }
+
+  state Simple Key {
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="simpleKeys")
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__00014_graveyard_key (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_SIMPLEKEY", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    on FINISHED → Trink Pause
+  }
+
+  state Zote Event {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="zoteRescuedBuzzer", isTrue=→"FINISHED", isFalse=(none))
+    SetPlayerDataBool(boolName="zoteDead", value=true)
+    SetPlayerDataInt(intName="zoteDeathPos", value=1)
+    on FINISHED → Walljump
+  }
+
+  state Notch {
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="charmSlots")
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=Charm_Notch (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_NOTCH", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    StringCompare(stringVariable=var "PD Bool Name", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetPlayerDataBool(boolName=var "PD Bool Name", value=true)
+    on FINISHED → Trink Pause
+  }
+
+  state Ore {
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="ore")
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=inv_item__0009_ore (resources.assets))
+    GetLanguageString(sheetName="UI", convName="INV_NAME_ORE", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    StringCompare(stringVariable=var "PD Bool Name", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetPlayerDataBool(boolName=var "PD Bool Name", value=true)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_acquired("Pale Ore"))
+    on FINISHED → Trink Pause
+  }
+
+  var Charm ID: int = 0
+  var Trinket Num: int = 0
+  var Charm: bool = false
+  var Dash Cloak: bool = false
+  var Exit Dream: bool = false
+  var Fling On Start: bool = false
+  var Journal: bool = false
+  var King's Brand: bool = true
+  var Mantis Claw: bool = false
+  var Pure Seed: bool = false
+  var Quake: bool = false
+  var Show Charm Tute: bool = true
+  var Super Dash: bool = false
+  var PD Bool Name: string = "hasKingsBrand"
+  var Icon Sprite: object = kings_brand_prompt (sharedassets326.assets)
+
+  var Speed: float = 0
+  var Type: int = 0
+  var Activated: bool = false
+  var Fling L: bool = false
+  var Slug Fling: bool = false
+  var Item Name: string = ""
+  var Return Door: string = "door_dreamReturn"
+  var Return Scene: string = "Crossroads_10"
+  var Extra Art: gameObject = <null>
+  var Inspect Region: gameObject = <null>
+  var Msg: gameObject = <null>
+  var Msg Icon: gameObject = <null>
+  var Msg Text: gameObject = <null>
+  var Self: gameObject = <null>
+  var Trail: gameObject = <null>
+  var Tute Msg: gameObject = <null>
+  var UI Msg: gameObject = <null>
+}

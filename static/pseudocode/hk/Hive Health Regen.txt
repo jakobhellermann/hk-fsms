@@ -1,0 +1,90 @@
+# Hive Health Regen
+# 2 location(s):
+#   Menu_Title / _GameCameras/HudCamera/Anchor TL/Hud Canvas Offset/Hud Canvas/Health
+#   resources.assets / _GameCameras/HudCamera/Anchor TL/Hud Canvas Offset/Hud Canvas/Health
+
+fsm Hive Health Regen {
+  start Init
+  on CHARM INDICATOR CHECK → Check  // from any state
+  on HERO LEAVE → Check  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Hive Recovery Blob", storeResult=var "Recovery Blob")
+    on FINISHED → Pause
+  }
+
+  state Idle {
+    on DAMAGE TAKEN → Start Recovery
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Check
+  }
+
+  state Check {
+    SetMeshRenderer(gameObject=var "Recovery Blob", active=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_29", isTrue=→"HIVE", isFalse=→"FINISHED")
+    on NORMAL → Inert
+    on HIVE → Idle
+  }
+
+  state Inert {
+  }
+
+  state Reset Timer {
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Recovery Blob", active=true)
+    Tk2dPlayAnimation(gameObject=var "Recovery Blob", animLibName="", clipName="Hive Health Recover1")
+    Tk2dPlayFrame(gameObject=var "Recovery Blob", frame=0)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="health", storeValue=var "HP")
+    ConvertIntToFloat(intVariable=var "HP", floatVariable=var "Blob X", everyFrame=false)
+    FloatSubtract(floatVariable=var "Blob X", subtract=1, everyFrame=false, perSecond=false)  // disabled
+    FloatMultiply(floatVariable=var "Blob X", multiplyBy=0.94, everyFrame=false)
+    FloatAdd(floatVariable=var "Blob X", add=-10.32, everyFrame=false, perSecond=false)
+    SetPosition(gameObject=var "Recovery Blob", vector=(unset), x=var "Blob X", y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Recover 1
+  }
+
+  state Start Recovery {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Reset Timer
+  }
+
+  state Recover 1 {
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Recover Time", tolerance=0, equal=→"NEXT", lessThan=(none), greaterThan=→"NEXT", everyFrame=true)
+    on DAMAGE TAKEN → Start Recovery
+    on NEXT → Recover 2
+    on HERO HEALED → Cancel Recovery
+    on HERO HEALED FULL → Cancel Recovery
+  }
+
+  state Recover 2 {
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Recovery Blob", animLibName="", clipName="Hive Health Recover2")
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Recover Time", tolerance=0, equal=→"NEXT", lessThan=(none), greaterThan=→"NEXT", everyFrame=true)
+    on DAMAGE TAKEN → Start Recovery
+    on NEXT → Recover
+    on HERO HEALED → Cancel Recovery
+    on HERO HEALED FULL → Cancel Recovery
+  }
+
+  state Recover {
+    SetMeshRenderer(gameObject=var "Recovery Blob", active=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AddHealth", parameters=[1], storeResult=(unset var))
+    on FINISHED → Idle
+  }
+
+  state Cancel Recovery {
+    SetMeshRenderer(gameObject=var "Recovery Blob", active=false)
+    on FINISHED → Idle
+  }
+
+  var Blob X: float = 0
+  var Recover Time: float = 5
+  var Timer: float = 0
+  var HP: int = 0
+  var Recovery Blob: gameObject = <null>
+}

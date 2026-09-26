@@ -1,0 +1,276 @@
+# Dream Return
+# 1 location(s):
+#   resources.assets / Knight:1
+
+fsm Dream Return {
+  start Init
+  on TEST → Pause  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="HeroBox", storeResult=var "HeroBox")
+    FindChild(gameObject=Self, childName="Dream Effects", storeResult=var "Dream Effects")
+    FindChild(gameObject=var "Dream Effects", childName="DG Set Impact", storeResult=var "DG Set Impact")
+    FindChild(gameObject=var "Dream Effects", childName="Warp In Pt", storeResult=var "Warp In Pt")
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on LEVEL LOADED → Wait until after
+  }
+
+  state Check {
+    BoolTest(boolVariable=var "Dream Returning", isTrue=→"DREAM RETURN", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Gate Returning", isTrue=→"GATE RETURN", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Idle
+    on DREAM RETURN → GG Return?
+    on GATE RETURN → Time Pause
+  }
+
+  state Prostrate {
+    SetBoolValue(boolVariable=var "Dream Returning", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Gate Returning", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Dream Return Long", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=EnableRenderer())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Prostrate")
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="MaxHealth", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="UPDATE BLUE HEALTH", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ready
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → GC Pause
+  }
+
+  state Ready {
+    ListenForDown(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForUp(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForRight(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForLeft(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForAttack(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForJump(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on GET UP → Get Up
+  }
+
+  state Get Up {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM WAKE", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Prostrate Rise", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Save
+  }
+
+  state Regain Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=QuakeInvuln())
+    ActivateGameObject(gameObject=var "HeroBox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetDamageModeFSM", parameters=[0], storeResult=(unset var))  // disabled
+    on FINISHED → Idle
+  }
+
+  state Long? {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    BoolTest(boolVariable=var "Dream Return Long", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Pause
+  }
+
+  state GC Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Longer Grimm Return?
+  }
+
+  state Time Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetPlayerDataBool(boolName="isInvincible", value=true)  // disabled
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetDamageModeFSM", parameters=[2], storeResult=(unset var))  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    on FINISHED → Frame Pause
+  }
+
+  state Frame Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Position
+  }
+
+  state Position {
+    GetPlayerDataFloat(gameObject=var "GameManager", floatName="dreamGateX", storeValue=var "Gate X")
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    GetPlayerDataFloat(gameObject=var "GameManager", floatName="dreamGateY", storeValue=var "Gate Y")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Gate X", y=var "Gate Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)  // disabled
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    CallMethodProper(gameObject=var "MainCamera", behaviour="CameraController", methodName="SnapTo", parameters=[var "Gate X", var "Gate Y"], storeResult=(unset var))
+    on FINISHED → Gate Fade
+  }
+
+  state Gate Fade {
+    SetBoolValue(boolVariable=var "Dream Returning", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Gate Returning", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Dream Return Long", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=EnableRenderer())  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Prostrate")  // disabled
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Warp In
+  }
+
+  state Warp In {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="DG Warp In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=dream_enter_pt_2, pitchMin=1.2, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "DG Set Impact", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Warp In Pt", emit=0)
+    GetStaticVariable(variableName="skipRemoveDreamOrbs", storeValue=var "Skip Remove Orbs")
+    SetStaticVariable(variableName="skipRemoveDreamOrbs", setValue=false)
+    BoolTest(boolVariable=var "Skip Remove Orbs", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="dreamOrbs", amount=var "Decrement")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM ORB COLLECT", delay=0, everyFrame=false)
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="dreamOrbsSpent")
+    on FINISHED → Abyss Check
+  }
+
+  state On Ground? {
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"GROUND", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Wait(time=0.2, finishEvent=→"AIR", realTime=false)  // disabled
+    NextFrameEvent(sendEvent=→"AIR")
+    on AIR → Air Regain
+    on GROUND → Land
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Hard Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    GetPosition(gameObject=Self, vector=var "Respawn Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Respawn Pos", vector3Value=(unset), x=(unset), y=(unset), z=0, everyFrame=false)
+    Vector3AddXYZ(vector3Variable=var "Respawn Pos", addX=0, addY=1, addZ=0, everyFrame=false, perSecond=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetHazardRespawn", parameters=[var "Respawn Pos", true], storeResult=(unset var))
+    on FINISHED → Ready 2
+  }
+
+  state Ready 2 {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlashingSuperDash())
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForUp(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForRight(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForLeft(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForAttack(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForJump(eventTarget=Self, wasPressed=→"GET UP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=var "Y Velocity", space=0, everyFrame=false)
+    FloatCompare(float1=var "X Velocity", float2=0, tolerance=0, equal=(none), lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    FloatCompare(float1=var "Y Velocity", float2=0, tolerance=0, equal=(none), lessThan=→"CANCEL", greaterThan=→"CANCEL", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    on GET UP → Get Up 2
+    on CANCEL → Air Regain
+  }
+
+  state Get Up 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Collect Normal 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    on FINISHED → Regain Control
+  }
+
+  state Air Regain {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    GetPosition(gameObject=Self, vector=var "Respawn Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Respawn Pos", vector3Value=(unset), x=(unset), y=(unset), z=0, everyFrame=false)
+    Vector3AddXYZ(vector3Variable=var "Respawn Pos", addX=0, addY=1, addZ=0, everyFrame=false, perSecond=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetHazardRespawn", parameters=[var "Respawn Pos", true], storeResult=(unset var))
+    on FINISHED → Regain Control
+  }
+
+  state Save {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=TimePasses())
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=SaveGame())
+    on FINISHED → Regain Control
+  }
+
+  state Longer Grimm Return? {
+    BoolTest(boolVariable=var "Grimm Return", isTrue=→"GRIMM", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Prostrate
+    on GRIMM → Grimm Pause
+  }
+
+  state Prostrate Grimm {
+    SetBoolValue(boolVariable=var "Dream Returning", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Grimm Return", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Gate Returning", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Dream Return Long", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=EnableRenderer())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Prostrate")
+    SetFsmFloat(gameObject=var "HUD Blanker", fsmName="Blanker Control", variableName="Fade Time", setValue=3, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="MaxHealth", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="UPDATE BLUE HEALTH", delay=0, everyFrame=false)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ready
+  }
+
+  state Grimm Pause {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Prostrate Grimm
+  }
+
+  state Abyss Check {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasShadowDash", isTrue=(none), isFalse=→"FINISHED")
+    CheckCurrentMapZone(mapZone="ABYSS", equalEvent=→"FINISHED", notEqualEvent=(none))
+    SetPlayerDataBool(boolName="hornetAbyssEncounter", value=true)
+    on FINISHED → On Ground?
+  }
+
+  state GG Return {
+    CheckStaticBool(variableName="finishedBossReturning", trueEvent=(none), falseEvent=→"CANCEL")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=EnableRenderer())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM WAKE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    on FINISHED → Save
+    on CANCEL → Pause
+  }
+
+  state Wait until after {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Check
+  }
+
+  state GG Return? {
+    CheckSceneName(sceneName="GG_Atrium", equalEvent=→"GODS GLORY", notEqualEvent=(none))
+    on FINISHED → Long?
+    on GODS GLORY → GG Return
+  }
+
+  var Gate X: float = 0
+  var Gate Y: float = 0
+  var X Velocity: float = 0
+  var Y Velocity: float = 0
+  var Decrement: int = -1
+  var Dream Return Long: bool = false
+  var Dream Returning: bool = false
+  var Gate Returning: bool = false
+  var Grimm Return: bool = false
+  var Skip Remove Orbs: bool = false
+  var Respawn Pos: vector3 = (0, 0, 0)
+  var DG Set Impact: gameObject = <null>
+  var Dream Effects: gameObject = <null>
+  var Hero: gameObject = <null>
+  var HeroBox: gameObject = <null>
+  var Self: gameObject = <null>
+  var Warp In Pt: gameObject = <null>
+}

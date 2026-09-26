@@ -1,0 +1,146 @@
+# Attack
+# 1 location(s):
+#   Shellwood_01b / Battle Scene/Wave 3/Stick Insect
+
+fsm Attack {
+  start Init
+  on CANCEL ATTACK → Cancel Attack  // from any state
+
+  state Inert {
+    on ATTACK → Face Hero
+  }
+
+  state Return {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Behaviour Base"), sendEvent="RETURN", delay=0, everyFrame=false)
+    on FINISHED → Inert
+  }
+
+  state Antic {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=stick_insect_antic (sfxstatic_assets_areashellwood.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="", outOfRangeEvent="CANCEL", everyFrame=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=stick_insect_puncher_and_charger_shing_antic (sfxstatic_assets_areashellwood.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_chirp_short (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=0)
+    SetBoolValue(boolVariable=var "Damager Active", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"CANCEL", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Lunge
+    on CANCEL → Return
+  }
+
+  state Init {
+    FindChild(gameObject=Self, childName="Attack Damager", storeResult=var "Attack Damager")
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=0)
+    GetHero(storeResult=var "Hero")
+    on FINISHED → Inert
+  }
+
+  state Face Hero {
+    FaceObjectV3(ObjectA=Self, ObjectB=var "Hero", SpriteFacesRight=true, NewAnimationClip="Turn", ResetFrame=false, PauseBetweenTurns=0.5, StoreDuration=var "Turn Duration", EveryFrame=false)
+    Wait(time=var "Turn Duration", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Run Back?
+  }
+
+  state Cancel Attack {
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=0)
+    ActivateGameObject(gameObject=var "Attack Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Return
+  }
+
+  state Run Back {
+    SetBoolValue(boolVariable=var "Force Run Back", boolValue=false, everyFrame=false)
+    TimeLimitCheck(storedValue=var "Next Run Back Time", aboveEvent=(none), belowEvent=→"FINISHED", EveryFrame=false)
+    TimeLimitSetRandom(MinDelay=1, MaxDelay=3, StoreValue=var "Next Run Back Time")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run Reversed", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GetWalkerSpeed(WalkSpeedL=(unset), WalkSpeedR=(unset), WalkSpeed=var "Walk Speed", target=Self, everyFrame=false)  // disabled
+    FloatOperator(float1=var "Walk Speed", float2=-1, operation=Multiply, storeResult=var "Walk Speed", everyFrame=false)  // disabled
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed", y=(unset), everyFrame=false)  // disabled
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Run")
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"FINISHED", bottomHitEvent=(none), leftHitEvent=→"FINISHED", otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    DetectGroundEdge(Body=Self, EdgeDistance=0.5, GroundDistance=1, EveryFixedUpdate=true, FoundWall=→"FINISHED", FoundEdge=→"FINISHED")
+    AudioPlayInState(gameObject=Self, volume=1)
+    on FINISHED → Pause
+    on CANCEL → Antic
+  }
+
+  state Pause {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle Right", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    WaitRandom(timeMin=0.2, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Antic
+  }
+
+  state Attack End {
+    AudioPlayInState(gameObject=Self, volume=1)
+    SetBoolValue(boolVariable=var "Force Run Back", boolValue=true, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Face Hero
+  }
+
+  state Run Back? {
+    BoolTest(boolVariable=var "Force Run Back", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendRandomEvent(events=[→"CANCEL", (none)], weights=[0.5, 0.5], delay=0)
+    on CANCEL → Antic
+    on FINISHED → Run Back
+  }
+
+  state Attack {
+    DecelerateXY(gameObject=Self, decelerationX=0.93, decelerationY=(unset), brakeOnExit=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Hand Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Attack End
+    on MULTI HIT CONNECT → Multihit
+  }
+
+  state Attack Lunge {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=bone_circler_vicious_fly_attack (sfxstatic_assets_areabone.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    PlayAudioEvent(audioClip=stick_insect_attack (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=0.7, volume=0.7, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=15, ySpeed=(unset), everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_flurry_attack (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Attack
+  }
+
+  state Multihit {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=-0.003, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=bone_circler_vicious_fly_attack (sfxstatic_assets_areabone.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Connect", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    GetPosition2D(gameObject=var "Multihit Point", vector=var "MultihitPos", x=(unset), y=(unset), space=0, everyFrame=false)
+    AnimateRigidBody2DPositionToV2(GameObject=var "Hero", ToValue=var "MultihitPos", ToX=0, ToY=0, time=0.15, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    on FINISHED → Multithit End
+  }
+
+  state Multithit End {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.003, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Connect End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Force Run Back", boolValue=true, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Face Hero
+  }
+
+  var Next Run Back Time: float = 0
+  var Turn Duration: float = 0
+  var Walk Speed: float = 0
+  var Damager Active: bool = false
+  var Force Run Back: bool = false
+  var MultihitPos: vector2 = (0, 0)
+  var Attack Damager: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Hand Damager: gameObject = Battle Scene/Wave 3/Stick Insect/Hand Damager
+  var Pt Run: gameObject = Battle Scene/Wave 3/Stick Insect/Pt Run
+  var Multihit Point: gameObject = Battle Scene/Wave 3/Stick Insect/Multihit Point
+  var Audio Loop Voice: gameObject = Battle Scene/Wave 3/Stick Insect/Audio Loop Voice
+}

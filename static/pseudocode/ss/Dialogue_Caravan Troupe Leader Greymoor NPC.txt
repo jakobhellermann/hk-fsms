@@ -1,0 +1,175 @@
+# Dialogue
+# 1 location(s):
+#   Greymoor_08_caravan / Caravan/Caravan Troupe Leader Greymoor NPC
+
+fsm Dialogue {
+  start Init
+  on CARAVAN TRAVEL ENDED → Meet Traveled  // from any state
+
+  state Init {
+    GetHero(storeResult=var "Hero")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=var "Hero Pos X", y=(unset), space=0, everyFrame=true)
+    GetPosition2D(gameObject=var "Wave Marker", vector=(unset), x=var "Wave Marker X", y=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Hero Pos X", float2=var "Wave Marker X", tolerance=0, equalBool=(unset), lessThanBool=var "Past Wave Marker", greaterThanBool=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Can Wave", var "Past Wave Marker"], boolStates=[true, true], trueEvent=→"WAVE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on INTERACT → Convo Choice
+    on WAVE → Wave
+  }
+
+  state End {
+    SetBoolValue(boolVariable=var "Can Wave", boolValue=true, everyFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Meet {
+    SetPlayerDataVariable(VariableName="MetCaravanTroupeLeaderGreymoor", SetValue=true)
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_GREYMOOR_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Wave {
+    SetBoolValue(boolVariable=var "Can Wave", boolValue=false, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Mooshka_talk (sfxdynamic_assets_fleacaravan.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wave", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on CANCEL → Idle
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=true, UseChildren=false)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Idle
+  }
+
+  state Repeat {
+    ConvertBoolToString(boolVariable=var "Need More Fleas", stringVariable=var "Dlg", falseString="TROUPE_LEADER_REPEAT_GENERIC", trueString="TROUPE_LEADER_GREYMOOR_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Convo Choice {
+    PlayerDataVariableTest(VariableName="MetCaravanTroupeLeaderGreymoor", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"MEET")
+    GetPlayerDataBool(boolName="visitedBellhart", storeValue=var "Seen Haunted Bellhart")
+    GetPlayerDataBool(boolName="spinnerDefeated", storeValue=var "Bellhart Saved")
+    GetPlayerDataBool(boolName="CaravanHauntedBellhartConvo_TroupeLeader", storeValue=var "Had Haunted Convo")
+    BoolTestMulti(boolVariables=[var "Seen Haunted Bellhart", var "Bellhart Saved", var "Had Haunted Convo"], boolStates=[true, false, false], trueEvent=→"HAUNTED BELLHART", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    GetProperty(targetProperty=QuestTargetPlayerDataBools.CompletedCount on FleasCollected Target (dataassets_assets_assets/dataassets/questsystem/proxies.bundle), everyFrame=false)
+    IntCompareToBool(integer1=var "Fleas Saved", integer2=12, equalBool=(unset), lessThanBool=var "Need More Fleas", greaterThanBool=(unset), everyFrame=false)
+    GetPlayerDataBool(boolName="defeatedLastJudge", storeValue=var "Judge Defeated")
+    BoolTest(boolVariable=var "Judge Defeated", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    GetPlayerDataBool(boolName="CaravanTroupeLeaderCanLeaveGreymoor", storeValue=var "Can Leave")
+    GetPlayerDataBool(boolName="SeenLastJudgeGateOpen", storeValue=var "Seen Citadel Gate Open")
+    BoolTestMulti(boolVariables=[var "Need More Fleas", var "Can Leave", var "Seen Citadel Gate Open"], boolStates=[false, true, true], trueEvent=→"CAN LEAVE", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on MEET → Meet
+    on HAUNTED BELLHART → Haunted Bellhart
+    on FINISHED → Shared Dlg?
+    on CAN LEAVE → Can Leave
+  }
+
+  state End 3 {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    ActivateInteraction(Activate=false)
+    on FINISHED → No Travel
+  }
+
+  sequence state Travel Prompt {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    GetLanguageString(sheetName="Caravan", convName="TROUPE_TRAVEL_PROMPT", storeValue=var "Travel Prompt Text")
+    DialogueYesNo(Text=var "Travel Prompt Text", TranslationSheet="", TranslationKey="", UseCurrency=false, CurrencyCost=0, CurrencyType=None, YesEvent=→"SUCCESS", NoEvent=→"FAILURE", ReturnHUDAfter=false)
+    on SUCCESS → Accept
+    on FAILURE → Decline
+  }
+
+  state Decline {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_GREYMOOR_LEAVE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End 3
+  }
+
+  state End 2 {
+    EndDialogue(ReturnControl=true, ReturnHUD=false, Target=Self, UseChildren=false)
+    ActivateInteraction(Activate=false)
+    on FINISHED → Travel
+  }
+
+  state Accept {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_GREYMOOR_TRAVEL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End 2
+  }
+
+  state Travel {
+    SendEventByNameV2(eventTarget=GameObjectFSM(var "Quest End Object", fsm="Quest End Sequence"), sendEvent="QUEST END TRAVEL", delay=0, everyFrame=false)
+  }
+
+  state No Travel {
+    SendEventByNameV2(eventTarget=GameObjectFSM(var "Quest End Object", fsm="Quest End Sequence"), sendEvent="QUEST END NOTRAVEL", delay=0, everyFrame=false)
+  }
+
+  sequence state Meet Traveled {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    SetPlayerDataVariable(VariableName="MetCaravanTroupeLeaderGreymoor", SetValue=true)
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_GREYMOOR_MEET_TRAVELED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Area Title
+  }
+
+  state Haunted Bellhart {
+    SetPlayerDataVariable(VariableName="CaravanHauntedBellhartConvo_TroupeLeader", SetValue=true)
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_GREYMOOR_HAUNTEDBELLHART", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Can Leave {
+    GetProperty(targetProperty=QuestTargetPlayerDataBools.CompletedCount on FleasCollected Target (dataassets_assets_assets/dataassets/questsystem/proxies.bundle), everyFrame=false)
+    IntCompareToBool(integer1=var "Fleas Saved", integer2=21, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "All Fleas Collected", everyFrame=false)
+    BoolTest(boolVariable=var "All Fleas Collected", isTrue=→"SKIP", isFalse=(none), everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_GREYMOOR_CANLEAVE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Travel Prompt
+    on SKIP → Skip Dialogue
+  }
+
+  state Shared Dlg? {
+    RunFSM(fsmTemplateControl=template=1575824009301008301, finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → End
+    on CANCEL → Repeat
+  }
+
+  state Area Title {
+    SendEventToRegister(eventName="GREYMOOR TITLE")
+    on FINISHED → End
+  }
+
+  state Skip Dialogue {
+    RunDialogue(Sheet="Caravan", Key="TROUPE_LEADER_GREYMOOR_CANLEAVE_FULL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Travel Prompt
+  }
+
+  var Quest End Object: gameObject = Caravan
+
+  var Hero Pos X: float = 0
+  var Wave Marker X: float = 0
+  var Fleas Saved: int = 0
+  var Can Wave: bool = false
+  var Past Wave Marker: bool = false
+  var Had Haunted Convo: bool = false
+  var Seen Haunted Bellhart: bool = false
+  var Bellhart Saved: bool = false
+  var Judge Defeated: bool = false
+  var Need More Fleas: bool = false
+  var Can Leave: bool = false
+  var Seen Citadel Gate Open: bool = false
+  var All Fleas Collected: bool = false
+  var Travel Prompt Text: string = ""
+  var Dlg: string = ""
+  var Hero: gameObject = <null>
+  var Wave Marker: gameObject = Caravan/Caravan Troupe Leader Greymoor NPC/Wave Marker
+  var Audio Loop Voice: gameObject = Caravan/Caravan Troupe Leader Greymoor NPC/Audio Loop Voice
+  var Quest: object = <null>
+}

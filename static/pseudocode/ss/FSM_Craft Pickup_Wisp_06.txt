@@ -1,0 +1,125 @@
+# FSM
+# 1 location(s):
+#   Wisp_06 / Craft Pickup
+
+fsm FSM {
+  start Init
+
+  sequence state Init {
+    NextFrameEvent(sendEvent=(none))
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    BoolTest(boolVariable=var "Activated", isTrue=→"GOT", isFalse=(none), everyFrame=false)
+    SavedItemCanGetMore(Item=var "Item", trueEvent=→"CAN GET", falseEvent=→"GOT", storeValue=(unset))
+    on GOT → Gone
+    on CAN GET → Idle
+  }
+
+  state Idle {
+    ActivateGameObject(gameObject=var "Materials Display", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on INTERACT → Inspect
+  }
+
+  state Gone {
+    ActivateGameObject(gameObject=var "Materials Display", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Prompt {
+    DialogueYesNoItemV3(Prompt={Sheet="Inspect", Key="WISP_BOMB_PROMPT"}, RequiredItem=Tool Metal (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle), RequiredAmount=1, ShowCounter=false, ConsumeItem=true, WillGetItem=var "Item", YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=true)
+    on NO → Cancel
+    on YES → Wait
+  }
+
+  state Inspect {
+    RunDialogue(Sheet="Inspect", Key=var "Inspect Cell", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Craft Pickup/Inspect Region)
+    on CONVO_END → Prompt Type
+  }
+
+  state Cancel {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Craft Pickup/Inspect Region, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Get Item {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    SavedItemGet(Item=var "Item")
+    on FINISHED → End
+  }
+
+  state Hero Face Table {
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_1 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="TurnToBG", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    tk2dPlayAnimAfterPreviousComplete(Target=var "Hero", AnimName="Idle BG", StoreDidPlay=(unset))
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Craft
+  }
+
+  state Craft {
+    PlayAudioEvent(audioClip=workstation_construct_tool (sfxstatic_assets_areaboneareahangareapeakareawisp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Materials Display", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Craft Pickup/inspect plink, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=4.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Turn Back
+  }
+
+  sequence state Turn Back {
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=1)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=hornet_run_start_1 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="TurnToFG", AnimationCompleteEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControlToIdle", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Get Item
+  }
+
+  sequence state Wait {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    ActivateInteractible(Target=Craft Pickup/Inspect Region, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=false, Target=Craft Pickup/Inspect Region, UseChildren=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    on FINISHED → Move Hero to Table
+  }
+
+  state End {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Craft Pickup/Inspect Region, UseChildren=false)
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    ActivateInteractible(Target=Craft Pickup/Inspect Region, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    on FINISHED → Gone
+  }
+
+  state Move Hero to Table {
+    MoveHeroToPosX(Hero=var "Hero", PositionTarget=Craft Pickup, PositionX=0, FinishEvent=→"FINISHED")
+    on FINISHED → Hero Face Table
+  }
+
+  state Prompt Type {
+    BoolTest(boolVariable=var "Awards Tool Pouch", isTrue=→"TOOL POUCH", isFalse=→"FINISHED", everyFrame=false)
+    on TOOL POUCH → Prompt - Tool Pouch
+    on FINISHED → Prompt
+  }
+
+  state Prompt - Tool Pouch {
+    DialogueYesNoV2(TranslationSheet="Inspect", TranslationKey="JAIL_ACT3_POCKET_PROMPT", UseCurrency=false, CurrencyCost=0, CurrencyType=0, ConsumeCurrency=false, WillGetItem=<null>, YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on NO → Cancel
+    on YES → Wait
+  }
+
+  state Item Type {
+    BoolTest(boolVariable=var "Awards Tool Pouch", isTrue=→"TOOL POUCH", isFalse=→"FINISHED", everyFrame=false)
+    on TOOL POUCH → 
+    on FINISHED → Get Item
+  }
+
+  var Awards Tool Pouch: bool = false
+  var Inspect Cell: string = "WISP_BOMB"
+  var Materials Display: gameObject = Craft Pickup/table_bomb_tool_materials
+  var Item: object = Pimpilo (dataassets_assets_assets/dataassets/tools/toolitems.bundle)
+
+  var Activated: bool = false
+  var Self: gameObject = <null>
+}

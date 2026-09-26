@@ -1,0 +1,266 @@
+# Tube Travel
+# 1 location(s):
+#   Bellway_City / City Travel Tube
+
+fsm Tube Travel {
+  start Init
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Interacted", boolValue=false, everyFrame=false)
+    on INTERACT → Interacted
+  }
+
+  state End Travel Interaction {
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    ActivateGameObject(gameObject=var "Fake Hero", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Fake Hero", vector=var "Fake Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AffectedByGravity", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Interacted", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Go To Next Scene {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    ActivateGameObject(gameObject=var "Fake Hero", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="END FOLLOWERS INSTANT")
+    ClearHeroEffectsLite()
+    BeginSceneTransition(sceneName=var "To Scene", entryGateName=var "Door Name", entryDelay=0, visualization=Default, preventCameraFadeOut=true)
+  }
+
+  state Open map {
+    Tk2dPlayAnimation(gameObject=var "Fake Hero", animLibName="", clipName="Idle")
+    OpenTubeTravelMap(SpawnedMap=var "Spawned Map", ClosedEvent=→"CONTINUE", StoreLocation=var "Target Location", ThisLocation=var "This Location")
+    on CONTINUE → Choose Scene
+  }
+
+  state Save State {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=TimePasses())
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SaveLevelState", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    on FINISHED → Fade Out
+  }
+
+  state Choose Scene {
+    EnumCompare(enumVariable=var "Target Location", compareTo=var "This Location", equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    EnumCompare(enumVariable=var "Target Location", compareTo=None, equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    GetTubeTravelScene(Location=var "Target Location", StoreSceneName=var "To Scene", InvalidEvent=→"INVALID")
+    on CANCEL → Hop Out Antic
+    on INVALID → Invalid
+    on FINISHED → Preload Scene
+  }
+
+  state Invalid {
+    DebugLogConsole(logLevel=2, text="Tube travel target not implemented!", sendToUnityLog=true)
+    on FINISHED → Hop Out Antic
+  }
+
+  sequence state Init {
+    NextFrameEvent(sendEvent=(none))
+    GetHero(storeResult=var "Hero")
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    CreateObject(gameObject=Tube Travel Map (shopui_assets_all.bundle), spawnPoint=var "", position=(unset), rotation=(unset), storeObject=var "Spawned Map")
+    FindChildRecursive(gameObject=var "Animated Tube", childName="Hornet", storeResult=var "Fake Hero")
+    SetFsmGameObject(gameObject=var "Animated Tube", fsmName="Animation", variableName="Event Target", setValue=var "Self", everyFrame=false)
+    ActivateGameObject(gameObject=var "Fake Hero", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tube Mask", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Wait
+    on INVALID → Idle
+  }
+
+  state Interacted {
+    SetBoolValue(boolVariable=var "Interacted", boolValue=true, everyFrame=false)
+    on FINISHED → Hop In Antic
+  }
+
+  state Hop In Antic {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    MatchScaleSign(Target=var "Fake Hero", MatchTo=var "Hero", EveryFrame=false)
+    SetCameraIgnoringXOffset(IgnoreXOffset=true)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    ActivateGameObject(gameObject=var "Fake Hero", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPosition(gameObject=var "Fake Hero", vector=var "Fake Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Fake Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Fake Hero", clipName="Hop", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Hop In
+  }
+
+  state Door Entry? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetEntryGateName", parameters=[], storeResult=var "Door Entered", EveryFrame=false)
+    StringCompare(stringVariable=var "Door Entered", compareTo=var "Door Name", equalEvent=→"TRUE", notEqualEvent=→"FALSE", storeResult=(unset), everyFrame=false)
+    on FALSE → Locked?
+    on TRUE → Tube Start Away
+  }
+
+  state Wait {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Door Entry?
+  }
+
+  state Start In Tube {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Tube Arrive
+  }
+
+  state Tube Start Away {
+    ActivateGameObject(gameObject=var "Tube Mask", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ToolsCutsceneControl(SetInCutscene=true)
+    GetPosition(gameObject=var "Fake Hero", vector=var "Fake Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    PlayAudioEvent(audioClip=city_travel_tube_arriving_1 (sfxstatic_assets_areasong.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="GONE", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    ActivateGameObject(gameObject=var "Fake Hero", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Wait for Scene Entry
+  }
+
+  sequence state Tube Arrive {
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="ARRIVE", delay=0, everyFrame=false)
+    on IMPACT → Break Items
+  }
+
+  state Leave {
+    ActivateGameObject(gameObject=var "Tube Mask", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="LEAVE", delay=0, everyFrame=false)
+    on ANIM FINISHED → Save State
+  }
+
+  state Fade Out {
+    TransitionToAudioSnapshot(snapshot=Off (audioobjects_assets_all.bundle), transitionTime=1)
+    TransitionToAudioSnapshot(snapshot=at None (audioobjects_assets_all.bundle), transitionTime=1)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.5)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    on FINISHED → Go To Next Scene
+  }
+
+  state Close {
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=3)
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="CLOSE", delay=0, everyFrame=false)
+    ToolsCutsceneControl(SetInCutscene=true)
+    on ANIM FINISHED → Leave
+  }
+
+  state Open {
+    ToolsCutsceneControl(SetInCutscene=false)
+    GetPosition(gameObject=var "Fake Hero", vector=var "Fake Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="OPEN", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tube Mask", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on ANIM FINISHED → Hop Out Antic
+  }
+
+  state Locked? {
+    StringCompare(stringVariable=var "Unlocked PD Bool", compareTo="", equalEvent=→"FALSE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName=var "Unlocked PD Bool", isTrue=→"FALSE", isFalse=→"TRUE")
+    on TRUE → Wait For Unlock
+    on FALSE → Start Open
+  }
+
+  state Wait For Unlock {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="LOCK", delay=0, everyFrame=false)
+    on UNLOCK → Unlock Open
+  }
+
+  state Unlock {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Hop In {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroAudioController", methodName="PlaySound", parameters=[enum(2), true], storeResult=(unset var), EveryFrame=false)
+    JumpTranslateTo(TranslateObject=var "Fake Hero", StartPos=var "Hero Pos", EndPos=var "Fake Hero Pos", JumpHeight=0.7, JumpCurve=curve[(time=0, value=0, inSlope=0, outSlope=3), (time=0.5, value=1, inSlope=0, outSlope=0), (time=1, value=0, inSlope=-3, outSlope=0)], Duration=0.25)
+    on FINISHED → Land In
+  }
+
+  state Land In {
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="ENTER LAND", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWait(Target=var "Fake Hero", ClipName="Hop Land", AnimationCompleteEvent=→"FINISHED")
+    on FINISHED → Open map
+  }
+
+  state Hop Out Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Fake Hero", clipName="Hop", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Hop Out
+  }
+
+  state Hop Out {
+    SetCameraIgnoringXOffset(IgnoreXOffset=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroAudioController", methodName="PlaySound", parameters=[enum(2), true], storeResult=(unset var), EveryFrame=false)
+    JumpTranslateTo(TranslateObject=var "Fake Hero", StartPos=var "Fake Hero Pos", EndPos=var "Hero Pos", JumpHeight=0.5, JumpCurve=curve[(time=0, value=0, inSlope=0, outSlope=3), (time=0.5, value=1, inSlope=0, outSlope=0), (time=1, value=0, inSlope=-3, outSlope=0)], Duration=0.2)
+    on FINISHED → Land Out
+  }
+
+  state Land Out {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SpawnSoftLandingPrefab", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWait(Target=var "Fake Hero", ClipName="Hop Land", AnimationCompleteEvent=→"FINISHED")
+    on FINISHED → End Travel Interaction
+  }
+
+  state Wait for Scene Entry {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=(unset), z=var "Hero Z", space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Fake Hero Pos", vector3Value=var "Fake Hero Pos", x=(unset), y=(unset), z=var "Hero Z", everyFrame=false)
+    SetPosition(gameObject=var "Hero", vector=var "Fake Hero Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    MatchScaleSign(Target=var "Fake Hero", MatchTo=var "Hero", EveryFrame=false)
+    PositionColliderOnGround(Target=var "Hero")
+    SetCameraIgnoringXOffset(IgnoreXOffset=true)
+    CameraRepositionToHero()
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Start In Tube
+  }
+
+  state Start Open {
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="START OPEN", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Unlock Open {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckTubeAchievements", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObject(var "Animated Tube"), sendEvent="UNLOCK", delay=0, everyFrame=false)
+    on ANIM FINISHED → Unlock
+  }
+
+  sequence state Hero Press Button {
+    Tk2dPlayAnimationWait(Target=var "Fake Hero", ClipName="Collect Stand 1", AnimationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=city_travel_tube_hornet_select (sfxstatic_assets_areasong.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=var "Fake Hero", ClipName="Collect Stand 2", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWait(Target=var "Fake Hero", ClipName="Collect Stand 3", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Fake Hero", clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Close
+  }
+
+  state Preload Scene {
+    StartPreloadingScene(SceneName=var "To Scene", LoadMode=LoadSceneMode(1))
+    on FINISHED → Hero Press Button
+  }
+
+  state Break Items {
+    CallStaticMethod(className="DeliveryQuestItem", methodName="BreakAll", parameters=[], storeResult=(unset var), everyFrame=false)
+    on ANIM FINISHED → Open
+  }
+
+  var Unlocked PD Bool: string = "UnlockedCityBellwayTube"
+  var Animated Tube: gameObject = City Travel Tube/pneumatic_tube_set
+  var This Location: enum = TubeTravelLocations(4)
+
+  var Hero Z: float = 0
+  var Interacted: bool = false
+  var To Scene: string = "Room_Town_Stag_Station"
+  var Door Entered: string = ""
+  var Door Name: string = "door_tubeEnter"
+  var Fake Hero Pos: vector3 = (0, 0, 0)
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Spawned Map: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Fake Hero: gameObject = <null>
+  var Self: gameObject = <null>
+  var Tube Mask: gameObject = City Travel Tube/Tube Mask
+  var Target Location: enum = TubeTravelLocations(0)
+}

@@ -1,0 +1,154 @@
+# Control
+# 1 location(s):
+#   Ant_19 / Boss Control/Boss Scene/Summon Enemies/Bone Crawler Smn
+
+fsm Control {
+  start Init
+  on ZERO HP → Die  // from any state
+  on BOSS DEFEATED → Boss Defeated  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Enemy Container")
+    on FINISHED → Dormant
+  }
+
+  state Walk {
+    SetAudioSource(gameObject=Self, active=true)
+    StartCrawler(Target=Self, ScheduleTurn=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Antic
+    on TOOK DAMAGE → Antic
+    on SING → Sing
+  }
+
+  state Antic {
+    StopCrawler(Target=Self, WaitForTurn=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spike Antic")
+    SetAudioSource(gameObject=Self, active=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=bone_crawler_spike_antic (sfxstatic_assets_areabone.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spike 1
+  }
+
+  state Spike 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spike", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Spike Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=bone_crawler_spikes (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=12, resetOnStateExit=false)
+    on FINISHED → Spike 2
+  }
+
+  state Spike 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Spike Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Spike 3
+  }
+
+  state Spike 3 {
+    Wait(time=1, finishEvent=→"NEXT", realTime=false)
+    ActivateGameObject(gameObject=var "Spike Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on NEXT → Retract
+  }
+
+  state Retract {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spike Retract", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=bone_crawler_sheath (sfxstatic_assets_areabone.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=12, resetOnStateExit=false)
+    on FINISHED → Attack Recover
+  }
+
+  state Attack Recover {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    StartCrawler(Target=Self, ScheduleTurn=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    on FINISHED → Walk
+    on SING → Sing
+  }
+
+  state Sing {
+    StopCrawler(Target=Self, WaitForTurn=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Sing", singAudioTable=<null>, noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Attack Recover
+    on SING DURATION END → Attack Recover
+  }
+
+  state Die {
+    SetBoolValue(boolVariable=var "Active", boolValue=false, everyFrame=false)
+    StopCrawler(Target=Self, WaitForTurn=false)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    on FINISHED → Reset
+  }
+
+  state Reset {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetParent(gameObject=Self, parent=var "Enemy Container", resetLocalPosition=false, resetLocalRotation=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=HealToMax())
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    on SUMMON → Fly In
+  }
+
+  state Fly In {
+    SetBoolValue(boolVariable=var "Active", boolValue=true, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Target")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    EaseFloat(fromValue=var "Z Pos", toValue=var "Z Target", floatVariable=var "Z Tween", time=0.35, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Tween", space=0, everyFrame=true, lateUpdate=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.5)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=28, everyFrame=false)
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Land
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spike Antic", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Walk
+  }
+
+  state Boss Defeated {
+    BoolTest(boolVariable=var "Active", isTrue=→"DIE", isFalse=(none), everyFrame=false)
+    on DIE → Die
+  }
+
+  var Z Pos: float = 0
+  var Z Target: float = 0
+  var Z Tween: float = 0
+  var Active: bool = false
+  var Spike Hit 1: gameObject = Boss Control/Boss Scene/Summon Enemies/Bone Crawler Smn/Spike Hit 1
+  var Spike Hit 2: gameObject = Boss Control/Boss Scene/Summon Enemies/Bone Crawler Smn/Spike Hit 2
+  var Spike Hit 3: gameObject = Boss Control/Boss Scene/Summon Enemies/Bone Crawler Smn/Spike Hit 3
+  var Enemy Container: gameObject = <null>
+  var Audio Loop Sing: gameObject = Boss Control/Boss Scene/Summon Enemies/Bone Crawler Smn/Audio Loop Sing
+}

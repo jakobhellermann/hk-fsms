@@ -1,0 +1,319 @@
+# breakable_wall_v2
+# 2 location(s):
+#   Aqueduct_04 / Breakable Wall bot mid
+#   Bellway_01 / Black Thread States Thread Only Variant/Black Thread World/Breakable Wall
+
+// uses template: breakable_wall_v2
+fsm breakable_wall_v2 {
+  start Start Pause
+
+  state Idle {
+    SetGameObject(variable=var "Damage Source", gameObject=<null>, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=var "Start Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Trigger2dEvent(gameObject=Self, trigger=0, collideTag="Wall Breaker", sendEvent=→"WALL BREAKER", storeCollider=var "Colliding Object")
+    Trigger2dEvent(gameObject=Self, trigger=0, collideTag="Nail Attack", sendEvent=→"NEEDLE", storeCollider=var "")  // disabled
+    ReceivedDamage(Target=Self, collideTag="", sendEvent=→"NEEDLE", sendEventHeavy=→"WALL BREAKER", sendEventSpikes=(none), sendEventLava=(none), sendEventLightning=(none), storeGameObject=var "Damage Source", ignoreAcid=false, ignoreLava=false, ignoreWater=false, ignoreHunterWeapon=false, ignoreTraps=false, ignoreNail=false, ignoreSpikes=false, storeDamageDealt=(unset), storeDirection=(unset), storeMagnitudeMultiplier=(unset), firstHitOnly=true)
+    on WALL BREAKER → Can Break? 2
+    on NEEDLE → Can Break?
+    on QUICK BREAK → Break
+  }
+
+  state Take Damage {
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Effect Origin", position=(unset), rotation=(unset), storeObject=var "")
+    SpawnObjectFromGlobalPool(gameObject=Slash Impact R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Effect Origin", position=(unset), rotation=(unset), storeObject=var "Slash")
+    MatchScaleSign(Target=var "Slash", MatchTo=var "Hero", EveryFrame=false)
+    IntOperator(integer1=var "Hits", integer2=1, operation=Subtract, storeResult=var "Hits", everyFrame=false)
+    IntCompare(integer1=var "Hits", integer2=0, equal=→"BREAK", lessThan=→"BREAK", greaterThan=(none), everyFrame=false)
+    on FINISHED → Fling Shards?
+    on BREAK → PD Bool?
+  }
+
+  state Break {
+    ActivateGameObject(gameObject=var "z4_Activate Interactible", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateInteractible(Target=var "z4_Activate Interactible", Activate=true, AllowQueueing=false, UseChildren=false)
+    AudioStopV2(gameObject=var "z3 Idle Audio Loop", fadeTime=0, cancelOnEarlyExit=false)
+    SpawnObjectFromGlobalPool(gameObject=Break Wall Effect (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Effect Origin", position=(0, 0, 0), rotation=(0, 0, 0), storeObject=var "Effect")  // disabled
+    SetPosition(gameObject=var "Effect", vector=(unset), x=(unset), y=(unset), z=0.003, space=0, everyFrame=false, lateUpdate=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Dust Break 1", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Dust Break 2", emit=0, resetIfPlaying=false)
+    SetCollider(gameObject=var "Self", active=false, resetOnExit=false)
+    CallMethodProper(gameObject=var "Masks", behaviour="Unmasker", methodName="Uncover", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="BREAK", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Break Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetSpriteRenderer(gameObject=Self, active=false)
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    StopParticleEmittersInChildren(gameObject=var "Pt Idle")
+    ActivateGameObject(gameObject=var "Camera Locks", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sprites", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Hit {
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SpawnObjectFromGlobalPool(gameObject=Dust Hit Wall (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Effect Origin", position=(0, 0, 0), rotation=(0, 0, 0), storeObject=var "Effect")
+    SetPosition(gameObject=var "Effect", vector=(unset), x=(unset), y=(unset), z=0.002, space=0, everyFrame=false, lateUpdate=false)
+    ObjectJitter(gameObject=Self, x=0.15, y=0.15, z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt Hit", resetTimeIfPlaying=false, stopOnStateExit=true)
+    on FINISHED → Hit 2
+  }
+
+  state Pause {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Activated?
+  }
+
+  state Activated {
+    ActivateGameObject(gameObject=var "z4_Activate Interactible", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateInteractible(Target=var "z4_Activate Interactible", Activate=true, AllowQueueing=false, UseChildren=false)
+    SetSpriteRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    DestroyObject(gameObject=var "Camera Locks", delay=0, detachChildren=false)
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="UNCOVER", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Masks", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pt Idle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sprites", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Activated? {
+    BoolTest(boolVariable=var "Activated", isTrue=→"ACTIVATE", isFalse=(none), everyFrame=false)
+    StringCompare(stringVariable=var "PlayerData Bool", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName=var "PlayerData Bool", isTrue=→"ACTIVATE", isFalse=(none))
+    on ACTIVATE → Activated
+    on FINISHED → Notify If Active
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=var "Self", childName="Camera Locks", storeResult=var "Camera Locks")
+    FindChild(gameObject=var "Self", childName="Masks", storeResult=var "Masks")
+    SetParent(gameObject=var "Camera Locks", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Masks", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Sprites")
+    FindChild(gameObject=Self, childName="Particle_rocks_small", storeResult=var "Particles Small")
+    FindChild(gameObject=Self, childName="Particle_rocks_large", storeResult=var "Particles Large")
+    FindChild(gameObject=Self, childName="Break Effects", storeResult=var "Break Effects")
+    FindChild(gameObject=var "Self", childName="Dust Break 1", storeResult=var "Dust Break 1")
+    FindChild(gameObject=var "Self", childName="Dust Break 2", storeResult=var "Dust Break 2")
+    FindNamedChild(gameObject=Self, storeResult=var "Effect Origin")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Idle")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=var "Start Y", z=(unset), space=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Config Type
+  }
+
+  state PD Bool? {
+    StringCompare(stringVariable=var "PlayerData Bool", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetPlayerDataBool(boolName=var "PlayerData Bool", value=true)
+    on FINISHED → Secret Tone
+  }
+
+  state Effect Origin Check {
+    GameObjectIsNull(gameObject=var "Effect Origin", isNull=(none), isNotNull=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SetGameObject(variable=var "Effect Origin", gameObject=var "Self", everyFrame=false)
+    on FINISHED → Pause
+  }
+
+  state Secret Tone {
+    BoolTest(boolVariable=var "z_No Secret Tone", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendEventToRegister(eventName="SECRET TONE")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player UI (audioobjects_assets_all.bundle), spawnPoint=var "Hero", audioClip=secret_discovered_temp (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)  // disabled
+    on FINISHED → Effects? 2
+  }
+
+  state Hit Effects? {
+    EnumSwitch(enumVariable=var "Effect Type", compareTo=[BreakableWallTypes(1), BreakableWallTypes(2), BreakableWallTypes(3)], sendEvent=[→"METAL", →"STONE METAL", →"WOOD"], everyFrame=false)
+    on METAL → Hit Effect Metal
+    on FINISHED → Hit Effect Regular
+    on STONE METAL → Hit Effect Stone Metal
+    on WOOD → Hit Effect Wood
+  }
+
+  state Hit Effect Regular {
+    RandomFloat(min=0.85, max=1.1, storeResult=var "Chooser")
+    SetAudioPitch(gameObject=var "Self", pitch=var "Chooser", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[breakable_wall_hit_1 (sfxstatic_assets_shared.bundle), breakable_wall_hit_2 (sfxstatic_assets_shared.bundle)], weights=[1, 1], pitchMin=0.85, pitchMax=1.15)
+    PlayParticleEmitter(gameObject=var "Particles Small", emit=5, resetIfPlaying=false)
+    on FINISHED → Find Closest Origin
+  }
+
+  state Hit Effect Metal {
+    RandomFloat(min=0.85, max=1.1, storeResult=var "Chooser")
+    SetAudioPitch(gameObject=var "Self", pitch=var "Chooser", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[understore_wall_or_secret_door_break (sfxstatic_assets_areaunderstore.bundle)], weights=[1], pitchMin=0.9, pitchMax=1.1)
+    on FINISHED → Find Closest Origin
+  }
+
+  state Effects? 2 {
+    EnumSwitch(enumVariable=var "Effect Type", compareTo=[BreakableWallTypes(1), BreakableWallTypes(2), BreakableWallTypes(3)], sendEvent=[→"METAL", →"STONE METAL", →"WOOD"], everyFrame=false)
+    on METAL → Break Effects Metal
+    on FINISHED → Break Effects Regular
+    on STONE METAL → Break Effects Stone Metal
+    on WOOD → Break Effects Wood
+  }
+
+  state Break Effects Regular {
+    PlayParticleEmitter(gameObject=var "Particles Large", emit=0, resetIfPlaying=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=breakable_wall_death (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SpawnObjectFromGlobalPool(gameObject=Break Wall Effect (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Effect Origin", position=(0, 0, 0), rotation=(0, 0, 0), storeObject=var "Effect")
+    PlayParticleEmitter(gameObject=var "Particles Small", emit=0, resetIfPlaying=false)
+    on FINISHED → Send to Register?
+  }
+
+  state Break Effects Metal {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[understore_wall_or_secret_door_break (sfxstatic_assets_areaunderstore.bundle)], weights=[1], pitchMin=0.9, pitchMax=1.1)
+    SpawnObjectFromGlobalPool(gameObject=Metal Grate Break Effect (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Effect Origin", position=(0, 0, 0), rotation=(0, 0, 0), storeObject=var "Effect")
+    on FINISHED → Send to Register?
+  }
+
+  state Config Type {
+    EnumSwitch(enumVariable=var "Effect Type", compareTo=[BreakableWallTypes(1)], sendEvent=[→"METAL"], everyFrame=false)
+    on METAL → Config Metal
+    on FINISHED → Config Regular
+  }
+
+  state Config Regular {
+    on FINISHED → Effect Origin Check
+  }
+
+  state Config Metal {
+    SetIntValue(intVariable=var "Hits", intValue=3, everyFrame=false)
+    on FINISHED → Effect Origin Check
+  }
+
+  state Send to Register? {
+    StringCompare(stringVariable=var "z Break Register Event", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEventToRegisterV2(EventName=var "z Break Register Event", ExcludeTarget=Self)
+    on FINISHED → Fling Shards? 2
+  }
+
+  state Fling Shards? {
+    IntCompare(integer1=var "Shards Fling Hit", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FlingObjectsFromGlobalPoolV2(GameObjects=[Shell Shard 01 (globalpoolprefabs_assets_all.bundle), Shell Shard 02 (globalpoolprefabs_assets_all.bundle), Shell Shard 03 (globalpoolprefabs_assets_all.bundle)], SpawnPoint=var "Self", Position=(unset), SpawnMin=var "Shards Fling Hit", SpawnMax=var "Shards Fling Hit", SpeedMin=5, SpeedMax=10, AngleMin=110, AngleMax=160, OriginVariationX=0.2, OriginVariationY=1)
+    on FINISHED → Hit
+  }
+
+  state Fling Shards? 2 {
+    IntCompare(integer1=var "Shards Fling Break", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FlingObjectsFromGlobalPoolV2(GameObjects=[Shell Shard 01 (globalpoolprefabs_assets_all.bundle), Shell Shard 02 (globalpoolprefabs_assets_all.bundle), Shell Shard 03 (globalpoolprefabs_assets_all.bundle)], SpawnPoint=var "Self", Position=(unset), SpawnMin=var "Shards Fling Break", SpawnMax=var "Shards Fling Break", SpeedMin=5, SpeedMax=25, AngleMin=110, AngleMax=160, OriginVariationX=0.2, OriginVariationY=1.5)
+    on FINISHED → Break
+  }
+
+  state Can Break? {
+    GameObjectCompare(gameObjectVariable=var "Can Break Trigger", compareTo=<null>, equalEvent=→"TRUE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckTrackTriggerCountV2(Target=var "Can Break Trigger", Count=0, Test=MoreThan, EveryFrame=false, SetBool=(unset), SuccessEvent=→"TRUE", FailEvent=→"FALSE")
+    on FALSE → Break Fail
+    on TRUE → Hit Effects?
+  }
+
+  state Break Fail {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Can Break? 2 {
+    GameObjectCompare(gameObjectVariable=var "Can Break Trigger", compareTo=<null>, equalEvent=→"TRUE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckTrackTriggerCountV2(Target=var "Can Break Trigger", Count=0, Test=MoreThan, EveryFrame=false, SetBool=(unset), SuccessEvent=→"TRUE", FailEvent=→"FALSE")
+    on FALSE → Break Fail
+    on TRUE → PD Bool?
+  }
+
+  state Notify If Active {
+    StringCompare(stringVariable=var "z2 Is Active Register Event", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEventToRegisterV2(EventName=var "z2 Is Active Register Event", ExcludeTarget=Self)
+    on FINISHED → Start Idle
+  }
+
+  state Start Idle {
+    AudioPlaySimpleV2(gameObject=var "z3 Idle Audio Loop", volume=1, startTime=0, oneShotClip=<null>)
+    ActivateInteractible(Target=var "z4_Activate Interactible", Activate=false, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Hit Effect Stone Metal {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[understore_wall_or_secret_door_break (sfxstatic_assets_areaunderstore.bundle)], weights=[1], pitchMin=0.9, pitchMax=1.1)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[breakable_wall_hit_1 (sfxstatic_assets_shared.bundle), breakable_wall_hit_2 (sfxstatic_assets_shared.bundle)], weights=[1, 1], pitchMin=0.85, pitchMax=1.15)
+    PlayParticleEmitter(gameObject=var "Particles Small", emit=5, resetIfPlaying=false)
+    on FINISHED → Find Closest Origin
+  }
+
+  state Break Effects Stone Metal {
+    PlayParticleEmitter(gameObject=var "Particles Large", emit=0, resetIfPlaying=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=breakable_wall_death (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[understore_wall_or_secret_door_break (sfxstatic_assets_areaunderstore.bundle)], weights=[1], pitchMin=0.9, pitchMax=1.1)
+    SpawnObjectFromGlobalPool(gameObject=Break Wall Effect (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Effect Origin", position=(0, 0, 0), rotation=(0, 0, 0), storeObject=var "Effect")
+    PlayParticleEmitter(gameObject=var "Particles Small", emit=0, resetIfPlaying=false)
+    on FINISHED → Send to Register?
+  }
+
+  state Hit Effect Wood {
+    RandomFloat(min=0.85, max=1.1, storeResult=var "Chooser")
+    SetAudioPitch(gameObject=var "Self", pitch=var "Chooser", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[shellwood_twig_wall_hit_1 (sfxstatic_assets_areashellwood.bundle), shellwood_twig_wall_hit_2 (sfxstatic_assets_areashellwood.bundle), shellwood_twig_wall_hit_3 (sfxstatic_assets_areashellwood.bundle)], weights=[1, 0, 0], pitchMin=0.9, pitchMax=1.1)
+    on FINISHED → Find Closest Origin
+  }
+
+  state Break Effects Wood {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[shellwood_twig_wall_break (sfxstatic_assets_areashellwood.bundle)], weights=[1], pitchMin=0.9, pitchMax=1.1)
+    SpawnObjectFromGlobalPool(gameObject=Metal Grate Break Effect (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Effect Origin", position=(0, 0, 0), rotation=(0, 0, 0), storeObject=var "Effect")
+    on FINISHED → Send to Register?
+  }
+
+  state Hit Loop {
+    on FINISHED → Can Break?
+  }
+
+  state Hit 2 {
+    ObjectJitter(gameObject=Self, x=0.15, y=0.15, z=(unset), allowMovement=false, limitFps=30)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    ReceivedDamage(Target=Self, collideTag="", sendEvent=→"NEEDLE", sendEventHeavy=→"WALL BREAKER", sendEventSpikes=(none), sendEventLava=(none), sendEventLightning=(none), storeGameObject=var "Damage Source", ignoreAcid=false, ignoreLava=false, ignoreWater=false, ignoreHunterWeapon=false, ignoreTraps=false, ignoreNail=false, ignoreSpikes=false, storeDamageDealt=(unset), storeDirection=(unset), storeMagnitudeMultiplier=(unset), firstHitOnly=false)
+    on FINISHED → Idle
+    on NEEDLE → Hit Loop
+    on WALL BREAKER → Can Break? 2
+  }
+
+  state Start Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Find Closest Origin {
+    BoolTest(boolVariable=var "Find Closest Origin", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ArrayListGetClosestGameObject(gameObject=Self, reference="", distanceFrom=var "Damage Source", orDistanceFromVector3=(0, 0, 0), everyframe=false, closestGameObject=var "Effect Origin", closestIndex=(unset))
+    on FINISHED → Take Damage
+  }
+
+  var Shards Fling Hit: int = 0
+  var Shards Fling Break: int = 0
+  var z_No Secret Tone: bool = true
+  var Find Closest Origin: bool = false
+  var PlayerData Bool: string = ""
+  var z Break Register Event: string = ""
+  var z2 Is Active Register Event: string = ""
+  var Can Break Trigger: gameObject = <null>
+  var z3 Idle Audio Loop: gameObject = <null>
+  var z4_Activate Interactible: gameObject = <null>
+  var Effect Type: enum = BreakableWallTypes(0)
+
+  var Chooser: float = 0
+  var Start X: float = 0
+  var Start Y: float = 0
+  var Hits: int = 4
+  var Activated: bool = false
+  var Break Effects: gameObject = <null>
+  var Camera Locks: gameObject = <null>
+  var Colliding Object: gameObject = <null>
+  var Dust Break 1: gameObject = <null>
+  var Dust Break 2: gameObject = <null>
+  var Effect: gameObject = <null>
+  var Effect Origin: gameObject = <null>
+  var Masks: gameObject = <null>
+  var Particles Large: gameObject = <null>
+  var Particles Small: gameObject = <null>
+  var Pt Hit: gameObject = <null>
+  var Pt Idle: gameObject = <null>
+  var Self: gameObject = <null>
+  var Slash: gameObject = <null>
+  var Sprites: gameObject = <null>
+  var Damage Source: gameObject = <null>
+}

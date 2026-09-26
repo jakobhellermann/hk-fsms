@@ -1,0 +1,176 @@
+# Control
+# 1 location(s):
+#   Library_11b / Library_11b_top/Memory Orb Challenge (1)/Silkfly Cloud
+
+fsm Control {
+  start Pause
+  on COMPLETED → Completed  // from any state
+
+  state Init {
+    BoolTest(boolVariable=var "Activated", isTrue=→"PREVIOUSLY COMPLETED", isFalse=(none), everyFrame=false)  // disabled
+    PlayerDataBoolTest(boolName=var "PD Bool", isTrue=→"PREVIOUSLY COMPLETED", isFalse=(none))
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Idle
+    on PREVIOUSLY COMPLETED → Completed
+  }
+
+  state Rise Up {
+    SetFloatValue(floatVariable=var "Spawn Pitch", floatValue=1, everyFrame=false)
+    PlayAudioEvent(audioClip=memory_orb_main_appear (sfxstatic_assets_areamemory.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=StartTrail())
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Angle", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Angle", add=90, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=35, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=true)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Trailing", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetBoolValue(boolVariable=var "Activated First Orb", boolValue=false, everyFrame=false)
+    on FINISHED → Start Travel
+  }
+
+  state Get Next Orb {
+    SilkCloudNextOrb(nextOrb=var "Next Orb", eventTarget=Self, finalOrbEvent="FINAL")
+    on FINAL → Finish Trail
+    on FINISHED → Fly To Next Orb
+  }
+
+  state Fly To Next Orb {
+    SetFloatValue(floatVariable=var "Accel Force", floatValue=100, everyFrame=false)
+    FloatAdd(floatVariable=var "Accel Force", add=1200, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Accel Force", minValue=0, maxValue=2000, everyFrame=true)
+    ChaseObjectV2(gameObject=Self, target=var "Next Orb", speedMax=25, accelerationForce=var "Accel Force", offsetX=0, offsetY=0)
+    GetDistance(gameObject=Self, target=var "Next Orb", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=1.25, tolerance=0, equal=(none), lessThan=→"NEXT", greaterThan=(none), everyFrame=true)
+    TiltBySpeed(gameObject=Self, tiltFactor=-0.5, tiltMax=9999, rotationSpeed=20)  // disabled
+    PlayParticleEmitterInState(gameObject=var "Pt FollowCloud")
+    on NEXT → Activate Orb
+  }
+
+  state Activate Orb {
+    PlayAudioEvent(audioClip=memory_orb_small_burst_into_place (sfxstatic_assets_areamemory.bundle), pitchMin=var "Spawn Pitch", pitchMax=var "Spawn Pitch", volume=1, audioPlayerPrefab=Audio Player Actor Distant@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FloatAdd(floatVariable=var "Spawn Pitch", add=0.05, everyFrame=false, perSecond=false)
+    GetPosition(gameObject=var "Next Orb", vector=(unset), x=var "Orb X", y=var "Orb Y", z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Orb X", y=var "Orb Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Next Orb", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetAudioPitch(gameObject=var "Next Orb", pitch=var "Spawn Pitch", everyFrame=false)
+    on FINISHED → Activate First Orb
+  }
+
+  state Trail Active {
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Alert Limit", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TIME UP", everyFrame=true)
+    on TIME UP → Time Alert
+    on COLLECT → Collect
+  }
+
+  state Activate First Orb {
+    BoolTest(boolVariable=var "Activated First Orb", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendMessage(gameObject=var "Next Orb", delivery=SendMessage, options=0, functionCall=SetActive())
+    SetBoolValue(boolVariable=var "Activated First Orb", boolValue=true, everyFrame=false)
+    on FINISHED → Get Next Orb
+  }
+
+  state Time Alert {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=StartTimeAlert())
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Time Limit", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TIME UP", everyFrame=true)
+    on TIME UP → Fail
+    on COLLECT → Collect 2
+  }
+
+  sequence state Fail {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=Dissipate())
+    Wait(time=2, finishEvent=(none), realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Spawner Object"), sendEvent="RESET", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Completed {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "Spawner Object", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    SetPlayerDataBool(boolName=var "PD Bool", value=true)
+    GetPlayerDataVariable(VariableName="CollectedCloverMemoryOrbs", StoreValue=var "Total Orbs Test")
+    DebugLogConsole(logLevel=0, text=var "Total Orbs Test", sendToUnityLog=false)
+    ActivateGameObject(gameObject=var "Trailing", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Spawner Object"), sendEvent="COMPLETED", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Set Time Limit
+  }
+
+  state Idle {
+    ActivateGameObject(gameObject=var "Trailing", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on START → Rise Up
+  }
+
+  state Set Time Limit {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Orbs")
+    GetChildCount(gameObject=var "Orbs", storeResult=var "Orb Count")
+    ConvertIntToFloat(intVariable=var "Orb Count", floatVariable=var "Time Limit", everyFrame=false)
+    FloatMultiply(floatVariable=var "Time Limit", multiplyBy=var "Time Limit Per Orb", everyFrame=false)
+    FloatOperator(float1=var "Time Limit", float2=1, operation=Subtract, storeResult=var "Alert Limit", everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Finish Trail {
+    ActivateGameObject(gameObject=var "Trailing", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Trail Active
+  }
+
+  state Collect {
+    FloatSubtract(floatVariable=var "Timer", subtract=var "Time Gain Per Orb", everyFrame=false, perSecond=false)
+    on FINISHED → Trail Active
+  }
+
+  state Collect 2 {
+    FloatSubtract(floatVariable=var "Timer", subtract=var "Time Gain Per Orb", everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Timer", float2=var "Alert Limit", tolerance=0, equal=(none), lessThan=→"UNALERT", greaterThan=(none), everyFrame=true)
+    on FINISHED → Time Alert
+    on UNALERT → Unalert
+  }
+
+  state Unalert {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=StopTimeAlert())
+    on FINISHED → Trail Active
+  }
+
+  state Start Travel {
+    PlayAudioEvent(audioClip=memory_orb_main_shoot_off (sfxstatic_assets_areamemory.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor Distant@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Get Next Orb
+  }
+
+  var PD Bool: string = ""
+  var Spawner Object: gameObject = <null>
+
+  var Accel Force: float = 0
+  var Angle: float = 0
+  var Distance: float = 0
+  var Orb X: float = 0
+  var Orb Y: float = 0
+  var Time Limit: float = 0
+  var Time Limit Per Orb: float = 0.85
+  var Time Gain Per Orb: float = 0.3
+  var Timer: float = 0
+  var Alert Limit: float = 0
+  var Spawn Pitch: float = 0
+  var Orb Count: int = 0
+  var Total Orbs Test: int = 0
+  var Activated First Orb: bool = false
+  var Activated: bool = false
+  var Start Pos: vector3 = (0, 0, 0)
+  var Next Orb: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Pt FollowCloud: gameObject = Library_11b_top/Memory Orb Challenge (1)/Silkfly Cloud/Pt FollowCloud
+  var Trailing: gameObject = Library_11b_top/Memory Orb Challenge (1)/Silkfly Cloud/Trailing
+  var Orbs: gameObject = <null>
+}

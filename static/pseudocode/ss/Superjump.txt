@@ -1,0 +1,611 @@
+# Superjump
+# 1 location(s):
+#   heroloading_assets_all.bundle / Hero_Hornet
+
+// uses template: hornet_superjump
+fsm Superjump {
+  start Init
+  on HERO DAMAGED → Cancel  // from any state
+  on FSM CANCEL → Cancel  // from any state
+  on SUPERJUMP HIT ROOF → Hit Roof Soft  // from any state
+  on LEAVING SCENE → Leaving Scene  // from any state
+  on PRE ENTER SUPERJUMPING → Pre Entered Jumping  // from any state
+
+  state Inactive {
+    on DO MOVE → Enough Silk?
+  }
+
+  state Regain Control To Idle {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashOnWall", false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashing", false], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=StartAnimationControlToIdle())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    on FINISHED → Reset Effects
+  }
+
+  state Cancel {
+    RemoveUsingSilk(Amount=1, UsingType=Normal, DidAddTracker=var "Did Add Using Silk")
+    ActivateGameObject(gameObject=var "Extra Ground Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Extra Throw Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Thread", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStopV2(gameObject=var "Charge Audio", fadeTime=0.4, cancelOnEarlyExit=false)
+    AudioStopV2(gameObject=var "Superjump Audio Loop", fadeTime=0, cancelOnEarlyExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashing", false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSuperJump", parameters=[false, var "Stick Needle Y"], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Did Start Flash", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CancelFlashByID(Target=Self, ID=var "Sprite Flash ID")
+    on FINISHED → Cancel Rumbling Focus
+  }
+
+  state Relinquish Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())  // disabled
+    on FINISHED → Start Delay
+  }
+
+  state Ground Charge {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    AddUsingSilk(Amount=1, UsingType=Normal, DidAddTracker=var "Did Add Using Silk")
+    ActivateGameObject(gameObject=var "Extra Ground Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Super Jump Antic")
+    PlayAudioEvent(audioClip=hornet_superjump_pt_1_into_position (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hornet_superjump_pt_2_charge_2d (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Charge Audio")
+    ActivateGameObject(gameObject=var "Antic Effect L", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Antic Effect L", animLibName="", clipName="Super Jump Antic Effect")
+    ActivateGameObject(gameObject=var "Antic Effect R", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Antic Effect R", animLibName="", clipName="Super Jump Antic Effect")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", true], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Started Rumbling Focus", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="FocusRumble", delay=0, everyFrame=false)
+    ListenForSuperdash(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=(none))
+    ActivateGameObject(gameObject=var "Charging Fader", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Charging Fader", ToAlpha=0, FadeTime=0)
+    FadeNestedFadeGroupV2(Target=var "Charging Fader", ToAlpha=1, FadeTime=var "Charge Time", Curve=curve[(time=0, value=0, inSlope=0, outSlope=0), (time=1, value=1, inSlope=2, outSlope=2)])
+    Wait(time=var "Charge Time", finishEvent=→"WAIT", realTime=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=-0.1, tolerance=0, equal=(none), lessThan=→"BUTTON UP", greaterThan=(none), everyFrame=true)
+    on BUTTON UP → Charge Cancel Ground
+    on WAIT → Ground Charged
+  }
+
+  state Charge Cancel Ground {
+    RemoveUsingSilk(Amount=1, UsingType=Normal, DidAddTracker=var "Did Add Using Silk")
+    ActivateGameObject(gameObject=var "Extra Ground Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStopV2(gameObject=var "Charge Audio", fadeTime=0.4, cancelOnEarlyExit=false)
+    ActivateGameObject(gameObject=var "Antic Effect L", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Antic Effect R", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Charging Fader", ToAlpha=0, FadeTime=0.1)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", false], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Antic Cancel", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=var "Antic Effect L", animLibName="", clipName="Super Jump Antic Effect End")
+    Tk2dPlayAnimation(gameObject=var "Antic Effect R", animLibName="", clipName="Super Jump Antic Effect End")
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus2", setValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    on FINISHED → Regain Control To Idle
+  }
+
+  state Ground Charged {
+    RemoveUsingSilk(Amount=1, UsingType=Normal, DidAddTracker=var "Did Add Using Silk")
+    TakeSilkV2(Target=Self, Amount=1, TakeSource=Normal)
+    SpawnObjectFromGlobalPoolV2(gameObject=Hornet_Super_Jump_Ready_Burst (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(0, -1.5, 0), rotation=(unset), amount=1, storeObject=var "", setParent=<null>)
+    AudioStopV2(gameObject=var "Charge Audio", fadeTime=0.4, cancelOnEarlyExit=false)
+    PlayAudioEvent(audioClip=hornet_superjump_pt_3_charge_ready (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayInState(gameObject=var "Nail Art Ready", volume=1)
+    SetAudioClip(gameObject=var "Superjump Audio Loop", audioClip=hornet_dramatic_stance_crazy_cloak_loop (herosfxstatic_assets_all.bundle), autoPlay=true, stopOnExit=false)
+    ActivateGameObject(gameObject=var "Charged Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoSpriteFlashNamed(Target=Self, Flash=FlashingSuperDash, CancelOnExit=false, FlashID=var "Sprite Flash ID", WaitForFlash=false, FinishedFlashing=(none))
+    SetBoolValue(boolVariable=var "Did Start Flash", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Started Rumbling Focus", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Started Rumbling Focus 2", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus2", setValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    ListenForSuperdash(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=→"BUTTON UP")
+    SetBoolValue(boolVariable=var "On Ground", boolValue=true, everyFrame=false)
+    RayCast2d(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "On Ground", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=2, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"BUTTON UP", everyFrame=true)
+    on BUTTON UP → Throw Needle Start
+  }
+
+  state Dash Start {
+    SetBoolValue(boolVariable=var "Queued Cancel", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Cancelable Time", floatValue=0.2, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="DoHardLandingEffectNoHit", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=hornet_superjump_pt_7_hornet_jump_big_2d (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=super_jump_dash_burst (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    ActivateGameObject(gameObject=var "Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Super Jump Loop")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashing", true], storeResult=(unset var), EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="SuperDashShake", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=var "Jump Speed", everyFrame=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSuperJump", parameters=[true, var "Stick Needle Y"], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="SUPER JUMP LAUNCH")
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Dashing
+  }
+
+  state Dashing {
+    SetAudioClip(gameObject=var "Superjump Audio Loop", audioClip=hornet_flying_through_air_fast_loop (sfxstatic_assets_shared.bundle), autoPlay=false, stopOnExit=false)
+    AudioPlayInState(gameObject=var "Superjump Audio Loop", volume=1)
+    VibrationPlayerPlayV2(target=var "Superjump Audio Loop", stopOnStateExit=true)
+    Wait(time=var "Cancelable Time", finishEvent=→"WAIT", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=var "Jump Speed", everyFrame=true)
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetGravity2dScale(gameObject=var "Self", gravityScale=0)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"HIT ROOF", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=0.1, tolerance=0, equal=→"HIT ROOF", lessThan=→"HIT ROOF", greaterThan=(none), everyFrame=true)
+    ActivateGameObjectDelay(gameObject=var "Thread Loop", activate=true, resetOnExit=true, delay=0.1)
+    DoCameraShakeV4(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=true, vibrate=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Show Thread", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlipEveryFrame(boolVariable=var "Show Thread", everyFrame=true)
+    SetMeshRendererEveryFrame(gameObject=var "Thread Loop", active=var "Show Thread")
+    on WAIT → Cancelable
+    on HIT ROOF → Hit Roof Hard
+  }
+
+  state Cancelable {
+    ActivateGameObject(gameObject=var "Thread Loop", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlayInState(gameObject=var "Superjump Audio Loop", volume=1)
+    VibrationPlayerPlayV2(target=var "Superjump Audio Loop", stopOnStateExit=true)
+    BoolTest(boolVariable=var "Queued Cancel", isTrue=→"NORM CANCEL", isFalse=(none), everyFrame=false)
+    ListenForJump(eventTarget=Self, wasPressed=→"NORM CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    ListenForAttackV2(EventTarget=Self, WasPressed=→"NORM CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=var "Jump Speed", everyFrame=true)
+    ListenForSuperdash(eventTarget=Self, wasPressed=→"NORM CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"HIT ROOF", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=0.1, tolerance=0, equal=→"HIT ROOF", lessThan=→"HIT ROOF", greaterThan=(none), everyFrame=true)
+    DoCameraShakeV4(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=true, vibrate=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Show Thread", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolFlipEveryFrame(boolVariable=var "Show Thread", everyFrame=true)
+    SetMeshRendererEveryFrame(gameObject=var "Thread Loop", active=var "Show Thread")
+    on HIT ROOF → Hit Roof Hard
+    on NORM CANCEL → Fall Needle Cancel
+  }
+
+  state Air Cancel {
+    ActivateGameObject(gameObject=var "Grab Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayRandomAudioClipTable(Table=Grunt Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    ActivateGameObject(gameObject=var "Throw Needle Fall", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Throw Needle Fall", vector=(unset), x=(unset), y=var "Initial Throw Needle Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSuperJump", parameters=[false, 0], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashing", false], storeResult=(unset var), EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.98, brakeOnExit=false)
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithUpdraftExit(), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Loop Cancel", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Regain Control To Idle
+  }
+
+  state Hit Roof {
+    ActivateGameObject(gameObject=var "Stick Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSuperJump", parameters=[false, 0], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashOnWall", true], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashing", false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=0, functionCall=SetPlaySuperJumpFall(), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Regain Control To Idle
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Effects", storeResult=var "Effects Folder")
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Antic Effect R", storeResult=var "Antic Effect R")
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Antic Effect L", storeResult=var "Antic Effect L")
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Charging Fader", storeResult=var "Charging Fader")
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Catch Effect", storeResult=var "Grab Effect")
+    FindChild(gameObject=Self, childName="Special Attacks", storeResult=var "Attacks Folder")
+    FindChild(gameObject=var "Attacks Folder", childName="Super Jump Needle Throw", storeResult=var "Throw Needle")
+    GetPosition(gameObject=var "Throw Needle", vector=(unset), x=(unset), y=var "Initial Throw Needle Y", z=(unset), space=1, everyFrame=false)
+    FindChild(gameObject=var "Throw Needle", childName="Move To", storeResult=var "Throw Needle Target")
+    FindChild(gameObject=var "Throw Needle", childName="Damager", storeResult=var "Throw Needle Damager")
+    FindChild(gameObject=var "Attacks Folder", childName="Super Jump Needle Throw Fall", storeResult=var "Throw Needle Fall")
+    FindChild(gameObject=var "Throw Needle Fall", childName="Move To", storeResult=var "Throw Needle Fall Target")
+    FindChild(gameObject=var "Attacks Folder", childName="Super Jump Needle Stick", storeResult=var "Stick Needle")
+    FindChild(gameObject=var "Attacks Folder", childName="Super Jump Damager", storeResult=var "Damager")
+    FindGameObject(objectName="", withTag="CameraTarget", store=var "Camera Target")
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Charged", storeResult=var "Charged Effect")
+    FindChild(gameObject=Self, childName="Sounds/Superjump Loop", storeResult=var "Superjump Audio Loop")
+    FindChild(gameObject=Self, childName="Sounds/Nail Art Ready", storeResult=var "Nail Art Ready")
+    FindGameObject(objectName="", withTag="CameraTarget", store=var "Camera Target")
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Thread", storeResult=var "Thread")
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Thread Loop", storeResult=var "Thread Loop")
+    ActivateGameObject(gameObject=var "Thread", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Thread Loop", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Extra Throw Effect", storeResult=var "Extra Throw Effect")
+    ActivateGameObject(gameObject=var "Extra Throw Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=var "Effects Folder", childName="Super Jump Extra Ground Effect", storeResult=var "Extra Ground Effect")
+    ActivateGameObject(gameObject=var "Extra Ground Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Inactive
+  }
+
+  state Reset Effects {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashOnWall", false], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Did Start Flash", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Antic Effect L", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Antic Effect R", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Needle Fall", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Stick Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Charged Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Charging Fader", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GameObjectCompare(gameObjectVariable=var "Stick Needle Parent", compareTo=<null>, equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetTransformParent(gameObject=var "Stick Needle", parent=var "Stick Needle Parent", worldPositionStays=true)
+    SendEventToRegister(eventName="SUPER JUMP ENDED")
+    on FINISHED → Inactive
+  }
+
+  state Throw Needle Start {
+    ActivateGameObject(gameObject=var "Extra Throw Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Charging Fader", ToAlpha=0, FadeTime=0.1)
+    Tk2dPlayAnimation(gameObject=var "Antic Effect L", animLibName="", clipName="Super Jump Antic Effect End")
+    Tk2dPlayAnimation(gameObject=var "Antic Effect R", animLibName="", clipName="Super Jump Antic Effect End")
+    CancelFlashByID(Target=Self, ID=var "Sprite Flash ID")
+    SetBoolValue(boolVariable=var "Did Start Flash", boolValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus2", setValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Started Rumbling Focus 2", boolValue=false, everyFrame=false)
+    SendMessageV2(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashFocusHeal(), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Throw", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SendEventToRegister(eventName="SUPER JUMP THROW NEEDLE")
+    on FINISHED → Get Distance
+  }
+
+  state Throw Needle {
+    tk2dPlayAnimAfterPreviousComplete(Target=Self, AnimName="Super Jump Throw Wait", StoreDidPlay=var "Played Throw Wait")
+    PlayRandomAudioClipTable(Table=Attack Heavy Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayAudioEvent(audioClip=hornet_superjump_pt_4_throw (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hornet_need_throw_superjump (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    ActivateGameObject(gameObject=var "Charged Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Throw Needle", vector=(unset), x=(unset), y=var "Initial Throw Needle Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Throw Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=var "Throw Needle", vector=(0, 150), x=(unset), y=(unset), everyFrame=false)
+    CheckCollisionSideV2(collidingObject=var "Throw Needle", topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"FINISHED", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=true, otherLayerNumber=8, ignoreTriggers=true, ignoreBodyVelocity=true)
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    GetPosition(gameObject=var "Throw Needle", vector=(unset), x=(unset), y=var "Throw Needle Pos Y Start", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Throw Needle", vector=(unset), x=(unset), y=var "Throw Needle Pos Y", z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Check Y", z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Check Y", add=30, everyFrame=false, perSecond=false)
+    FloatTestToBool(float1=var "Throw Needle Pos Y", float2=var "Check Y", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Is Distant", everyFrame=true)
+    BoolFlipEveryFrame(boolVariable=var "Is Distant", everyFrame=true)
+    ActivateGameObject(gameObject=var "Throw Needle Damager", activate=var "Is Distant", recursive=false, resetOnExit=false, everyFrame=true)
+    FloatCompare(float1=var "Throw Needle Pos Y", float2=var "Throw Needle Pos Y Start", tolerance=0.1, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Position Stick Needle Pre
+    on DAMAGER HIT SPIKES → Hit Spikes
+  }
+
+  state Position Stick Needle {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Check Y", z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Check Y", add=15, everyFrame=false, perSecond=false)
+    FloatTestToBool(float1=var "Stick Needle Y", float2=var "Check Y", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Is Distant", everyFrame=false)
+    BoolTestToObject(Test=var "Is Distant", ExpectedValue=true, TrueObject=hornet_superjump_pt_5_needle_impact_2d_distant (sfxstatic_assets_shared.bundle), FalseObject=hornet_superjump_pt_5_needle_impact_2d (sfxstatic_assets_shared.bundle), StoreResult=var "Clip", EveryFrame=false)
+    PlayAudioEvent(audioClip=var "Clip", pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 10, 0), SpawnedPlayerRef=var "")
+    BoolTest(boolVariable=var "Played Throw Wait", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on CANCEL → Catch Wait
+    on FINISHED → Throw Wait
+  }
+
+  state Fall Catch Needle {
+    AudioStopV2(gameObject=var "Superjump Audio Loop", fadeTime=0, cancelOnEarlyExit=false)
+    ActivateGameObject(gameObject=var "Throw Needle Fall", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Throw Needle Fall", vector=(unset), x=(unset), y=var "Initial Throw Needle Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", false], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Grab Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_superjump_cancel (sfxstatic_assets_shared.bundle), pitchMin=0.98, pitchMax=1.02, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Catch Cancel", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DebugLogConsole(logLevel=2, text="Superjump couldn't find roof, cancelling", sendToUnityLog=true)  // disabled
+    on FINISHED → Regain Control To Idle
+  }
+
+  state Throw Wait {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Throw Wait", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GameObjectIsVisible(gameObject=var "Stick Needle", trueEvent=(none), falseEvent=(none), storeResult=var "Needle Visible", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Needle Visible", floatVariable=var "Throw Wait Time", falseValue=0.5, trueValue=0, everyFrame=false)
+    Wait(time=var "Throw Wait Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Jump Antic {
+    AudioStopV2(gameObject=var "Superjump Audio Loop", fadeTime=0, cancelOnEarlyExit=false)
+    PlayAudioEvent(audioClip=hornet_superjump_pt_6_hornet_jump_antic (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Jump Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dash Start
+  }
+
+  state Catch Wait {
+    ActivateGameObject(gameObject=var "Stick Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Throw Wait", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fall Needle
+  }
+
+  state Fall Needle {
+    GetPosition(gameObject=var "Throw Needle Fall", vector=(unset), x=(unset), y=var "Current Throw Needle Y", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Throw Needle Fall Target", vector=(unset), x=(unset), y=var "Throw Needle Target Y", z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Throw Needle Target Y", float2=var "Current Throw Needle Y", operation=Subtract, storeResult=var "Throw Needle Distance", everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Needle Fall", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Throw Needle Move By", vector3Value=(unset), x=(unset), y=var "Throw Needle Distance", z=(unset), everyFrame=false)
+    iTweenMoveBy(gameObject=var "Throw Needle Fall", id="", vector=var "Throw Needle Move By", time=(unset), delay=0, speed=150, easeType=21, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=false)
+    on FINISHED → Fall Catch Needle
+  }
+
+  state Enough Silk? {
+    GetPlayerDataVariable(VariableName="silk", StoreValue=var "Current Silk")
+    IntCompare(integer1=var "Current Silk", integer2=var "Silk Cost", equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    on CANCEL → Inactive
+    on FINISHED → Relinquish Control
+  }
+
+  state Fall Needle Cancel {
+    SetBoolValue(boolVariable=var "Queued Cancel", boolValue=false, everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_superjump_cancel (sfxstatic_assets_shared.bundle), pitchMin=0.98, pitchMax=1.02, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    GetPosition(gameObject=var "Throw Needle Fall", vector=(unset), x=(unset), y=var "Current Throw Needle Y", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Throw Needle Fall Target", vector=(unset), x=(unset), y=var "Throw Needle Target Y", z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Throw Needle Target Y", float2=var "Current Throw Needle Y", operation=Subtract, storeResult=var "Throw Needle Distance", everyFrame=false)
+    ActivateGameObject(gameObject=var "Throw Needle Fall", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Stick Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Throw Needle Move By", vector3Value=(unset), x=(unset), y=var "Throw Needle Distance", z=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    iTweenMoveBy(gameObject=var "Throw Needle Fall", id="", vector=var "Throw Needle Move By", time=(unset), delay=0, speed=150, easeType=21, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=false)
+    DecelerateV2(gameObject=Self, deceleration=0.98, brakeOnExit=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSuperJump", parameters=[false, var "Stick Needle Y"], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="SUPER JUMP ENDED")
+    on FINISHED → Air Cancel
+  }
+
+  state Start Delay {
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    ListenForSuperdash(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=(none))
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on BUTTON UP → Regain Control
+    on FINISHED → Ground Charge
+  }
+
+  state Regain Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=StartAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    on FINISHED → Inactive
+  }
+
+  state Hit Roof Hard {
+    CallStaticMethod(className="DeliveryQuestItem", methodName="TakeHit", parameters=[], storeResult=(unset var), everyFrame=false)
+    CreateNoiseV2(From=Self, LocalOrigin=(0, 0), Radius=5, Intensity=Normal)
+    ActivateGameObject(gameObject=var "Stick Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Roof Slam Effect R (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    PlayRandomAudioClipTable(Table=Grunt Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=true, Delay=0, CancelOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Hit Roof", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSuperJump", parameters=[false, var "Stick Needle Y"], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="SUPER JUMP ENDED")
+    PlayAudioEvent(audioClip=hornet_land_hard new (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hornet_land_hard (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    on FINISHED → Hit Roof
+  }
+
+  state Hit Roof Soft {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Super Jump Hit Roof Q", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSuperJump", parameters=[false, var "Stick Needle Y"], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="SUPER JUMP ENDED")
+    on FINISHED → Hit Roof
+  }
+
+  state Hit Spikes {
+    SetBoolValue(boolVariable=var "Did Find Roof", boolValue=false, everyFrame=false)
+    DoCameraShakeV4(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false, vibrate=true)
+    GetPosition2D(gameObject=var "Throw Needle", vector=(unset), x=(unset), y=var "Throw Needle Pos Y", space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "MainCamera", vector=(unset), x=(unset), y=var "Main Cam Pos Y", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Main Cam Pos Y", add=10, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Throw Needle Pos Y", float2=var "Main Cam Pos Y", tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    PlayRandomAudioClipTableV3(Table=tink_effect (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=Audio Player Actor Lowpass@AudioSource (audioobjects_assets_all.bundle), SpawnPoint=var "Throw Needle", SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "Spawned Audio Player")
+    SetPosition2D(GameObject=var "Spawned Audio Player", Vector=(unset), X=(unset), Y=var "Main Cam Pos Y", Space=0, EveryFrame=false)
+    on FINISHED → Position Stick Needle Pre
+  }
+
+  state Get Distance {
+    GetPosition(gameObject=var "Throw Needle", vector=(unset), x=(unset), y=var "Current Throw Needle Y", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Throw Needle Target", vector=(unset), x=(unset), y=var "Throw Needle Target Y", z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Throw Needle Target Y", float2=var "Current Throw Needle Y", operation=Subtract, storeResult=var "Throw Needle Distance", everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=0, distance=350, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Did Find Roof", storeHitObject=var "Roof", storeHitPoint=var "Ray Hit Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=var "Throw Needle Distance", repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)  // disabled
+    SuperJumpRaycast(FromGameObject=Self, FromPosition=(unset), Direction=(0, 1), Space=0, Distance=350, HitEvent=(none), NoHitEvent=(none), StoreDidHit=var "Did Find Roof", StoreHitObject=var "Roof", StoreHitPoint=var "Ray Hit Point", StoreDistance=var "Throw Needle Distance", StoreIsTransitionGate=var "Is Transition Gate", StoreHitSpikes=false)
+    SetVector3XYZ(vector3Variable=var "Throw Needle Move By", vector3Value=(unset), x=(unset), y=var "Throw Needle Distance", z=(unset), everyFrame=false)
+    FloatCompare(float1=var "Throw Needle Distance", float2=12, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    ActivateGameObject(gameObject=var "Thread", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Throw Needle
+  }
+
+  state Position Stick Needle Pre {
+    ActivateGameObject(gameObject=var "Throw Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Stick Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Did Find Roof", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    CallStaticMethod(className="NoSuperJumpCollider", methodName="IsInside", parameters=[var "Ray Hit Point"], storeResult=var "Test", everyFrame=false)
+    BoolTest(boolVariable=var "Test", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    HasComponent(gameObject=var "Roof", component="NoSuperJumpCollider", removeOnExit=false, trueEvent=→"CANCEL", falseEvent=(none), store=(unset), everyFrame=false)
+    GetParent(gameObject=var "Stick Needle", storeResult=var "Stick Needle Parent")
+    SetTransformParent(gameObject=var "Stick Needle", parent=<null>, worldPositionStays=true)
+    GetPosition2D(gameObject=var "Throw Needle", vector=(unset), x=var "Throw Needle X", y=(unset), space=0, everyFrame=false)
+    SetPosition2D(GameObject=var "Stick Needle", Vector=var "Ray Hit Point", X=0, Y=0, Space=0, EveryFrame=false)
+    GetPosition2D(gameObject=var "Stick Needle", vector=(unset), x=var "Stick Needle X", y=var "Stick Needle Y", space=0, everyFrame=false)
+    FloatOperator(float1=var "Throw Needle X", float2=var "Stick Needle X", operation=Subtract, storeResult=var "Stick Needle Offset X", everyFrame=false)
+    Translate(gameObject=var "Stick Needle", vector=(unset), x=var "Stick Needle Offset X", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)  // disabled
+    BoolTest(boolVariable=var "Is Transition Gate", isTrue=→"TRANSITION GATE", isFalse=(none), everyFrame=false)
+    CheckOutOfCamera(gameObject=var "Stick Needle", margin=0, outsideEvent=→"FINISHED", insideEvent=(none), insideBool=false, outsideBool=false, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Nail Terrain Hit Effect (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Stick Needle", position=(unset), rotation=(unset), storeObject=var "")
+    on CANCEL → Catch Wait
+    on TRANSITION GATE → Hit Transition Gate
+    on FINISHED → Position Stick Needle
+  }
+
+  state Cancel Rumbling Focus {
+    BoolTest(boolVariable=var "Started Rumbling Focus", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Started Rumbling Focus", boolValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus", setValue=false, everyFrame=false)
+    on FINISHED → Cancel Rumbling Focus 2
+  }
+
+  state Cancel Rumbling Focus 2 {
+    BoolTest(boolVariable=var "Started Rumbling Focus 2", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Started Rumbling Focus 2", boolValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingFocus2", setValue=false, everyFrame=false)
+    on FINISHED → Reset Effects
+  }
+
+  state Hit Transition Gate {
+    ActivateGameObject(gameObject=var "Stick Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_superjump_pt_5_needle_impact_2d_distant (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 10, 0), SpawnedPlayerRef=var "")
+    BoolTest(boolVariable=var "Played Throw Wait", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Throw Wait
+  }
+
+  state Leaving Scene {
+    BoolTest(boolVariable=var "Is Transition Gate", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Cancel
+    on LEVEL LOADED → Cancel
+  }
+
+  state Entered Jumping {
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Begin Jumping
+  }
+
+  state Begin Jumping {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SuperJumpRaycast(FromGameObject=Self, FromPosition=(unset), Direction=(0, 1), Space=0, Distance=350, HitEvent=(none), NoHitEvent=(none), StoreDidHit=var "Did Find Roof", StoreHitObject=var "Roof", StoreHitPoint=var "Ray Hit Point", StoreDistance=var "Throw Needle Distance", StoreIsTransitionGate=var "Is Transition Gate", StoreHitSpikes=var "Did Hit Spikes")
+    on FINISHED → Position Stick Needle Pre 2
+  }
+
+  state Position Stick Needle Pre 2 {
+    ActivateGameObject(gameObject=var "Throw Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Stick Needle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Did Find Roof", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Did Hit Spikes", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CallStaticMethod(className="NoSuperJumpCollider", methodName="IsInside", parameters=[var "Ray Hit Point"], storeResult=var "Test", everyFrame=false)
+    BoolTest(boolVariable=var "Test", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    HasComponent(gameObject=var "Roof", component="NoSuperJumpCollider", removeOnExit=false, trueEvent=→"CANCEL", falseEvent=(none), store=(unset), everyFrame=false)
+    GetParent(gameObject=var "Stick Needle", storeResult=var "Stick Needle Parent")
+    SetTransformParent(gameObject=var "Stick Needle", parent=<null>, worldPositionStays=true)
+    GetPosition2D(gameObject=var "Throw Needle", vector=(unset), x=var "Throw Needle X", y=(unset), space=0, everyFrame=false)
+    SetPosition2D(GameObject=var "Stick Needle", Vector=var "Ray Hit Point", X=0, Y=0, Space=0, EveryFrame=false)
+    GetPosition2D(gameObject=var "Stick Needle", vector=(unset), x=var "Stick Needle X", y=var "Stick Needle Y", space=0, everyFrame=false)
+    FloatOperator(float1=var "Throw Needle X", float2=var "Stick Needle X", operation=Subtract, storeResult=var "Stick Needle Offset X", everyFrame=false)
+    Translate(gameObject=var "Stick Needle", vector=(unset), x=var "Stick Needle Offset X", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)  // disabled
+    BoolTest(boolVariable=var "Is Transition Gate", isTrue=→"TRANSITION GATE", isFalse=(none), everyFrame=false)
+    on CANCEL → Queue Cancel
+    on TRANSITION GATE → Hit Transition Gate 2
+    on FINISHED → Dash Start Quick
+  }
+
+  state Hit Transition Gate 2 {
+    ActivateGameObject(gameObject=var "Stick Needle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Dash Start Quick
+  }
+
+  state Dash Start Quick {
+    ActivateGameObject(gameObject=var "Damager", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Super Jump Loop")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["freezeCharge", false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashing", true], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=var "Jump Speed", everyFrame=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetSuperJump", parameters=[true, var "Stick Needle Y"], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Dashing
+  }
+
+  state Pre Entered Jumping {
+    SetBoolValue(boolVariable=var "Queued Cancel", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetCState", parameters=["superDashing", true], storeResult=(unset var), EveryFrame=false)
+    on ENTER SUPERJUMPING → Entered Jumping
+  }
+
+  state Queue Cancel {
+    SetFloatValue(floatVariable=var "Cancelable Time", floatValue=0.05, everyFrame=false)
+    SetBoolValue(boolVariable=var "Queued Cancel", boolValue=true, everyFrame=false)
+    on FINISHED → Dash Start Quick
+  }
+
+  var Cancelable Time: float = 0.2
+  var Charge Time: float = 0.8
+  var Check Y: float = 0
+  var Current Throw Needle Y: float = 0
+  var Initial Throw Needle Y: float = 0
+  var Jump Speed: float = 33
+  var Main Cam Pos Y: float = 0
+  var Speed: float = 0
+  var Stick Needle Offset X: float = 0
+  var Stick Needle X: float = 0
+  var Stick Needle Y: float = 0
+  var Throw Needle Distance: float = 0
+  var Throw Needle Pos Y: float = 0
+  var Throw Needle Target Y: float = 0
+  var Throw Needle X: float = 0
+  var Throw Wait Time: float = 0
+  var Y Speed: float = 0
+  var Throw Needle Pos Y Start: float = 0
+  var Current Silk: int = 0
+  var Silk Cost: int = 1
+  var Sprite Flash ID: int = 0
+  var Did Find Roof: bool = false
+  var Is Distant: bool = false
+  var Needle Visible: bool = false
+  var On Ground: bool = false
+  var Played Throw Wait: bool = false
+  var Show Thread: bool = false
+  var Terrain Above: bool = false
+  var Did Add Using Silk: bool = false
+  var Test: bool = false
+  var Did Start Flash: bool = false
+  var Started Rumbling Focus: bool = false
+  var Started Rumbling Focus 2: bool = false
+  var Is Transition Gate: bool = false
+  var Queued Cancel: bool = false
+  var Did Hit Spikes: bool = false
+  var Ray Hit Point: vector2 = (0, 0)
+  var Throw Needle Move By: vector3 = (0, 0, 0)
+  var Antic Effect L: gameObject = <null>
+  var Antic Effect R: gameObject = <null>
+  var Attacks Folder: gameObject = <null>
+  var Camera Target: gameObject = <null>
+  var Charged Effect: gameObject = <null>
+  var Charging Fader: gameObject = <null>
+  var Damager: gameObject = <null>
+  var Effects Folder: gameObject = <null>
+  var Grab Effect: gameObject = <null>
+  var Self: gameObject = <null>
+  var Stick Needle: gameObject = <null>
+  var Stick Needle Parent: gameObject = <null>
+  var Throw Needle: gameObject = <null>
+  var Throw Needle Fall: gameObject = <null>
+  var Throw Needle Fall Target: gameObject = <null>
+  var Throw Needle Target: gameObject = <null>
+  var Superjump Audio Loop: gameObject = <null>
+  var Roof: gameObject = <null>
+  var Charge Audio: gameObject = <null>
+  var Thread: gameObject = <null>
+  var Spawned Audio Player: gameObject = <null>
+  var Extra Throw Effect: gameObject = <null>
+  var Extra Ground Effect: gameObject = <null>
+  var Nail Art Ready: gameObject = <null>
+  var Throw Needle Damager: gameObject = <null>
+  var Thread Loop: gameObject = <null>
+  var Clip: object = <null>
+}

@@ -1,0 +1,177 @@
+# Mines Crawler
+# 1 location(s):
+#   Mines_25 / Mines Crawler (5)
+
+// component disabled: this FSM does not run until something enables it
+fsm Mines Crawler {
+  start Init
+
+  state Init {
+    FindChild(gameObject=Self, childName="Attack Box", storeResult=var "Attack Box")
+    FindChild(gameObject=Self, childName="Wake Range", storeResult=var "Wake Range Obj")
+    FindChild(gameObject=Self, childName="Wall Range", storeResult=var "Wall Range Obj")
+    ActivateGameObject(gameObject=var "Edge Range Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wall Range Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Check Type
+  }
+
+  state Activate {
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetActive(false))
+    on FINISHED → Check Dir
+  }
+
+  state Check Dir {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Scale", float2=0, tolerance=0, equal=→"LEFT DOWN", lessThan=→"UP RIGHT", greaterThan=→"LEFT DOWN", everyFrame=false)
+    on UP RIGHT → Up Right
+    on LEFT DOWN → Left Down
+  }
+
+  state Up Right {
+    SetVector2XY(vector2Variable=var "Current Velocity", vector2Value=var "UR Velocity", x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Walk Start
+  }
+
+  state Check Type {
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Angle", space=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=(unset), yScale=var "Y Scale", zScale=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=90, tolerance=1, equal=→"WALL", lessThan=(none), greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Y Scale", float2=-1, tolerance=0.1, equal=→"ROOF", lessThan=(none), greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=0, tolerance=1, equal=→"FLOOR", lessThan=(none), greaterThan=(none), everyFrame=false)
+    on FLOOR → Floor
+    on ROOF → Roof
+    on WALL → Wall
+    on FINISHED → Floor
+  }
+
+  state Floor {
+    SetVector2XY(vector2Variable=var "LD Velocity", vector2Value=(unset), x=-3, y=0, everyFrame=false)
+    SetVector2XY(vector2Variable=var "UR Velocity", vector2Value=(unset), x=3, y=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    SetFsmInt(gameObject=Self, fsmName="recoil", variableName="Recoil per second", setValue=15, everyFrame=false)  // disabled
+    SetFsmFloat(gameObject=Self, fsmName="recoil", variableName="Recoil per second", setValue=15, everyFrame=false)  // disabled
+    SetRecoilFreeze(target=Self, freeze=true)
+    on FINISHED → Activate
+  }
+
+  state Roof {
+    SetVector2XY(vector2Variable=var "LD Velocity", vector2Value=(unset), x=-3, y=0, everyFrame=false)
+    SetVector2XY(vector2Variable=var "UR Velocity", vector2Value=(unset), x=3, y=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetFsmInt(gameObject=Self, fsmName="recoil", variableName="Recoil per second", setValue=0, everyFrame=false)
+    SetRecoilFreeze(target=Self, freeze=true)
+    on FINISHED → Activate
+  }
+
+  state Wall {
+    SetVector2XY(vector2Variable=var "LD Velocity", vector2Value=(unset), x=0, y=-3, everyFrame=false)
+    SetVector2XY(vector2Variable=var "UR Velocity", vector2Value=(unset), x=0, y=3, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    SetRecoilFreeze(target=Self, freeze=true)
+    on FINISHED → Activate
+  }
+
+  state Left Down {
+    SetVector2XY(vector2Variable=var "Current Velocity", vector2Value=var "LD Velocity", x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Walk Start
+  }
+
+  state Walking {
+    ConstrainMovement(gameObject=Self, xConstrain=0.25, yConstrain=0.25)
+    SetBoolValue(boolVariable=var "Edge Range", boolValue=true, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=var "Current Velocity", x=(unset), y=(unset), everyFrame=true)
+    BoolTest(boolVariable=var "Wake Range", isTrue=→"WAKE", isFalse=(none), everyFrame=true)
+    RayCast2dV2(fromGameObject=var "Edge Range Obj", fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Edge Range", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=3, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Wall Range Obj", fromPosition=(unset), direction=(-1, 0), space=1, distance=0.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"TURN", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=3, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    BoolTest(boolVariable=var "Edge Range", isTrue=(none), isFalse=→"TURN", everyFrame=true)
+    on TURN → Turn Check
+    on WAKE → Attack Antic
+  }
+
+  state Turn Check {
+    BoolTest(boolVariable=(unset), isTrue=(none), isFalse=→"CANCEL", everyFrame=false)  // disabled
+    on CANCEL → Cancel Frame
+    on FINISHED → Turn
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Walking
+  }
+
+  state Walk Start {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=Self, vector=var "Current Velocity", x=(unset), y=(unset), everyFrame=true)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Walking
+  }
+
+  state Turn {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    on FINISHED → Flip
+  }
+
+  state Flip {
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Check Dir
+  }
+
+  state Attack Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack Antic")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=ruin_flying_sentry_prepare (sharedassets34.assets))
+    on FINISHED → Attack
+  }
+
+  state Attack {
+    ActivateGameObject(gameObject=var "Attack Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mines_crystal_expand (sharedassets251.assets))
+    on FINISHED → Attack Ready
+  }
+
+  state Attack Recover {
+    ActivateGameObject(gameObject=var "Attack Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Attack Box", audioClip=mines_crawler_hit_top (sharedassets249.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mines_crawler_hit_top (sharedassets249.assets))  // disabled
+    on FINISHED → Walk Restart
+  }
+
+  state Attack Ready {
+    BoolTest(boolVariable=var "Wake Range", isTrue=(none), isFalse=→"HIDE", everyFrame=true)
+    on HIDE → Attack Recover
+  }
+
+  state Walk Restart {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=Self, vector=var "Current Velocity", x=(unset), y=(unset), everyFrame=true)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Walking
+  }
+
+  var Edge Range Obj: gameObject = Mines Crawler (5)/Edge Range
+  var Wall Range Obj: gameObject = Mines Crawler (5)/Wall Range
+
+  var Angle: float = 0
+  var X Scale: float = 0
+  var Y Scale: float = 0
+  var Edge Range: bool = false
+  var Wake Range: bool = false
+  var Current Velocity: vector2 = (0, 0)
+  var LD Velocity: vector2 = (0, 0)
+  var UR Velocity: vector2 = (0, 0)
+  var Attack Box: gameObject = <null>
+  var Wake Range Obj: gameObject = <null>
+}

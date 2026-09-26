@@ -1,0 +1,86 @@
+# Control
+# 2 location(s):
+#   herodynamic_assets_all.bundle / Weaver Bomb Blast
+#   localpoolprefabs_assets_shared.bundle / Weaver Bomb Blast Zap
+
+// uses template: weaver_bomb_blast
+fsm Control {
+  start Start
+
+  state Start {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Blast")
+    ActivateGameObject(gameObject=var "Blast", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetTag(gameObject=Self, tag="Weaver Bomb Blast")
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    on FINISHED → Check Closest Blast
+  }
+
+  state Blast {
+    RandomFloat(min=0.6, max=0.8, storeResult=var "Size")
+    SetScale(gameObject=var "Blast", vector=(unset), x=var "Size", y=var "Size", z=(unset), everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Blast", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    PlayRandomAudioClipTable(Table=weaver_bomb_appear (sfxdynamic_assets_trobbio.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Reset Pos
+  }
+
+  state Wait {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state End {
+    RecycleSelf()
+  }
+
+  state Reset Pos {
+    SetTag(gameObject=Self, tag="Untagged")
+    CallMethodProper(gameObject=Self, behaviour="RecycleResetHandler", methodName="OnPreRecycle", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Wait
+  }
+
+  state Appear Pause {
+    Wait(time=var "Wait Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Blast
+  }
+
+  state Check Closest Blast {
+    FindClosest(gameObject=Self, withTag="Weaver Bomb Blast", ignoreOwner=true, mustBeVisible=false, storeObject=var "Nearest Blast", storeDistance=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=var "Min Spread Distance", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Nearest Blast", offsetX=0, offsetY=0, storeAngle=var "Shift Angle", pause=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Shift Angle", add=180, everyFrame=false, perSecond=false)
+    ConvertAngleToVector2(angle=var "Shift Angle", storeVector=var "Shift Vector", everyFrame=false)
+    FloatOperator(float1=var "Min Spread Distance", float2=var "Distance", operation=Subtract, storeResult=var "Shift Distance", everyFrame=false)
+    Vector2Multiply(vector2Variable=var "Shift Vector", multiplyBy=var "Shift Distance", everyFrame=false)
+    Translate(gameObject=Self, vector=var "Shift Vector", x=(unset), y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendEvent(eventTarget=Self, sendEvent=→"RETRY", delay=0, everyFrame=false)
+    on FINISHED → Pre Wait Frame
+    on RETRY → Retry Frame
+  }
+
+  state Retry Frame {
+    IntAdd(intVariable=var "Retries", add=1, everyFrame=false)
+    IntCompare(integer1=var "Retries", integer2=10, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    NextFixedFrameEvent(SendEvent=→"FINISHED")
+    on FINISHED → Check Closest Blast
+    on CANCEL → Pre Wait Frame
+  }
+
+  state Pre Wait Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Appear Pause
+  }
+
+  var Size: float = 0
+  var Distance: float = 0
+  var Shift Angle: float = 0
+  var Shift Distance: float = 0
+  var Min Spread Distance: float = 1.5
+  var Wait Time: float = 0
+  var Retries: int = 0
+  var Shift Vector: vector2 = (0, 0)
+  var Self: gameObject = <null>
+  var Blast: gameObject = <null>
+  var Nearest Blast: gameObject = <null>
+}

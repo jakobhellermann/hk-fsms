@@ -1,0 +1,113 @@
+# Geo Sprite
+# 1 location(s):
+#   resources.assets / _GameCameras/HudCamera/Anchor TL/Hud Canvas Offset/Hud Canvas/Geo Counter/Geo Sprite
+
+fsm Geo Sprite {
+  start Init
+  on TO ZERO → Lose  // from any state
+  on SHATTER → Shatter  // from any state
+
+  state Idle {
+    SetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Coin Get")
+    SetMeshRenderer(gameObject=Self, active=true)
+    on GET → Get
+    on TAKE → Take
+  }
+
+  state Get {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Coin Get Loop")
+    on IDLE → Idle
+    on TAKE → Take
+  }
+
+  state Lose {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Coin Idle")
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=false)
+    on LEVEL LOADED → Idle
+  }
+
+  state Shatter {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Coin Break", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindChild(gameObject=var "Parent", childName="Add Text", storeResult=var "Add Text")
+    FindChild(gameObject=var "Parent", childName="Subtract Text", storeResult=var "Sub Text")
+    DestroyObject(gameObject=var "Add Text", delay=0, detachChildren=false)  // disabled
+    DestroyObject(gameObject=var "Sub Text", delay=0, detachChildren=false)  // disabled
+    on FINISHED → Destroy Object
+  }
+
+  state Destroy Object {
+    SetMeshRenderer(gameObject=Self, active=false)
+    FindChild(gameObject=var "Parent", childName="Geo Text", storeResult=var "Text")
+    SendEventByName(eventTarget=GameObject(var "Text"), sendEvent="DOWN", delay=0, everyFrame=false)
+    on LEVEL LOADED → Reset
+  }
+
+  state Init {
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="firstGeo", isTrue=(none), isFalse=→"GEO FIRST")
+    BoolTest(boolVariable=var "Initialised", isTrue=→"FINISHED", isFalse=→"APPEAR", everyFrame=false)  // disabled
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="isFirstGame", isTrue=→"APPEAR", isFalse=→"FINISHED")  // disabled
+    on FINISHED → pause
+    on APPEAR → pause
+    on GEO FIRST → First Geo Uncollected
+  }
+
+  state pause {
+    SetBoolValue(boolVariable=var "Initialised", boolValue=true, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindChild(gameObject=var "Parent", childName="Geo Text", storeResult=var "Text")
+    SendEventByName(eventTarget=GameObject(var "Text"), sendEvent="DOWN INSTANT", delay=0, everyFrame=false)
+    Wait(time=4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Appear
+  }
+
+  state Appear {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Coin Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetMeshRenderer(gameObject=Self, active=true)
+    SendEventByName(eventTarget=GameObject(var "Text"), sendEvent="UP", delay=0, everyFrame=false)
+    on FINISHED → Idle
+    on GET → Get
+  }
+
+  state Take {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Coin Idle")
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=false)  // disabled
+    ObjectJitterLocal(gameObject=Self, x=0.1, y=0.1, z=(unset))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor 2D, spawnPoint=var "Hero", audioClip=geo_deplete_count_down, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on IDLE → Idle
+    on GET → Get
+    on LEVEL LOADED → Idle
+  }
+
+  state First Geo Uncollected {
+    SetMeshRenderer(gameObject=Self, active=false)
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindChild(gameObject=var "Parent", childName="Geo Text", storeResult=var "Text")
+    SendEventByName(eventTarget=GameObject(var "Text"), sendEvent="DOWN", delay=0, everyFrame=false)
+    on CHECK FIRST → First Get
+  }
+
+  state First Get {
+    SetPlayerDataBool(boolName="firstGeo", value=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Coin Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetMeshRenderer(gameObject=Self, active=true)
+    SendEventByName(eventTarget=GameObject(var "Text"), sendEvent="UP", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Reset {
+    SendEventByName(eventTarget=GameObject(var "Text"), sendEvent="UP", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Frame: int = 0
+  var Initialised: bool = false
+  var Start Pos: vector3 = (0, 0, 0)
+  var Add Text: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Sub Text: gameObject = <null>
+  var Text: gameObject = <null>
+}

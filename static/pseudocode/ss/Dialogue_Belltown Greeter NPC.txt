@@ -1,0 +1,327 @@
+# Dialogue
+# 1 location(s):
+#   Belltown / Town States/Spinner Defeated/Bagpipers Not Here/Belltown Greeter NPC
+
+fsm Dialogue {
+  start Init
+
+  state End {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Wave Active?
+  }
+
+  state Init {
+    SetTransformParent(gameObject=var "Turn Marker Left", parent=<null>, worldPositionStays=true)
+    SetTransformParent(gameObject=var "Turn Marker Right", parent=<null>, worldPositionStays=true)
+    on FINISHED → Wave Active?
+  }
+
+  state Meet {
+    SetPlayerDataVariable(VariableName="BelltownGreeterConvo", SetValue=1)
+    GetPlayerDataBool(boolName="visitedBellhartHaunted", storeValue=var "Visited Haunted")
+    GetPlayerDataBool(boolName="citadelWoken", storeValue=var "Citadel Woken")
+    GetPlayerDataBool(boolName="spinnerDefeated", storeValue=var "Spinner Defeated")
+    BoolTestMulti(boolVariables=[var "Visited Haunted", var "Spinner Defeated"], boolStates=[false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Test", everyFrame=false)
+    BoolOperator(bool1=var "Test", bool2=var "Citadel Woken", operation=OR, storeResult=var "Test", everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Convo Key", falseString="GREETER_MEET", trueString="GREETER_MEET_ALT", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Belltown", Key="GREETER_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Convo {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="BELLHART_GREETER")
+    AudioPlaySimple(gameObject=var "Audio Loop IdleBell", volume=1, oneShotClip=<null>)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GetPlayerDataVariable(VariableName="BelltownGreeterConvo", StoreValue=var "Convo")
+    IntSwitch(intVariable=var "Convo", compareTo=[0], sendEvent=[→"MEET"], everyFrame=false)
+    PlayerDataBoolMultiTest(boolTests=[{boolName="IsAnyCursed", inputBool=(unset), expectedValue=true, storeValue=(unset)}, {boolName="soulSnareReady", inputBool=(unset), expectedValue=false, storeValue=(unset)}], storeValue=(unset), passedEvent=→"CURSED", failedEvent=(none))
+    PlayerDataVariableTest(VariableName="IsAnyCursed", ExpectedValue=true, IsExpectedEvent=→"CURSED", IsNotExpectedEvent=(none))  // disabled
+    GetPlayerDataVariable(VariableName="BelltownHouseState", StoreValue=var "Belltown House State")
+    EnumSwitch(enumVariable=var "Belltown House State", compareTo=[BelltownHouseStates(1), BelltownHouseStates(2)], sendEvent=[→"HOUSE HALF", →"HOUSE FULL"], everyFrame=false)
+    IntSwitch(intVariable=var "Convo", compareTo=[0, 1], sendEvent=[→"MEET", →"1"], everyFrame=false)
+    on MEET → Meet
+    on 1 → Talk 1
+    on FINISHED → Check Twisted Bud Convo
+    on CURSED → Cursed
+    on HOUSE HALF → House Half Talk
+    on HOUSE FULL → House Full Talked?
+  }
+
+  state Talk 1 {
+    SetPlayerDataVariable(VariableName="BelltownGreeterConvo", SetValue=2)
+    PlayerDataBoolTest(boolName="visitedBellhartHaunted", isTrue=(none), isFalse=→"CANCEL")
+    RunDialogue(Sheet="Belltown", Key="GREETER_TALK_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+    on CANCEL → Repeat
+  }
+
+  state Idle {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SendRandomEventFair(Events=[{SendEvent=(none), Probability=0.95}, {SendEvent=→"IDLE SING", Probability=0.05}], TrackingArray=var "Idle Sing Tracking Array", MissedMultiplier=2)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    CheckTrackTriggerCount(target=var "Wave Trigger", count=0, test=MoreThan, everyFrame=true, successEvent=→"WAVE TRIGGER")
+    RandomWait(min=2, max=4, finishEvent=→"WALK", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.2, MaxReactDelay=1.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlayInState(gameObject=var "Audio Loop IdleBell", volume=1)
+    on INTERACT → Face Hero
+    on WALK → Start Walk
+    on SING → Start Sing
+    on IDLE SING → Idle Sing
+    on WAVE TRIGGER → Waving
+    on STARTLE → Startle
+  }
+
+  state Walk {
+    GetIsInteractionQueued(Target=Self, IsQueuedEvent=→"CANCEL", NotQueuedEvent=(none), StoreIsQueued=(unset), EveryFrame=true)
+    CheckTrackTriggerCount(target=var "Wave Trigger", count=0, test=MoreThan, everyFrame=true, successEvent=→"WAVE TRIGGER")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Walk", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-1.5, ySpeed=(unset), everyFrame=false)
+    RandomWait(min=2, max=6, finishEvent=→"CANCEL", realTime=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignToBool(Value=var "X Scale", StoreIsPositive=var "Facing Left", EveryFrame=false)
+    BoolTestToGameObject(Test=var "Facing Left", ExpectedValue=true, TrueGameObject=var "Turn Marker Left", FalseGameObject=var "Turn Marker Right", StoreResult=var "Turn Marker", EveryFrame=false)
+    CheckPassedTarget(Self=Self, Target=var "Turn Marker", IsActive=true, DefaultFacingRight=false, DistancePast=0, StoreResult=(unset), PassedEvent=→"TURN", NotPassedEvent=(none), EveryFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.2, MaxReactDelay=1.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlayInState(gameObject=Self, volume=0.85)
+    AudioPlayInState(gameObject=var "Audio Loop WalkBell", volume=1)
+    on TURN → Turn
+    on CANCEL → Start Idle
+    on SING → Start Sing
+    on WAVE TRIGGER → Activate Interactible
+    on STARTLE → Startle
+  }
+
+  state Turn {
+    PlayRandomAudioClipTable(Table=small_bell_movement (sfxdynamic_assets_areabellareacradleareasongareatutorial.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayAudioEvent(audioClip=trobbio_showoff_spin_and_pose_1 (sfxstatic_assets_trobbio.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=pavo_twirl (sfxstatic_assets_areabell.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    FlipScaleOnExit(gameObject=Self, flipHorizontally=true, flipVertically=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spin", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Walk
+  }
+
+  state Start Walk {
+    SetRandomAudioClipFromTable(Table=Pavo_idle_hum_loop (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    PlayAudioEvent(audioClip=pavo_little_bob_between_anims (sfxstatic_assets_areabell.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    SendRandomEventFair(Events=[{SendEvent=(none), Probability=0.95}, {SendEvent=→"IDLE SING", Probability=0.05}], TrackingArray=var "Idle Sing Tracking Array", MissedMultiplier=2)
+    SendRandomEventFair(Events=[{SendEvent=→"FINISHED", Probability=0.8}, {SendEvent=→"TURN", Probability=0.2}], TrackingArray=var "Start Walk Tracking Array", MissedMultiplier=2)
+    on IDLE SING → Idle Sing
+    on TURN → Turn
+    on FINISHED → Walk
+  }
+
+  state Face Hero {
+    StopWalkerV2(Target=Self)
+    AudioStop(gameObject=var "Audio Loop Voice", fadeTime=0)
+    SetFloatValue(floatVariable=var "Turn Anim Duration", floatValue=0, everyFrame=false)
+    FaceObjectV3(ObjectA=Self, ObjectB=var "Hero", SpriteFacesRight=false, NewAnimationClip="Spin", ResetFrame=true, PauseBetweenTurns=0, StoreDuration=var "Turn Anim Duration", EveryFrame=false)
+    Wait(time=var "Turn Anim Duration", finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=pavo_little_bob_between_anims (sfxstatic_assets_areabell.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Convo
+  }
+
+  state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    AudioPlaySimple(gameObject=var "Audio Loop SingBell", volume=1, oneShotClip=<null>)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Pavo_sing (sfxdynamic_assets_areabell.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    AudioStopV2(gameObject=var "Audio Loop SingBell", fadeTime=0, cancelOnEarlyExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="SingToIdle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Start Idle
+  }
+
+  state Idle Sing {
+    AudioPlaySimple(gameObject=var "Audio Loop SingBell", volume=1, oneShotClip=<null>)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Pavo_idle_sing (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=pavo_move_into_sing (sfxstatic_assets_areabell.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    RandomWait(min=2, max=5, finishEvent=→"CANCEL", realTime=false)
+    GetIsInteractionQueued(Target=Self, IsQueuedEvent=→"CANCEL", NotQueuedEvent=(none), StoreIsQueued=(unset), EveryFrame=true)
+    on CANCEL → Sing End
+    on SING → Sing
+    on STARTLE → Startle
+  }
+
+  state House Half Talk {
+    CheckQuestCompleteTotalGroup(TotalGroup=Belltown House Key (dataassets_assets_assets/dataassets/questsystem/completetotalgroups.bundle), trueEvent=(none), falseEvent=→"CANCEL", storeValue=(unset))
+    PlayerDataVariableTest(VariableName="BelltownGreeterHouseHalfDlg", ExpectedValue=true, IsExpectedEvent=→"CANCEL", IsNotExpectedEvent=(none))
+    SetPlayerDataVariable(VariableName="BelltownGreeterHouseHalfDlg", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="GREETER_HOUSE_MID_TALK", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Repeat
+    on CONVO_END → End
+  }
+
+  state House Full Talk {
+    SetPlayerDataVariable(VariableName="BelltownGreeterHouseFullDlg", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="GREETER_HOUSE_FULL_TALK", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → House Key
+  }
+
+  state House Full Repeat {
+    RunDialogue(Sheet="Belltown", Key="GREETER_HOUSE_FULL_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state House Full Talked? {
+    GetPlayerDataVariable(VariableName="BelltownHouseVisited", StoreValue=var "House Unlocked")
+    GetPlayerDataBool(boolName="BelltownGreeterFurnishingDlg", storeValue=var "Furnishing Dlg")
+    CountShopItemsFromStock(StockList=Bellhart Stock (dataassets_assets_assets/dataassets/shopitems.bundle), MatchFlag=BellhomeFurnishing, PurchasedOnly=true, StoreCount=var "Purchased Furnishings")
+    IntCompareToBool(integer1=var "Purchased Furnishings", integer2=2, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Test", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "House Unlocked", var "Furnishing Dlg", var "Test"], boolStates=[true, false, false], trueEvent=→"FURNISH", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckQuestCompleteTotalGroup(TotalGroup=Belltown House Key (dataassets_assets_assets/dataassets/questsystem/completetotalgroups.bundle), trueEvent=(none), falseEvent=→"CANCEL", storeValue=(unset))
+    PlayerDataVariableTest(VariableName="BelltownGreeterHouseFullDlg", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on CANCEL → Check Twisted Bud Convo
+    on FALSE → House Full Talk
+    on TRUE → Check Twisted Bud Convo 2
+    on FURNISH → Furnish Dlg
+  }
+
+  sequence state House Key {
+    SavedItemGet(Item=Belltown House Key (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    on FINISHED → End
+  }
+
+  state Waving {
+    PlayAudioEvent(audioClip=pavo_little_bob_between_anims (sfxstatic_assets_areabell.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Pavo_talk (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    StopWalkerV2(Target=Self)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wave", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FaceObjectV3(ObjectA=Self, ObjectB=var "Hero", SpriteFacesRight=false, NewAnimationClip="SpinToWave", ResetFrame=true, PauseBetweenTurns=0, StoreDuration=var "Turn Anim Duration", EveryFrame=true)
+    CheckTrackTriggerCount(target=var "Wave Trigger", count=0, test=LessThanOrEqual, everyFrame=true, successEvent=→"CANCEL")
+    AudioPlayInState(gameObject=var "Audio Loop SingBell", volume=1)
+    Wait(time=2.5, finishEvent=→"CALL", realTime=false)
+    on INTERACT → Face Hero
+    on CANCEL → Start Idle
+    on CALL → Waving Call
+  }
+
+  state Cursed {
+    PlayerDataBoolTest(boolName="BelltownGreetCursedConvo", isTrue=→"REPEAT", isFalse=→"SPEAK")
+    on SPEAK → Cursed Speak
+    on REPEAT → Cursed Speak R
+  }
+
+  state Cursed Speak {
+    RunDialogue(Sheet="Belltown", Key="GREETER_CURSED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataBool(boolName="BelltownGreetCursedConvo", value=true)
+    on CONVO_END → End
+  }
+
+  state Cursed Speak R {
+    RunDialogue(Sheet="Belltown", Key="GREETER_CURSED_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Start Sing {
+    PlayAudioEvent(audioClip=pavo_move_into_sing (sfxstatic_assets_areabell.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Sing
+  }
+
+  state Start Idle {
+    PlayAudioEvent(audioClip=pavo_little_bob_between_anims (sfxstatic_assets_areabell.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Furnish Dlg {
+    SetPlayerDataBool(boolName="BelltownGreeterFurnishingDlg", value=true)
+    RunDialogue(Sheet="Belltown", Key="GREETER_FURNISHINGS", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Wave Active? {
+    GetPlayerDataVariable(VariableName="BelltownHouseState", StoreValue=var "Belltown House State")
+    EnumCompare(enumVariable=var "Belltown House State", compareTo=Full, equalEvent=(none), notEqualEvent=(none), storeResult=var "Is Full", everyFrame=false)
+    CheckQuestCompleteTotalGroup(TotalGroup=Belltown House Key (dataassets_assets_assets/dataassets/questsystem/completetotalgroups.bundle), trueEvent=(none), falseEvent=(none), storeValue=var "Test")
+    GetPlayerDataBool(boolName="BelltownGreeterHouseFullDlg", storeValue=var "House Unlocked")
+    BoolTestMulti(boolVariables=[var "House Unlocked", var "Test", var "Is Full"], boolStates=[false, true, true], trueEvent=(none), falseEvent=(none), storeResult=var "Wave Active", everyFrame=false)
+    ActivateGameObject(gameObject=var "Wave Trigger", activate=var "Wave Active", recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Activate Interactible {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=true, UseChildren=false)
+    on FINISHED → Waving
+  }
+
+  state Startle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Pavo_startle (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Start Idle
+  }
+
+  state Waving Call {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Pavo_waving_call (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Waving
+  }
+
+  state Twisted Bud Convo {
+    SetPlayerDataVariable(VariableName="BelltownGreeterTwistedBudDlg", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="GREETER_TWISTED_BUD_HINT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Check Twisted Bud Convo {
+    PlayerDataBoolTest(boolName="BelltownGreeterTwistedBudDlg", isTrue=→"FINISHED", isFalse=(none))
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=1, IsCollected=→"TRUE", NotCollected=(none), ItemName="", Sprite=var "", Item=Wood Witch Item (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    on FINISHED → Repeat
+    on TRUE → Twisted Bud Convo
+  }
+
+  state Check Twisted Bud Convo 2 {
+    PlayerDataBoolTest(boolName="BelltownGreeterTwistedBudDlg", isTrue=→"FINISHED", isFalse=(none))
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=1, IsCollected=→"TRUE", NotCollected=(none), ItemName="", Sprite=var "", Item=Wood Witch Item (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    on FINISHED → House Full Repeat
+    on TRUE → Twisted Bud Convo
+  }
+
+  var Turn Anim Duration: float = 0
+  var X Scale: float = 0
+  var Convo: int = 0
+  var Purchased Furnishings: int = 0
+  var Facing Left: bool = false
+  var Visited Haunted: bool = false
+  var House Unlocked: bool = false
+  var Furnishing Dlg: bool = false
+  var Test: bool = false
+  var Citadel Woken: bool = false
+  var Wave Active: bool = false
+  var Is Full: bool = false
+  var Spinner Defeated: bool = false
+  var Convo Key: string = ""
+  var Turn Marker: gameObject = <null>
+  var Turn Marker Left: gameObject = Town States/Spinner Defeated/Bagpipers Not Here/Belltown Greeter NPC/Turn Marker Left
+  var Turn Marker Right: gameObject = Town States/Spinner Defeated/Bagpipers Not Here/Belltown Greeter NPC/Turn Marker Right
+  var Wave Trigger: gameObject = Town States/Spinner Defeated/Bagpipers Not Here/Belltown Greeter NPC/Wave Trigger
+  var Audio Loop WalkBell: gameObject = Town States/Spinner Defeated/Bagpipers Not Here/Belltown Greeter NPC/Audio Loop WalkBell
+  var Audio Loop IdleBell: gameObject = Town States/Spinner Defeated/Bagpipers Not Here/Belltown Greeter NPC/Audio Loop IdleBell
+  var Audio Loop SingBell: gameObject = Town States/Spinner Defeated/Bagpipers Not Here/Belltown Greeter NPC/Audio Loop SingBell
+  var Audio Loop Voice: gameObject = Town States/Spinner Defeated/Bagpipers Not Here/Belltown Greeter NPC/Audio Loop Voice
+  var Idle Sing Tracking Array: array = var "Idle Sing Tracking Array"
+  var Start Walk Tracking Array: array = var "Start Walk Tracking Array"
+  var Belltown House State: enum = BelltownHouseStates(0)
+}

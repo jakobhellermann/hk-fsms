@@ -1,0 +1,1626 @@
+# Control
+# 1 location(s):
+#   Belltown_Shrine / Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss
+
+fsm Control {
+  start Init
+  on STUN → Stun Start  // from any state
+  on ZERO HP → Death Stagger  // from any state
+  on FAKE DEATH → Death Stagger F  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Boss Scene")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Battle Darkening Folder")
+    FindChild(gameObject=var "Boss Scene", childName="HarpShots/Spinner BellShot 1", storeResult=var "HarpShot 1")
+    FindChild(gameObject=var "Boss Scene", childName="HarpShots/Spinner BellShot 2", storeResult=var "HarpShot 2")
+    FindChild(gameObject=var "Boss Scene", childName="HarpShots/Spinner HarpShot 3", storeResult=var "HarpShot 3")
+    FindChild(gameObject=var "Boss Scene", childName="Ground Bells", storeResult=var "Ground Bells")
+    FindChild(gameObject=var "Boss Scene", childName="Contrast Plane Region", storeResult=var "Contrast Plane Region")
+    FindChild(gameObject=var "Boss Scene", childName="Walk Web/Target", storeResult=var "Web Target")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Dash Slash")
+    FindNamedChild(gameObject=var "Death Effects", storeResult=var "Bind Silk")
+    SetParent(gameObject=var "Aimer", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "DashSlash Effect", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetHP(target=Self, storeValue=var "P2 HP")  // disabled
+    MultiplyIntByFloat(integer=var "P2 HP", multiplyFloat=0.7, storeResult=var "P2 HP", everyFrame=false, forceRoundUp=false)  // disabled
+    on FINISHED → Dormant
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetBoolValue(boolVariable=var "Evade To Idle", boolValue=false, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValueAtTime(BoolVariable=var "Can Evade", BoolValue=true, Time=0.35, SetOppositeOnStateEntry=true)
+    CompareHPBool(enemy=var "Self", compareTo=var "P2 HP", equalBool=false, lessThanBool=var "In P2", greaterThanBool=false, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=6, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Nearby", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Evade", var "In P2", var "Hero Nearby"], sendEvent=→"EVADE", storeResult=(unset), everyFrame=true)
+    on FINISHED → Tele Out
+    on TOOK DAMAGE → Tele Out
+    on EVADE → Tele Out
+  }
+
+  state Move Choice P1 {
+    SendEvent(eventTarget=Self, sendEvent=→"DASH SLASH", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"CHASE SLAM", →"DASH SLASH", →"SCUTTLE", →"STRUM SHOT"], weights=[1, 1, 1, 1], eventMax=[1, 2, 1, 1], missedMax=[4, 4, 5, 4], activeBool=var "Did Attack")
+    SendRandomEventV4(events=[→"CHASE SLAM", →"DASH SLASH", →"STRUM SHOT"], weights=[1, 1, 1], eventMax=[1, 2, 1], missedMax=[4, 4, 5], activeBool=(unset))
+    on STRUM SHOT → Set Strum Shot
+    on CHASE SLAM → Set Chase Slam
+    on SCUTTLE → Set Scuttle
+    on DASH SLASH → Set Dash Slash
+  }
+
+  state Tele Out {
+    SetBoolValue(boolVariable=var "Did Tele", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Web Target"), sendEvent="STOP", delay=0, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[widow_insectoid_teleport_1 (sfxstatic_assets_areabell.bundle), widow_insectoid_teleport_2 (sfxstatic_assets_areabell.bundle), widow_insectoid_teleport_3 (sfxstatic_assets_areabell.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Currently Away", boolValue=false, everyFrame=false)
+    on FINISHED → Away
+  }
+
+  state Away {
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Lenient Tele Placement", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Currently Away", boolValue=true, everyFrame=false)
+    on FINISHED → Phase Check
+  }
+
+  state Random Pos {
+    BoolTest(boolVariable=var "Did Tele", isTrue=(none), isFalse=→"SKIP", everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=42.5, max=62.5, storeResult=var "Tele X")
+    GetDifferenceBetweenFloats(differenceResult=var "Difference", float1=var "Tele X", float2=var "Self X", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Lenient Tele Placement", floatVariable=var "Allowance", falseValue=4, trueValue=2, everyFrame=false)
+    FloatCompare(float1=var "Difference", float2=var "Allowance", tolerance=0, equal=(none), lessThan=→"REPEAT", greaterThan=(none), everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Difference", float1=var "Tele X", float2=var "Hero X", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Lenient Tele Placement", floatVariable=var "Allowance", falseValue=8.5, trueValue=7.5, everyFrame=false)
+    FloatCompare(float1=var "Difference", float2=8.5, tolerance=0, equal=(none), lessThan=→"REPEAT", greaterThan=(none), everyFrame=false)
+    RandomFloat(min=11, max=11, storeResult=var "Tele Y")  // disabled
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Web Target"), sendEvent="START", delay=0, everyFrame=false)
+    on FINISHED → Tele In
+    on REPEAT → Retry Pos
+    on SKIP → Next Event
+  }
+
+  state Tele In {
+    SetIntValue(intVariable=var "Repeats", intValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Currently Away", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Lenient Tele Placement", boolValue=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEventRandom(audioClips=[widow_insectoid_teleport_1 (sfxstatic_assets_areabell.bundle), widow_insectoid_teleport_2 (sfxstatic_assets_areabell.bundle), widow_insectoid_teleport_3 (sfxstatic_assets_areabell.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Next Event
+  }
+
+  state Retry Pos {
+    IntAdd(intVariable=var "Repeats", add=1, everyFrame=false)
+    IntCompare(integer1=var "Repeats", integer2=100, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Repeats", intValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Lenient Tele Placement", boolValue=true, everyFrame=false)
+    NextFrameEvent(sendEvent=→"CANCEL")
+    on FINISHED → Random Pos
+    on CANCEL → Phase Check
+  }
+
+  state Ptn Choice {
+    SetBoolValue(boolVariable=var "Did Attack", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioPlaySimple(gameObject=var "Pull Loop", volume=1, oneShotClip=<null>)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    CheckXPosition(gameObject=var "Hero", compareTo=47, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"PTN 1", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))  // disabled
+    CheckXPosition(gameObject=var "Hero", compareTo=58, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"PTN 2", greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))  // disabled
+    SendRandomEventV4(events=[→"PTN 1", →"PTN 2"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on PTN 1 → Strum Start 1
+    on PTN 2 → Strum Start 2
+  }
+
+  state Ptn1 1 {
+    SendEventByName(eventTarget=GameObject(var "HarpShot 1"), sendEvent="FIRE R", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Followup? 3
+  }
+
+  state Ptn1 2 {
+    AudioPlaySimple(gameObject=var "Pull Loop", volume=1, oneShotClip=<null>)
+    SendEventByName(eventTarget=GameObject(var "HarpShot 2"), sendEvent="FIRE L", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum ReThrow", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Flip1 1
+  }
+
+  state Ptn1 3 {
+    PlayAudioEventRandom(audioClips=[widow_insectoid_strum_silk_1 (sfxstatic_assets_areabell.bundle), widow_insectoid_strum_silk_2 (sfxstatic_assets_areabell.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioStopV2(gameObject=var "Pull Loop", fadeTime=0, cancelOnEarlyExit=false)
+    SendEventByName(eventTarget=GameObject(var "HarpShot 3"), sendEvent="FIRE R", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum ReThrow", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    on FINISHED → Flip1 2
+  }
+
+  state Strum End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum Throw End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEventRandom(audioClips=[widow_insectoid_strum_silk_1 (sfxstatic_assets_areabell.bundle), widow_insectoid_strum_silk_2 (sfxstatic_assets_areabell.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStopV2(gameObject=var "Pull Loop", fadeTime=0, cancelOnEarlyExit=false)
+    on FINISHED → Idle Recover
+  }
+
+  state Flip1 1 {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Strum End
+  }
+
+  state Flip1 2 {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    on FINISHED → Strum End
+  }
+
+  state Ptn2 1 {
+    SendEventByName(eventTarget=GameObject(var "HarpShot 1"), sendEvent="FIRE L", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Followup? 2
+  }
+
+  state Ptn2 2 {
+    AudioPlaySimple(gameObject=var "Pull Loop", volume=1, oneShotClip=<null>)
+    SendEventByName(eventTarget=GameObject(var "HarpShot 2"), sendEvent="FIRE R", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum ReThrow", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Flip2 1
+  }
+
+  state Ptn2 3 {
+    AudioStopV2(gameObject=var "Pull Loop", fadeTime=0, cancelOnEarlyExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEventRandom(audioClips=[widow_insectoid_strum_silk_1 (sfxstatic_assets_areabell.bundle), widow_insectoid_strum_silk_2 (sfxstatic_assets_areabell.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(var "HarpShot 3"), sendEvent="FIRE L", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum ReThrow", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    on FINISHED → Flip2 2
+  }
+
+  state Flip2 1 {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Strum End
+  }
+
+  state Flip2 2 {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    on FINISHED → Strum End
+  }
+
+  state Start Spinning {
+    SetBoolValue(boolVariable=var "Did Attack", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Block Strum Shot", boolValue=false, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Simple Spin")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    AudioPlaySimple(gameObject=var "Pull Loop", volume=1, oneShotClip=<null>)
+    on FINISHED → SlamString 1
+  }
+
+  state SlamString 1 {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Hero X", addMin=-2, addMax=2)
+    FloatClamp(floatVariable=var "Hero X", minValue=var "SlamString Min X", maxValue=var "SlamString Max X", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Spinner_vertical_slash (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(0, 12.67266, 0), rotation=(unset), storeObject=var "Slam String")
+    SetPosition(gameObject=var "Slam String", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=spinner_silk_multi_appear (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=spinner_silk_multi_strike (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.5, storePlayer=<null>)
+    on FINISHED → Followup?
+  }
+
+  state SlamString 3 {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Hero X", addMin=-2, addMax=2)
+    FloatClamp(floatVariable=var "Hero X", minValue=var "SlamString Min X", maxValue=var "SlamString Max X", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Spinner_vertical_slash (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(0, 12.67266, 0), rotation=(unset), storeObject=var "Slam String")
+    SetPosition(gameObject=var "Slam String", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=spinner_silk_multi_appear (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Aim SlamString
+  }
+
+  state SlamString 4 {
+    SpawnObjectFromGlobalPool(gameObject=Spinner_vertical_slash (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(0, 12.67266, 0), rotation=(unset), storeObject=var "Slam String")
+    SetPosition(gameObject=var "Slam String", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=spinner_silk_multi_strike (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.2, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=spinner_silk_multi_appear (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=spinner_silk_multi_strike (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.5, storePlayer=<null>)
+    on FINISHED → Idle Recover
+    on TOOK DAMAGE → Tele Or Idle
+  }
+
+  state Aim SlamString {
+    RandomFloat(min=5, max=9, storeResult=var "Difference")
+    RandomlyFlipFloat(storeResult=var "Difference")
+    FloatAdd(floatVariable=var "Hero X", add=var "Difference", everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Hero X", float2=var "SlamString Max X", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FLIP", everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "SlamString Min X", tolerance=0, equal=(none), lessThan=→"FLIP", greaterThan=(none), everyFrame=false)
+    on FLIP → Flip Aim
+    on FINISHED → SlamString 4
+  }
+
+  state Flip Aim {
+    FloatMultiply(floatVariable=var "Difference", multiplyBy=-1, everyFrame=false)
+    FloatAdd(floatVariable=var "Hero X", add=var "Difference", everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Hero X", add=var "Difference", everyFrame=false, perSecond=false)
+    on FINISHED → SlamString 4
+  }
+
+  state Charge {
+    PlayParticleEmitterInState(gameObject=var "Pt ChargeDust")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_dash_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    AccelerateToX(gameObject=Self, accelerationFactor=0.5, targetSpeed=var "Charge Speed")
+    CheckXPosition(gameObject=Self, compareTo=3.5, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"TELE", greaterThanBool=(unset), everyFrame=true, space=1, activeBool=(unset))
+    CheckXPosition(gameObject=Self, compareTo=-20, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"TELE", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=1, activeBool=(unset))
+    ActivateAllChildren(gameObject=var "Ground Bells", activate=true)
+    AudioPlayInState(gameObject=var "Scuttle Loop", volume=1)
+    on TELE → Charge Tele
+  }
+
+  state Set Chase Slam {
+    SetStringValue(stringVariable=var "Next Event", stringValue="CHASE SLAM", everyFrame=false)
+    RandomFloat(min=11, max=11, storeResult=var "Tele Y")
+    on FINISHED → Random Pos
+  }
+
+  state Next Event {
+    SetBoolValue(boolVariable=var "Did Tele", boolValue=false, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=var "Damage Hero Amount")
+    SendEventByName(eventTarget=Self, sendEvent=var "Next Event", delay=0, everyFrame=false)
+    on CHASE SLAM → Start Spinning
+    on STRUM SHOT → Ptn Choice
+    on SCUTTLE → Rage Charge?
+    on SCREAM → Scream Antic
+    on RAGE → Rage Start 1
+    on DASH SLASH → Chase? 2
+  }
+
+  state Set Strum Shot {
+    BoolTest(boolVariable=var "Block Strum Shot", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetStringValue(stringVariable=var "Next Event", stringValue="STRUM SHOT", everyFrame=false)
+    RandomFloat(min=11, max=11, storeResult=var "Tele Y")
+    on FINISHED → Random Pos
+    on CANCEL → Cancel Strum Shot
+  }
+
+  state Set Scuttle {
+    BoolTest(boolVariable=var "Did Tele", isTrue=(none), isFalse=→"TELE", everyFrame=false)
+    SetStringValue(stringVariable=var "Next Event", stringValue="SCUTTLE", everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=-5.89, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    CheckXPosition(gameObject=var "Hero", compareTo=52.5, compareToOffset=0, tolerance=0, equal=→"R", equalBool=(unset), lessThan=→"R", lessThanBool=(unset), greaterThan=→"L", greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    on L → Pos L
+    on R → Pos R
+    on TELE → Tele Out
+  }
+
+  state Set Scream {
+    SetStringValue(stringVariable=var "Next Event", stringValue="SCREAM", everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Scream", boolValue=true, everyFrame=false)
+    RandomFloat(min=11, max=11, storeResult=var "Tele Y")
+    on FINISHED → Random Pos
+  }
+
+  state Pos L {
+    SetPosition(gameObject=Self, vector=(unset), x=-19.97, y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Charge Speed", floatValue=30, everyFrame=false)
+    on FINISHED → Tele In
+  }
+
+  state Pos R {
+    SetPosition(gameObject=Self, vector=(unset), x=3.4, y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Charge Speed", floatValue=-30, everyFrame=false)
+    on FINISHED → Tele In
+  }
+
+  state Charge Tele {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_evade (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Charge Wait
+  }
+
+  state Idle Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioStop(gameObject=var "Pull Loop", fadeTime=0)
+    SetBoolValueAtTime(BoolVariable=var "Can Evade", BoolValue=true, Time=0.35, SetOppositeOnStateEntry=true)
+    CompareHPBool(enemy=var "Self", compareTo=var "P2 HP", equalBool=false, lessThanBool=var "In P2", greaterThanBool=false, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=6, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Nearby", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Evade", var "In P2", var "Hero Nearby"], sendEvent=→"EVADE", storeResult=(unset), everyFrame=true)
+    on FINISHED → Tele Or Idle
+    on TOOK DAMAGE → Tele Or Idle
+    on EVADE → Chase?
+  }
+
+  state Strum Start 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum Start L", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Ptn1 1
+  }
+
+  state Strum Start 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum Start L", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Ptn2 1
+  }
+
+  state Charge Wait {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetBoolValue(boolVariable=var "Did Tele", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Final Phase", isTrue=→"P3", isFalse=(none), everyFrame=false)
+    Wait(time=2.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Phase Check
+    on P3 → P3 Wait
+  }
+
+  state Scream Antic {
+    SetBoolValue(boolVariable=var "Block Strum Shot", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scream", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    on FINISHED → Scream
+  }
+
+  state Scream {
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_short_roar (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Wait(time=0.85, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Scream Side
+  }
+
+  state Scream End {
+    SetBoolValue(boolVariable=var "Dmg Evade", boolValue=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Wait(time=1.1, finishEvent=→"FINISHED", realTime=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=8, tolerance=0, equal=(none), lessThan=→"EVADE", greaterThan=(none), everyFrame=true)
+    on FINISHED → Tele Or Idle
+    on EVADE → Set Evade To Idle
+    on TOOK DAMAGE → Set Evade To Idle
+  }
+
+  state Stun Start {
+    AudioStop(gameObject=var "Pull Loop", fadeTime=0)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_stun (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Evade To Idle", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Web Target"), sendEvent="STOP", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Stun Timer", floatValue=2, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Air")
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=15, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SendEventToRegister(eventName="SPINNER STUN")
+    on FINISHED → Stun Air
+  }
+
+  state Stun Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    on LAND → Stun Land
+  }
+
+  state Stunned {
+    FloatAdd(floatVariable=var "Stun Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    on END → Stun Recover
+    on TOOK DAMAGE → Stun Damage
+  }
+
+  state Stun Recover {
+    SetHitEffectOrigin(target=Self, effectOrigin=(0, -0.22, 0), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=var "Damage Hero Amount")
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    Tk2dPlayAnimation(gameObject=var "DazedEffect", animLibName="", clipName="Dazed End")  // disabled
+    SendEventByName(eventTarget=GameObject(var "DazedEffect"), sendEvent="STUN EFFECT END", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "DazedEffect", fadeTime=0)
+    SetGameObject(variable=var "DazedEffect", gameObject=<null>, everyFrame=false)
+    on FINISHED → Tele Out
+  }
+
+  state Stun Land {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Land")
+    SetHitEffectOrigin(target=Self, effectOrigin=(-0.68, -2.5, 0), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=var "Damage Hero Amount")
+    GetScale(gameObject=var "Dazed", vector=(unset), xScale=var "Daze X Scale", yScale=var "Daze Y Scale", zScale=(unset), space=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Dazed Effect (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Dazed", position=(unset), rotation=(unset), storeObject=var "DazedEffect")
+    SetScale(gameObject=var "DazedEffect", vector=(unset), x=var "Daze X Scale", y=var "Daze Y Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "DazedEffect", animLibName="", clipName="Dazed")  // disabled
+    PlayAudioEvent(audioClip=big_enemy_corpse_ground_land (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Stunned
+  }
+
+  state Stun Damage {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Hit")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_stun_hit (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FloatAdd(floatVariable=var "Stun Timer", add=-0.25, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Stunned
+    on END → 
+  }
+
+  state Move Choice P2 {
+    BoolTest(boolVariable=var "Did Scream", isTrue=(none), isFalse=→"SCREAM", everyFrame=false)
+    SendRandomEventV4(events=[→"CHASE SLAM", →"STRUM SHOT", →"SCUTTLE", →"SCREAM", →"DASH SLASH"], weights=[1, 1, 1, 1, 1], eventMax=[2, 2, 1, 1, 2], missedMax=[4, 4, 5, 5, 4], activeBool=(unset))
+    on STRUM SHOT → Set Strum Shot
+    on CHASE SLAM → Set Chase Slam
+    on SCUTTLE → Set Scuttle
+    on SCREAM → Set Scream
+    on DASH SLASH → Set Dash Slash
+  }
+
+  state Phase Check {
+    SetBoolValue(boolVariable=var "Extra Slam", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Extra Strum", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="P3", delay=0, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Did Fake Death", isTrue=→"P3", isFalse=(none), everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "P3 HP", equal=→"P3", lessThan=→"P3", greaterThan=(none), everyFrame=false)  // disabled
+    CompareHP(enemy=var "Self", integer2=var "P2 HP", equal=→"P2", lessThan=→"P2", greaterThan=→"P1", everyFrame=false)
+    on P1 → Move Choice P1
+    on P2 → Move Choice P2
+    on P3 → Move Choice P3
+  }
+
+  state Dormant {
+    on BATTLE START → Set Intro Pos
+  }
+
+  state Intro In {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=var "Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEventRandom(audioClips=[widow_insectoid_teleport_1 (sfxstatic_assets_areabell.bundle), widow_insectoid_teleport_2 (sfxstatic_assets_areabell.bundle), widow_insectoid_teleport_3 (sfxstatic_assets_areabell.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Scream Start
+  }
+
+  state Scream Start {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Intro Scream", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Intro Scream
+  }
+
+  state Intro Scream {
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="SPINNER")
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_intro_roar (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    FadeNestedFadeGroup(Target=var "Battle Darkening Folder", ToAlpha=1, FadeTime=0.25)
+    SetCollider(gameObject=var "Contrast Plane Region", active=true, resetOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Start Fight
+  }
+
+  state Start Fight {
+    SetDamageHeroAmount(target=Self, damageDealt=var "Damage Hero Amount")
+    ApplyMusicCue(musicCue=Spinner (audiocuesdynamic_assets_areabellareaslab.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Intro Scream to Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Set Rage {
+    BoolTest(boolVariable=var "Currently Away", isTrue=(none), isFalse=→"TELE", everyFrame=false)
+    SetStringValue(stringVariable=var "Next Event", stringValue="RAGE", everyFrame=false)
+    BoolTest(boolVariable=var "Started Rage", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=1)
+    on FINISHED → Close Pos Low
+    on TELE → Tele Out
+  }
+
+  state Close Pos {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=42.5, max=62.5, storeResult=var "Tele X")
+    GetDifferenceBetweenFloats(differenceResult=var "Difference", float1=var "Tele X", float2=var "Self X", everyFrame=false)
+    FloatCompare(float1=var "Difference", float2=2, tolerance=0, equal=(none), lessThan=→"REPEAT", greaterThan=(none), everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Difference", float1=var "Tele X", float2=var "Hero X", everyFrame=false)
+    FloatCompare(float1=var "Difference", float2=3, tolerance=0, equal=(none), lessThan=→"REPEAT", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Difference", float2=9, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"REPEAT", everyFrame=false)
+    RandomFloat(min=18, max=19, storeResult=var "Tele Y")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Tele In
+    on REPEAT → Retry Pos 2
+  }
+
+  state Retry Pos 2 {
+    IntAdd(intVariable=var "Repeats", add=1, everyFrame=false)
+    IntCompare(integer1=var "Repeats", integer2=950, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Repeats", intValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Close Pos
+  }
+
+  state Move Choice P3 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Final Phase", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Started Rage", isTrue=(none), isFalse=→"RAGE", everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"RAGE", →"SCUTTLE"], weights=[1, 1], eventMax=[3, 2], missedMax=[3, 3], activeBool=(unset))  // disabled
+    on RAGE → Set Rage
+    on SCUTTLE → Set Scuttle
+    on FINISHED → Set Rage
+  }
+
+  state Rage Charge? {
+    SetBoolValue(boolVariable=var "Block Strum Shot", boolValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Final Phase", isTrue=→"P3", isFalse=(none), everyFrame=false)
+    on P3 → Rage Charge 1
+    on FINISHED → Charge
+  }
+
+  state Rage Charge 1 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Slash 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AccelerateToX(gameObject=Self, accelerationFactor=0.5, targetSpeed=var "Charge Speed")
+    AudioPlaySimple(gameObject=var "Scuttle Loop", volume=1, oneShotClip=<null>)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_dash_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Rage Charge 2
+  }
+
+  state Rage Charge 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge Slash 2")
+    AccelerateToX(gameObject=Self, accelerationFactor=0.5, targetSpeed=var "Charge Speed")
+    CheckXPosition(gameObject=Self, compareTo=3.5, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"TELE", greaterThanBool=(unset), everyFrame=true, space=1, activeBool=(unset))
+    CheckXPosition(gameObject=Self, compareTo=-20, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"TELE", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=1, activeBool=(unset))
+    AudioPlayInState(gameObject=var "Scuttle Loop", volume=1)
+    ActivateGameObject(gameObject=var "Charge Slash", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=false, Delay=0)
+    on TELE → Charge Tele
+  }
+
+  state P3 Wait {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Phase Check
+  }
+
+  state DashSlash Antic {
+    PlayAudioEvent(audioClip=widow_insectoid_diagonal_sword_attack_antic (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NewDive Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → DashSlash Pullback
+  }
+
+  state Dash Slash Dir {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → DashSlash Aim L
+    on R → DashSlash Aim R
+  }
+
+  state DashSlash Aim L {
+    SetBoolValue(boolVariable=var "Aimed L", boolValue=true, everyFrame=false)
+    SetPositionToObject(gameObject=var "Aimer", targetObject=var "Hero", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Aimer", vector=(unset), x=var "Aimer X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Aim Clamp", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Aim Clamp", float2=9, operation=Subtract, storeResult=var "Aim Clamp Long", everyFrame=false)
+    FloatAdd(floatVariable=var "Aim Clamp", add=-4, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Aimer X", minValue=45, maxValue=var "Aim Clamp", everyFrame=false)
+    FloatClamp(floatVariable=var "Aimer X", minValue=var "Aim Clamp Long", maxValue=var "Aim Clamp", everyFrame=false)
+    SetPosition(gameObject=var "Aimer", vector=(unset), x=var "Aimer X", y=11, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Aimer", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    on EVADE → DashSlash RePos 1
+    on FINISHED → DashSlash Antic
+  }
+
+  state DashSlash RePos 1 {
+    PlayAudioEvent(audioClip=widow_insectoid_walk_sideways_on_web (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → DashSlash RePos 2
+  }
+
+  state DashSlash Aim R {
+    SetBoolValue(boolVariable=var "Aimed L", boolValue=false, everyFrame=false)
+    SetPositionToObject(gameObject=var "Aimer", targetObject=var "Hero", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Aimer", vector=(unset), x=var "Aimer X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Aim Clamp", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Aim Clamp", float2=9, operation=Add, storeResult=var "Aim Clamp Long", everyFrame=false)
+    FloatAdd(floatVariable=var "Aim Clamp", add=4, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Aimer X", minValue=var "Aim Clamp", maxValue=60, everyFrame=false)
+    FloatClamp(floatVariable=var "Aimer X", minValue=var "Aim Clamp", maxValue=var "Aim Clamp Long", everyFrame=false)
+    SetPosition(gameObject=var "Aimer", vector=(unset), x=var "Aimer X", y=11, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Aimer", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    on EVADE → DashSlash RePos 1
+    on FINISHED → DashSlash Antic
+  }
+
+  state DashSlash {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="NewDive")
+    PlayAudioEvent(audioClip=widow_insectoid_diagonal_sword_attack_launch (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=60, everyFrame=false)
+    CheckYPosition(gameObject=Self, compareTo=9.5, compareToOffset=0, tolerance=0, equal=(none), lessThan=→"LAND", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    ActivateGameObject(gameObject=var "DashSlash Hit", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "DashSlash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FloatAdd(floatVariable=var "Angle", add=180, everyFrame=false, perSecond=false)
+    SetRotation(gameObject=var "DashSlash Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Angle", space=0, everyFrame=false, lateUpdate=false)
+    SetPositionToObject(gameObject=var "DashSlash Effect", targetObject=var "Self", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=132, angleOffsetIfMirrored=50, otherGameObject=<null>, everyFrame=true)
+    on LAND → DashSlash Land
+    on MULTI HIT CONNECT → Multihit Slash
+  }
+
+  state DashSlash Land {
+    PlayAudioEvent(audioClip=widow_insectoid_diagonal_sword_attack_land (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NewDive Land", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → DashCharge Antic
+  }
+
+  state Set Dash Slash {
+    SetStringValue(stringVariable=var "Next Event", stringValue="DASH SLASH", everyFrame=false)
+    RandomFloat(min=15, max=17, storeResult=var "Tele Y")
+    on FINISHED → Random Pos
+  }
+
+  state Followup? {
+    BoolTest(boolVariable=var "Extra Slam", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Extra Strum", boolValue=true, everyFrame=false)
+    SendRandomEventV4(events=[→"CHASE SLAM", →"FINISHED", →"STRUM SHOT"], weights=[0.5, 0.5, 0.5], eventMax=[2, 1, 2], missedMax=[4, 4, 4], activeBool=(unset))
+    on CHASE SLAM → SlamString 3
+    on FINISHED → Idle Recover
+    on STRUM SHOT → 
+  }
+
+  state Followup? 2 {
+    PlayAudioEventRandom(audioClips=[widow_insectoid_strum_silk_1 (sfxstatic_assets_areabell.bundle), widow_insectoid_strum_silk_2 (sfxstatic_assets_areabell.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStopV2(gameObject=var "Pull Loop", fadeTime=0, cancelOnEarlyExit=false)
+    BoolTest(boolVariable=var "Extra Strum", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Extra Slam", boolValue=true, everyFrame=false)
+    SendRandomEventV4(events=[→"STRUM SHOT", →"FINISHED", →"CHASE SLAM"], weights=[0.5, 0.5, 0.5], eventMax=[2, 1, 2], missedMax=[4, 4, 4], activeBool=(unset))
+    on STRUM SHOT → Ptn2 2
+    on FINISHED → Strum End
+    on CHASE SLAM → Start Spinning
+  }
+
+  state Followup? 3 {
+    PlayAudioEventRandom(audioClips=[widow_insectoid_strum_silk_1 (sfxstatic_assets_areabell.bundle), widow_insectoid_strum_silk_2 (sfxstatic_assets_areabell.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStopV2(gameObject=var "Pull Loop", fadeTime=0, cancelOnEarlyExit=false)
+    BoolTest(boolVariable=var "Extra Strum", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Extra Slam", boolValue=true, everyFrame=false)
+    SendRandomEventV4(events=[→"STRUM SHOT", →"FINISHED", →"CHASE SLAM"], weights=[0.5, 0.5, 0.5], eventMax=[2, 1, 2], missedMax=[4, 4, 4], activeBool=(unset))
+    on STRUM SHOT → Ptn1 2
+    on FINISHED → Strum End
+    on CHASE SLAM → Start Spinning
+  }
+
+  state DashSlash Pullback {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Web Target"), sendEvent="STOP", delay=0, everyFrame=false)
+    FloatOperator(float1=var "Angle", float2=180, operation=Add, storeResult=var "PB Angle", everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "PB Angle", speed=25, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=true)
+    ActivateGameObjectDelay(gameObject=var "widow_attack_glint_air", activate=true, resetOnExit=false, delay=0.08)
+    on FINISHED → DashSlash
+  }
+
+  state Scream Side {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckXPosition(gameObject=var "Hero", compareTo=52.5, compareToOffset=0, tolerance=0, equal=→"R", equalBool=(unset), lessThan=→"L", lessThanBool=(unset), greaterThan=→"R", greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    on L → L Choice
+    on R → R Choice
+  }
+
+  state L Choice {
+    SendRandomEvent(events=[→"L", →"MID", →"OUTER"], weights=[0.4, 0.3, 0.3], delay=0)
+    on L → Slams L
+    on MID → Slams Mid
+    on OUTER → Slams Outer
+  }
+
+  state R Choice {
+    SendRandomEvent(events=[→"R", →"MID", →"OUTER"], weights=[0.4, 0.3, 0.3], delay=0)
+    on R → Slams R
+    on MID → Slams Mid
+    on OUTER → Slams Outer
+  }
+
+  state Slams L {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(38, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(40, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(42, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(44, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(46, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(48, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(50, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → Scream End
+  }
+
+  state Slams R {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(55, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(57, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(59, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(61, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(63, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(65, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(67, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → Scream End
+  }
+
+  state Slams Mid {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(47, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(49, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(51, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(53, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(55, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(57, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(59, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → Scream End
+  }
+
+  state Tele Or Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    AudioStopV2(gameObject=var "Pull Loop", fadeTime=0, cancelOnEarlyExit=false)
+    BoolTest(boolVariable=var "Final Phase", isTrue=→"TELE", isFalse=(none), everyFrame=false)
+    SendRandomEventV4(events=[→"TELE", →"IDLE", →"EVADE"], weights=[1, 1, 1], eventMax=[1, 1, 1], missedMax=[2, 2, 2], activeBool=(unset))
+    on TELE → Tele Out
+    on IDLE → Extra Idle
+    on EVADE → Chase?
+    on SING → Sing
+  }
+
+  state Extra Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Evade To Idle", boolValue=false, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Can Evade", BoolValue=true, Time=0.2, SetOppositeOnStateEntry=true)
+    CompareHPBool(enemy=var "Self", compareTo=var "P2 HP", equalBool=false, lessThanBool=var "In P2", greaterThanBool=false, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatTestToBool(float1=var "Distance", float2=6, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Nearby", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Evade", var "In P2", var "Hero Nearby"], sendEvent=→"EVADE", storeResult=(unset), everyFrame=true)
+    on FINISHED → Phase Check
+    on TOOK DAMAGE → Dmg Response
+    on EVADE → Chase?
+  }
+
+  state DashSlash RePos 2 {
+    SetVelocityByScale(gameObject=Self, speed=20, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → DashSlash Repos 3
+  }
+
+  state DashSlash Repos 3 {
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → RePos End
+  }
+
+  state RePos End {
+    BoolTest(boolVariable=var "Aimed L", isTrue=→"L", isFalse=→"R", everyFrame=false)
+    on L → DashSlash Aim L
+    on R → DashSlash Aim R
+  }
+
+  state Evade 1 {
+    PlayAudioEvent(audioClip=widow_insectoid_walk_backwards_on_ground (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RayCast2dV2(fromGameObject=var "Evade Ray", fromPosition=(unset), direction=(1, 0), space=1, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Evade 2
+    on CANCEL → Evade End
+  }
+
+  state Evade 2 {
+    SetVelocityByScale(gameObject=Self, speed=20, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Evade 3
+  }
+
+  state Evade 3 {
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Evade End
+  }
+
+  state Dmg Response {
+    SendRandomEventV4(events=[→"ATTACK", →"EVADE"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on ATTACK → Phase Check
+    on EVADE → Dmg Evade
+  }
+
+  state Dmg Evade {
+    SetBoolValue(boolVariable=var "Dmg Evade", boolValue=true, everyFrame=false)
+    on FINISHED → Evade 1
+  }
+
+  state Evade End {
+    BoolTest(boolVariable=var "Evade To Idle", isTrue=→"IDLE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Dmg Evade", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Dmg Evade", boolValue=false, everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"ATTACK", delay=0, everyFrame=false)
+    on FINISHED → Tele Or Idle
+    on ATTACK → Phase Check
+    on IDLE → Idle
+  }
+
+  state Chase? {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_evade (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=14, tolerance=0, equal=→"CHASE", lessThan=→"EVADE", greaterThan=→"CHASE", everyFrame=false)
+    on EVADE → Evade 1
+    on CHASE → Chase Antic
+  }
+
+  state Chase 1 {
+    PlayAudioEvent(audioClip=widow_insectoid_walk_backwards_on_ground (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase 2
+  }
+
+  state Chase 2 {
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase 3
+  }
+
+  state Chase 3 {
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Extra Idle
+  }
+
+  state Rage Start 1 {
+    BoolTest(boolVariable=var "Started Rage", isTrue=→"NEXT", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Started Rage", boolValue=true, everyFrame=false)
+    SetHP(target=Self, hp=var "P3 HP")  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Intro Scream", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Rage Scream 2
+    on NEXT → Rage Attack
+  }
+
+  state Rage Scream 2 {
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_intro_roar (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ApplyMusicCue(musicCue=SpinnerRage (audiocuesdynamic_assets_areabellareaslab.bundle), delayTime=0, transitionTime=0.1)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Rage Scream End 2
+  }
+
+  state Rage Scream End 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    on FINISHED → Rage Attack
+  }
+
+  state Evade 4 {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=widow_insectoid_walk_backwards_on_ground (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RayCast2dV2(fromGameObject=var "Evade Ray", fromPosition=(unset), direction=(1, 0), space=1, distance=6.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Evade 5
+    on CANCEL → Tele Out
+  }
+
+  state Evade 5 {
+    RandomFloat(min=15, max=20, storeResult=var "Speed")
+    SetVelocityByScale(gameObject=Self, speed=var "Speed", ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Evade 6
+  }
+
+  state Evade 6 {
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Evade End 2
+  }
+
+  state Evade End 2 {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=11.05, z=(unset), space=0, everyFrame=false, lateUpdate=false)  // disabled
+    on FINISHED → Rage Attack
+  }
+
+  state Rage Move {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=9.9, z=(unset), space=0, everyFrame=false, lateUpdate=false)  // disabled
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_evade (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=13, tolerance=0, equal=→"CHASE", lessThan=→"EVADE", greaterThan=→"CHASE", everyFrame=false)
+    on EVADE → Evade 4
+    on CHASE → Chase 4
+    on SING → Sing 2
+  }
+
+  state Chase 4 {
+    PlayAudioEvent(audioClip=widow_insectoid_walk_backwards_on_ground (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RayCast2dV2(fromGameObject=var "Evade Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=6, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Chase 5
+    on CANCEL → Evade 4
+  }
+
+  state Chase 5 {
+    RandomFloat(min=-20, max=-15, storeResult=var "Speed")
+    SetVelocityByScale(gameObject=Self, speed=var "Speed", ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase 6
+  }
+
+  state Chase 6 {
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Evade End 2
+  }
+
+  state Rage Screaming {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Scream")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_short_roar (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → R Scream Choice
+  }
+
+  state Close Pos Low {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=42.5, max=62.5, storeResult=var "Tele X")
+    GetDifferenceBetweenFloats(differenceResult=var "Difference", float1=var "Tele X", float2=var "Self X", everyFrame=false)
+    FloatCompare(float1=var "Difference", float2=2, tolerance=0, equal=(none), lessThan=→"REPEAT", greaterThan=(none), everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Difference", float1=var "Tele X", float2=var "Hero X", everyFrame=false)
+    FloatCompare(float1=var "Difference", float2=8.5, tolerance=0, equal=(none), lessThan=→"REPEAT", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Difference", float2=14, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"REPEAT", everyFrame=false)
+    RandomFloat(min=11.05958, max=11.05958, storeResult=var "Tele Y")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Tele In
+    on REPEAT → Retry Pos 3
+  }
+
+  state Retry Pos 3 {
+    IntAdd(intVariable=var "Repeats", add=1, everyFrame=false)
+    IntCompare(integer1=var "Repeats", integer2=950, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Repeats", intValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Close Pos Low
+  }
+
+  state Chase? 2 {
+    SetBoolValue(boolVariable=var "Did Attack", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Block Strum Shot", boolValue=false, everyFrame=false)
+    CheckYPosition(gameObject=Self, compareTo=15, compareToOffset=0, tolerance=0, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false, space=0, activeBool=(unset))
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=11, tolerance=0, equal=→"CHASE", lessThan=(none), greaterThan=→"CHASE", everyFrame=false)
+    on FINISHED → Dash Slash Dir
+    on CHASE → Chase 7
+    on CANCEL → Tele Out
+  }
+
+  state Chase 7 {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=widow_insectoid_walk_sideways_on_web (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_move (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Chase 8
+  }
+
+  state Chase 8 {
+    SetVelocityByScale(gameObject=Self, speed=-20, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Chase 9
+  }
+
+  state Chase 9 {
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.8, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Dash Slash Dir
+  }
+
+  state Slams Outer {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(38, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(40, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(42, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(44, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(61, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(63, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(65, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(67, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → Scream End
+  }
+
+  state R Scream End {
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rage Idle
+  }
+
+  state Scream Side 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckXPosition(gameObject=var "Hero", compareTo=52.5, compareToOffset=0, tolerance=0, equal=→"R", equalBool=(unset), lessThan=→"L", lessThanBool=(unset), greaterThan=→"R", greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    on L → L Choice 2
+    on R → R Choice 2
+  }
+
+  state L Choice 2 {
+    SendRandomEvent(events=[→"L", →"MID", →"OUTER"], weights=[0.4, 0.3, 0.3], delay=0)
+    on L → Slams L 2
+    on MID → Slams Mid 2
+    on OUTER → Slams Outer 2
+  }
+
+  state R Choice 2 {
+    SendRandomEvent(events=[→"R", →"MID", →"OUTER"], weights=[0.4, 0.3, 0.3], delay=0)
+    on R → Slams R 2
+    on MID → Slams Mid 2
+    on OUTER → Slams Outer 2
+  }
+
+  state Slams L 2 {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(39, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(41, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(43, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(45, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(47, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(49, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → R Scream End
+  }
+
+  state Slams R 2 {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(56, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(58, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(60, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(62, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(64, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(66, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → R Scream End
+  }
+
+  state Slams Mid 2 {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(47, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(49, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(51, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(53, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(55, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(57, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(59, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → R Scream End
+  }
+
+  state Slams Outer 2 {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(39, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(41, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(43, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(45, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(60, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(62, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(64, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(66, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → R Scream End
+  }
+
+  state Rage Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rage Move
+    on TOOK DAMAGE → Rage Dmg Response
+  }
+
+  state Ptn All {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(39, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(41, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(43, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(45, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(47, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(49, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(51, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(53, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(55, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(57, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(59, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(61, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(63, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(65, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+  }
+
+  state Ptn 1 {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(39, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(47, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(55, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(63, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → R Scream End
+  }
+
+  state Ptn 2 {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(41, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(49, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(57, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(65, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → R Scream End
+  }
+
+  state Ptn 3 {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(43, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(51, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(59, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → R Scream End
+  }
+
+  state Ptn 4 {
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(38.5, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(45.5, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(53.5, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    SpawnObjectFromGlobalPoolDelay(gameObject=Spinner_vertical_slash_long_new (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(61.5, 12.67266, 0), rotation=(unset), storeObject=var "", delayMin=0, delayMax=var "Slam Delay")
+    on FINISHED → R Scream End
+  }
+
+  state R Scream Choice {
+    PlayAudioEvent(audioClip=widow_bells_from_ceiling_antic (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=widow_directly_down_bell_antic_1 (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=widow_directly_down_bell_antic_3 (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendRandomEventV4(events=[→"PTN 1", →"PTN 2", →"PTN 3", →"PTN 4"], weights=[1, 1, 1, 1], eventMax=[2, 2, 2, 2], missedMax=[5, 5, 5, 5], activeBool=(unset))
+    on PTN 1 → Ptn 1
+    on PTN 2 → Ptn 2
+    on PTN 3 → Ptn 3
+    on PTN 4 → Ptn 4
+  }
+
+  state Rage Attack {
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=22, tolerance=0, equal=→"CHASE", lessThan=(none), greaterThan=→"CHASE", everyFrame=false)
+    SendRandomEventV4(events=[→"SCREAM", →"STRUM SHOT", →"SCUTTLE"], weights=[1, 1, 1], eventMax=[2, 2, 1], missedMax=[3, 3, 3], activeBool=(unset))
+    on SCREAM → Rage Screaming
+    on STRUM SHOT → Rage Strum 1
+    on SCUTTLE → Rage Scuttle Antic
+    on CHASE → Chase 4
+  }
+
+  state Rage Strum 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Throw Event
+  }
+
+  state Strum End 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum Throw End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Rage Idle
+  }
+
+  state Rage Throw {
+    SendEventByName(eventTarget=GameObject(var "HarpShot 1"), sendEvent=var "Throw Event 1", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HarpShot 2"), sendEvent=var "Throw Event 2", delay=0.2, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Strum Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Strum End 2
+  }
+
+  state Throw Event {
+    SetStringValue(stringVariable=var "Throw Event 1", stringValue="FIRE L1", everyFrame=false)
+    SetStringValue(stringVariable=var "Throw Event 2", stringValue="FIRE L2", everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[1, 1], delay=0)
+    SetStringValue(stringVariable=var "Throw Event 1", stringValue="FIRE R1", everyFrame=false)
+    SetStringValue(stringVariable=var "Throw Event 2", stringValue="FIRE R2", everyFrame=false)
+    on FINISHED → Rage Throw
+  }
+
+  state Chase Antic {
+    on FINISHED → Chase 1
+  }
+
+  state Set Evade To Idle {
+    SetBoolValue(boolVariable=var "Evade To Idle", boolValue=true, everyFrame=false)
+    on FINISHED → Evade 1
+  }
+
+  state Set Intro Pos {
+    SetFloatValue(floatVariable=var "Tele X", floatValue=58.66, everyFrame=false)
+    CheckXPosition(gameObject=var "Hero", compareTo=53, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"FINISHED", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    SetFloatValue(floatVariable=var "Tele X", floatValue=44, everyFrame=false)
+    on FINISHED → Intro In
+  }
+
+  state DashCharge Antic {
+    PlayAudioEvent(audioClip=widow_insectoid_antic_before_running_with_slashes (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ActivateGameObjectDelay(gameObject=var "widow_attack_glint_ground", activate=true, resetOnExit=false, delay=0.17)
+    on FINISHED → DashCharge
+  }
+
+  state DashCharge {
+    PlayAudioEvent(audioClip=widow_run_n_slash (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Sound Player")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_attack (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayParticleEmitterInState(gameObject=var "Pt ChargeDust")
+    AccelerateToXByScale(gameObject=Self, accelerationFactor=5, targetSpeed=-25)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="NewDive Charge")
+    ActivateGameObject(gameObject=var "NewCharge Hit", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    RayCast2dV2(fromGameObject=var "Evade Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=→"FINISHED", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → DashCharge End
+    on MULTI HIT CONNECT → Multihit Slash
+  }
+
+  state DashCharge End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NewDive Charge End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=true)
+    on FINISHED → Dash Audio End
+  }
+
+  state Death Stagger {
+    SetPlayerDataBool(boolName="disableInventory", value=true)
+    SetIsDead(target=Self, setValue=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetBlockFsmMove", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CancelDamageRecoilSimple", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_death_hit (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "DazedEffect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    AudioStop(gameObject=var "Pull Loop", fadeTime=0)
+    SendEventByName(eventTarget=GameObject(var "Web Target"), sendEvent="STOP", delay=0, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Air")
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    CreateObject(gameObject=Boss Death FinalHit (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=boss_death_pt_1 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=0.01)
+    SendEventToRegister(eventName="SPINNER DEFEATED")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Hornet Dash
+  }
+
+  state Hornet Dash {
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Hornet Dummy", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Hornet Dummy", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=var "Hornet Dummy", targetObject=var "Hero", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=true)
+    FaceObjectV2(objectA=var "Hornet Dummy", objectB=var "Self", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetPosition2D(gameObject=Self, vector=var "Dummy Target Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatMultiply(floatVariable=var "Distance", multiplyBy=0.01, everyFrame=false)
+    AnimateRigidBody2DPositionToV2(GameObject=var "Hero", ToValue=var "Dummy Target Pos", ToX=0, ToY=0, time=var "Distance", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Hornet Connect
+  }
+
+  state Hornet Connect {
+    ClearHeroEffects()
+    ApplyMusicCue(musicCue=None (audiocuesdynamic_assets_shared.bundle), delayTime=0, transitionTime=0)
+    SetPositionToObject2D(gameObject=var "Hero", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    ActivateGameObject(gameObject=var "Hornet Dummy", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Connect")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt BindStab", emit=0, resetIfPlaying=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Death Steam Audio", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Death Pt SilkDust", emit=0, resetIfPlaying=false)
+    AudioPlaySimple(gameObject=var "Audio Loop CloakFlap", volume=1, oneShotClip=<null>)
+    SetRandomAudioClipFromTable(Table=Widow_death_scream_loop (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    SetAudioClip(gameObject=var "Audio Loop HornetVoice", audioClip=hornet_crest_claim_loop (herosfxstatic_assets_all.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Can Bind
+  }
+
+  state Can Bind {
+    ListenForCast(eventTarget=Self, wasPressed=→"BIND", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    SendEventToRegister(eventName="BOSS BIND UP")
+    on BIND → Bind
+  }
+
+  state Bind {
+    PlayRandomAudioClipTableV3(Table=Widow_death_stab (sfxdynamic_assets_areabell.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    SendEventToRegister(eventName="BOSS BIND DOWN")
+    IntAdd(intVariable=var "Binds", add=-1, everyFrame=false)
+    PlayAudioEvent(audioClip=boss_final_hit (sfxstatic_assets_boss.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=bind_for_crest_silk_spin_around_hornet_2d (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    ActivateAllChildren(gameObject=var "Death Effects", activate=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Bind Silk", clipName="Bind Silk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Bind")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    on FINISHED → Bind Burst
+  }
+
+  state Bind Burst {
+    AudioStop(gameObject=var "Audio Loop HornetVoice", fadeTime=0)
+    AudioPlaySimple(gameObject=var "Audio Loop HornetVoice", volume=1, oneShotClip=<null>)
+    PlayAudioEvent(audioClip=bind_for_crest_silk_slam_into_hornet_2d (sfxstatic_assets_crestshrine.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Bind Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ScreenFlash(flashColour=(1, 1, 1, 1))
+    IntCompare(integer1=var "Binds", integer2=0, equal=→"SHIFT", lessThan=→"SHIFT", greaterThan=(none), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AddSilk(target=var "Hero", amount=3, playHeroEffect=false)
+    on FINISHED → Rebind Ready
+    on SHIFT → Final Bind Burst
+  }
+
+  state Rebind Ready {
+    ListenForCast(eventTarget=Self, wasPressed=→"BIND", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    SendEventToRegisterDelay(EventName="BOSS BIND QUICK", delay=0.25, ExcludeTarget=Self)
+    SetRandomAudioClipFromTable(Table=Widow_death_scream_loop (sfxdynamic_assets_areabell.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on BIND → Bind
+  }
+
+  state Final Bind Burst {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop HornetVoice", audioClipTable=Death Hornet Voice (herodynamic_assets_all.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Bind Silk", clipName="Bind Silk Loop", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetPlayerDataBool(boolName="hasNeedolin", value=true)
+    SetPlayerDataBool(boolName="spinnerDefeated", value=true)
+    RecordJournalKillV2(Record=Spinner Boss (dataassets_assets_assets/dataassets/enemyjournal/journalrecords.bundle), ShowPopup=false)
+    PlayAudioEvent(audioClip=boss_death_pt_3 (sfxstatic_assets_boss.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=silk_cradle_head_rips_out (sfxstatic_assets_areacradle.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt SilkDust", emit=0, resetIfPlaying=false)
+    AddSilk(target=var "Hero", amount=100, playHeroEffect=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Big Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    ActivateGameObject(gameObject=var "Death Steam Audio", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=at None (audioobjects_assets_all.bundle), transitionTime=0.5)
+    AudioStopV2(gameObject=var "Audio Loop CloakFlap", fadeTime=0, cancelOnEarlyExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Bind Final")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_death_hit (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Fade
+  }
+
+  sequence state Fade To Black {
+    SendEventToRegister(eventName="SPINNER DEATH EXPLODE")
+    ScreenFader(startColour=(1, 1, 1, 1), endColour=(0, 0, 0, 1), duration=2)
+    TransitionToAudioSnapshot(snapshot=Off (audioobjects_assets_all.bundle), transitionTime=3)
+    StopParticleEmitter(gameObject=var "Death Pt SilkDust")
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    AwardAchievementProgress(Key="DEFEATED_WIDOW", CurrentValue=(unset), MaxValue=(unset))
+    Wait(time=5.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Needolin
+  }
+
+  state To Memory Scene {
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    BeginSceneTransition(sceneName="Memory_Needolin", entryGateName="door_wakeOnGround", entryDelay=0, visualization=Default, preventCameraFadeOut=false)
+  }
+
+  state Get Needolin {
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    SpawnPowerUpGetMsg(MsgPrefab=Ancestral_Art_Get_Prompt (prompts_assets_all.bundle), PowerUp=Needolin)
+    on FINISHED → To Memory Scene
+  }
+
+  state Dash Audio End {
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    on FINISHED → Tele Out
+  }
+
+  state Multihit Slash {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetPosition2d(gameObject=var "Multihit Point", vector_2d=var "Multihit Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Tele", boolValue=true, everyFrame=false)
+    AnimateRigidBody2DPositionToV2(GameObject=var "Hero", ToValue=var "Multihit Pos", ToX=(unset), ToY=(unset), time=0.1, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NewDive Multihit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Away
+  }
+
+  state Fade {
+    ScreenFader(startColour=(1, 1, 1, 0), endColour=(1, 1, 1, 1), duration=0.05)
+    StopVibrationV2(tag="", fadeTime=2, waitUntilFinish=false)
+    Wait(time=4, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=boss_death_pt_1 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Fade To Black
+  }
+
+  state Rage Dmg Response {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rage Move
+  }
+
+  state Rage Scuttle Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rage Scuttle Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=widow_insectoid_antic_before_running_with_slashes (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_move (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateGameObjectDelay(gameObject=var "widow_attack_glint_ground", activate=true, resetOnExit=false, delay=0.25)
+    on FINISHED → DashCharge
+  }
+
+  state Cancel Strum Shot {
+    SendRandomEvent(events=[→"CHASE SLAM", →"DASH SLASH"], weights=[0.5, 0.5], delay=0)
+    on CHASE SLAM → Set Chase Slam
+    on DASH SLASH → Set Dash Slash
+  }
+
+  state Death Stagger F {
+    ActivateGameObject(gameObject=var "DazedEffect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Widow_death_hit (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Did Fake Death", boolValue=true, everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    AudioStop(gameObject=var "Pull Loop", fadeTime=0)
+    SendEventByName(eventTarget=GameObject(var "Web Target"), sendEvent="STOP", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL RESET", delay=0, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Air")
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    CreateObject(gameObject=Boss Death FinalHit (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=boss_death_pt_1 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=0.01)
+    SendEventToRegister(eventName="SPINNER MID DEATH")
+    on FINISHED → Fake Death End
+  }
+
+  state Fake Death End {
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    on FINISHED → Tele Out
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Scream")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Widow_sing (sfxdynamic_assets_areabell.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    on FINISHED → Tele Out
+  }
+
+  state Sing 2 {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Scream")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Widow_sing (sfxdynamic_assets_areabell.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on SING DURATION END → Sing End 2
+  }
+
+  state Sing End 2 {
+    on FINISHED → Rage Move
+  }
+
+  var Aim Clamp: float = 0
+  var Aim Clamp Long: float = 0
+  var Aimer X: float = 0
+  var Angle: float = 0
+  var Charge Speed: float = 0
+  var Daze X Scale: float = 0
+  var Daze Y Scale: float = 0
+  var Difference: float = 0
+  var Distance: float = 0
+  var Ground Y: float = 11.02
+  var Hero X: float = 0
+  var PB Angle: float = 0
+  var Self X: float = 0
+  var SlamString Max X: float = 67.1
+  var SlamString Min X: float = 38.1
+  var Stun Timer: float = 0
+  var Tele X: float = 0
+  var Tele Y: float = 0
+  var Speed: float = 0
+  var Slam Delay: float = 0.25
+  var Allowance: float = 0
+  var Damage Hero Amount: int = 1
+  var P2 HP: int = 250
+  var P3 HP: int = 150
+  var Repeats: int = 0
+  var Binds: int = 3
+  var Aimed L: bool = false
+  var Block Strum Shot: bool = false
+  var Did Attack: bool = false
+  var Did Scream: bool = false
+  var Did Tele: bool = false
+  var Dmg Evade: bool = false
+  var Evade To Idle: bool = false
+  var Extra Slam: bool = false
+  var Extra Strum: bool = false
+  var Final Phase: bool = false
+  var Lenient Tele Placement: bool = false
+  var Started Rage: bool = false
+  var Currently Away: bool = false
+  var Did Fake Death: bool = false
+  var Can Evade: bool = false
+  var In P2: bool = false
+  var Hero Nearby: bool = false
+  var Next Event: string = ""
+  var Throw Event 2: string = ""
+  var Throw Event 1: string = ""
+  var Dummy Target Pos: vector2 = (0, 0)
+  var Multihit Pos: vector2 = (0, 0)
+  var Aimer: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Aimer
+  var Audio Loop CloakFlap: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Audio Loop CloakFlap
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Audio Loop Voice
+  var Battle Darkening Folder: gameObject = <null>
+  var Bind Flash: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Bind Flash
+  var Bind Silk: gameObject = <null>
+  var Boss Scene: gameObject = <null>
+  var Charge Slash: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Charge Slash
+  var Contrast Plane Region: gameObject = <null>
+  var Dash Slash: gameObject = <null>
+  var DashSlash Effect: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/DashSlash Effect
+  var DashSlash Hit: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/DashSlash Hit
+  var Dazed: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/DazedEffectMarker
+  var DazedEffect: gameObject = <null>
+  var Death Effects: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Death Effects
+  var Death Pt SilkDust: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Death Effects/Pt SilkDust
+  var Death Steam Audio: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Death Steam Audio
+  var Door Temp: gameObject = <null>
+  var Evade Ray: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Evade Ray
+  var Ground Bells: gameObject = <null>
+  var HarpShot 1: gameObject = <null>
+  var HarpShot 2: gameObject = <null>
+  var HarpShot 3: gameObject = <null>
+  var Hornet Dummy: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Hornet Dummy
+  var Multihit Point: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Multihit Point
+  var NewCharge Hit: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/NewCharge Hit
+  var Pt BindStab: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Pt BindStab
+  var Pt ChargeDust: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Pt ChargeDust
+  var Pt Lingering Silk: gameObject = <null>
+  var Pt SilkDust: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Pt SilkDust
+  var Pull Loop: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Pull Loop
+  var Scuttle Loop: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Scuttle Loop
+  var Self: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss
+  var Slam Effect: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Slam Effect
+  var Slam String: gameObject = <null>
+  var Sound Player: gameObject = <null>
+  var Web Target: gameObject = <null>
+  var Audio Loop HornetVoice: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/Audio Loop HornetVoice
+  var widow_attack_glint_air: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/widow_attack_glint_air
+  var widow_attack_glint_ground: gameObject = Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss/widow_attack_glint_ground
+}

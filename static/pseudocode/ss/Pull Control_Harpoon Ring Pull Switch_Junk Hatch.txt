@@ -1,0 +1,169 @@
+# Pull Control
+# 1 location(s):
+#   Ward_07 / Group:1/Junk Hatch/Harpoon Ring Pull Switch
+
+fsm Pull Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    GetPosition(gameObject=var "Pull Point", vector=(unset), x=(unset), y=var "Pull Y", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Retract Point", vector=(unset), x=(unset), y=var "Retract Y", z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Start Y", z=(unset), space=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pull Point", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Retract Point", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FloatOperator(float1=var "Pull Speed", float2=2, operation=Multiply, storeResult=var "Return Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Pull Speed", multiplyBy=-1, everyFrame=false)
+    SetParent(gameObject=var "Cog", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Persistence Check
+  }
+
+  state Idle {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Start Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Wobble")
+    Tk2dPlayFrame(gameObject=var "Ring", frame=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on CONNECT → Pull Pause
+  }
+
+  state Pull Pause {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetRotationSpeed(0))
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on DISCONNECT → Idle
+    on FINISHED → Pull Down
+  }
+
+  state Pull Down {
+    AudioPlayInState(gameObject=var "Loop Pull", volume=1)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AccelerateToY(gameObject=Self, accelerationFactor=var "Acceleration", targetSpeed=var "Pull Speed")
+    Rotate(gameObject=var "Cog", vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Pull Speed", space=0, perSecond=false, everyFrame=true, lateUpdate=false, fixedUpdate=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetRotationSpeed(var "Pull Speed"))
+    CheckYPosition(gameObject=Self, compareTo=var "Pull Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    on DISCONNECT → Return Pause
+    on FINISHED → Pull Complete
+  }
+
+  state Return Pause {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetRotationSpeed(0))
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Return
+  }
+
+  state Return {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=var "Return Speed", z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)  // disabled
+    AudioPlayInState(gameObject=var "Loop Retract", volume=1)
+    AccelerateToY(gameObject=Self, accelerationFactor=var "Acceleration", targetSpeed=var "Return Speed")
+    Rotate(gameObject=var "Cog", vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Return Speed", space=0, perSecond=false, everyFrame=true, lateUpdate=false, fixedUpdate=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetRotationSpeed(var "Return Speed"))
+    CheckYPosition(gameObject=Self, compareTo=var "Start Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=true, space=0, activeBool=(unset))
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Wobble")
+    Tk2dPlayFrame(gameObject=var "Ring", frame=0)
+    on FINISHED → Return To Top
+    on CONNECT → Pull Pause
+  }
+
+  state Pull Complete {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetRotationSpeed(0))
+    PlayAudioEvent(audioClip=harpoon_pull_switch_arrived_bottom (sfxstatic_assets_areahang.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Ring Drop Impact")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetCircleCollider(gameObject=Self, active=false)
+    on FINISHED → Notify
+  }
+
+  state Notify {
+    SendEventByName(eventTarget=GameObject(var "Event Receiver"), sendEvent="OPEN", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Gate", delivery=SendMessage, options=1, functionCall=Open())
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ready To Return
+  }
+
+  state Persistence Check {
+    BoolTest(boolVariable=var "Activated", isTrue=→"ACTIVATE", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+    on ACTIVATE → Activated
+  }
+
+  state Activated {
+    SendEventByName(eventTarget=GameObject(var "Event Receiver"), sendEvent="ACTIVATED", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Gate", delivery=SendMessage, options=1, functionCall=Opened())
+    BoolTest(boolVariable=var "Retract After Activation", isTrue=→"RETRACT", isFalse=(none), everyFrame=false)
+    on RETRACT → Deactivate
+  }
+
+  state Deactivate {
+    SendEventByName(eventTarget=GameObject(Group:1/Junk Hatch/Harpoon Ring Pull Switch/Harpoon Ring Chain), sendEvent="EJECT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Group:1/Junk Hatch/Harpoon Ring Pull Switch/Harpoon Ring Chain), sendEvent="DISCONNECT", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=Group:1/Junk Hatch/Harpoon Ring Pull Switch/Harpoon Ring Chain, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Ready To Return {
+    Wait(time=0.25, finishEvent=→"RECHECK", realTime=false)
+    GetFsmBool(gameObject=Group:1/Junk Hatch/Harpoon Ring Pull Switch/Harpoon Ring Chain, fsmName="Proxy", variableName="Is Connected", storeValue=var "Is Connected", everyFrame=false)
+    BoolTest(boolVariable=var "Is Connected", isTrue=(none), isFalse=→"DISCONNECT", everyFrame=false)
+    on RECHECK → Ready To Return
+    on DISCONNECT → Return Type
+  }
+
+  state Return Type {
+    BoolTest(boolVariable=var "Retract After Activation", isTrue=→"RETRACT", isFalse=→"RETURN", everyFrame=false)
+    on RETURN → Return Pause
+    on RETRACT → Retract Pause
+  }
+
+  state Retract Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetCircleCollider(gameObject=Self, active=false)
+    SetCircleCollider(gameObject=var "Ring Parent", active=false)
+    SetFsmBool(gameObject=var "Ring Parent", fsmName="Control", variableName="Collider Start Enabled", setValue=false, everyFrame=false)
+    on FINISHED → Retract
+  }
+
+  state Retract {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=12, z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)  // disabled
+    AudioPlayInState(gameObject=var "Loop Retract Fast", volume=1)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.5, targetSpeed=20)
+    CheckYPosition(gameObject=Self, compareTo=var "Retract Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=true, space=0, activeBool=(unset))
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Wobble")
+    Tk2dPlayFrame(gameObject=var "Ring", frame=0)
+    on FINISHED → Retract End
+  }
+
+  state Return To Top {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetRotationSpeed(0))
+    PlayAudioEvent(audioClip=harpoon_pull_switch_return_to_init (sfxstatic_assets_areahang.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle
+  }
+
+  state Retract End {
+    PlayAudioEvent(audioClip=harpoon_pull_switch_return_to_init (sfxstatic_assets_areahang.bundle), pitchMin=0.9, pitchMax=0.9, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Deactivate
+  }
+
+  var Pull Speed: float = 2
+  var Retract After Activation: bool = true
+  var Event Receiver: gameObject = Group:1/Junk Hatch
+  var Gate: gameObject = <null>
+
+  var Pull Y: float = 0
+  var Retract Y: float = 0
+  var Return Speed: float = 0
+  var Start Y: float = 0
+  var Acceleration: float = 0.1
+  var Activated: bool = false
+  var Is Connected: bool = false
+  var Pull Point: gameObject = Group:1/Junk Hatch/Harpoon Ring Pull Switch/Pull Point
+  var Retract Point: gameObject = Group:1/Junk Hatch/Harpoon Ring Pull Switch/Retract Point
+  var Ring: gameObject = Group:1/Junk Hatch/Harpoon Ring Pull Switch/Harpoon Ring Chain/Hang/Harpoon Ring Citadel/Ring Parent/Ring
+  var Cog: gameObject = Group:1/Junk Hatch/Harpoon Ring Pull Switch/Cog
+  var Loop Pull: gameObject = Group:1/Junk Hatch/Harpoon Ring Pull Switch/Loop Pull
+  var Loop Retract: gameObject = Group:1/Junk Hatch/Harpoon Ring Pull Switch/Loop Retract
+  var Loop Retract Fast: gameObject = Group:1/Junk Hatch/Harpoon Ring Pull Switch/Loop Retract Fast
+  var Ring Parent: gameObject = Group:1/Junk Hatch/Harpoon Ring Pull Switch/Harpoon Ring Chain/Hang/Harpoon Ring Citadel
+}

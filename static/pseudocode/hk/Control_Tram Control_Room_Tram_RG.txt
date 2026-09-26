@@ -1,0 +1,124 @@
+# Control
+# 1 location(s):
+#   Room_Tram_RG / Tram Control
+
+fsm Control {
+  start Pause Frame
+
+  state Init {
+    FindGameObject(objectName="Tram Console L", withTag="Untagged", store=var "Tram Console L")
+    FindGameObject(objectName="Tram Console R", withTag="Untagged", store=var "Tram Console R")
+    FindChild(gameObject=Self, childName="BG", storeResult=var "BG")
+    FindChild(gameObject=var "HUD Camera", childName="Blanker", storeResult=var "Blanker")
+    on FINISHED → Check Pos
+  }
+
+  state Check Pos {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="tramRestingGroundsPosition", storeValue=var "Tram Position")
+    IntSwitch(intVariable=var "Tram Position", compareTo=[0, 1], sendEvent=[→"LEFT", →"RIGHT"], everyFrame=false)
+    on LEFT → Left
+    on RIGHT → Right
+  }
+
+  state Left {
+    SendEventByName(eventTarget=GameObject(var "Tram Console L"), sendEvent="OFF", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Tram Console R"), sendEvent="ON", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Game Map", behaviour="GameMap", methodName="SetCustomCompassPos", parameters=[18, 10, "Crossroads_46", "CROSSROADS", 0, 0, 55, 25], storeResult=(unset var))
+    SetFsmBool(gameObject=var "Quick Map", fsmName="Quick Map", variableName="In Room", setValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Right {
+    SendEventByName(eventTarget=GameObject(var "Tram Console L"), sendEvent="ON", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Tram Console R"), sendEvent="OFF", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Game Map", behaviour="GameMap", methodName="SetCustomCompassPos", parameters=[32, 10, "Crossroads_46b", "RESTING_GROUNDS", 0, 0, 55, 25], storeResult=(unset var))
+    SetFsmBool(gameObject=var "Quick Map", fsmName="Quick Map", variableName="In Room", setValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on TRAM MOVE R → Set R
+    on TRAM MOVE L → Set L
+  }
+
+  state Pause Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Set R {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="tramRestingGroundsPosition", storeValue=var "Tram Position")
+    SetIntValue(intVariable=var "Station Increment", intValue=1, everyFrame=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="tramRestingGroundsPosition", amount=var "Station Increment")
+    SetVector3XYZ(vector3Variable=var "BG Tween Vector", vector3Value=(unset), x=-30, y=0, z=0, everyFrame=false)
+    on FINISHED → Shake
+  }
+
+  state Shake {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="TramShake", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Tram Console L"), sendEvent="OFF", delay=0, everyFrame=false)  // disabled
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=jiji_door_open_pt_2 (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "Tram Console R"), sendEvent="OFF", delay=0, everyFrame=false)  // disabled
+    on FINISHED → Tween Out
+  }
+
+  state Tween Out {
+    iTweenMoveBy(gameObject=var "BG", id="", vector=var "BG Tween Vector", time=4, delay=0, speed=(unset), easeType=easeInCubic, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=true)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    FadeAudio(gameObject=Self, startVolume=0, endVolume=1, time=0.5)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Fade Out
+  }
+
+  state Fade Out {
+    SetFsmFloat(gameObject=var "Blanker", fsmName="Blanker Control", variableName="Fade Time", setValue=0.8, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Blanker"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fade In
+  }
+
+  state Fade In {
+    SetPosition(gameObject=var "BG", vector=(unset), x=0, y=0, z=0, space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Blanker"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    Vector3Multiply(vector3Variable=var "BG Tween Vector", multiplyBy=0.5, everyFrame=false)
+    SetVector3Value(vector3Variable=var "Translate Vector", vector3Value=var "BG Tween Vector", everyFrame=false)
+    Vector3Multiply(vector3Variable=var "Translate Vector", multiplyBy=-1, everyFrame=false)
+    Translate(gameObject=var "BG", vector=var "Translate Vector", x=(unset), y=(unset), z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    iTweenMoveBy(gameObject=var "BG", id="", vector=var "BG Tween Vector", time=3, delay=0, speed=(unset), easeType=easeOutQuart, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=true)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Audio Fade
+  }
+
+  state Reset {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="TRAM ARRIVE", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "BG", vector=(unset), x=0, y=0, z=0, space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="TramShake", delay=0, everyFrame=false)  // disabled
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=ruins_big_lift_gate_door_thingy_open (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=toll_bench_open (sharedassets23.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Check Pos
+  }
+
+  state Set L {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="tramRestingGroundsPosition", storeValue=var "Tram Position")
+    SetIntValue(intVariable=var "Station Increment", intValue=-1, everyFrame=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="tramRestingGroundsPosition", amount=var "Station Increment")
+    SetVector3XYZ(vector3Variable=var "BG Tween Vector", vector3Value=(unset), x=30, y=0, z=0, everyFrame=false)
+    on FINISHED → Shake
+  }
+
+  state Audio Fade {
+    Wait(time=1, finishEvent=(none), realTime=false)
+    FadeAudio(gameObject=Self, startVolume=1, endVolume=0, time=1)
+    on FINISHED → Reset
+  }
+
+  var Station Increment: int = 0
+  var Tram Position: int = 0
+  var BG Tween Vector: vector3 = (0, 0, 0)
+  var Translate Vector: vector3 = (0, 0, 0)
+  var BG: gameObject = <null>
+  var Blanker: gameObject = <null>
+  var Tram Console L: gameObject = <null>
+  var Tram Console R: gameObject = <null>
+}

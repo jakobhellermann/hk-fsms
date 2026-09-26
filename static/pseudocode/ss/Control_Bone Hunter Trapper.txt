@@ -1,0 +1,800 @@
+# Control
+# 1 location(s):
+#   Bone_East_18b / Boss Scene/Bone Hunter Trapper
+
+fsm Control {
+  start Init
+  on STUN → Stun Start  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Boss Scene")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Barb Traps")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Barb Traps - Add After Intro")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Spike Traps")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    FindNamedChild(gameObject=var "Barb Traps", storeResult=var "Intro Barb LA")
+    FindNamedChild(gameObject=var "Barb Traps", storeResult=var "Intro Barb LB")
+    FindNamedChild(gameObject=var "Barb Traps", storeResult=var "Intro Barb LC")
+    FindNamedChild(gameObject=var "Barb Traps", storeResult=var "Intro Barb RA")
+    FindNamedChild(gameObject=var "Barb Traps", storeResult=var "Intro Barb RB")
+    FindNamedChild(gameObject=var "Barb Traps", storeResult=var "Intro Barb RC")
+    on FINISHED → Set HPs
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValueAtTime(BoolVariable=var "Can Evade", BoolValue=true, Time=0.08, SetOppositeOnStateEntry=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Evade Range", storeResult=var "In Evade Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    RayCast2dV2(fromGameObject=var "Ray Pt Centre", fromPosition=(unset), direction=(-1, 0), space=1, distance=7.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Can Evade", var "Will Evade", var "In Evade Range", var "Wall Behind"], boolStates=[true, true, true, false], trueEvent=→"EVADE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTest(boolVariable=var "Hero Binding", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    on FINISHED → Choice
+    on EVADE → Evade Antic
+  }
+
+  state Choice {
+    BoolTest(boolVariable=var "Did First Charge", isTrue=(none), isFalse=→"INTRO", everyFrame=false)
+    GetHP(target=Self, storeValue=var "HP Current")
+    IntCompareToBool(integer1=var "HP Current", integer2=var "P2 HP", equalBool=(unset), lessThanBool=var "Below Rage HP", greaterThanBool=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Below Rage HP", var "Did Rage"], boolStates=[true, false], trueEvent=→"RAGE", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    SendRandomEventV4(events=[→"CHARGE", →"DIG IN", →"HOP", →"SPIKES"], weights=[1, 1, 1, 1], eventMax=[2, 1, 1, 2], missedMax=[5, 6, 5, 4], activeBool=(unset))
+    on DIG IN → Dig In 1
+    on CHARGE → Charge Dir
+    on HOP → Hop Dir
+    on SPIKES → Spike Jump Antic
+    on INTRO → Intro Roar Antic
+    on RAGE → Rage Roar Antic
+  }
+
+  state Dig In 1 {
+    AudioPlayRandomVoiceFromTable(gameObject=Self, audioClipTable=ant_trapper_yelp (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig Away", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    PlayAudioEvent(audioClip=moss_charger_return (sfxstatic_assets_areawilds.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Dig In 2
+  }
+
+  state Dig In 2 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=(unset), IsDownBlocked=(unset), IsLeftBlocked=true, IsRightBlocked=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Dig In", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "DigIn Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    on FINISHED → Away
+  }
+
+  state Away {
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetBoxColliderTrigger(gameObject=Self, trigger=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=-3.213614, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Away")
+    on FINISHED → Spike Pause?
+  }
+
+  state Diag Leap Facing {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CheckXPosition(gameObject=Self, compareTo=var "Centre X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"FINISHED", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=1, activeBool=(unset))
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Diag Leap Antic
+  }
+
+  state Diag Leap Antic {
+    Wait(time=0.9, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt DiagonalLeapAntic")
+    PlayAudioEvent(audioClip=moss_knight_rustle (sfxstatic_assets_areashellwoodareawilds.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayInState(gameObject=var "Audio Loop Dig", volume=1)
+    on FINISHED → Diag Leap
+  }
+
+  state Diag Leap {
+    SetBoolValue(boolVariable=var "Leaping Diagonally", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ant_trapper_yelp (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=moss_charger_emerge (sfxstatic_assets_areawilds.bundle), pitchMin=1.2, pitchMax=1.3, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=-8, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetVelocityByScale(gameObject=Self, speed=25, ySpeed=36, everyFrame=false)
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fall
+  }
+
+  state Fall {
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Y Pos", space=1, everyFrame=true)
+    FloatTestToBool(float1=var "Y Pos", float2=1.75, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Over Throw Height", everyFrame=true)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.975, decelerationY=(unset), brakeOnExit=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    BoolTestMulti(boolVariables=[var "Will Throw", var "Over Throw Height"], boolStates=[true, true], trueEvent=→"THROW", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on LAND → Land
+    on THROW → Count Barbs
+  }
+
+  state Land {
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Default Gravity")
+    BoolTest(boolVariable=var "Diving", isTrue=→"DIG IN", isFalse=(none), everyFrame=false)
+    PlayAudioEvent(audioClip=scholar_land (sfxstatic_assets_arealibrary.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Will Evade?
+    on DIG IN → Dive In
+  }
+
+  state Return Choice {
+    BoolTest(boolVariable=var "Did First Dive", isTrue=(none), isFalse=→"FIRST", everyFrame=false)
+    GetHP(target=Self, storeValue=var "HP Current")  // disabled
+    IntCompareToBool(integer1=var "HP Current", integer2=var "Rage HP", equalBool=(unset), lessThanBool=var "Below Rage HP", greaterThanBool=(unset), everyFrame=false)  // disabled
+    BoolTestMulti(boolVariables=[var "Below Rage HP", var "Did Rage"], boolStates=[true, false], trueEvent=→"RAGE", falseEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Leaping Diagonally", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Throw", boolValue=true, everyFrame=false)
+    RandomFloat(min=var "Min X", max=var "Max X", storeResult=var "Target X")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Target X", y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SendRandomEvent(events=[→"UP", →"DIAG"], weights=[1, 1], delay=0)
+    on UP → Up Leap Antic
+    on DIAG → Diag Leap Facing
+    on RAGE → Rage Wait
+    on FIRST → First Leap
+  }
+
+  state Up Leap Antic {
+    Wait(time=0.9, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt LeapAntic")
+    PlayAudioEvent(audioClip=moss_knight_rustle (sfxstatic_assets_areashellwoodareawilds.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayInState(gameObject=var "Audio Loop Dig", volume=1)
+    on FINISHED → Up Leap
+  }
+
+  state Up Leap {
+    SetBoolValue(boolVariable=var "Diving", boolValue=true, everyFrame=false)  // disabled
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ant_trapper_yelp (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=moss_charger_emerge (sfxstatic_assets_areawilds.bundle), pitchMin=1.2, pitchMax=1.3, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap Up")
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=-8, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=36, everyFrame=false)
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fall
+  }
+
+  state Stun Start {
+    SetFloatValue(floatVariable=var "Stun Timer", floatValue=2, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ant_trapper_wound (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Did Intro Throw", boolValue=true, everyFrame=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=(unset), IsDownBlocked=(unset), IsLeftBlocked=false, IsRightBlocked=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Air")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Default Gravity")
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=25, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Stun Air
+  }
+
+  state Stun Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Stun Land
+  }
+
+  state Stunned {
+    FloatAdd(floatVariable=var "Stun Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    on END → Stun Recover
+    on TOOK DAMAGE → Stun Damage
+  }
+
+  state Stun Recover {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=trobbio_recover_or_general_foley_movement (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Choice
+  }
+
+  state Stun Land {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Land")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.975, decelerationY=(unset), brakeOnExit=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=scholar_land (sfxstatic_assets_arealibrary.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=moss_charger_leafy_explode (sfxstatic_assets_areaantareaboneareamemoryareawilds.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Stunned
+  }
+
+  state Stun Damage {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ant_trapper_wound (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Hit")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FloatAdd(floatVariable=var "Stun Timer", add=-0.25, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Stunned
+    on END → Damage Recover
+  }
+
+  state Damage Recover {
+    SendEventByName(eventTarget=Self, sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    on FINISHED → Stun Recover
+  }
+
+  state Charge Dir {
+    SetBoolValue(boolVariable=var "Did First Charge", boolValue=true, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CheckXPosition(gameObject=Self, compareTo=var "Centre X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"FINISHED", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=1, activeBool=(unset))
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Charge Antic
+  }
+
+  state Charge Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ant_trapper_yelp (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Charge
+  }
+
+  state Charge {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    PlayAudioEvent(audioClip=bone_hunter_throw_jump (sfxstatic_assets_areaant.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Charge Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-5, ySpeed=(unset), everyFrame=false)
+    FloatMultiply(floatVariable=var "Charge Speed", multiplyBy=30, everyFrame=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=0.75, targetSpeed=var "Charge Speed")
+    RayCast2dV2(fromGameObject=var "Charge Ray Pt", fromPosition=(unset), direction=(1, 0), space=1, distance=4.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"FINISHED", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Charge")
+    AudioPlayInState(gameObject=Self, volume=1)
+    on FINISHED → Charge Followup
+  }
+
+  state Throw Set {
+    BoolTest(boolVariable=var "Did Intro Throw", isTrue=(none), isFalse=→"INTRO", everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Will Throw", boolValue=false, everyFrame=false)
+    GetRandomChild(gameObject=var "Barb Traps", storeResult=var "Next Barb Trap")
+    GameObjectIsActive(Target=var "Next Barb Trap", ActiveSpace=1, trueEvent=(none), falseEvent=→"SKIP", storeValue=(unset))
+    GetXDistance(gameObject=Self, target=var "Next Barb Trap", storeResult=var "X Distance", everyFrame=false)
+    FloatCompare(float1=var "X Distance", float2=4, tolerance=0, equal=(none), lessThan=→"SKIP", greaterThan=(none), everyFrame=false)
+    GameObjectIsNull(gameObject=var "Next Barb Trap", isNull=→"CANCEL", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    on CANCEL → Fall
+    on FINISHED → Throw Antic
+    on SKIP → Skip Check
+  }
+
+  state Throw Antic {
+    BoolTest(boolVariable=var "Threw First Spike of Set", isTrue=→"NEXT", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spin Throw", animationTriggerEvent=→"NEXT", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Next Barb Trap", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="Turn Throw Antic", resetFrame=false, everyFrame=false, pauseBetweenTurns=0)  // disabled
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ant_trapper_yelp (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Default Gravity")
+    SetBoolValue(boolVariable=var "Leaping Diagonally", boolValue=false, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.83, brakeOnExit=false)
+    BoolTest(boolVariable=var "Did Rage Throw Antic", isTrue=→"NEXT", isFalse=(none), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"NEXT")
+    on NEXT → Throw
+  }
+
+  state Throw Amount {
+    SetBoolValue(boolVariable=var "Threw First Spike of Set", boolValue=false, everyFrame=false)
+    SetIntValue(intVariable=var "Skips", intValue=0, everyFrame=false)
+    BoolTest(boolVariable=var "Did First Dive", isTrue=(none), isFalse=→"FIRST", everyFrame=false)  // disabled
+    RandomInt(min=var "Throw Min", max=var "Throw Max", storeResult=var "Throws", inclusiveMax=true, noRepeat=false)
+    on FINISHED → Throw Set
+  }
+
+  state Throw {
+    SetBoolValue(boolVariable=var "Did Rage Throw Antic", boolValue=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    SendEventByName(eventTarget=GameObject(var "Next Barb Trap"), sendEvent="THROW", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=shakra_throw_disc (sfxstatic_assets_mapper.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.08, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rethrow?
+  }
+
+  state Throw Fall {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    SetBoolValue(boolVariable=var "Diving", boolValue=false, everyFrame=false)
+    on FINISHED → Fall
+  }
+
+  state Rethrow? {
+    SetBoolValue(boolVariable=var "Threw First Spike of Set", boolValue=true, everyFrame=false)
+    SetIntValue(intVariable=var "Skips", intValue=0, everyFrame=false)
+    IntAdd(intVariable=var "Throws", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Throws", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"THROW", everyFrame=false)
+    on THROW → Throw Set
+    on FINISHED → Throw Anim End
+  }
+
+  state Hop Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RandomFloat(min=18, max=25, storeResult=var "Jump Speed")
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Hop
+  }
+
+  state After Throw {
+    BoolTest(boolVariable=var "Did First Dive", isTrue=(none), isFalse=→"DIVE", everyFrame=false)
+    BoolTest(boolVariable=var "Leaping Diagonally", isTrue=→"FALL", isFalse=(none), everyFrame=false)  // disabled
+    SendEvent(eventTarget=Self, sendEvent=→"DIVE", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"DIVE", →"FALL"], weights=[0.75, 1], eventMax=[1, 2], missedMax=[2, 1], activeBool=(unset))
+    on DIVE → Dive
+    on FALL → Throw Fall
+  }
+
+  state Dive {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dive")
+    SetBoolValue(boolVariable=var "Diving", boolValue=true, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=15, everyFrame=false)
+    on FINISHED → Fall
+  }
+
+  state Hop Dir {
+    GetChildCount(gameObject=var "Barb Traps", storeResult=var "Unused Barbs")
+    IntCompare(integer1=var "Unused Barbs", integer2=15, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=(unset), z=(unset), space=1, everyFrame=false)
+    FloatCompare(float1=var "X Pos", float2=-5, tolerance=0, equal=(none), lessThan=→"R", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "X Pos", float2=5, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"L", everyFrame=false)
+    SendRandomEvent(events=[→"L", →"R"], weights=[1, 1], delay=0)
+    on L → Hop L
+    on R → Hop R
+    on CANCEL → Choice
+  }
+
+  state Hop L {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Hop Antic
+  }
+
+  state Hop R {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Hop Antic
+  }
+
+  state Hop {
+    PlayAudioEvent(audioClip=bone_hunter_jump_back (sfxstatic_assets_areaant.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Leaping Diagonally", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hop")
+    SetVelocityByScale(gameObject=Self, speed=var "Jump Speed", ySpeed=37, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1.4)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Fall
+  }
+
+  state Dive In {
+    SetVelocity2d(gameObject=Self, vector=(0, -20), x=(unset), y=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=moss_charger_leafy_explode (sfxstatic_assets_areaantareaboneareamemoryareawilds.bundle), pitchMin=1.2, pitchMax=1.3, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoxColliderTrigger(gameObject=Self, trigger=true)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Dive In", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "DiveIn Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckYPosition(gameObject=Self, compareTo=0, compareToOffset=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    on FINISHED → Title?
+  }
+
+  state Count Barbs {
+    GetChildCount(gameObject=var "Barb Traps", storeResult=var "Unused Barbs")
+    IntCompare(integer1=var "Unused Barbs", integer2=13, equal=(none), lessThan=→"MIN", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Throw Min", intValue=2, everyFrame=false)
+    SetIntValue(intVariable=var "Throw Max", intValue=2, everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "P2 HP", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetIntValue(intVariable=var "Throw Min", intValue=3, everyFrame=false)
+    SetIntValue(intVariable=var "Throw Max", intValue=3, everyFrame=false)
+    on FINISHED → Throw Amount
+    on MIN → Throw Amount Min
+  }
+
+  state Pos Choice {
+    SendRandomEvent(events=[→"1", →"2"], weights=[1, 1], delay=0)  // disabled
+    on 1 → Pos 1
+    on 2 → Pos 2
+    on FINISHED → Pos 1
+  }
+
+  state Pos 1 {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=Self, vector=(unset), x=-14, y=-0.95, z=11.95, space=1, everyFrame=false, lateUpdate=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    FindChild(gameObject=var "Boss Scene", childName="Ambush 1", storeResult=var "Ambush Object")
+    FindChild(gameObject=var "Ambush Object", childName="Mask", storeResult=var "Ambush Mask")
+    FindChild(gameObject=var "Ambush Object", childName="Pt Antic", storeResult=var "Pt Ambush Antic")
+    on FINISHED → Hiding
+  }
+
+  state Hiding {
+    on START → Ambush Antic
+  }
+
+  state Ambush Antic {
+    SendMessage(gameObject=var "Ambush Object", delivery=BroadcastMessage, options=1, functionCall=StartJitter())
+    PlayParticleEmitterInState(gameObject=var "Pt Ambush Antic")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=misc_rumble_loop (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=false, Delay=0)
+    on FINISHED → Burst Out
+  }
+
+  state Burst Out {
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=moss_charger_emerge (sfxstatic_assets_areawilds.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetMeshRenderer(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Ambush Mask", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Entry Burst", emit=0, resetIfPlaying=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SendMessage(gameObject=var "Ambush Object", delivery=BroadcastMessage, options=1, functionCall=StopJitter())
+    SetVelocityByScale(gameObject=Self, speed=11, ySpeed=38, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Start Z", space=0, everyFrame=false)
+    EaseFloat(fromValue=var "Start Z", toValue=0.006, floatVariable=var "Tween Z", time=0.4, speed=(unset), delay=(unset), easeType=12, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Tween Z", space=1, everyFrame=true, lateUpdate=false)
+    AudioStopV2(gameObject=var "Audio Player", fadeTime=0.1, cancelOnEarlyExit=false)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    CallMethodProper(gameObject=Self, behaviour="NonBouncer", methodName="SetActive", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    SetDamageHero(Target=Self, Enabled=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Fall
+  }
+
+  state Skip Check {
+    IntAdd(intVariable=var "Skips", add=1, everyFrame=false)
+    IntCompare(integer1=var "Skips", integer2=100, equal=(none), lessThan=(none), greaterThan=→"SKIP", everyFrame=false)
+    on SKIP → Rethrow?
+    on FINISHED → Throw Set
+  }
+
+  state Title? {
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Did First Dive", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="HUNTER_TRAPPER")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    ActivateAllChildren(gameObject=var "Barb Traps", activate=true)
+    ApplyMusicCue(musicCue=RipAndShred (audiocuesdynamic_assets_areaantareaboneareacoralareamossareawilds.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0)
+    SendEventByName(eventTarget=GameObject(var "Barb Traps - Add After Intro"), sendEvent="ADD TO PARENT", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetBoxColliderTrigger(gameObject=Self, trigger=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=-3.213614, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Away")
+    on FINISHED → Away
+  }
+
+  state Pos 2 {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=Self, vector=(unset), x=15, y=-2.51, z=13.23, space=1, everyFrame=false, lateUpdate=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    FindChild(gameObject=var "Boss Scene", childName="Ambush 2", storeResult=var "Ambush Object")
+    FindChild(gameObject=var "Ambush Object", childName="Mask", storeResult=var "Ambush Mask")
+    FindChild(gameObject=var "Ambush Object", childName="Pt Antic", storeResult=var "Pt Ambush Antic")
+    on FINISHED → Hiding
+  }
+
+  state Intro Throw 1 {
+    SetIntValue(intVariable=var "Throws", intValue=2, everyFrame=false)
+    SelectRandomGameObject(gameObjects=[var "Intro Barb RA", var "Intro Barb RB", var "Intro Barb RC"], weights=[1, 1, 1], storeGameObject=var "Next Barb Trap")  // disabled
+    on FINISHED → Throw Set
+  }
+
+  state Spike Jump Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Spike Jump
+  }
+
+  state Spike Jump {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spike Hop")
+    SetVelocityByScale(gameObject=Self, speed=0, ySpeed=38, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=bone_hunter_jump_back (sfxstatic_assets_areaant.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ant_trapper_yelp (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Spike Jump Air
+  }
+
+  state Spike Jump Air {
+    CheckYPosition(gameObject=Self, compareTo=1.75, compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=true, space=1, activeBool=(unset))
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    on FINISHED → Spike Dive
+    on LAND → Summon Spikes
+  }
+
+  state Spike Dive {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spike Dive")
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Summon Spikes
+  }
+
+  state Summon Spikes {
+    PlayAudioEvent(audioClip=bone_cogs_move (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=bone_lever_activate (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(var "Spike Traps"), sendEvent="TRAP", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Spike Drop", boolValue=true, everyFrame=false)
+    on FINISHED → Dive In
+  }
+
+  state Spike Pause? {
+    BoolTest(boolVariable=var "Spike Drop", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Wait(time=1.35, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Spike Drop", boolValue=false, everyFrame=false)
+    on FINISHED → Return Choice
+  }
+
+  state Set HPs {
+    GetHP(target=Self, storeValue=var "HP")
+    MultiplyIntByFloat(integer=var "HP", multiplyFloat=0.6, storeResult=var "P2 HP", everyFrame=false, forceRoundUp=false)
+    MultiplyIntByFloat(integer=var "HP", multiplyFloat=0.4, storeResult=var "Rage HP", everyFrame=false, forceRoundUp=false)
+    on FINISHED → Pos Choice
+  }
+
+  state Rage Wait {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTRL STOP", delay=0, everyFrame=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rage Tremor
+  }
+
+  state Rage Tremor {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=misc_rumble_loop (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    AudioPlayInState(gameObject=var "Audio Loop Roar 1", volume=1)
+    AudioPlayInState(gameObject=var "Audio Loop Roar 2", volume=1)
+    on FINISHED → Rage Jump Antic
+  }
+
+  state Rage Jump Antic {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt LeapAntic")
+    SetPosition(gameObject=Self, vector=(unset), x=0, y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Rage Jump
+  }
+
+  state Rage Jump {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap Up")
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=-8, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=40, everyFrame=false)
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=moss_charger_emerge (sfxstatic_assets_areawilds.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStopV2(gameObject=var "Audio Player", fadeTime=0.1, cancelOnEarlyExit=false)
+    on FINISHED → Rage Jump Rise
+  }
+
+  state Rage Jump Rise {
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Y Pos", space=1, everyFrame=true)
+    FloatTestToBool(float1=var "Y Pos", float2=1.75, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Over Throw Height", everyFrame=true)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.975, decelerationY=(unset), brakeOnExit=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    BoolTest(boolVariable=var "Over Throw Height", isTrue=→"THROW", isFalse=(none), everyFrame=true)
+    on THROW → Rage Throw Antic
+    on LAND → Land
+  }
+
+  state Rage Throw Antic {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rage Throw Antic")
+    SetBoolValue(boolVariable=var "Did Rage Throw Antic", boolValue=true, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    on FINISHED → Set Rage Throw
+  }
+
+  state Set Rage Throw {
+    SetBoolValue(boolVariable=var "Did Rage", boolValue=true, everyFrame=false)
+    SetIntValue(intVariable=var "Throws", intValue=5, everyFrame=false)
+    on FINISHED → Throw Set
+  }
+
+  state First Leap {
+    SetBoolValue(boolVariable=var "Did First Dive", boolValue=true, everyFrame=false)
+    RandomFloatEither(value1=var "Min X", value2=var "Max X", storeResult=var "Target X")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Target X", y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Will Throw", boolValue=true, everyFrame=false)
+    on FINISHED → Up Leap Antic
+  }
+
+  state Intro Roar Antic {
+    SetBoolValue(boolVariable=var "Did First Charge", boolValue=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Intro Roar
+  }
+
+  state Intro Roar {
+    StartRoarEmitter(spawnPoint=var "Roar Point", delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="HUNTER_TRAPPER")
+    ActivateAllChildren(gameObject=var "Barb Traps", activate=true)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayInState(gameObject=var "Audio Loop Roar 1", volume=1)
+    AudioPlayInState(gameObject=var "Audio Loop Roar 2", volume=1)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    on FINISHED → Music Start
+  }
+
+  state Music Start {
+    ApplyMusicCue(musicCue=RipAndShred (audiocuesdynamic_assets_areaantareaboneareacoralareamossareawilds.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0)
+    on FINISHED → Charge Dir
+  }
+
+  state Charge Followup {
+    BoolTest(boolVariable=var "Did First Charge", isTrue=(none), isFalse=→"DIG IN", everyFrame=false)
+    SendRandomEventV4(events=[→"DIG IN", →"HOP"], weights=[0.65, 0.35], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    on DIG IN → Dig In 1
+    on HOP → Skid To Leap
+  }
+
+  state Skid To Leap {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Skid Into Leap", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=false)
+    FlipScaleOnExit(gameObject=Self, flipHorizontally=true, flipVertically=false)
+    RandomFloat(min=20, max=30, storeResult=var "Jump Speed")
+    PlayAudioEvent(audioClip=bone_hunter_jump (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=moss_knight_rustle (sfxstatic_assets_areashellwoodareawilds.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    RandomBool(storeResult=var "Will Throw")
+    on FINISHED → Hop
+  }
+
+  state Will Evade? {
+    SetBoolValue(boolVariable=var "Will Evade", boolValue=false, everyFrame=false)
+    SendRandomEventV4(events=[→"FINISHED", (none)], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    SetBoolValue(boolVariable=var "Will Evade", boolValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Evade Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=moss_charger_emerge (sfxstatic_assets_areawilds.bundle), pitchMin=1.1, pitchMax=1.1, volume=0.8, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Evade
+  }
+
+  state Evade {
+    SetVelocityByScale(gameObject=Self, speed=-40, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.9375, decelerationY=(unset), brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=ant_trapper_yelp (sfxdynamic_assets_areaboneareawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Choice
+  }
+
+  state Throw Anim End {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → After Throw
+  }
+
+  state Throw Amount Min {
+    SetBoolValue(boolVariable=var "Threw First Spike of Set", boolValue=false, everyFrame=false)
+    SetIntValue(intVariable=var "Skips", intValue=0, everyFrame=false)
+    SetIntValue(intVariable=var "Throws", intValue=1, everyFrame=false)
+    on FINISHED → Throw Set
+  }
+
+  state Rage Roar Antic {
+    SetBoolValue(boolVariable=var "Did First Charge", boolValue=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Rage Roar
+  }
+
+  state Rage Roar {
+    StartRoarEmitter(spawnPoint=var "Roar Point", delay=0, stunHero=false, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    SetBoolValue(boolVariable=var "Did Rage", boolValue=true, everyFrame=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayInState(gameObject=var "Audio Loop Roar 1", volume=1)
+    AudioPlayInState(gameObject=var "Audio Loop Roar 2", volume=1)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    on FINISHED → Choice
+  }
+
+  var Centre X: float = 0
+  var Min X: float = -12
+  var Max X: float = 12
+  var Target X: float = 0
+  var Stun Timer: float = 0
+  var Charge Speed: float = 0
+  var Y Pos: float = 0
+  var X Distance: float = 0
+  var X Pos: float = 0
+  var Jump Speed: float = 0
+  var Start Z: float = 0
+  var Tween Z: float = 0
+  var Default Gravity: float = 2
+  var Throws: int = 0
+  var Unused Barbs: int = 0
+  var Throw Min: int = 0
+  var Throw Max: int = 0
+  var Skips: int = 0
+  var HP: int = 0
+  var P2 HP: int = 0
+  var Rage HP: int = 0
+  var HP Current: int = 0
+  var Below Rage HP: bool = false
+  var Did First Charge: bool = false
+  var Did First Dive: bool = false
+  var Did Intro Throw: bool = false
+  var Did Rage: bool = false
+  var Diving: bool = false
+  var Hero Is Close: bool = false
+  var Leaping Diagonally: bool = false
+  var Over Throw Height: bool = false
+  var Spike Drop: bool = false
+  var Will Throw: bool = false
+  var Did Rage Throw Antic: bool = false
+  var Will Evade: bool = false
+  var Can Evade: bool = false
+  var In Evade Range: bool = false
+  var Wall Behind: bool = false
+  var Hero Binding: bool = false
+  var Threw First Spike of Set: bool = false
+  var Charge Ray Pt: gameObject = Boss Scene/Bone Hunter Trapper/Charge Ray Pt
+  var DigIn Slam Effect: gameObject = Boss Scene/Bone Hunter Trapper/DigIn Slam Effect
+  var Pt DiagonalLeapAntic: gameObject = Boss Scene/Bone Hunter Trapper/Pt DiagonalLeapAntic
+  var Pt Dig In: gameObject = Boss Scene/Bone Hunter Trapper/Pt Dig In
+  var Pt LeapAntic: gameObject = Boss Scene/Bone Hunter Trapper/Pt LeapAntic
+  var Self: gameObject = Boss Scene/Bone Hunter Trapper
+  var Pt Charge: gameObject = Boss Scene/Bone Hunter Trapper/Pt Charge
+  var Boss Scene: gameObject = <null>
+  var Barb Traps: gameObject = <null>
+  var Next Barb Trap: gameObject = <null>
+  var Pt Dive In: gameObject = Boss Scene/Bone Hunter Trapper/Pt Dive In
+  var DiveIn Slam Effect: gameObject = Boss Scene/Bone Hunter Trapper/DiveIn Slam Effect
+  var Ambush Object: gameObject = <null>
+  var Ambush Mask: gameObject = <null>
+  var Pt Ambush Antic: gameObject = <null>
+  var Pt Entry Burst: gameObject = Boss Scene/Bone Hunter Trapper/Pt Entry Burst
+  var Spike Traps: gameObject = <null>
+  var Audio Loop Dig: gameObject = Boss Scene/Bone Hunter Trapper/Audio Loop Dig
+  var Barb Traps - Add After Intro: gameObject = <null>
+  var Audio Player: gameObject = <null>
+  var Intro Barb LA: gameObject = <null>
+  var Intro Barb LB: gameObject = <null>
+  var Intro Barb LC: gameObject = <null>
+  var Intro Barb RA: gameObject = <null>
+  var Intro Barb RB: gameObject = <null>
+  var Intro Barb RC: gameObject = <null>
+  var Audio Loop Voice: gameObject = Boss Scene/Bone Hunter Trapper/Audio Loop Voice
+  var Roar Point: gameObject = Boss Scene/Bone Hunter Trapper/Roar Point
+  var Audio Loop Roar 2: gameObject = Boss Scene/Bone Hunter Trapper/Audio Loop Roar 2
+  var Audio Loop Roar 1: gameObject = Boss Scene/Bone Hunter Trapper/Audio Loop Roar 1
+  var Ray Pt Centre: gameObject = Boss Scene/Bone Hunter Trapper/Ray Pt Centre
+}

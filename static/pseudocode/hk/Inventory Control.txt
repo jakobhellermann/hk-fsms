@@ -1,0 +1,583 @@
+# Inventory Control
+# 2 location(s):
+#   Menu_Title / _GameCameras/HudCamera/Inventory
+#   resources.assets / _GameCameras/HudCamera/Inventory
+
+fsm Inventory Control {
+  start Init
+  on NO INV → No Inv  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Border", storeResult=var "Border")
+    FindChild(gameObject=Self, childName="Inv", storeResult=var "Inventory Pane")
+    FindChild(gameObject=Self, childName="Charms", storeResult=var "Charm Pane")
+    FindChild(gameObject=Self, childName="Journal", storeResult=var "Journal Pane")
+    FindChild(gameObject=Self, childName="Map", storeResult=var "Map Pane")
+    FindChild(gameObject=var "Map Pane", childName="World Map", storeResult=var "World Map")
+    FindChild(gameObject=var "Border", childName="Arrow Right", storeResult=var "Arrow R")
+    FindChild(gameObject=var "Border", childName="Arrow Left", storeResult=var "Arrow L")
+    FindChild(gameObject=var "Border", childName="Pane Name", storeResult=var "Pane Name Obj")
+    FindChild(gameObject=var "Border", childName="Pane Name L", storeResult=var "Pane Name L Obj")
+    FindChild(gameObject=var "Border", childName="Pane Name R", storeResult=var "Pane Name R Obj")
+    FindChild(gameObject=var "Border", childName="Pane Arrow L", storeResult=var "Pane Arrow L")
+    FindChild(gameObject=var "Border", childName="Pane Arrow R", storeResult=var "Pane Arrow R")
+    ActivateGameObject(gameObject=var "Border", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGameObjectSelf(variable=var "Inventory", gameObject=Self, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Init Enemy List
+  }
+
+  state Closed {
+    SetBoolValue(boolVariable=var "Map Shortcut", boolValue=false, everyFrame=false)
+    ListenForInventory(eventTarget=Self, wasPressed=→"BUTTON PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on BUTTON PRESSED → Can Open Inventory?
+    on OPEN INVENTORY MAP → Map Shortcut
+  }
+
+  state Can Open Inventory? {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="IsGameplayScene", parameters=[], storeResult=var "Is Gameplay Scene")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanOpenInventory", parameters=[], storeResult=var "Can Open Inventory")
+    BoolTest(boolVariable=var "Can Open Inventory", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Is HUD Out", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on CANCEL → Closed
+    on FINISHED → Single Pane?
+  }
+
+  state Open {
+    CallMethodProper(gameObject=_GameCameras/HudCamera/Inventory/Border/Inventory ScreenPlane, behaviour="DisplayFrozenCamera", methodName="Freeze", parameters=[], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Opened", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Open", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DESTROY JOURNAL MSG", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INVENTORY OPENED", delay=0, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SetIsInventoryOpen", parameters=[true], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControlNotVelocity", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT", delay=0, everyFrame=false)
+    on HERO DAMAGED → Damage Close
+    on FINISHED → Check Current Pane
+    on HERO ROAR LOCKED → R Lock Close
+    on INVENTORY CANCEL → R Lock Close
+  }
+
+  state Close {
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAP KEY DOWN", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=SetCanPan(false))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INVENTORY CLOSED", delay=0, everyFrame=false)
+    SetPlayerDataInt(intName="currentInvPane", value=var "Current Pane Num")
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="DOWN", delay=0, everyFrame=false)
+    FadeGroupDown(target=var "Border", fast=false)
+    FadeGroupDown(target=var "Current Pane", fast=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="CHANGE DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Inventory Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "World Map", fsmName="UI Control", variableName="Disable Zoom", setValue=true, everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Charm Equip Check?
+    on CANCEL → Opened
+    on INVENTORY CANCEL → Regain Control 2
+  }
+
+  state Regain Control {
+    SetBoolValue(boolVariable=var "Open", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Not Close", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Inventory Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Map Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Journal Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Charm Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SetIsInventoryOpen", parameters=[false], storeResult=(unset var))
+    CallMethodProper(gameObject=_GameCameras/HudCamera/Inventory/Border/Inventory ScreenPlane, behaviour="DisplayFrozenCamera", methodName="Unfreeze", parameters=[], storeResult=(unset var))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="atBench", isTrue=→"FINISHED", isFalse=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))  // disabled
+    on FINISHED → Closed
+  }
+
+  state Opened {
+    SetIntValue(intVariable=var "Next Pane Num", intValue=var "Current Pane Num", everyFrame=false)
+    SetBoolValue(boolVariable=var "Opened", boolValue=true, everyFrame=false)
+    SetPlayerDataInt(intName="currentInvPane", value=var "Current Pane Num")
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="ACTIVATE", delay=0, everyFrame=false)
+    ListenForInventory(eventTarget=Self, wasPressed=→"CLOSE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForMenuCancel(eventTarget=Self, wasPressed=→"CLOSE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForPaneRight(eventTarget=Self, wasPressed=→"MOVE PANE R", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForPaneLeft(eventTarget=Self, wasPressed=→"MOVE PANE L", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on HERO DAMAGED → Damage Close
+    on CLOSE → Can Close?
+    on MOVE PANE R → Set R Increment
+    on MOVE PANE L → Set L Increment
+    on HERO ROAR LOCKED → R Lock Close
+    on INVENTORY CANCEL → R Lock Close
+  }
+
+  state Check Current Pane {
+    SetFsmInt(gameObject=var "Charm Pane", fsmName="UI Charms", variableName="New Charm ID", setValue=1, everyFrame=false)
+    BoolTest(boolVariable=var "Map Open", isTrue=→"MAP", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Map Shortcut", isTrue=→"MAP", isFalse=(none), everyFrame=false)
+    PlayerDataBoolAllTrue(gameObject=var "GameManager", stringVariables=["hasCharm", "atBench"], trueEvent=→"CHARMS", falseEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    FindGameObject(objectName="", withTag="Journal Up Msg", store=var "Journal Msg")
+    GameObjectIsNull(gameObject=var "Journal Msg", isNull=(none), isNotNull=→"JOURNAL", storeResult=(unset), everyFrame=false)
+    FindGameObject(objectName="", withTag="Relic Get Msg", store=var "Relic Msg")
+    GameObjectIsNull(gameObject=var "Relic Msg", isNull=(none), isNotNull=→"INV", storeResult=(unset), everyFrame=false)
+    FindGameObject(objectName="", withTag="Charm Get Msg", store=var "Charm Msg")
+    GameObjectIsNull(gameObject=var "Charm Msg", isNull=(none), isNotNull=→"CHARM NEW", storeResult=(unset), everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="currentInvPane", storeValue=var "Current Pane Num")
+    IntSwitch(intVariable=var "Current Pane Num", compareTo=[0, 1, 2, 3], sendEvent=[→"INV", →"CHARMS", →"JOURNAL", →"MAP"], everyFrame=false)
+    ListenForInventory(eventTarget=Self, wasPressed=→"CLOSE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    SendEventByName(eventTarget=Self, sendEvent="FINISHED", delay=0, everyFrame=false)
+    on INV → Open inv
+    on CHARMS → Open charms
+    on JOURNAL → Open Journal
+    on MAP → Open Map
+    on CHARM NEW → New Charm
+    on FINISHED → Open inv
+    on CLOSE → Close
+  }
+
+  state Open inv {
+    GetLanguageString(sheetName="UI", convName="PANE_INVENTORY", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name Obj", textString=var "Pane Name String")
+    SetGameObject(variable=var "Current Pane", gameObject=var "Inventory Pane", everyFrame=false)
+    SetIntValue(intVariable=var "Current Pane Num", intValue=0, everyFrame=false)
+    SetIntValue(intVariable=var "Next Pane Num", intValue=0, everyFrame=false)
+    on FINISHED → Open Pane Check
+  }
+
+  state Open charms {
+    GetLanguageString(sheetName="UI", convName="PANE_CHARMS", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name Obj", textString=var "Pane Name String")
+    SetGameObject(variable=var "Current Pane", gameObject=var "Charm Pane", everyFrame=false)
+    SetIntValue(intVariable=var "Current Pane Num", intValue=1, everyFrame=false)
+    SetIntValue(intVariable=var "Next Pane Num", intValue=1, everyFrame=false)
+    on FINISHED → Open Pane Check
+  }
+
+  state Open Current Pane {
+    SetPosition(gameObject=var "Current Pane", vector=(unset), x=0, y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Current Pane", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeGroupUp(target=var "Current Pane")
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="UP", delay=0, everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Opened
+    on HERO ROAR LOCKED → Close
+    on HERO DAMAGED → Damage Close
+    on INVENTORY CANCEL → R Lock Close
+  }
+
+  state Open Journal {
+    GetLanguageString(sheetName="UI", convName="PANE_JOURNAL", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name Obj", textString=var "Pane Name String")
+    SetIntValue(intVariable=var "Current Pane Num", intValue=2, everyFrame=false)
+    SetIntValue(intVariable=var "Next Pane Num", intValue=2, everyFrame=false)
+    SetGameObject(variable=var "Current Pane", gameObject=var "Journal Pane", everyFrame=false)
+    on FINISHED → Open Pane Check
+  }
+
+  state Open Map {
+    GetLanguageString(sheetName="UI", convName="PANE_MAP", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name Obj", textString=var "Pane Name String")
+    SetGameObject(variable=var "Current Pane", gameObject=var "Map Pane", everyFrame=false)
+    SetIntValue(intVariable=var "Current Pane Num", intValue=3, everyFrame=false)
+    SetIntValue(intVariable=var "Next Pane Num", intValue=3, everyFrame=false)
+    on FINISHED → Open Pane Check
+  }
+
+  state Set R Increment {
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Pane Incrementer", intValue=1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Next Pane Start X", floatValue=31, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Prev Pane End Pos", vector3Value=(unset), x=-31, y=0, z=0, everyFrame=false)
+    SetStringValue(stringVariable=var "Arrow Broadcast Event", stringValue="ARROW R ANIM START", everyFrame=false)
+    SetStringValue(stringVariable=var "Particle Obj Name", stringValue="Particles R", everyFrame=false)
+    on FINISHED → Loop Through
+    on CANCEL → Opened
+  }
+
+  state Set L Increment {
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Pane Incrementer", intValue=-1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Next Pane Start X", floatValue=-31, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Prev Pane End Pos", vector3Value=(unset), x=31, y=0, z=0, everyFrame=false)
+    SetStringValue(stringVariable=var "Arrow Broadcast Event", stringValue="ARROW L ANIM START", everyFrame=false)
+    SetStringValue(stringVariable=var "Particle Obj Name", stringValue="Particles L", everyFrame=false)
+    on FINISHED → Loop Through
+    on CANCEL → Opened
+  }
+
+  state Loop Through {
+    IntAdd(intVariable=var "Next Pane Num", add=var "Pane Incrementer", everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INV PANEL CHANGE", delay=0, everyFrame=false)
+    IntCompare(integer1=var "Next Pane Num", integer2=var "Current Pane Num", equal=→"CANCEL", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntSwitch(intVariable=var "Next Pane Num", compareTo=[0, 1, 2, 3, -1, 4], sendEvent=[→"INV", →"CHARMS", →"JOURNAL", →"MAP", →"UNDER", →"OVER"], everyFrame=false)
+    on CANCEL → Opened
+    on INV → Next Inv
+    on CHARMS → Next Charms
+    on JOURNAL → Next Journal
+    on MAP → Next Map
+    on UNDER → Under
+    on OVER → Over
+  }
+
+  state Next Inv {
+    GetLanguageString(sheetName="UI", convName="PANE_INVENTORY", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name Obj", textString=var "Pane Name String")
+    SetGameObject(variable=var "Prev Pane", gameObject=var "Current Pane", everyFrame=false)
+    SetGameObject(variable=var "Current Pane", gameObject=var "Inventory Pane", everyFrame=false)
+    on FINISHED → To Pane Checks
+  }
+
+  state Next Charms {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasCharm", isTrue=(none), isFalse=→"CANCEL")
+    SetGameObject(variable=var "Prev Pane", gameObject=var "Current Pane", everyFrame=false)
+    SetGameObject(variable=var "Current Pane", gameObject=var "Charm Pane", everyFrame=false)
+    GetLanguageString(sheetName="UI", convName="PANE_CHARMS", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name Obj", textString=var "Pane Name String")
+    on FINISHED → To Pane Checks
+    on CANCEL → Loop Through
+  }
+
+  state Next Journal {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=(none), isFalse=→"CANCEL")
+    SetGameObject(variable=var "Prev Pane", gameObject=var "Current Pane", everyFrame=false)
+    SetGameObject(variable=var "Current Pane", gameObject=var "Journal Pane", everyFrame=false)
+    GetLanguageString(sheetName="UI", convName="PANE_JOURNAL", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name Obj", textString=var "Pane Name String")
+    on FINISHED → To Pane Checks
+    on CANCEL → Loop Through
+  }
+
+  state Next Map {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasMap", isTrue=(none), isFalse=→"CANCEL")
+    SetGameObject(variable=var "Prev Pane", gameObject=var "Current Pane", everyFrame=false)
+    SetGameObject(variable=var "Current Pane", gameObject=var "Map Pane", everyFrame=false)
+    GetLanguageString(sheetName="UI", convName="PANE_MAP", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name Obj", textString=var "Pane Name String")
+    on FINISHED → To Pane Checks
+    on CANCEL → Loop Through
+  }
+
+  state Under {
+    SetIntValue(intVariable=var "Next Pane Num", intValue=4, everyFrame=false)
+    on FINISHED → Loop Through
+  }
+
+  state Over {
+    SetIntValue(intVariable=var "Next Pane Num", intValue=-1, everyFrame=false)
+    on FINISHED → Loop Through
+  }
+
+  state Tween Panes {
+    FindChild(gameObject=Self, childName=var "Particle Obj Name", storeResult=var "Particle Obj")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent=var "Arrow Broadcast Event", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Current Pane", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="UP", delay=0, everyFrame=false)
+    FadeGroupUp(target=var "Current Pane")
+    SendEventByName(eventTarget=GameObject(var "Prev Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "Current Pane", vector=(unset), x=var "Next Pane Start X", y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    iTweenMoveTo(gameObject=var "Current Pane", id="", transformPosition=var "", vectorPosition=(0, 0, 0), time=0.35, delay=0, speed=(unset), space=1, easeType=easeOutSine, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=true, stopOnExit=true, loopDontFinish=true)
+    iTweenMoveTo(gameObject=var "Prev Pane", id="", transformPosition=var "", vectorPosition=var "Prev Pane End Pos", time=0.35, delay=0, speed=(unset), space=1, easeType=easeOutSine, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=(none), realTime=true, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Pane Final Pos
+    on HERO DAMAGED → Damage Close
+    on HERO ROAR LOCKED → R Lock Close
+    on INVENTORY CANCEL → R Lock Close
+  }
+
+  state Single Pane? {
+    SetBoolValue(boolVariable=var "Single Pane", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Arrow R", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Arrow L", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pane Arrow R", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pane Arrow L", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pane Name L Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pane Name R Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasMap", isTrue=→"FINISHED", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasCharm", isTrue=→"FINISHED", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=→"FINISHED", isFalse=(none))
+    ActivateGameObject(gameObject=var "Arrow R", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Arrow L", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pane Arrow R", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pane Arrow L", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pane Name L Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pane Name R Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Single Pane", boolValue=true, everyFrame=false)
+    on FINISHED → Refresh Enemy List
+  }
+
+  state Check R Pane {
+    IntAdd(intVariable=var "R Pane Number", add=1, everyFrame=false)
+    IntSwitch(intVariable=var "R Pane Number", compareTo=[0, 1, 2, 3, -1, 4], sendEvent=[→"INV", →"CHARMS", →"JOURNAL", →"MAP", →"UNDER", →"OVER"], everyFrame=false)
+    on UNDER → Under 2
+    on OVER → Over 2
+    on INV → Next Inv 2
+    on CHARMS → Next Charms 2
+    on JOURNAL → Next Journal 2
+    on MAP → Next Map 2
+  }
+
+  state Next Inv 2 {
+    GetLanguageString(sheetName="UI", convName="PANE_INVENTORY", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name R Obj", textString=var "Pane Name String")
+    on FINISHED → Check L Pane
+  }
+
+  state Next Charms 2 {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasCharm", isTrue=(none), isFalse=→"CANCEL")
+    GetLanguageString(sheetName="UI", convName="PANE_CHARMS", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name R Obj", textString=var "Pane Name String")
+    on FINISHED → Check L Pane
+    on CANCEL → Check R Pane
+  }
+
+  state Next Journal 2 {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=(none), isFalse=→"CANCEL")
+    GetLanguageString(sheetName="UI", convName="PANE_JOURNAL", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name R Obj", textString=var "Pane Name String")
+    on FINISHED → Check L Pane
+    on CANCEL → Check R Pane
+  }
+
+  state Next Map 2 {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasMap", isTrue=(none), isFalse=→"CANCEL")
+    GetLanguageString(sheetName="UI", convName="PANE_MAP", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name R Obj", textString=var "Pane Name String")
+    on FINISHED → Check L Pane
+    on CANCEL → Check R Pane
+  }
+
+  state Under 2 {
+    SetIntValue(intVariable=var "R Pane Number", intValue=4, everyFrame=false)
+    on FINISHED → Check R Pane
+  }
+
+  state Over 2 {
+    SetIntValue(intVariable=var "R Pane Number", intValue=-1, everyFrame=false)
+    on FINISHED → Check R Pane
+  }
+
+  state Opened? {
+    BoolTest(boolVariable=var "Opened", isTrue=→"OPEN", isFalse=→"NOT OPEN", everyFrame=false)
+    on OPEN → Tween Panes
+    on NOT OPEN → Open Current Pane
+  }
+
+  state To Pane Checks {
+    SetIntValue(intVariable=var "Current Pane Num", intValue=var "Next Pane Num", everyFrame=false)
+    BoolTest(boolVariable=var "Single Pane", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SetIntValue(intVariable=var "R Pane Number", intValue=var "Current Pane Num", everyFrame=false)
+    SetIntValue(intVariable=var "L Pane Number", intValue=var "Current Pane Num", everyFrame=false)
+    on CANCEL → Opened?
+    on FINISHED → Check R Pane
+  }
+
+  state Check L Pane {
+    IntAdd(intVariable=var "L Pane Number", add=-1, everyFrame=false)
+    IntSwitch(intVariable=var "L Pane Number", compareTo=[0, 1, 2, 3, -1, 4], sendEvent=[→"INV", →"CHARMS", →"JOURNAL", →"MAP", →"UNDER", →"OVER"], everyFrame=false)
+    on UNDER → Under 3
+    on OVER → Over 3
+    on INV → Next Inv 3
+    on CHARMS → Next Charms 3
+    on JOURNAL → Next Journal 3
+    on MAP → Next Map 3
+  }
+
+  state Next Inv 3 {
+    GetLanguageString(sheetName="UI", convName="PANE_INVENTORY", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name L Obj", textString=var "Pane Name String")
+    on FINISHED → Opened?
+  }
+
+  state Next Charms 3 {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasCharm", isTrue=(none), isFalse=→"CANCEL")
+    GetLanguageString(sheetName="UI", convName="PANE_CHARMS", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name L Obj", textString=var "Pane Name String")
+    on FINISHED → Opened?
+    on CANCEL → Check L Pane
+  }
+
+  state Next Journal 3 {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=(none), isFalse=→"CANCEL")
+    GetLanguageString(sheetName="UI", convName="PANE_JOURNAL", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name L Obj", textString=var "Pane Name String")
+    on FINISHED → Opened?
+    on CANCEL → Check L Pane
+  }
+
+  state Next Map 3 {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasMap", isTrue=(none), isFalse=→"CANCEL")
+    GetLanguageString(sheetName="UI", convName="PANE_MAP", storeValue=var "Pane Name String")
+    SetTextMeshProText(gameObject=var "Pane Name L Obj", textString=var "Pane Name String")
+    on FINISHED → Opened?
+    on CANCEL → Check L Pane
+  }
+
+  state Under 3 {
+    SetIntValue(intVariable=var "L Pane Number", intValue=4, everyFrame=false)
+    on FINISHED → Check L Pane
+  }
+
+  state Over 3 {
+    SetIntValue(intVariable=var "L Pane Number", intValue=-1, everyFrame=false)
+    on FINISHED → Check L Pane
+  }
+
+  state Open Pane Check {
+    on FINISHED → To Pane Checks
+  }
+
+  state Map Shortcut {
+    SetBoolValue(boolVariable=var "Map Shortcut", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "World Map", fsmName="UI Control", variableName="Zoom Shortcut", setValue=true, everyFrame=false)
+    on FINISHED → Single Pane?
+  }
+
+  state New Charm {
+    GetFsmInt(gameObject=var "Charm Msg", fsmName="Charm Msg", variableName="ID", storeValue=var "New Charm ID", everyFrame=false)
+    SetFsmInt(gameObject=var "Charm Pane", fsmName="UI Charms", variableName="New Charm ID", setValue=var "New Charm ID", everyFrame=false)
+    on FINISHED → Open charms
+  }
+
+  state R Lock Close {
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAP KEY DOWN", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=SetCanPan(false))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CHARM EQUIP CHECK", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INVENTORY CLOSED", delay=0, everyFrame=false)
+    SetPlayerDataInt(intName="currentInvPane", value=var "Current Pane Num")
+    FadeGroupDown(target=var "Border", fast=false)
+    FadeGroupDown(target=var "Current Pane", fast=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="CHANGE DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Inventory Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=_GameCameras/HudCamera/Inventory/Border/Inventory ScreenPlane, behaviour="DisplayFrozenCamera", methodName="Unfreeze", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SetIsInventoryOpen", parameters=[false], storeResult=(unset var))
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Regain Control 2
+  }
+
+  state Regain Control 2 {
+    SetBoolValue(boolVariable=var "Open", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Inventory Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Map Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Journal Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Charm Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    on FINISHED → Closed
+  }
+
+  state Can Close? {
+    BoolTest(boolVariable=var "Do Not Close", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Close
+    on CANCEL → Opened
+  }
+
+  state Init Enemy List {
+    FindChild(gameObject=var "Journal Pane", childName="Enemy List", storeResult=var "Enemy List")
+    CallMethodProper(gameObject=var "Enemy List", behaviour="JournalList", methodName="BuildEnemyList", parameters=[], storeResult=(unset var))
+    ActivateGameObject(gameObject=var "Journal Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Map Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Closed
+  }
+
+  state Refresh Enemy List {
+    CallMethodProper(gameObject=var "Enemy List", behaviour="JournalList", methodName="UpdateEnemyList", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CountJournalEntries", parameters=[], storeResult=(unset var))
+    on FINISHED → Calc Notches
+  }
+
+  state Calc Completion {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CountGameCompletion", parameters=[], storeResult=(unset var))
+    on FINISHED → Border Up
+  }
+
+  state No Inv {
+    on LEVEL LOADED → Closed
+  }
+
+  state Border Up {
+    FadeGroupUp(target=var "Border")
+    on FINISHED → Open
+  }
+
+  state Damage Close {
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=CloseQuickMap())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="MAP KEY DOWN", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=SetCanPan(false))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="INVENTORY CLOSED", delay=0, everyFrame=false)
+    SetPlayerDataInt(intName="currentInvPane", value=var "Current Pane Num")
+    SendEventByName(eventTarget=GameObject(var "Border"), sendEvent="DOWN", delay=0, everyFrame=false)
+    FadeGroupDown(target=var "Border", fast=false)
+    FadeGroupDown(target=var "Current Pane", fast=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Current Pane"), sendEvent="CHANGE DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Inventory Pane"), sendEvent="PANE RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    Wait(time=0.05, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Charm Equip Check?
+    on CANCEL → 
+    on INVENTORY CANCEL → Regain Control 2
+  }
+
+  state Calc Notches {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CalculateNotchesUsed", parameters=[], storeResult=(unset var))
+    on FINISHED → Calc Completion
+  }
+
+  state Charm Equip Check? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="atBench", isTrue=(none), isFalse=→"FINISHED")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CHARM EQUIP CHECK", delay=0, everyFrame=false)
+    on FINISHED → Regain Control
+  }
+
+  state Pane Final Pos {
+    SetPosition(gameObject=var "Current Pane", vector=(unset), x=0, y=0, z=0, space=1, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=var "Prev Pane", vector=var "Prev Pane End Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Prev Pane", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Opened
+  }
+
+  var Do Not Close: bool = false
+
+  var Next Pane Start X: float = 0
+  var Current Pane Num: int = 0
+  var L Pane Number: int = 0
+  var New Charm ID: int = 0
+  var Next Pane Num: int = 0
+  var Pane Incrementer: int = 0
+  var R Pane Number: int = 0
+  var Can Open Inventory: bool = false
+  var Is Gameplay Scene: bool = false
+  var Map Open: bool = false
+  var Map Shortcut: bool = false
+  var Open: bool = false
+  var Opened: bool = false
+  var Single Pane: bool = false
+  var Arrow Broadcast Event: string = ""
+  var Pane Name String: string = ""
+  var Particle Obj Name: string = ""
+  var Prev Pane End Pos: vector3 = (0, 0, 0)
+  var Arrow L: gameObject = <null>
+  var Arrow R: gameObject = <null>
+  var Border: gameObject = <null>
+  var Charm Msg: gameObject = <null>
+  var Charm Pane: gameObject = <null>
+  var Current Pane: gameObject = <null>
+  var Enemy List: gameObject = <null>
+  var Inventory Pane: gameObject = <null>
+  var Journal Msg: gameObject = <null>
+  var Journal Pane: gameObject = <null>
+  var Map Pane: gameObject = <null>
+  var Pane Arrow L: gameObject = <null>
+  var Pane Arrow R: gameObject = <null>
+  var Pane Name L Obj: gameObject = <null>
+  var Pane Name Obj: gameObject = <null>
+  var Pane Name R Obj: gameObject = <null>
+  var Particle Obj: gameObject = <null>
+  var Prev Pane: gameObject = <null>
+  var Relic Msg: gameObject = <null>
+  var World Map: gameObject = <null>
+}

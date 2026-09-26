@@ -1,0 +1,116 @@
+# Control
+# 2 location(s):
+#   GG_Mighty_Zote / Zote Turret
+#   GG_Mighty_Zote / Battle Control/Extra Zotes/Zote Turret
+
+fsm Control {
+  start Init
+  on ZERO HP → Die  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Fire Point", storeResult=var "Fire Point")
+    FindChild(gameObject=Self, childName="Hurt Box", storeResult=var "Hurt Box")
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    GetHP(target=Self, storeValue=var "Max HP")
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    on GO → Pos
+  }
+
+  state Pos {
+    RandomFloat(min=93.44, max=112.05, storeResult=var "X Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    on RETRY → Retry Frame
+    on FINISHED → Appear
+  }
+
+  state Retry Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Pos
+  }
+
+  state Appear {
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turret Emerge", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Zote_pirouette_02 (sharedassets399.assets), pitchMin=1.2, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetHP(target=Self, hp=var "Max HP")
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetFloatValue(floatVariable=var "Out Time", floatValue=0, everyFrame=false)
+    SetCollider(gameObject=var "Hurt Box", active=false)
+    on FINISHED → Active
+  }
+
+  state Active {
+    SetCollider(gameObject=Self, active=true)
+    SetCollider(gameObject=var "Hurt Box", active=true)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Turret Idle")
+    WaitRandom(timeMin=1, timeMax=2, finishEvent=→"FINISHED", realTime=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=true)
+    FloatAdd(floatVariable=var "Out Time", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Out Time", float2=8, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETRACT", everyFrame=true)
+    on FINISHED → Antic
+    on RETRACT → Retract
+  }
+
+  state Fire {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turret Fire", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SpawnObjectFromGlobalPool(gameObject=Spitter Shot R (sharedassets32.assets), spawnPoint=var "Fire Point", position=(unset), rotation=(unset), storeObject=var "Shot")
+    FireAtTarget(gameObject=var "Shot", target=var "Hero", speed=15, position=(0, -0.5, 0), spread=4, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mawlek_spit_b (sharedassets34.assets), pitchMin=1.2, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Idle
+  }
+
+  state Die {
+    SpawnObjectFromGlobalPool(gameObject=Zote Crew Death (sharedassets481.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SetCollider(gameObject=var "Hurt Box", active=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    SendEventToRegister(eventName="ZOTE WARRIOR KILLED")
+    SetHP(target=Self, hp=150)  // disabled
+    SetIsDead(target=Self, setValue=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false)
+    on FINISHED → Death Pause
+  }
+
+  state Death Pause {
+    SetParent(gameObject=Self, parent=var "Parent", resetLocalPosition=false, resetLocalRotation=false)
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="RETURN", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on GO → Pos
+  }
+
+  state Retract {
+    SetCollider(gameObject=Self, active=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turret Retract", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Zote_pirouette_03 (sharedassets399.assets), pitchMin=1.2, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    SetCollider(gameObject=var "Hurt Box", active=false)
+    on FINISHED → Death Pause
+  }
+
+  state Antic {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Turret Antic")
+    on FINISHED → Fire
+  }
+
+  var Distance: float = 0
+  var Out Time: float = 0
+  var X Pos: float = 0
+  var Max HP: int = 0
+  var Fire Point: gameObject = <null>
+  var Hurt Box: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shot: gameObject = <null>
+}

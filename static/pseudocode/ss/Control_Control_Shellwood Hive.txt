@@ -1,0 +1,198 @@
+# Control
+# 1 location(s):
+#   Shellwood_01 / Wasp Scene/Hive Scene/Shellwood Hive/Control
+
+fsm Control {
+  start Init
+  on ZERO HP → Send Destroy  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Pt Hit", storeResult=var "Pt Hit")
+    FindChild(gameObject=Self, childName="Spawn Point", storeResult=var "Spawn Point")
+    FindChild(gameObject=Self, childName="Wasps", storeResult=var "Wasps")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "BG Spawn 1")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "BG Spawn 2")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt ShootAntic")
+    FindNamedChild(gameObject=Self, storeResult=var "Emerge Effect")
+    SetParent(gameObject=var "Wasps", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetScale(gameObject=var "Wasps", vector=(unset), x=1, y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    GetHP(target=Self, storeValue=var "Spawn HP1")
+    GetHP(target=Self, storeValue=var "Spawn HP2")
+    GetHP(target=Self, storeValue=var "Spawn HP3")
+    MultiplyIntByFloat(integer=var "Spawn HP1", multiplyFloat=0.7, storeResult=var "Spawn HP1", everyFrame=false, forceRoundUp=false)
+    MultiplyIntByFloat(integer=var "Spawn HP2", multiplyFloat=0.5, storeResult=var "Spawn HP2", everyFrame=false, forceRoundUp=false)
+    MultiplyIntByFloat(integer=var "Spawn HP3", multiplyFloat=0.35, storeResult=var "Spawn HP3", everyFrame=false, forceRoundUp=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on SPAWN → Spawn Wasps
+  }
+
+  state Send Destroy {
+    DestroyObject(gameObject=var "Wasps", delay=0, detachChildren=true)  // disabled
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="DESTROY", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "BG Wasps"), sendEvent="DISPERSE", delay=0, everyFrame=false)
+  }
+
+  state Idle {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Damage Range", storeResult=false, sendEvent="", outOfRangeEvent="RANGE OUT", everyFrame=true)
+    SetPolygonCollider(gameObject=Self, active=true, resetOnExit=false)
+    FloatAdd(floatVariable=var "Spawn Pause", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Spawn Pause", float2=1.5, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TRY SPAWN", everyFrame=true)
+    on TOOK DAMAGE → Spawn 1
+    on RANGE OUT → Invincible
+    on TRY SPAWN → Can Spawn?
+    on FINISHED → 
+  }
+
+  state Damage {
+    ObjectJitterLocal(gameObject=var "Art", x=0.1, y=0.05, z=(unset), resetPosOnStateExit=true, limitFps=0)  // disabled
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt Hit", emit=0, resetIfPlaying=false)  // disabled
+    SendEventByName(eventTarget=GameObject(var "Wasps"), sendEvent="ALERT", delay=0, everyFrame=false)  // disabled
+    SetSpriteRendererColor(TintColor=(0, 0, 0, 1), Target=var "")  // disabled
+    PlayAudioEvent(audioClip=shellwood_hive_break (sfxstatic_assets_areashellwood.bundle), pitchMin=0.95, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    on TOOK DAMAGE → Damage
+    on FINISHED → Idle
+  }
+
+  state Spawn Wasps {
+    CreateObject(gameObject=Shellwood Wasp (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Wasps", position=(unset), rotation=(unset), storeObject=var "Wasp")
+    TranslateRandom(gameObject=var "Wasp", translateMin=(-2, -0.5, 0), translateMax=(-3, 0.5, 0), space=1)
+    SetParent(gameObject=var "Wasp", parent=var "Wasps", resetLocalPosition=false, resetLocalRotation=false)
+    SetFsmGameObject(gameObject=var "Wasp", fsmName="Control", variableName="Death Folder", setValue=var "Dead Wasp Folder", everyFrame=false)
+    CreateObject(gameObject=Shellwood Wasp (localpoolprefabs_assets_areashellwood.bundle), spawnPoint=var "Wasps", position=(unset), rotation=(unset), storeObject=var "Wasp")
+    TranslateRandom(gameObject=var "Wasp", translateMin=(-0.5, 2, 0), translateMax=(0.5, 3, 0), space=1)
+    SetParent(gameObject=var "Wasp", parent=var "Wasps", resetLocalPosition=false, resetLocalRotation=false)
+    SetFsmGameObject(gameObject=var "Wasp", fsmName="Control", variableName="Death Folder", setValue=var "Dead Wasp Folder", everyFrame=false)
+    on FINISHED → Invincible
+  }
+
+  state Invincible {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Damage Range", storeResult=false, sendEvent="RANGE IN", outOfRangeEvent="", everyFrame=true)
+    SetPolygonCollider(gameObject=Self, active=false, resetOnExit=false)
+    on FINISHED → 
+    on RANGE IN → Idle
+  }
+
+  state Spawn 1 {
+    BoolTest(boolVariable=var "Spawned 1", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "Spawn HP1", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetIntValue(intVariable=var "Sideline Amount", intValue=3, everyFrame=false)
+    SetBoolValue(boolVariable=var "Spawned 1", boolValue=true, everyFrame=false)
+    on FINISHED → Spawn 2
+  }
+
+  state Spawn 2 {
+    BoolTest(boolVariable=var "Spawned 2", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "Spawn HP2", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetIntValue(intVariable=var "Sideline Amount", intValue=2, everyFrame=false)
+    SetBoolValue(boolVariable=var "Spawned 2", boolValue=true, everyFrame=false)
+    on FINISHED → Spawn 3
+  }
+
+  state Spawn 3 {
+    BoolTest(boolVariable=var "Spawned 3", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "Spawn HP3", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetIntValue(intVariable=var "Sideline Amount", intValue=2, everyFrame=false)
+    SetBoolValue(boolVariable=var "Spawned 3", boolValue=true, everyFrame=false)
+    on FINISHED → Damage
+  }
+
+  state Alert BG {
+    BoolTest(boolVariable=var "Alerted", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "BG Wasps"), sendEvent="ANGRY", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Alerted", boolValue=true, everyFrame=false)
+    on FINISHED → Spawn 1
+  }
+
+  state Can Spawn? {
+    SetFloatValue(floatVariable=var "Spawn Pause", floatValue=0, everyFrame=false)
+    GetChildCount(gameObject=var "Dead Wasp Folder", storeResult=var "Sidelined")
+    IntCompare(integer1=var "Sidelined", integer2=var "Sideline Amount", equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Spawn Type
+  }
+
+  state Spawn Type {
+    SendEvent(eventTarget=Self, sendEvent=→"SHOOT", delay=0, everyFrame=false)
+    SendRandomEventV4(events=[→"SHOOT", →"BG"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on BG → BG Select
+    on SHOOT → Shoot Antic
+  }
+
+  state BG Select {
+    SetGameObject(variable=var "BG Spawn Point", gameObject=var "BG Spawn 1", everyFrame=false)
+    GetDistance(gameObject=var "Hero", target=var "BG Spawn 1", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=4, tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetGameObject(variable=var "BG Spawn Point", gameObject=var "BG Spawn 2", everyFrame=false)
+    on FINISHED → Spawn
+  }
+
+  state Spawn {
+    GetRandomChild(gameObject=var "Dead Wasp Folder", storeResult=var "Wasp")
+    SetParent(gameObject=var "Wasp", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=var "Wasp", targetObject=var "BG Spawn Point", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    TranslateRandom(gameObject=var "Wasp", translateMin=(-1, -1, 0), translateMax=(1, 1, 0), space=0)
+    SendEventByName(eventTarget=GameObject(var "Wasp"), sendEvent="SPAWN BG", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Shoot Antic {
+    PlayParticleEmitterInState(gameObject=var "Pt ShootAntic")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayRandomAudioClipTable(Table=enemy_emerge_antic (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Shoot Spawn
+  }
+
+  state Shoot Spawn {
+    PlayAudioEvent(audioClip=garden_zombie_shoot (sfxstatic_assets_areashellwood.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Emerge Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetRandomChild(gameObject=var "Dead Wasp Folder", storeResult=var "Wasp")
+    SetParent(gameObject=var "Wasp", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=var "Wasp", targetObject=var "Spawn Point", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    SetVelocityAsAngle(gameObject=var "Wasp", angle=var "Spawn Shoot Angle", speed=25, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Wasp"), sendEvent="SPAWN SHOOT", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Spawn Pause", floatValue=1, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Init 2 {
+    FindChild(gameObject=Self, childName="Pt Hit", storeResult=var "Pt Hit")
+    FindChild(gameObject=Self, childName="Wasps", storeResult=var "Wasps")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "BG Spawn 1")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "BG Spawn 2")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt ShootAntic")
+    FindNamedChild(gameObject=Self, storeResult=var "Emerge Effect")
+    on SPAWN → 
+  }
+
+  var Spawn Shoot Angle: float = 180
+  var BG Wasps: gameObject = <null>
+
+  var Distance: float = 0
+  var Spawn Pause: float = 0
+  var Sideline Amount: int = 3
+  var Spawn HP1: int = 0
+  var Spawn HP2: int = 0
+  var Spawn HP3: int = 0
+  var Sidelined: int = 0
+  var Spawned 1: bool = false
+  var Spawned 2: bool = false
+  var Spawned 3: bool = false
+  var Alerted: bool = false
+  var Art: gameObject = Wasp Scene/Hive Scene/Shellwood Hive/Art
+  var Parent: gameObject = Wasp Scene/Hive Scene/Shellwood Hive
+  var Pt Hit: gameObject = <null>
+  var Self: gameObject = Wasp Scene/Hive Scene/Shellwood Hive/Control
+  var Spawn Point: gameObject = <null>
+  var Wasp: gameObject = <null>
+  var Wasps: gameObject = <null>
+  var Dead Wasp Folder: gameObject = Wasp Scene/Hive Scene/Shellwood Hive/Control/Dead Wasps
+  var BG Spawn 1: gameObject = <null>
+  var BG Spawn 2: gameObject = <null>
+  var BG Spawn Point: gameObject = <null>
+  var Pt ShootAntic: gameObject = <null>
+  var Emerge Effect: gameObject = <null>
+  var Wasps - Hive Destroyed: gameObject = Wasp Scene/Hive Scene/Shellwood Hive/Control/Wasps - Hive Destroyed
+}

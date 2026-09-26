@@ -1,0 +1,318 @@
+# Centipede
+# 2 location(s):
+#   Deepnest_26 / Centipede Cage/Baby Centipede Spawner (5)
+#   Deepnest_26b / Centipede Cage/Baby Centipede Spawner (5)
+
+fsm Centipede {
+  start Pause
+  on CENTIPEDE DEATH → Reset  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=Self, storeResult=var "Cage")
+    on FINISHED → Spawn Ready
+  }
+
+  state Chase {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=30, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CENTIPEDE DEATH", everyFrame=false)
+    ActivateGameObject(gameObject=var "Attack Range Obj", activate=(unset), recursive=false, resetOnExit=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "On Ground", boolValue=true, everyFrame=false)
+    AudioPlayInState(gameObject=Self, volume=1)
+    SetBoolValue(boolVariable=var "Touching Wall R", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Touching Wall L", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Self X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Self X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Facing Right", everyFrame=true)
+    SetFloatValue(floatVariable=var "Climb Time", floatValue=0, everyFrame=false)
+    ChaseObjectGround(gameObject=var "Self", target=var "Hero", speedMax=var "Walk Speed", acceleration=1, animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=1)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Walk")
+    FaceDirection(gameObject=Self, spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToWalk", everyFrame=true, pauseBetweenTurns=true, pauseTime=0)
+    CheckCollisionSide(topHit=(unset), rightHit=var "Touching Wall R", bottomHit=var "On Ground", leftHit=var "Touching Wall L", topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=var "Touching Wall R", bottomHit=(unset), leftHit=var "Touching Wall L", topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    BoolAllTrue(boolVariables=[var "Touching Wall R", var "Facing Right"], sendEvent=→"WALL R", storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Touching Wall L", var "Facing Right"], boolStates=[true, false], trueEvent=→"WALL L", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Hero X", float2=var "Self X", tolerance=1, equalBool=var "Hero Similar X", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatAdd(floatVariable=var "Self Y", add=3, everyFrame=true, perSecond=false)
+    FloatTestToBool(float1=var "Hero Y", float2=var "Self Y", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Hero Above", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Hero Above", var "Hero Similar X"], sendEvent=→"ABOVE", storeResult=(unset), everyFrame=true)
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"OFF GROUND", everyFrame=true)
+    GetFsmBool(gameObject=Self, fsmName="recoil", variableName="Recoiling", storeValue=var "Recoiling", everyFrame=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=0, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Dig Check", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=2, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Will Dig", var "Recoiling", var "Dig Check"], boolStates=[true, false, true], trueEvent=→"DIG", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    WaitRandom(timeMin=1, timeMax=4, finishEvent=→"SPEED", realTime=false)
+    on TOOK DAMAGE → Hit Slow
+    on WALL R → Climbing R
+    on WALL L → Climbing L
+    on ABOVE → Hero Above
+    on ATTACK → Aim Leap
+    on OFF GROUND → Fall Anim
+    on SPEED → Speed Pause?
+  }
+
+  state Hit Slow {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Climbing R {
+    ActivateGameObject(gameObject=var "Corner Check Obj", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Corner Check", boolValue=true, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=true, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Clamber Speed", floatValue=5, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=0.8, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=true, fixedUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="WalkToWall")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Climb Speed", everyFrame=true)
+    CheckCollisionSide(topHit=(unset), rightHit=var "Wall R", bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    FloatAdd(floatVariable=var "Climb Time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Climb Time", minValue=0, maxValue=1, everyFrame=true)
+    FloatTestToBool(float1=var "Climb Time", float2=0.1, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Climb Time Hit", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Climb Time Hit", var "Corner Check"], boolStates=[true, false], trueEvent=→"CLIMB OVER", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=var "Hero Above", belowBool=(unset), rightBool=(unset), leftBool=var "Hero Left", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hero Above", var "Hero Left"], boolStates=[false, true], trueEvent=→"STOP", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"STOP", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"STOP", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on STOP → Set Walk Speed
+    on CLIMB OVER → Climb Over
+  }
+
+  state Climbing L {
+    SetFloatValue(floatVariable=var "Clamber Speed", floatValue=-5, everyFrame=false)
+    ActivateGameObject(gameObject=var "Corner Check Obj", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Corner Check", boolValue=true, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=-0.8, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=true, fixedUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="WalkToWall")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Climb Speed", everyFrame=true)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=var "Wall L", topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    FloatAdd(floatVariable=var "Climb Time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Climb Time", minValue=0, maxValue=1, everyFrame=true)
+    FloatTestToBool(float1=var "Climb Time", float2=0.1, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Climb Time Hit", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Climb Time Hit", var "Corner Check"], boolStates=[true, false], trueEvent=→"CLIMB OVER", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=var "Hero Above", belowBool=(unset), rightBool=var "Hero Right", leftBool=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hero Above", var "Hero Right"], boolStates=[false, true], trueEvent=→"STOP", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"STOP", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"STOP", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on STOP → Set Walk Speed
+    on CLIMB OVER → Climb Over
+  }
+
+  state Climb Over {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Climb Over", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Clamber Speed", y=(unset), everyFrame=true)
+    on FINISHED → Chase
+  }
+
+  state Hero Above {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=centipede_call_from_below (sharedassets278.assets))
+    ActivateGameObject(gameObject=var "Attack Range Obj", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Above")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Hero X", float2=var "Self X", tolerance=1, equalBool=var "Hero Similar X", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Hero Y", float2=var "Self Y", tolerance=1.5, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Hero Above", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Hero Above", var "Hero Similar X"], sendEvent=(none), storeResult=var "All True", everyFrame=true)
+    BoolTest(boolVariable=var "All True", isTrue=(none), isFalse=→"STOP", everyFrame=true)
+    WaitRandom(timeMin=1, timeMax=2.5, finishEvent=→"ATTACK", realTime=false)
+    on STOP → Set Walk Speed
+    on ATTACK → Aim Leap
+  }
+
+  state Leap Antic {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=centipede_prepare (sharedassets33.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leap Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Leap
+  }
+
+  state Leap {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=centipede_jump (sharedassets278.assets))
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=20, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    FaceDirection(gameObject=Self, spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", everyFrame=false, pauseBetweenTurns=false, pauseTime=0)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Land
+    on TOOK DAMAGE → Hit Slow Air
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Set Walk Speed
+  }
+
+  state Hit Slow Air {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  state Fall Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    on FINISHED → In Air
+  }
+
+  state Set Active {
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetBoolValue(boolVariable=var "Will Dig", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetActive(false))
+    on FINISHED → Set Walk Speed
+  }
+
+  state Set Walk Speed {
+    RandomFloat(min=4.5, max=8, storeResult=var "Walk Speed")
+    on FINISHED → Chase
+  }
+
+  state Speed Pause? {
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[0.75, 0.25], delay=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Above")
+    WaitRandom(timeMin=0.25, timeMax=0.8, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Set Walk Speed
+  }
+
+  state Aim Leap {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", everyFrame=false)
+    RandomFloat(min=5, max=5, storeResult=var "Random")
+    FloatAdd(floatVariable=var "Angle", add=var "Random", everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Angle", float2=45, tolerance=0, equal=(none), lessThan=→"UNDER", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=135, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=270, tolerance=0, equal=(none), lessThan=→"OVER", greaterThan=→"UNDER", everyFrame=false)
+    on OVER → Set 135
+    on UNDER → Set 45
+    on FINISHED → Leap Antic
+  }
+
+  state Set 45 {
+    SetFloatValue(floatVariable=var "Angle", floatValue=45, everyFrame=false)
+    on FINISHED → Leap Antic
+  }
+
+  state Set 135 {
+    SetFloatValue(floatVariable=var "Angle", floatValue=135, everyFrame=false)
+    on FINISHED → Leap Antic
+  }
+
+  state Curled {
+    RandomFloat(min=0.0061, max=0.008, storeResult=var "zPos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "zPos", space=0, everyFrame=false, lateUpdate=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Bounce
+  }
+
+  state Bounce {
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "X Speed", multiplyBy=0.5, everyFrame=false)
+    RandomFloat(min=7, max=9, storeResult=var "Random")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=var "Random", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Bounced
+  }
+
+  state Bounced {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Unfurl
+  }
+
+  state Unfurl {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Unroll", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Set Active
+  }
+
+  state Spawn Ready {
+    on SPAWN → Curled
+  }
+
+  state Reset {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClip=enemy_death_sword (resources.assets), pitchMin=0.75, pitchMax=1.25, volume=1, delay=0, storePlayer=<null>)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsDead(target=Self, setValue=false)
+    SetParent(gameObject=Self, parent=var "Cage", resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=Self, vector=(unset), x=0, y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Attack Range Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Corner Check Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wake Range Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetHP(target=Self, hp=var "Init Health")
+    on FINISHED → Spawn Ready
+  }
+
+  var Starts Underground: bool = true
+  var Warps: bool = false
+
+  var Angle: float = 0
+  var Clamber Speed: float = 0
+  var Climb Speed: float = 6
+  var Climb Time: float = 0
+  var Distance: float = 0
+  var Hero X: float = 0
+  var Hero Y: float = 0
+  var Random: float = 0
+  var Self X: float = 0
+  var Self X Scale: float = 0
+  var Self Y: float = 0
+  var Target Scale: float = 0
+  var Tele X: float = 0
+  var Tele Y: float = 0
+  var Walk Speed: float = 0
+  var X Max: float = 0
+  var X Min: float = 0
+  var X Scale: float = 0
+  var X Speed: float = 0
+  var Y Max: float = 0
+  var Y Min: float = 0
+  var zPos: float = 0
+  var Init Health: int = 20
+  var All True: bool = false
+  var Climb Time Hit: bool = false
+  var Corner Check: bool = false
+  var Curler: bool = false
+  var Dig Check: bool = false
+  var Facing Right: bool = false
+  var Hero Above: bool = false
+  var Hero Left: bool = false
+  var Hero Right: bool = false
+  var Hero Similar X: bool = false
+  var On Ground: bool = false
+  var Recoiling: bool = false
+  var Rewarp: bool = false
+  var Touching Wall L: bool = false
+  var Touching Wall R: bool = false
+  var Wake Range: bool = false
+  var Wall L: bool = false
+  var Wall R: bool = false
+  var Will Dig: bool = false
+  var Scale To: vector3 = (0, 0, 0)
+  var Attack Range Obj: gameObject = Centipede Cage/Baby Centipede Spawner (5)/Attack Range
+  var Cage: gameObject = <null>
+  var Corner Check Obj: gameObject = Centipede Cage/Baby Centipede Spawner (5)/Corner Check
+  var Dig Dust: gameObject = Centipede Cage/Baby Centipede Spawner (5)/Dig Dust
+  var Self: gameObject = <null>
+  var Teleplane: gameObject = <null>
+  var Wake Range Obj: gameObject = Centipede Cage/Baby Centipede Spawner (5)/Wake Range
+}

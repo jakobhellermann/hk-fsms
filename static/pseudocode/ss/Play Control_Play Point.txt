@@ -1,0 +1,450 @@
+# Play Control
+# 1 location(s):
+#   Coral_33 / Black Thread States/Normal World/Dice Game Control/Dice Game/Play Point
+
+fsm Play Control {
+  start Init
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Dice Hornet")
+    FindNamedChild(gameObject=Self, storeResult=var "Dice Cage")
+    FindNamedChild(gameObject=Self, storeResult=var "Throw Point Hornet")
+    FindNamedChild(gameObject=Self, storeResult=var "Throw Point Pilgrim")
+    FindNamedChild(gameObject=Self, storeResult=var "Audio Loop DiceRoll")
+    FindNamedChild(gameObject=var "Dice", storeResult=var "Die Diamond")
+    FindNamedChild(gameObject=var "Dice", storeResult=var "Die Octagon")
+    FindNamedChild(gameObject=var "Dice", storeResult=var "Die Triangle")
+    SetMeshRenderer(gameObject=var "Dice Hornet", active=false)
+    ActivateGameObject(gameObject=var "Dice Cage", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on INTERACT → Kneel Start
+  }
+
+  state Kneel Start {
+    PlayerdataIntCompare(playerdataInt="dicePilgrimBank", compareTo=0, equal=(none), lessThan=→"DEFEATED", greaterThan=(none))
+    GetPlayerDataInt(intName="geo", storeValue=var "Rosaries")
+    IntCompare(integer1=var "Rosaries", integer2=var "Wager Amount", equal=(none), lessThan=→"NOT ENOUGH", greaterThan=(none), everyFrame=false)
+    AudioStop(gameObject=var "Audio Loop DiceRoll", fadeTime=0)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    SetMeshRenderer(gameObject=var "Dice Hornet", active=true)
+    PlayAudioEvent(audioClip=trobbio_recover_or_general_foley_movement (sfxstatic_assets_shared.bundle), pitchMin=0.85, pitchMax=0.85, volume=0.7, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Dice Hornet", clipName="Hornet Kneel Start", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Tk2dPlayAnimation(gameObject=var "Dice Pilgrim", animLibName="", clipName="Pilgrim Speak")
+    SetIsKinematic2d(gameObject=var "Hero", isKinematic=true)
+    ActivateGameObject(gameObject=var "Dice Cage", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Give Anim
+    on NOT ENOUGH → Not Enough
+    on DEFEATED → Defeated
+  }
+
+  state Give Anim {
+    PlayAudioEvent(audioClip=dicegame_grab_from_air (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=soft_landing_sand (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=var "Dice Pilgrim", animLibName="", clipName="Pilgrim Give")
+    Tk2dWatchAnimationEvents(gameObject=var "Dice Hornet", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dice Idle
+  }
+
+  state Dice Idle {
+    Tk2dPlayAnimation(gameObject=var "Dice Hornet", animLibName="", clipName="Hornet Dice Idle")
+    ListenForMenuActionsV2(EventTarget=Self, SubmitPressed=→"PRESS", CancelPressed=(none), ExtraPressed=(none), SuperPressed=(none), IgnoreAttack=false)
+    ShowControlReminderSingle(AppearEvent="", DisappearEvent="HIDE_DICE_PROMPT", PlayerDataBool="", FadeInDelay=0, FadeInTime=1, FadeOutTime=0.5, Text={Sheet="UI", Key="CTRL_ROLL"}, Prompt={Sheet="", Key=""}, Button=MENU_SUBMIT, DisappearOnButtonPress=true)
+    on PRESS → Roll Start
+  }
+
+  state Roll Start {
+    SendEventToRegister(eventName="HIDE_DICE_PROMPT")
+    SetBoolValue(boolVariable=var "Hornet Turn", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Perfect Roll", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Dice Hornet", animLibName="", clipName="Hornet Roll")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetAudioClip(gameObject=var "Audio Loop DiceRoll", audioClip=dicegame_hornet_diceroll_loop (sfxstatic_assets_areacoral.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Rolling
+  }
+
+  state Rolling {
+    ListenForMenuSubmit(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"RELEASE")
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Roll Speed")
+    SetFloatValue(floatVariable=var "Roll Time", floatValue=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Roll Time", add=var "Roll Speed", everyFrame=true, perSecond=true)
+    FloatOperator(float1=var "Roll Time", float2=var "Perfect Roll Time", operation=Divide, storeResult=var "Perfect Progress", everyFrame=true)
+    FloatOperator(float1=var "Perfect Progress", float2=0.5, operation=Multiply, storeResult=var "Pitch Add", everyFrame=true)
+    FloatOperator(float1=1, float2=var "Pitch Add", operation=Add, storeResult=var "Pitch", everyFrame=true)
+    SetAudioPitch(gameObject=var "Audio Loop DiceRoll", pitch=var "Pitch", everyFrame=true)
+    Wait(time=var "Perfect Roll Time", finishEvent=→"FINISHED", realTime=false)
+    on RELEASE → Throw Antic
+    on FINISHED → Wait For Anim Loop
+  }
+
+  state Throw Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Dice Hornet", clipName="Hornet Throw", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    AudioStop(gameObject=var "Audio Loop DiceRoll", fadeTime=0)
+    SetAudioPitch(gameObject=var "Audio Loop DiceRoll", pitch=1, everyFrame=false)
+    on FINISHED → Perfect?
+  }
+
+  state Throw {
+    PlayAudioEvent(audioClip=dicegame_throw_dice (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateAllChildren(gameObject=var "Dice", activate=true)
+    SetPositionToObject2D(gameObject=var "Die Octagon", targetObject=var "Throw Point Hornet", xOffset=0, yOffset=0, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Die Diamond", targetObject=var "Throw Point Hornet", xOffset=0, yOffset=0, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Die Triangle", targetObject=var "Throw Point Hornet", xOffset=0, yOffset=0, everyFrame=false)
+    TranslateRandom(gameObject=var "Die Octagon", translateMin=(-0.2, -0.2, 0), translateMax=(0.2, 0.2, 0), space=1)
+    TranslateRandom(gameObject=var "Die Diamond", translateMin=(-0.2, -0.2, 0), translateMax=(0.2, 0.2, 0), space=1)
+    TranslateRandom(gameObject=var "Die Triangle", translateMin=(-0.2, -0.2, 0), translateMax=(0.2, 0.2, 0), space=1)
+    RandomFloatEither(value1=var "Angular Velocity Min", value2=var "Angular Velocity Max", storeResult=var "Angular Velocity")
+    SetAngularVelocity2d(gameObject=var "Die Octagon", angularVelocity=var "Angular Velocity", everyFrame=false)
+    RandomFloatEither(value1=var "Angular Velocity Min", value2=var "Angular Velocity Max", storeResult=var "Angular Velocity")
+    SetAngularVelocity2d(gameObject=var "Die Diamond", angularVelocity=var "Angular Velocity", everyFrame=false)
+    RandomFloatEither(value1=var "Angular Velocity Min", value2=var "Angular Velocity Max", storeResult=var "Angular Velocity")
+    SetAngularVelocity2d(gameObject=var "Die Triangle", angularVelocity=var "Angular Velocity", everyFrame=false)
+    FlingObjects(containerObject=var "Dice", adjustPosition=(unset), randomisePosition=(unset), speedMin=4, speedMax=6, angleMin=110, angleMax=130, space=0)
+    WaitRandom(timeMin=1.5, timeMax=1.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Middle
+  }
+
+  state Get Middle {
+    GetMiddleObjectX(objectA=var "Die Octagon", objectB=var "Die Diamond", objectC=var "Die Triangle", storeMiddleObject=var "Middle Die", everyFrame=false)  // disabled
+    GetClosestGameObject(Target=Self, GameObjects=[var "Die Octagon", var "Die Diamond", var "Die Triangle"], MatchEvents=[→"OCTAGON", →"DIAMOND", →"TRIANGLE"], StoreGameObject=var "", EveryFrame=false)  // disabled
+    GetHorizontallyClosestGameObject(Target=Self, GameObjects=[var "Die Octagon", var "Die Diamond", var "Die Triangle"], MatchEvents=[→"OCTAGON", →"DIAMOND", →"TRIANGLE"], StoreGameObject=var "Middle Die", EveryFrame=false)
+    GameObjectCompare(gameObjectVariable=var "Middle Die", compareTo=var "Die Octagon", equalEvent=→"OCTAGON", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    GameObjectCompare(gameObjectVariable=var "Middle Die", compareTo=var "Die Diamond", equalEvent=→"DIAMOND", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    GameObjectCompare(gameObjectVariable=var "Middle Die", compareTo=var "Die Triangle", equalEvent=→"TRIANGLE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    on OCTAGON → Octagon
+    on DIAMOND → Diamond
+    on TRIANGLE → Triangle
+  }
+
+  state Octagon {
+    SetFsmGameObject(gameObject=var "Die Diamond", fsmName="floating_die", variableName="Master", setValue=var "Die Octagon", everyFrame=false)
+    SetFsmGameObject(gameObject=var "Die Triangle", fsmName="floating_die", variableName="Master", setValue=var "Die Octagon", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Octagon"), sendEvent="MASTER", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Diamond"), sendEvent="SUB", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Triangle"), sendEvent="SUB", delay=0, everyFrame=false)
+    SetTag(gameObject=var "Middle Die", tag="Target")
+    FindNamedChild(gameObject=var "Middle Die", storeResult=var "Bouncer")
+    SetTag(gameObject=var "Bouncer", tag="Target")
+    on FINISHED → Combine Pause
+  }
+
+  state Diamond {
+    SetFsmGameObject(gameObject=var "Die Octagon", fsmName="floating_die", variableName="Master", setValue=var "Die Diamond", everyFrame=false)
+    SetFsmGameObject(gameObject=var "Die Triangle", fsmName="floating_die", variableName="Master", setValue=var "Die Diamond", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Diamond"), sendEvent="MASTER", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Octagon"), sendEvent="SUB", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Triangle"), sendEvent="SUB", delay=0, everyFrame=false)
+    SetTag(gameObject=var "Middle Die", tag="Target")
+    FindNamedChild(gameObject=var "Middle Die", storeResult=var "Bouncer")
+    SetTag(gameObject=var "Bouncer", tag="Target")
+    on FINISHED → Combine Pause
+  }
+
+  state Triangle {
+    SetFsmGameObject(gameObject=var "Die Octagon", fsmName="floating_die", variableName="Master", setValue=var "Die Triangle", everyFrame=false)
+    SetFsmGameObject(gameObject=var "Die Diamond", fsmName="floating_die", variableName="Master", setValue=var "Die Triangle", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Triangle"), sendEvent="MASTER", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Octagon"), sendEvent="SUB", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Diamond"), sendEvent="SUB", delay=0, everyFrame=false)
+    SetTag(gameObject=var "Middle Die", tag="Target")
+    FindNamedChild(gameObject=var "Middle Die", storeResult=var "Bouncer")
+    SetTag(gameObject=var "Bouncer", tag="Target")
+    on FINISHED → Combine Pause
+  }
+
+  state Combine Pause {
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Who Is Next?
+  }
+
+  state Who Is Next? {
+    BoolTest(boolVariable=var "Hornet Turn", isTrue=→"PILGRIM", isFalse=→"HORNET", everyFrame=false)
+    on PILGRIM → Pilgrim Collect 1
+    on HORNET → Who Won?
+  }
+
+  state Pilgrim Collect 1 {
+    PlayAudioEvent(audioClip=dicegame_grab_from_air (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Dice Pilgrim", clipName="Pilgrim Pickup", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetBoolValue(boolVariable=var "Hornet Turn", boolValue=false, everyFrame=false)
+    on FINISHED → Pilgrim Collect 2
+  }
+
+  state Pilgrim Collect 2 {
+    SendEventByName(eventTarget=GameObject(var "Die Octagon"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Diamond"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Triangle"), sendEvent="RESET", delay=0, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Dice Pilgrim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Pilgrim Roll
+  }
+
+  state Pilgrim Roll {
+    Tk2dPlayAnimation(gameObject=var "Dice Pilgrim", animLibName="", clipName="Pilgrim Roll")
+    WaitRandom(timeMin=1, timeMax=2, finishEvent=→"FINISHED", realTime=false)
+    SetAudioClip(gameObject=var "Audio Loop DiceRoll", audioClip=dicegame_npc_diceroll_loop (sfxstatic_assets_areacoral.bundle), autoPlay=true, stopOnExit=true)
+    on FINISHED → Pilgrim Throw
+  }
+
+  state Pilgrim Throw {
+    PlayAudioEvent(audioClip=dicegame_throw_dice (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=var "Dice Pilgrim", animLibName="", clipName="Pilgrim Throw")
+    ActivateAllChildren(gameObject=var "Dice", activate=true)
+    SetPositionToObject2D(gameObject=var "Die Octagon", targetObject=var "Throw Point Pilgrim", xOffset=0, yOffset=0, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Die Diamond", targetObject=var "Throw Point Pilgrim", xOffset=0, yOffset=0, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Die Triangle", targetObject=var "Throw Point Pilgrim", xOffset=0, yOffset=0, everyFrame=false)
+    TranslateRandom(gameObject=var "Die Octagon", translateMin=(-0.2, -0.2, 0), translateMax=(0.2, 0.2, 0), space=1)
+    TranslateRandom(gameObject=var "Die Diamond", translateMin=(-0.2, -0.2, 0), translateMax=(0.2, 0.2, 0), space=1)
+    TranslateRandom(gameObject=var "Die Triangle", translateMin=(-0.2, -0.2, 0), translateMax=(0.2, 0.2, 0), space=1)
+    RandomFloat(min=var "Angular Velocity Min", max=var "Angular Velocity Max", storeResult=var "Angular Velocity")
+    SetAngularVelocity2d(gameObject=var "Die Octagon", angularVelocity=var "Angular Velocity", everyFrame=false)
+    RandomFloat(min=var "Angular Velocity Min", max=var "Angular Velocity Max", storeResult=var "Angular Velocity")
+    SetAngularVelocity2d(gameObject=var "Die Diamond", angularVelocity=var "Angular Velocity", everyFrame=false)
+    RandomFloat(min=var "Angular Velocity Min", max=var "Angular Velocity Max", storeResult=var "Angular Velocity")
+    SetAngularVelocity2d(gameObject=var "Die Triangle", angularVelocity=var "Angular Velocity", everyFrame=false)
+    FlingObjects(containerObject=var "Dice", adjustPosition=(unset), randomisePosition=(unset), speedMin=4, speedMax=6, angleMin=50, angleMax=70, space=0)
+    WaitRandom(timeMin=1.25, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Middle
+  }
+
+  state Hornet Choice {
+    GetPlayerDataInt(intName="geo", storeValue=var "Rosaries")
+    IntCompare(integer1=var "Rosaries", integer2=var "Wager Amount", equal=(none), lessThan=→"NOT ENOUGH", greaterThan=(none), everyFrame=false)
+    ListenForMenuActionsV2(EventTarget=Self, SubmitPressed=→"PRESS", CancelPressed=→"EXIT", ExtraPressed=(none), SuperPressed=(none), IgnoreAttack=false)
+    ShowControlReminderSingleGroup(DisappearEvent="HIDE_DICE_PROMPT", PlayerDataBool="", FadeInDelay=0, FadeInTime=1, FadeOutTime=0.5, Groups=[{Text={Sheet="UI", Key="CTRL_PLAY_GAME"}, Prompt={Sheet="", Key=""}, Button=HeroActionButton(8)}, {Text={Sheet="UI", Key="CTRL_STOP"}, Prompt={Sheet="", Key=""}, Button=HeroActionButton(9)}], DisappearOnButtonPress=false)
+    on NOT ENOUGH → Rosaries Depleted
+    on PRESS → Hornet Collect 1
+    on EXIT → Return Dice 1
+  }
+
+  state Hornet Collect 1 {
+    SendEventToRegister(eventName="HIDE_DICE_PROMPT")
+    PlayAudioEvent(audioClip=dicegame_grab_from_air (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Dice Hornet", clipName="Hornet Pickup", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Hornet Collect 2
+  }
+
+  state Hornet Collect 2 {
+    SendEventByName(eventTarget=GameObject(var "Die Octagon"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Diamond"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Triangle"), sendEvent="RESET", delay=0, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Dice Hornet", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Roll Start
+  }
+
+  state Return Dice 1 {
+    SendEventToRegister(eventName="HIDE_DICE_PROMPT")
+    PlayAudioEvent(audioClip=dicegame_grab_from_air (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Dice Pilgrim", clipName="Pilgrim Game End", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Return Dice 2
+  }
+
+  state Return Dice 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Dice Hornet", clipName="Hornet Kneel End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Die Octagon"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Diamond"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Die Triangle"), sendEvent="RESET", delay=0, everyFrame=false)
+    on FINISHED → End Game
+  }
+
+  state End Game {
+    ActivateGameObject(gameObject=var "Dice Cage", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    SetMeshRenderer(gameObject=var "Dice Hornet", active=false)
+    SetIsKinematic2d(gameObject=var "Hero", isKinematic=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Replayable
+  }
+
+  state Replayable {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Idle
+  }
+
+  state Who Won? {
+    BoolTest(boolVariable=var "Perfect Roll", isTrue=→"HORNET", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Always Win", isTrue=→"HORNET", isFalse=(none), everyFrame=false)
+    SendRandomEvent(events=[→"PILGRIM", →"HORNET"], weights=[0.5, 0.5], delay=0)
+    on PILGRIM → Lose Rosaries
+    on HORNET → Gain Rosaries
+  }
+
+  state Lose Rosaries {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=TakeGeo(var "Wager Amount"))
+    PlayerDataIntAdd(intName="dicePilgrimBank", amount=var "Wager Amount")
+    on FINISHED → Hornet Turn Pause
+  }
+
+  state Gain Rosaries {
+    IntOperator(integer1=var "Wager Amount", integer2=-1, operation=Multiply, storeResult=var "Wager Loss", everyFrame=false)
+    PlayerDataIntAdd(intName="dicePilgrimBank", amount=var "Wager Loss")
+    PlayerdataIntCompare(playerdataInt="dicePilgrimBank", compareTo=0, equal=(none), lessThan=→"PILGRIM DEPLETED", greaterThan=(none))
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AddGeo(var "Wager Amount"))
+    on FINISHED → Hornet Turn Pause
+    on PILGRIM DEPLETED → Pilgrim Depleted Pause
+  }
+
+  state Hornet Turn Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Hornet Choice
+  }
+
+  state Rosaries Depleted {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="DICE_PILGRIM")
+    RunDialogue(Sheet="Wanderers", Key="DICE_PILGRIM_HORNETDEPLETED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Rosaries Depleted End
+  }
+
+  state Not Enough {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="DICE_PILGRIM")
+    RunDialogue(Sheet="Wanderers", Key="DICE_PILGRIM_NOTENOUGH", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Not Enough End
+  }
+
+  state Not Enough End {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Rosaries Depleted End {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Return Dice 1
+  }
+
+  state Pilgrim Depleted {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="DICE_PILGRIM_DEFEATED")
+    RunDialogue(Sheet="Wanderers", Key="DICE_PILGRIM_DEPLETED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetFsmBool(gameObject=var "Dice Pilgrim", fsmName="Dialogue", variableName="Defeated", setValue=true, everyFrame=false)
+    on CONVO_END → Hornet Get Pause
+  }
+
+  state Get Reward {
+    SetToolUnlocked(Tool=Magnetite Dice (dataassets_assets_assets/dataassets/tools/toolitems.bundle), WaitForTutorialMsgEnd=false)
+    SetPlayerDataBool(boolName="dicePilgrimDefeated", value=true)
+    SetInteractableLabel(Target=Self, Label=Speak, UseChildren=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateInteractible(Target=var "Dice Pilgrim", Activate=true, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(var "Dice Pilgrim"), sendEvent="LOST DICE", delay=0, everyFrame=false)
+    on FINISHED → End Game
+  }
+
+  state Hornet Get 1 {
+    PlayAudioEvent(audioClip=dicegame_grab_from_air (sfxstatic_assets_areacoral.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Dice Hornet", clipName="Hornet Take Dice", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Hornet Get 2
+  }
+
+  state Hornet Get 2 {
+    ActivateAllChildren(gameObject=var "Dice", activate=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Dice Hornet", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Get Reward
+  }
+
+  state Defeated {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="DICE_PILGRIM_DEFEATED")
+    RunDialogue(Sheet="Wanderers", Key="DICE_PILGRIM_DEPLETED_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Defeated End
+  }
+
+  state Defeated End {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Pilgrim Depleted Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Pilgrim Depleted
+  }
+
+  state Perfect? {
+    FloatInRange(floatVariable=var "Roll Time", lowerValue=3.8, upperValue=4.2, boolVariable=(unset), trueEvent=(none), falseEvent=→"STANDARD", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Perfect Timing", isTrue=(none), isFalse=→"STANDARD", everyFrame=false)
+    ActivateAllChildren(gameObject=var "Dice", activate=true)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayRandomAudioClipTableV3(Table=Attack Normal Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0), ForcePlay=true, StoreSpawned=var "")
+    SendMessage(gameObject=var "Die Octagon", delivery=SendMessage, options=0, functionCall=flashFocusHeal())
+    SendMessage(gameObject=var "Die Diamond", delivery=SendMessage, options=0, functionCall=flashFocusHeal())
+    SendMessage(gameObject=var "Die Triangle", delivery=SendMessage, options=0, functionCall=flashFocusHeal())
+    SetBoolValue(boolVariable=var "Perfect Roll", boolValue=true, everyFrame=false)
+    on FINISHED → Throw
+    on STANDARD → Standard
+  }
+
+  state Standard {
+    PlayRandomAudioClipTable(Table=Attack Normal Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))  // disabled
+    on FINISHED → Throw
+  }
+
+  state Hornet Get Pause {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    on FINISHED → Hornet Get 1
+  }
+
+  state Rolling 2 {
+    ListenForMenuSubmit(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"RELEASE")
+    FloatAdd(floatVariable=var "Roll Time", add=var "Roll Speed", everyFrame=true, perSecond=true)
+    EaseFloat(fromValue=var "Pitch", toValue=1, floatVariable=var "Pitch", time=0.75, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    SetAudioPitch(gameObject=var "Audio Loop DiceRoll", pitch=var "Pitch", everyFrame=true)
+    SetBoolValue(boolVariable=var "Perfect Timing", boolValue=false, everyFrame=false)
+    on RELEASE → Throw Antic
+  }
+
+  state Wait For Anim Loop {
+    ListenForMenuSubmit(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"RELEASE")
+    Tk2dWatchAnimationEvents(gameObject=var "Dice Hornet", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on RELEASE → Throw Antic
+    on FINISHED → Perfect Anim
+  }
+
+  state Perfect Anim {
+    SetBoolValue(boolVariable=var "Perfect Timing", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Dice Hornet", animLibName="", clipName="Hornet Roll Special")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=dicegame_start_floating_finish_join (sfxstatic_assets_areacoral.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ListenForMenuSubmit(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"RELEASE")
+    on FINISHED → Rolling 2
+    on RELEASE → Throw Antic
+  }
+
+  var Angular Velocity: float = 0
+  var Angular Velocity Min: float = -5000
+  var Angular Velocity Max: float = 5000
+  var Pitch: float = 0
+  var Roll Time: float = 0
+  var Roll Speed: float = 0
+  var Perfect Progress: float = 0
+  var Pitch Add: float = 0
+  var Perfect Roll Time: float = 4
+  var Framerate: float = 0
+  var Wager Amount: int = 4
+  var Rosaries: int = 0
+  var Wager Loss: int = 0
+  var Hornet Turn: bool = false
+  var Perfect Roll: bool = false
+  var Always Win: bool = false
+  var Perfect Timing: bool = false
+  var Dice: gameObject = Black Thread States/Normal World/Dice Game Control/Dice Game/Dice
+  var Dice Cage: gameObject = <null>
+  var Dice Hornet: gameObject = <null>
+  var Dice Pilgrim: gameObject = Black Thread States/Normal World/Dice Game Control/Dice Game/Dice Pilgrim
+  var Die Diamond: gameObject = <null>
+  var Die Octagon: gameObject = <null>
+  var Die Triangle: gameObject = <null>
+  var Middle Die: gameObject = <null>
+  var Throw Point Hornet: gameObject = <null>
+  var Bouncer: gameObject = <null>
+  var Throw Point: gameObject = <null>
+  var Throw Point Pilgrim: gameObject = <null>
+  var Audio Loop DiceRoll: gameObject = <null>
+  var Audio Loop Voice: gameObject = Black Thread States/Normal World/Dice Game Control/Dice Game/Dice Pilgrim/Audio Loop Voice
+}

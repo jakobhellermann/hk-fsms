@@ -1,0 +1,447 @@
+# Control
+# 1 location(s):
+#   Shellwood_26 / Black Thread States/Normal World/Stick Insect Flyer (1)
+
+fsm Control {
+  start Init
+  on ZERO HP → Death  // from any state
+  on WITCH CRUSH → Witch Crush  // from any state
+  on DISABLE → Stop  // from any state
+  on ENEMY CLEANUP → Boss End Death  // from any state
+
+  state Init {
+    AudioStop(gameObject=Self, fadeTime=0)
+    BoolTest(boolVariable=var "Summon", isTrue=→"SUMMON", isFalse=(none), everyFrame=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Wall Cling", equalEvent=→"WALL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Idle Fly
+    on WALL → Wall Idle
+    on SUMMON → Summon Init
+  }
+
+  state Wall Idle {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ALERT → Wall Startle
+    on TOOK DAMAGE → Wall Startle
+  }
+
+  state Idle Fly {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=2.5, accelerationMin=5, accelerationMax=20, roamingRangeX=2, roamingRangeY=1, manualStartPos=(unset))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ALERT → Startle Anim
+    on TOOK DAMAGE → Startle Anim
+    on GO UP → Go Up
+  }
+
+  state Startle Anim {
+    SetStringValue(stringVariable=var "Clip", stringValue="Startle", everyFrame=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    SetStringValue(stringVariable=var "Clip", stringValue="TurnToStartle", everyFrame=false)
+    on FINISHED → Startle
+  }
+
+  state Wall Launch {
+    SetVelocityByScale(gameObject=Self, speed=-15, ySpeed=(unset), everyFrame=false)
+    on FINISHED → Startle Anim
+  }
+
+  state Startle {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Clip", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_chirp (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Distance?
+  }
+
+  state Chase {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Chase")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToChase", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.3)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Offset", yScale=(unset), zScale=(unset), space=0, everyFrame=true)
+    FloatMultiply(floatVariable=var "X Offset", multiplyBy=6, everyFrame=true)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=6, accelerationForce=12, offsetX=var "X Offset", offsetY=1)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Attack Ready", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "In Attack Range", var "Attack Ready"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.4, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ATTACK → Spin Away?
+    on SING → Sing
+    on GO UP → Go Up
+  }
+
+  state Attack Antic {
+    PlayAudioEvent(audioClip=stick_insect_flyer_spin_antic (sfxstatic_assets_areashellwood.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_death (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Attacked", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Attack Ready", boolValue=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spin", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)
+    on FINISHED → Attack Dir
+  }
+
+  state Spin Launch {
+    PlayAudioEventRandom(audioClips=[stick_insect_flyer_spin_attack_2 (sfxstatic_assets_areashellwood.bundle), stick_insect_flyer_spin_attack_3 (sfxstatic_assets_areashellwood.bundle), stick_insect_flyer_spin_attack (sfxstatic_assets_areashellwood.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    SetDamageHero(Target=Self, Enabled=false)
+    ActivateGameObject(gameObject=var "Spin Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=20, everyFrame=false)
+    AddForce2d(gameObject=Self, forceMode=1, atPosition=(unset), vector=(unset), x=(unset), y=-10, vector3=(unset), everyFrame=false)
+    AddForce2d(gameObject=Self, forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=30, vector3=(unset), everyFrame=true)
+    DecelerateV2(gameObject=Self, deceleration=0.985, brakeOnExit=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=var "Right Wall", bottomHit=(unset), leftHit=var "Left Wall", topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    BoolTestMulti(boolVariables=[var "Going L", var "Left Wall"], boolStates=[true, true], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Going L", var "Right Wall"], boolStates=[false, true], trueEvent=→"WALL", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    PlayParticleEmitterInState(gameObject=var "Pt Spin")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPIN START", delay=0, everyFrame=false)
+    on FINISHED → Spin End
+    on WALL → Hit Wall
+    on MULTI HIT CONNECT → Multihit
+  }
+
+  state Spin End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spin End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.97, brakeOnExit=false)
+    AddForce2d(gameObject=Self, forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=30, vector3=(unset), everyFrame=true)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPIN END", delay=0, everyFrame=false)
+    SetDamageHero(Target=Self, Enabled=true)
+    on FINISHED → After Spin
+  }
+
+  state Attack Dir {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0.5, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → Clamp L
+    on R → Clamp R
+  }
+
+  state Clamp L {
+    FloatClamp(floatVariable=var "Angle", minValue=140, maxValue=210, everyFrame=false)
+    SetBoolValue(boolVariable=var "Going L", boolValue=true, everyFrame=false)
+    on FINISHED → Spin Launch
+  }
+
+  state Clamp R {
+    ClampAngle(angleVariable=var "Angle", minValue=40, maxValue=-30, everyFrame=false)
+    SetBoolValue(boolVariable=var "Going L", boolValue=false, everyFrame=false)
+    on FINISHED → Spin Launch
+  }
+
+  state Keep Distance {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    SetBoolValue(boolVariable=var "Attack Ready", boolValue=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.3)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Offset", yScale=(unset), zScale=(unset), space=0, everyFrame=true)
+    FloatMultiply(floatVariable=var "X Offset", multiplyBy=9, everyFrame=true)
+    RandomFloat(min=0.7, max=4, storeResult=var "Y Offset")
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=6, accelerationForce=12, offsetX=var "X Offset", offsetY=var "Y Offset")
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Chase
+    on TOOK DAMAGE → Chase
+  }
+
+  state Distance? {
+    SendRandomEventV4(events=[→"CHASE", →"DISTANCE"], weights=[0.65, 0.35], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    on CHASE → Chase
+    on DISTANCE → Keep Distance
+  }
+
+  state Spin Away? {
+    SetBoolValue(boolVariable=var "Attacked", boolValue=false, everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=false, sendEvent="", outOfRangeEvent="ATTACK", everyFrame=false)
+    SendRandomEventV4(events=[→"ATTACK", →"DISTANCE"], weights=[0.5, 0.5], eventMax=[1, 1], missedMax=[1, 1], activeBool=(unset))
+    on ATTACK → Attack Antic
+    on DISTANCE → Evade Antic
+    on SING → Sing
+  }
+
+  state Evade Antic {
+    PlayAudioEvent(audioClip=stick_insect_flyer_spin_antic (sfxstatic_assets_areashellwood.bundle), pitchMin=1.1, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_chirp (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quick Spin", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    on FINISHED → Evade Audio
+  }
+
+  state Evade Launch {
+    ActivateGameObject(gameObject=var "Spin Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=20, everyFrame=false)
+    AddForce2d(gameObject=Self, forceMode=1, atPosition=(unset), vector=(unset), x=(unset), y=-15, vector3=(unset), everyFrame=false)
+    AddForce2d(gameObject=Self, forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=40, vector3=(unset), everyFrame=true)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Spin")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPIN START", delay=0, everyFrame=false)
+    on FINISHED → Spin End
+    on MULTI HIT CONNECT → Multihit
+  }
+
+  state Evade Dir {
+    GetAngleToTarget2D(gameObject=var "Hero", target=var "Self", offsetX=0, offsetY=0.5, storeAngle=var "Angle", pause=0, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"L", negativeEvent=→"R", space=0)
+    on L → Clamp L 2
+    on R → Clamp R 2
+  }
+
+  state Clamp L 2 {
+    ClampAngle(angleVariable=var "Angle", minValue=40, maxValue=-40, everyFrame=false)
+    on FINISHED → Evade Launch
+  }
+
+  state Clamp R 2 {
+    FloatClamp(floatVariable=var "Angle", minValue=140, maxValue=220, everyFrame=false)
+    on FINISHED → Evade Launch
+  }
+
+  state After Spin {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=var "In Close Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    RandomBool(storeResult=var "Tricks Round")  // disabled
+    BoolTestMulti(boolVariables=[var "Attacked", var "In Close Range", var "Tricks Round"], boolStates=[false, true], trueEvent=→"ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Attacked", var "In Close Range", var "Tricks Round"], boolStates=[true, true], trueEvent=→"DISTANCE", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on ATTACK → Attack Antic
+    on DISTANCE → Evade Antic
+    on FINISHED → Distance?
+  }
+
+  state Wall Startle {
+    PlayAudioEvent(audioClip=stick_insect_flyer_emerge_from_chilling_out (sfxstatic_assets_areashellwood.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_chirp (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Wall Launch
+  }
+
+  state Hit Wall {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Translate", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Translate", multiplyBy=-0.65, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Translate", y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Hit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPIN END", delay=0, everyFrame=false)
+    on FINISHED → Launch Off
+  }
+
+  state Launch Off {
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Death {
+    AudioStop(gameObject=var "Current Clip", fadeTime=0)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=stick_insect_attack (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    SetDamageHero(Target=Self, Enabled=true)
+    CancelRecoil(target=Self)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SPIN END", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Summon", isTrue=→"SUMMON", isFalse=(none), everyFrame=false)
+    on SUMMON → Death Air
+  }
+
+  state Summon Init {
+    SetSpecialDeath(target=Self, hasSpecialDeath=true)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Summon Y", z=(unset), space=0, everyFrame=false)
+    GetParent(gameObject=Self, storeResult=var "Summon Folder")
+    FindNamedChild(gameObject=Self, storeResult=var "RoofShaker Idle")
+    on FINISHED → Summon Ready
+  }
+
+  state Summon Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HealthManager", methodName="RefillHP", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Spin Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Soft Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=100, z=(unset), space=0, everyFrame=false, lateUpdate=false)  // disabled
+    SetBoolValue(boolVariable=var "Active", boolValue=false, everyFrame=false)
+    on SUMMON → Summon Antic
+  }
+
+  state Summon Antic {
+    PlayAudioEvent(audioClip=stick_insect_flyer_spin_antic (sfxstatic_assets_areashellwood.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    PlayParticleEmitterInState(gameObject=var "Pt Summon")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Summon Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetCollider(gameObject=var "RoofShaker Idle", active=true, resetOnExit=true)
+    SetBoolValue(boolVariable=var "Active", boolValue=true, everyFrame=false)
+    on FINISHED → Spin In
+  }
+
+  state Spin In {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_chirp (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=stick_insect_flyer_spin_attack (sfxstatic_assets_areashellwood.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    ActivateGameObject(gameObject=var "Summon Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Spin Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Summon Spin")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-15, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Soft Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Spinning In
+  }
+
+  state Spinning In {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    DecelerateV2(gameObject=Self, deceleration=0.975, brakeOnExit=false)
+    on FINISHED → Spin In End
+    on MULTI HIT CONNECT → Multihit
+  }
+
+  state Spin In End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spin End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Spin Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=var "")
+    on FINISHED → Distance?
+  }
+
+  state Summon Death {
+    PlayAudioEvent(audioClip=flying_stick_insect_corpse_burst (sfxstatic_assets_areashellwood.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetParent(gameObject=Self, parent=var "Summon Folder", resetLocalPosition=false, resetLocalRotation=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    PlayParticleEmitter(gameObject=var "Pt Death", emit=0, resetIfPlaying=false)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Summon Ready
+  }
+
+  state Death Air {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SendEventToRegister(eventName="FLYER KILLED")
+    ActivateGameObject(gameObject=var "Soft Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Air")
+    SetLayer(gameObject=Self, layer=Corpse(26))
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=20, everyFrame=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetLayer(gameObject=Self, layer=Terrain Detector(14))
+    on LAND → Summon Death
+  }
+
+  state Witch Crush {
+    SendEventToRegister(eventName="FLYER KILLED")
+    AudioStop(gameObject=Self, fadeTime=0)
+    AudioStop(gameObject=var "Current Clip", fadeTime=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashFocusGet())
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    PlayAudioEvent(audioClip=enemy_damage_old (sfxstatic_assets_areabellshared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Soft Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Spin Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Air")
+    SetLayer(gameObject=Self, layer=Corpse(26))  // disabled
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-60, everyFrame=false)
+    SetLayer(gameObject=Self, layer=Terrain Detector(14))
+    on LAND → Witch Crush Land
+  }
+
+  state Stop {
+    AudioStop(gameObject=var "Current Clip", fadeTime=0)
+  }
+
+  state Boss End Death {
+    BoolTest(boolVariable=var "Active", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    InstaDeath(target=Self, direction=270)
+    on FINISHED → Boss End
+  }
+
+  state Boss End {
+  }
+
+  state Multihit {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=-0.003, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spin Multihit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Multihit Rebound
+  }
+
+  state Multihit Rebound {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spin Multihit Rebound")
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.003, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetDamageHero(Target=Self, Enabled=true)
+    on FINISHED → Evade Dir
+  }
+
+  state Evade Audio {
+    PlayAudioEvent(audioClip=stick_insect_flyer_spin_attack (sfxstatic_assets_areashellwood.bundle), pitchMin=1.1, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    on FINISHED → Evade Dir
+  }
+
+  state Witch Crush Land {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    on FINISHED → Summon Death
+  }
+
+  state Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.5, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Stick_Insect_voice_sing (sfxdynamic_assets_areashellwood.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spin End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.97, brakeOnExit=false)
+    PlayAudioEvent(audioClip=stick_insect_flyer_emerge_from_chilling_out (sfxstatic_assets_areashellwood.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Chase
+  }
+
+  state Go Up {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  var Summon: bool = false
+
+  var Angle: float = 0
+  var X Offset: float = 0
+  var Y Offset: float = 0
+  var Translate: float = 0
+  var Summon Y: float = 0
+  var In Attack Range: bool = false
+  var Attack Ready: bool = true
+  var Attacked: bool = false
+  var In Close Range: bool = false
+  var Tricks Round: bool = true
+  var Going L: bool = false
+  var Right Wall: bool = false
+  var Left Wall: bool = false
+  var Active: bool = false
+  var Clip: string = ""
+  var Spin Collider: gameObject = Black Thread States/Normal World/Stick Insect Flyer (1)/Spin Collider
+  var Self: gameObject = Black Thread States/Normal World/Stick Insect Flyer (1)
+  var Pt Spin: gameObject = <null>
+  var Pt Death: gameObject = Black Thread States/Normal World/Stick Insect Flyer (1)/Pt Death
+  var Summon Folder: gameObject = <null>
+  var Pt Summon: gameObject = Black Thread States/Normal World/Stick Insect Flyer (1)/Pt Summon
+  var Summon Slam Effect: gameObject = Black Thread States/Normal World/Stick Insect Flyer (1)/Slam Effect
+  var Soft Collider: gameObject = Black Thread States/Normal World/Stick Insect Flyer (1)/Soft Collider
+  var RoofShaker Idle: gameObject = <null>
+  var Current Clip: gameObject = <null>
+  var Audio Loop Voice: gameObject = Black Thread States/Normal World/Stick Insect Flyer (1)/Audio Loop Voice
+}

@@ -1,0 +1,766 @@
+# Mage Lord
+# 2 location(s):
+#   Ruins1_24_boss / Mage Lord
+#   GG_Soul_Master / Mage Lord
+
+fsm Mage Lord {
+  start Pause
+  on STUN → Stun Init  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Self Z", space=0, everyFrame=false)
+    FindChild(gameObject=var "Silhouette", childName="White Flash", storeResult=var "Silh Flash")
+    FindChild(gameObject=var "Silhouette", childName="Shot Charge", storeResult=var "Silh Charge")
+    SetParent(gameObject=var "CamLock", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GGCheckIfBossScene(bossSceneEvent=→"GG BOSS", regularSceneEvent=(none))
+    on FINISHED → Sleep
+    on GG BOSS → GG Pause
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    WaitRandom(timeMin=0.5, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    FloatAdd(floatVariable=var "Idle Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Idle Timer", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on TELE AWAY → Tele Away
+    on HIGH SPINNER → Tele Spinner X
+    on CHARGE → Tele Charge
+    on SHOOT → Tele Shoot
+    on FINISHED → Attack Choice
+    on TOOK DAMAGE → Damaged Idle
+    on QUAKE → Tele Quake
+  }
+
+  state Teleport {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetScale(gameObject=var "Tele Out Anim", vector=(unset), x=var "X Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Head Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true)
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=var "Self Z", everyFrame=false)
+    GetPosition(gameObject=Self, vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=Self, vector=var "Teleport Point", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tele Out Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Appear Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Tele Out Anim", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=var "Tele Out Anim", vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mage_appear (sharedassets34.assets), pitchMin=0.85, pitchMax=0.85, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Tele Line
+  }
+
+  state Tele Line {
+    Vector3Lerp(fromVector=var "Teleport Point", toVector=var "Self Pos", amount=0.5, storeResult=var "Line Pos", everyFrame=false)
+    GetAngleBetweenPoints(point1=var "Teleport Point", point2=var "Self Pos", storeAngle=var "Tele Angle", everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Final Tele Distance", point1=var "Self Pos", point2=var "Teleport Point", ignoreZ=false, everyFrame=false)
+    Vector3AddXYZ(vector3Variable=var "Line Pos", addX=0, addY=0, addZ=0.1, everyFrame=false, perSecond=false)
+    CreateObject(gameObject=Tele Line (sharedassets34.assets), spawnPoint=var "", position=var "Line Pos", rotation=(unset), storeObject=var "Tele Line", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Tele Line", vector=(unset), x=var "Final Tele Distance", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=var "Tele Line", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tele Angle", space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Tele Line", emit=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → After Tele
+  }
+
+  state Tele Away {
+    SetStringValue(stringVariable=var "Next Event", stringValue="IDLE", everyFrame=false)
+    RandomFloat(min=var "Left X", max=var "Right X", storeResult=var "Tele X")
+    RandomFloatEither(value1=var "Top Y", value2=var "Bot Y", storeResult=var "Tele Y")
+    on FINISHED → Away Valid?
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Away Valid? {
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=var "Self Z", everyFrame=false)
+    GetPosition(gameObject=Self, vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance", point1=var "Self Pos", point2=var "Teleport Point", ignoreZ=true, everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"REDO", greaterThan=(none), everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance", point1=var "Hero Pos", point2=var "Teleport Point", ignoreZ=true, everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=8.5, tolerance=0, equal=(none), lessThan=→"REDO", greaterThan=(none), everyFrame=false)
+    on REDO → Tele Away
+    on FINISHED → Teleport
+  }
+
+  state Tele Top Y {
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Top Y", everyFrame=false)
+    on FINISHED → Teleport
+  }
+
+  state Tele Spinner X {
+    SetStringValue(stringVariable=var "Next Event", stringValue="HIGH SPINNER", everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFsmFloat(gameObject=var "Orb Spinner", fsmName="Spin Control", variableName="Spin Speed", setValue=75, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele X", floatValue=var "Left X", everyFrame=false)
+    SetBoolValue(boolVariable=var "High Spinner Right", boolValue=true, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Hero Mid X", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele X", floatValue=var "Right X", everyFrame=false)
+    SetBoolValue(boolVariable=var "High Spinner Right", boolValue=false, everyFrame=false)
+    SetFsmFloat(gameObject=var "Orb Spinner", fsmName="Spin Control", variableName="Spin Speed", setValue=-75, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Tele Top Y
+  }
+
+  state After Tele {
+    SendEventByName(eventTarget=Self, sendEvent=var "Next Event", delay=0, everyFrame=false)
+    on IDLE → Set Idle Timer
+    on HIGH SPINNER → HS Summon
+    on CHARGE → Charge Antic
+    on SHOOT → Set Shots
+  }
+
+  state HS Summon {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Summon")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_projectile_charge (sharedassets102.assets))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Soul_Master_Cast_03 (sharedassets102.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → HS Orb
+  }
+
+  state HS Orb {
+    SendEventByName(eventTarget=GameObject(var "Orb Spinner"), sendEvent="SPINNER SUMMON", delay=0, everyFrame=false)
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → HS Dir
+  }
+
+  state HS Dir {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="SummonToIdle")
+    BoolTest(boolVariable=var "High Spinner Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on RIGHT → HS Right
+    on LEFT → HS Left
+  }
+
+  state HS Right {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "High Spinner Speed", y=(unset), everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Right X", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    on FINISHED → HS Stop
+  }
+
+  state HS Left {
+    SetFloatValue(floatVariable=var "Speed Crt", floatValue=var "High Spinner Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed Crt", multiplyBy=-1, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed Crt", y=(unset), everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Left X", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → HS Stop
+  }
+
+  state HS Stop {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdle")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → HS Tele Out
+  }
+
+  state HS Tele Out {
+    GetPosition(gameObject=Self, vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Tele Out Anim", vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetScale(gameObject=var "Tele Out Anim", vector=(unset), x=var "X Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetCollider(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Head Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tele Out Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Appear Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Tele Out Anim", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetActive(true))
+    BoolTest(boolVariable=var "High Spinner Right", isTrue=→"LEFT", isFalse=→"RIGHT", everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClip=mage_appear (sharedassets34.assets), pitchMin=0.85, pitchMax=0.85, volume=1, delay=0, storePlayer=<null>)
+    on LEFT → HS Ret Left
+    on RIGHT → Hs Ret Right
+  }
+
+  state HS Ret Left {
+    AccelerateVelocity(gameObject=Self, xAccel=-0.38, yAccel=(unset), xMaxSpeed=20, yMaxSpeed=(unset))
+    Wait(time=2.25, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_projectile_shoot (sharedassets102.assets))
+    on FINISHED → HS Dissipate
+  }
+
+  state Hs Ret Right {
+    AccelerateVelocity(gameObject=Self, xAccel=0.38, yAccel=(unset), xMaxSpeed=20, yMaxSpeed=(unset))
+    Wait(time=2.25, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_projectile_shoot (sharedassets102.assets))
+    on FINISHED → HS Dissipate
+  }
+
+  state Reactivate {
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetActive(false))
+    SetStringValue(stringVariable=var "Next Event", stringValue="IDLE", everyFrame=false)
+    ActivateGameObject(gameObject=var "Quake Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Tele Away
+  }
+
+  state HS Dissipate {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Orb Spinner"), sendEvent="DISSIPATE", delay=0, everyFrame=false)
+    on FINISHED → Reactivate
+  }
+
+  state Tele Charge {
+    SetStringValue(stringVariable=var "Next Event", stringValue="CHARGE", everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Tele X", floatValue=var "Left X", everyFrame=false)
+    SetBoolValue(boolVariable=var "High Spinner Right", boolValue=true, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Hero Mid X", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele X", floatValue=var "Right X", everyFrame=false)
+    SetBoolValue(boolVariable=var "High Spinner Right", boolValue=false, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Tele Bot Y
+  }
+
+  state Charge Dir {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_dash (sharedassets102.assets))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dash")
+    BoolTest(boolVariable=var "High Spinner Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on LEFT → Charge Left
+    on RIGHT → Charge Right
+  }
+
+  state Charge Left {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-15, y=(unset), everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Left X", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Charge Stop
+  }
+
+  state Charge Right {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=15, y=(unset), everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Right X", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    on FINISHED → Charge Stop
+  }
+
+  state Charge Stop {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetStringValue(stringVariable=var "Next Event", stringValue="IDLE", everyFrame=false)
+    on FINISHED → Tele Away
+  }
+
+  state Tele Bot Y {
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Bot Y", everyFrame=false)
+    on FINISHED → Teleport
+  }
+
+  state Set Shots {
+    RandomInt(min=1, max=2, storeResult=var "Shots", inclusiveMax=true)
+    on FINISHED → Shot Antic
+  }
+
+  state Shot Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Summon")
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Shot Charge", emit=0)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_projectile_charge (sharedassets102.assets))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Soul_Master_Cast_01 (sharedassets102.assets), Soul_Master_Cast_02 (sharedassets102.assets), Soul_Master_Cast_03 (sharedassets102.assets), Soul_Master_Cast_04 (sharedassets102.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Shot
+  }
+
+  state Shot {
+    StopParticleEmitter(gameObject=var "Shot Charge")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_projectile_shoot (sharedassets102.assets))
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Mage Orb (sharedassets34.assets), spawnPoint=var "Fire Effect", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    SetIsKinematic2d(gameObject=var "Projectile", isKinematic=false)
+    SendEventByName(eventTarget=GameObject(var "Projectile"), sendEvent="FIRE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Fire Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=-0.5, storeAngle=var "Angle", everyFrame=false)
+    SetVelocityAsAngle(gameObject=var "Projectile", angle=var "Angle", speed=var "Shot Speed", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="SummonToIdle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.82, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Next?
+  }
+
+  state Tele Shoot {
+    SetStringValue(stringVariable=var "Next Event", stringValue="SHOOT", everyFrame=false)
+    RandomFloat(min=var "Left X", max=var "Right X", storeResult=var "Tele X")
+    RandomFloatEither(value1=var "Top Y", value2=var "Bot Y", storeResult=var "Tele Y")
+    on FINISHED → Shoot Valid?
+  }
+
+  state Attack Choice {
+    SendRandomEventV2(events=[→"CHARGE", →"HIGH SPINNER", →"SHOOT", →"QUAKE"], weights=[0.15, 0.15, 0.35, 0.35], trackingInts=[var "Ct Charge", var "Ct HS", var "Ct Shoot", var "Ct Quake"], eventMax=[1, 1, 2, 2])  // disabled
+    SendRandomEventV3(events=[→"CHARGE", →"HIGH SPINNER", →"SHOOT", →"QUAKE"], weights=[0.15, 0.15, 0.35, 0.35], trackingInts=[var "Ct Charge", var "Ct HS", var "Ct Shoot", var "Ct Quake"], eventMax=[1, 1, 2, 2], trackingIntsMissed=[var "Ms Charge", var "Ms HS", var "Ms Shoot", var "Ms Quake"], missedMax=[6, 6, 4, 4])
+    on HIGH SPINNER → Tele Spinner X
+    on CHARGE → Tele Charge
+    on SHOOT → Tele Shoot
+    on QUAKE → Tele Quake
+  }
+
+  state Next? {
+    IntAdd(intVariable=var "Shots", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Shots", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"SHOOT", everyFrame=false)
+    on SHOOT → Tele Shoot
+    on FINISHED → Set Idle Timer
+  }
+
+  state Damaged Idle {
+    SendRandomEvent(events=[→"FINISHED", →"TELE AWAY", →"ATTACK"], weights=[0.5, 0.25, 0.25], delay=0)
+    on FINISHED → Idle
+    on TELE AWAY → Damage Tele Away
+    on ATTACK → Attack Choice
+  }
+
+  state Set Idle Timer {
+    RandomFloat(min=0.5, max=1.2, storeResult=var "Idle Timer")
+    on FINISHED → Idle
+  }
+
+  state Shoot Valid? {
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=var "Self Z", everyFrame=false)
+    GetPosition(gameObject=Self, vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance", point1=var "Self Pos", point2=var "Teleport Point", ignoreZ=true, everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=5, tolerance=0, equal=(none), lessThan=→"REDO", greaterThan=(none), everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance", point1=var "Hero Pos", point2=var "Teleport Point", ignoreZ=true, everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=8.5, tolerance=0, equal=(none), lessThan=→"REDO", greaterThan=(none), everyFrame=false)
+    on REDO → Tele Shoot
+    on FINISHED → Teleport
+  }
+
+  state Tele Quake {
+    RandomFloat(min=0, max=100, storeResult=var "Random")
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Tele X", y=var "Hero Y", z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero Y", float2=var "Knight Quake Y Max", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Quake Y", everyFrame=false)
+    FloatClamp(floatVariable=var "Tele X", minValue=var "Left X", maxValue=var "Right X", everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mage_appear (sharedassets34.assets), pitchMin=0.85, pitchMax=0.85, volume=1, delay=0, storePlayer=<null>)
+    on CANCEL → Attack Choice
+    on FINISHED → TeleportQ
+  }
+
+  state TeleportQ {
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=var "Self Z", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetScale(gameObject=var "Tele Out Anim", vector=(unset), x=var "X Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    GetPosition(gameObject=Self, vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=Self, vector=var "Teleport Point", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Tele Out Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Appear Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Tele Out Anim", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=var "Tele Out Anim", vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    on FINISHED → Tele Line Q
+  }
+
+  state Tele Line Q {
+    Vector3Lerp(fromVector=var "Teleport Point", toVector=var "Self Pos", amount=0.5, storeResult=var "Line Pos", everyFrame=false)
+    GetAngleBetweenPoints(point1=var "Teleport Point", point2=var "Self Pos", storeAngle=var "Tele Angle", everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Final Tele Distance", point1=var "Self Pos", point2=var "Teleport Point", ignoreZ=false, everyFrame=false)
+    Vector3AddXYZ(vector3Variable=var "Line Pos", addX=0, addY=0, addZ=0.1, everyFrame=false, perSecond=false)
+    CreateObject(gameObject=Tele Line (sharedassets34.assets), spawnPoint=var "", position=var "Line Pos", rotation=(unset), storeObject=var "Tele Line", networkInstantiate=false, networkGroup=0)
+    SetScale(gameObject=var "Tele Line", vector=(unset), x=var "Final Tele Distance", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=var "Tele Line", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Tele Angle", space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Tele Line", emit=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In Quick", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Quake Antic
+  }
+
+  state Quake Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Quake Antic Quick", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    iTweenMoveBy(gameObject=Self, id="", vector=(0, 2, 0), time=0.4, delay=0, speed=(unset), easeType=easeOutCubic, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_strike_prepare (sharedassets102.assets))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Soul_Master_Cast_01 (sharedassets102.assets), Soul_Master_Cast_02 (sharedassets102.assets), Soul_Master_Cast_03 (sharedassets102.assets), Soul_Master_Cast_04 (sharedassets102.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Fakeout?
+  }
+
+  state Quake Down {
+    SetBoolValue(boolVariable=var "Done Quake", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Faked", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Quake Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Quake")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Quake Speed", everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Ground Y", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Quake Land
+  }
+
+  state Quake Land {
+    ActivateGameObject(gameObject=var "Quake Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_strike_impact (sharedassets102.assets))
+    ActivateGameObject(gameObject=var "Quake Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetFsmInt(gameObject=Self, fsmName="damages_hero", variableName="damageDealt", setValue=0, everyFrame=false)
+    SetFsmBool(gameObject=Self, fsmName="health_manager_enemy", variableName="Invincible", setValue=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetActive(true))
+    ActivateGameObject(gameObject=var "Quake Blast", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Quake Pillar", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Quake Particles", emit=0)
+    PlayParticleEmitter(gameObject=var "Quake Rocks", emit=0)
+    on FINISHED → Quake Waves
+  }
+
+  state Re Pos {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=30, z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    on FINISHED → Reactivate
+  }
+
+  state Quake Waves {
+    SpawnObjectFromGlobalPool(gameObject=Shockwave Wave (sharedassets48.assets), spawnPoint=var "Self", position=(1.5, 0, 0), rotation=(unset), storeObject=var "Shockwave")
+    SetPosition(gameObject=var "Shockwave", vector=(unset), x=(unset), y=var "Shockwave Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Shockwave", vector=(unset), x=var "Shockwave Height", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFsmBool(gameObject=var "Shockwave", fsmName="shockwave", variableName="Facing Right", setValue=true, everyFrame=false)
+    SetFsmFloat(gameObject=var "Shockwave", fsmName="shockwave", variableName="Speed", setValue=var "Shockwave Speed", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Shockwave Wave (sharedassets48.assets), spawnPoint=var "Self", position=(-1.5, 0, 0), rotation=(unset), storeObject=var "Shockwave")
+    SetPosition(gameObject=var "Shockwave", vector=(unset), x=(unset), y=var "Shockwave Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Shockwave", vector=(unset), x=var "Shockwave Height", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFsmBool(gameObject=var "Shockwave", fsmName="shockwave", variableName="Facing Right", setValue=false, everyFrame=false)
+    SetFsmFloat(gameObject=var "Shockwave", fsmName="shockwave", variableName="Speed", setValue=var "Shockwave Speed", everyFrame=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Re Pos
+  }
+
+  state Damage Tele Away {
+    BoolTest(boolVariable=var "Dmg Tele Away", isTrue=→"ATTACK", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Dmg Tele Away", boolValue=true, everyFrame=false)
+    on FINISHED → Tele Away
+    on ATTACK → Attack Instead
+  }
+
+  state Attack Instead {
+    SetBoolValue(boolVariable=var "Dmg Tele Away", boolValue=false, everyFrame=false)
+    on FINISHED → Attack Choice
+  }
+
+  state Charge Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Soul_Master_Cast_01 (sharedassets102.assets), Soul_Master_Cast_02 (sharedassets102.assets), Soul_Master_Cast_03 (sharedassets102.assets), Soul_Master_Cast_04 (sharedassets102.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Charge Dir
+  }
+
+  state Fakeout? {
+    BoolTest(boolVariable=var "Done Quake", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BoolTest(boolVariable=var "Faked", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    FloatCompare(float1=var "Random", float2=71, tolerance=0, equal=→"FAKE", lessThan=(none), greaterThan=→"FAKE", everyFrame=false)
+    on FAKE → Fake Down
+    on FINISHED → Quake Down
+  }
+
+  state Fake Down {
+    ActivateGameObject(gameObject=var "Quake Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Faked", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Quake")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Quake Speed", everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    Wait(time=0.075, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reset
+  }
+
+  state Reset {
+    ActivateGameObject(gameObject=var "Quake Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Tele Quake
+  }
+
+  state Stun Init {
+    AudioStop(gameObject=var "Voice Player")
+    StopParticleEmitter(gameObject=var "Shot Charge")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(var "Orb Spinner"), sendEvent="DISSIPATE", delay=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Stun Effect (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=(unset), yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Start 1")
+    ActivateGameObject(gameObject=var "Quake Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wound Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"LEFT", negativeEvent=→"RIGHT", space=0)
+    on LEFT → Stun L
+    on RIGHT → Stun R
+  }
+
+  state Stun L {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-2.5, y=3, everyFrame=false)
+    on FINISHED → Stun Start 1
+  }
+
+  state Stun R {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=2.5, y=3, everyFrame=false)
+    on FINISHED → Stun Start 1
+  }
+
+  state Stun Start 1 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Soul_Master_Stun (sharedassets102.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Stun Start 2
+  }
+
+  state Stun Start 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Start 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_hurt (sharedassets102.assets))
+    on FINISHED → Stunned
+  }
+
+  state Stunned {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Soul_Master_Stun_loop (sharedassets102.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=-0.75, everyFrame=false)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Weak Particles", emit=0)
+    on FINISHED → Stun Reset
+    on TOOK DAMAGE → Stun Hit
+  }
+
+  state Stun Reset {
+    SetCollider(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Head Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Wound Box", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Weak Particles")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    AudioStop(gameObject=var "Voice Player")
+    on FINISHED → Tele Away
+  }
+
+  state Stun Hit {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Away")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"LEFT", negativeEvent=→"RIGHT", space=0)
+    AudioStop(gameObject=var "Voice Player")
+    on LEFT → Stun Hit L
+    on RIGHT → Stun Hit R
+  }
+
+  state Stun Hit L {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-5, y=6, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Stun Reset
+  }
+
+  state Stun Hit R {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=5, y=6, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Stun Reset
+  }
+
+  state Sleep {
+    BoolTest(boolVariable=var "Start Range", isTrue=→"WAKE", isFalse=(none), everyFrame=true)
+    on WAKE → Encountered?
+  }
+
+  state Start Arena {
+    TransitionToAudioSnapshot(snapshot=Silent (resources.assets), transitionTime=1)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BG CLOSE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Silhouette Rise
+  }
+
+  state Silhouette Rise {
+    iTweenMoveBy(gameObject=var "Silhouette", id="", vector=(0, 6.85, 0), time=5, delay=0, speed=(unset), easeType=linear, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=6.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Silhouette Summon
+  }
+
+  state Silhouette Summon {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Silhouette", animLibName="", clipName="Summon")
+    ActivateGameObject(gameObject=var "Silh Flash", activate=true, recursive=true, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Silh Charge", emit=0)
+    Wait(time=3.7, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=mage_lord_summon_projectiles (sharedassets102.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Set Entry Point
+  }
+
+  state Set Entry Point {
+    SendEventByName(eventTarget=GameObject(var "Silhouette"), sendEvent="TELE OUT", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Top Y", everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Tele X", floatValue=13.27, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Hero Mid X", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Tele X", floatValue=28.27, everyFrame=false)
+    on FINISHED → Teleport In
+  }
+
+  state Teleport In {
+    SetCollider(gameObject=Self, active=true)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_onscreen_appear (sharedassets102.assets))
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetStringValue(stringVariable=var "Next Event", stringValue="ROAR", everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=var "Self Z", everyFrame=false)
+    GetPosition(gameObject=var "Silhouette", vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=Self, vector=var "Teleport Point", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="BigShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Appear Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Box", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Arrive Particles", emit=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In Quick", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Music
+  }
+
+  state Roar {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=(unset))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetActive(false))
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    SetFsmGameObject(gameObject=var "Hero", fsmName="Roar Lock", variableName="Roar Object", setValue=var "Self", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR ENTER", delay=0, everyFrame=false)
+    Wait(time=2.4, finishEvent=→"FINISHED", realTime=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="Visited", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="MAGE_LORD", everyFrame=false)
+    on FINISHED → Roar End
+  }
+
+  state Roar End {
+    SendEventByName(eventTarget=GameObject(var "Roar Emitter"), sendEvent="END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR EXIT", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="SummonToIdle")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Set Idle Timer
+  }
+
+  state Encountered? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="mageLordEncountered", isTrue=→"REFIGHT", isFalse=(none))
+    SetPlayerDataBool(boolName="mageLordEncountered", value=true)
+    on REFIGHT → Quick Start
+    on FINISHED → Start Arena
+  }
+
+  state Quick Start {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BG CLOSE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Set Entry Point
+  }
+
+  state GG Pause {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Set Entry Point GG
+  }
+
+  state Set Entry Point GG {
+    ActivateGameObject(gameObject=var "Silhouette", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Top Y", everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Tele X", floatValue=20, everyFrame=false)
+    on FINISHED → Teleport In
+  }
+
+  state Music {
+    GGCheckIfBossScene(bossSceneEvent=→"FINISHED", regularSceneEvent=(none))
+    ApplyMusicCue(musicCue=BossMageLord (sharedassets102.assets), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (resources.assets), transitionTime=0)
+    on FINISHED → Roar
+  }
+
+  var Angle: float = 0
+  var Bot Y: float = 31.07
+  var Distance: float = 0
+  var Final Tele Distance: float = 0
+  var Ground Y: float = 31.05
+  var Hero Mid X: float = 20.18
+  var Hero X: float = 0
+  var Hero Y: float = 0
+  var High Spinner Speed: float = 9.5
+  var Idle Timer: float = 0
+  var Knight Quake Y Max: float = 35.41
+  var Left X: float = 6.98
+  var Move Speed: float = 0
+  var Quake Speed: float = -80
+  var Quake Y: float = 38
+  var Random: float = 0
+  var Right X: float = 34.75
+  var Self X: float = 0
+  var Self Y: float = 0
+  var Self Z: float = 0
+  var Shockwave Height: float = 1.6
+  var Shockwave Speed: float = 25
+  var Shockwave Y: float = 27.82
+  var Shot Speed: float = 20
+  var Speed Crt: float = 0
+  var Tele Angle: float = 0
+  var Tele X: float = 0
+  var Tele Y: float = 0
+  var Top Y: float = 35.85
+  var X Scale: float = 0
+  var Ct Charge: int = 0
+  var Ct HS: int = 0
+  var Ct Quake: int = 0
+  var Ct Shoot: int = 0
+  var Ms Charge: int = 0
+  var Ms HS: int = 0
+  var Ms Quake: int = 0
+  var Ms Shoot: int = 0
+  var Shots: int = 0
+  var Dmg Tele Away: bool = false
+  var Done Quake: bool = false
+  var Faked: bool = false
+  var High Spinner Right: bool = false
+  var Start Range: bool = false
+  var Next Event: string = ""
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Line Pos: vector3 = (0, 0, 0)
+  var Self Pos: vector3 = (0, 0, 0)
+  var Teleport Point: vector3 = (0, 0, 0)
+  var Appear Flash: gameObject = Mage Lord/Appear Flash
+  var Area Title: gameObject = <null>
+  var Arrive Particles: gameObject = Mage Lord/Arrive Particles
+  var CamLock: gameObject = Mage Lord/CameraLockArea B
+  var Fire Effect: gameObject = Mage Lord/Fire Effect
+  var Head Box: gameObject = Mage Lord/Head Box
+  var Orb Spinner: gameObject = Mage Lord/Orb Spinner
+  var Projectile: gameObject = <null>
+  var Quake Blast: gameObject = Mage Lord/Quake Blast
+  var Quake Box: gameObject = Mage Lord/Quake Box
+  var Quake Hit: gameObject = Mage Lord/Quake Particles
+  var Quake Particles: gameObject = <null>
+  var Quake Pillar: gameObject = Mage Lord/Quake Pillar
+  var Quake Rocks: gameObject = Mage Lord/Quake Rocks
+  var Roar Emitter: gameObject = <null>
+  var Self: gameObject = Mage Lord/Shot Charge
+  var Shockwave: gameObject = <null>
+  var Shot Charge: gameObject = Mage Lord/Shot Charge
+  var Silh Charge: gameObject = <null>
+  var Silh Flash: gameObject = <null>
+  var Silhouette: gameObject = Mage Lord/Silhouette
+  var Tele Line: gameObject = <null>
+  var Tele Out Anim: gameObject = Mage Lord/Tele Out Anim
+  var Voice Player: gameObject = <null>
+  var Weak Particles: gameObject = Mage Lord/Weak Particles
+  var White Flash: gameObject = Mage Lord/White Flash
+  var Wound Box: gameObject = Mage Lord/Wound Box
+}

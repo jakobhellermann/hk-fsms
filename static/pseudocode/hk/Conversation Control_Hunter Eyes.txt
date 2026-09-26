@@ -1,0 +1,262 @@
+# Conversation Control
+# 1 location(s):
+#   Fungus1_08 / Hunter Eyes
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Idle
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="HUNTER", everyFrame=false)
+    on FINISHED → Convo Choice
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")  // disabled
+    AudioStop(gameObject=var "Voice Player")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Meet {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HUNTER_MEET", "Hunter"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="metHunter", value=true)
+    TransitionToAudioSnapshot(snapshot=Silent (resources.assets), transitionTime=2)
+    FindGameObject(objectName="Music Region", withTag="Untagged", store=var "Music Region")
+    DestroyObject(gameObject=var "Music Region", delay=0, detachChildren=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Hunter_Talk_01 (sharedassets137.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Spit Pause
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")  // disabled
+    on FINISHED → Box Up
+  }
+
+  state Convo Choice {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metHunter", isTrue=(none), isFalse=→"MEET")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CountJournalEntries", parameters=[], storeResult=(unset var))
+    GetPlayerDataInt(gameObject=var "GameManager", intName="journalNotesCompleted", storeValue=var "Notes Completed")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="journalEntriesCompleted", storeValue=var "Entries Completed")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="journalEntriesTotal", storeValue=var "Entries Total")
+    IntCompare(integer1=var "Notes Completed", integer2=var "Entries Total", equal=→"COMPLETED", lessThan=(none), greaterThan=→"COMPLETED", everyFrame=false)
+    IntCompare(integer1=var "Entries Completed", integer2=var "Entries Total", equal=→"ALL ENTRIES", lessThan=(none), greaterThan=→"ALL ENTRIES", everyFrame=false)
+    IntCompare(integer1=var "Entries Completed", integer2=50, equal=(none), lessThan=→"CONVO 1", greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Entries Completed", integer2=100, equal=(none), lessThan=→"CONVO 2", greaterThan=(none), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"CONVO 3", delay=0, everyFrame=false)
+    on MEET → Meet
+    on CONVO 1 → Convo 1
+    on COMPLETED → Completed
+    on CONVO 2 → Convo 2
+    on CONVO 3 → Convo 3
+    on ALL ENTRIES → All Entries
+  }
+
+  state Spit Pause {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spit
+  }
+
+  state Spit {
+    iTweenShakePosition(gameObject=var "", id="", vector=(unset), time=1, delay=0, loopType=none, space=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mawlek_spit (sharedassets33.assets), pitchMin=1.25, pitchMax=1.25, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Shiny Item", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    iTweenShakePosition(gameObject=var "Eyes", id="", vector=(0.4, 0.4, 0), time=0.6, delay=0, loopType=none, space=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetCollider(gameObject=Self, active=false)
+    on FINISHED → Talk Finish
+  }
+
+  state Convo 1 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HUNTER_CONVO_1", "Hunter"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Hunter_Talk_03 (sharedassets137.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Completed {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Hunter_journal_01 (sharedassets137.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hunterRewardOffered", isTrue=→"REPEAT", isFalse=(none))
+    SetPlayerDataBool(boolName="hunterRewardOffered", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HUNTER_COMPLETE", "Hunter"], storeResult=(unset var))
+    on REPEAT → Completed Repeat
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Completed Repeat {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["COMPLETE_REPEAT", "Hunter"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=0, everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["HUNTER_REWARD", "Prompts"], storeResult=(unset var))
+    on NO → Decline Pause
+    on YES → Yes
+  }
+
+  state Yes {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    FindGameObject(objectName="break_floor_grass", withTag="Untagged", store=var "Break Floor Grass")
+    on FINISHED → Turn Hero
+  }
+
+  state Decline Pause {
+    Wait(time=0.3, finishEvent=→"TALK FINISH", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    on FINISHED → 
+  }
+
+  state Box Down 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up YN
+  }
+
+  state Turn Hero {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on FINISHED → Move Hero
+  }
+
+  state Move Hero {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=-6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=39.04, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Turn Back
+  }
+
+  state Turn Back {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=0, everyFrame=false)
+    SetPosition(gameObject=var "Hero", vector=(unset), x=39.04, y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Roar
+  }
+
+  state Roar {
+    SetFsmGameObject(gameObject=var "Hero", fsmName="Roar Lock", variableName="Roar Object", setValue=var "Self", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR ENTER", delay=0, everyFrame=false)
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Roar", networkInstantiate=false, networkGroup=0)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mawlek_scream (sharedassets45.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Roar End
+  }
+
+  state Roar End {
+    SendEventByName(eventTarget=GameObject(var "Roar"), sendEvent="END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="ROAR EXIT SCENE", delay=0, everyFrame=false)
+    on FINISHED → Break Floor
+  }
+
+  state Break Floor {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=false_knight_land (sharedassets32.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=false_knight_land (sharedassets32.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=false_knight_land_1st_time (sharedassets6.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=break_wall_after_tutorial_area (sharedassets6.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BREAK GRASS FLOOR", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Airborne")
+    Tk2dPlayFrame(gameObject=var "Hero", frame=9)
+    on FINISHED → Fall
+  }
+
+  state Fall {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Y", float2=8.57, tolerance=0, equal=→"LAND", lessThan=→"LAND", greaterThan=(none), everyFrame=true)
+    on LAND → Land
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="HardLand", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CreateObject(gameObject=Hard Land Effect (resources.assets), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    on FINISHED → Regain Control
+  }
+
+  state Regain Control {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HUNTER ENTRY", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Convo 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HUNTER_CONVO_2", "Hunter"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Hunter_Talk_04 (sharedassets137.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Convo 3 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HUNTER_CONVO_3", "Hunter"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Hunter_Talk_01 (sharedassets137.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state All Entries {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["HUNTER_ENTRIES_COMPLETED", "Hunter"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Hunter_Talk_02 (sharedassets137.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  var Hero X: float = 0
+  var Hero Y: float = 0
+  var Self X Scale: float = 0
+  var Elderbug State: int = 0
+  var Entries Completed: int = 0
+  var Entries Total: int = 0
+  var History: int = 0
+  var Notes Completed: int = 0
+  var Met Elderbug: bool = false
+  var Reintro Played: bool = false
+  var Visited Crossroads: bool = false
+  var mapCrossroads: bool = false
+  var Area Title: gameObject = <null>
+  var Break Floor Grass: gameObject = <null>
+  var Eyes: gameObject = Hunter Eyes/Eyes
+  var Music Region: gameObject = <null>
+  var Roar: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shiny Item: gameObject = Hunter Eyes/Shiny Item
+  var Voice Player: gameObject = <null>
+}

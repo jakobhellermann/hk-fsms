@@ -1,0 +1,58 @@
+# Control
+# 1 location(s):
+#   GG_Atrium / Dream Fall Catcher
+
+fsm Control {
+  start Pause
+
+  state Pause {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=false)
+    on FINISHED → Detect
+  }
+
+  state Detect {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Y", float2=0, tolerance=0, equal=(none), lessThan=→"FALL", greaterThan=(none), everyFrame=true)
+    Trigger2dEvent(trigger=OnTriggerEnter2D, collideTag="Player", collideLayer="", sendEvent=→"FALL", storeCollider=var "")
+    on FALL → Freeze Camera
+  }
+
+  state Fade Out {
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Hero", fsmName="ProxyFSM", variableName="No Charms", setValue=false, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=dream_enter (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    SetFsmFloat(gameObject=var "HUD Blanker White", fsmName="Blanker Control", variableName="Fade Time", setValue=0.9, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → New Scene
+  }
+
+  state New Scene {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=TimePasses())
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=ResetSemiPersistentItems())
+    SetFsmBool(gameObject=var "MainCamera", fsmName="CameraFade", variableName="No Fade", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Hero", fsmName="Dream Return", variableName="Dream Returning", setValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="EnterWithoutInput", parameters=[true], storeResult=(unset var))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="bossRushMode", isTrue=→"GG MODE", isFalse=→"FINISHED")
+    on GG MODE → Stay
+    on FINISHED → Waterways
+  }
+
+  state Waterways {
+    BeginSceneTransition(sceneName="GG_Waterways", entryGateName="door_dreamReturn", entryDelay=0, visualization=Dream, preventCameraFadeOut=true)
+  }
+
+  state Stay {
+    BeginSceneTransition(sceneName="GG_Atrium", entryGateName="door_dreamEnter_ReturnGGMode", entryDelay=0, visualization=Dream, preventCameraFadeOut=true)
+  }
+
+  state Freeze Camera {
+    CameraFreezeInPlace(freezeTargetAlso=true)
+    on FINISHED → Fade Out
+  }
+
+  var Hero Y: float = 0
+}

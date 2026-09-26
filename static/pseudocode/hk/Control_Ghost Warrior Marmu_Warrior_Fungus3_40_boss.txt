@@ -1,0 +1,212 @@
+# Control
+# 2 location(s):
+#   Fungus3_40_boss / Warrior/Ghost Warrior Marmu
+#   GG_Ghost_Marmu / Warrior/Ghost Warrior Marmu
+
+fsm Control {
+  start Start
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    PlayParticleEmitter(gameObject=var "Attack Pt", emit=0)
+    ActivateGameObject(gameObject=var "Warp", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Start Pause
+  }
+
+  state Start Pause {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClips=[Marmu_long_01 (sharedassets221.assets), Marmu_long_02 (sharedassets221.assets), Marmu_long_03 (sharedassets221.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Antic
+  }
+
+  state Antic {
+    RandomFloat(min=1, max=3, storeResult=var "Roll Time")
+    SetFloatValue(floatVariable=var "Roll Timer", floatValue=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll Start")
+    ActivateGameObject(gameObject=var "Hit Idle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=true)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0.5, storeAngle=var "Angle To Hero", everyFrame=false)
+    FloatAdd(floatVariable=var "Angle To Hero", add=180, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle To Hero", speed=40, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fire
+  }
+
+  state Chase {
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=40, accelerationForce=85, offsetX=0, offsetY=-0.5)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=true)
+    FloatAdd(floatVariable=var "Roll Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Roll Timer", float2=var "Roll Time", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UNROLL", everyFrame=true)
+    on HIT DOWN → Hit Down
+    on HIT LEFT → Hit Left
+    on HIT RIGHT → Hit Right
+    on HIT UP → Hit Up
+    on UNROLL → Roll Warp?
+  }
+
+  state Hit Down {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-40, everyFrame=false)
+    on FINISHED → Hit Voice
+  }
+
+  state Hit Left {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-40, y=15, everyFrame=false)
+    on FINISHED → Hit Voice
+  }
+
+  state Hit Right {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=40, y=15, everyFrame=false)
+    on FINISHED → Hit Voice
+  }
+
+  state Hit Up {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=50, everyFrame=false)
+    on FINISHED → Hit Voice
+  }
+
+  state Unroll {
+    DecelerateV2(gameObject=Self, deceleration=0.8)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll End")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Warp?
+  }
+
+  state Fire {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=-0.5, storeAngle=var "Angle To Hero", everyFrame=false)
+    RandomFloat(min=-45, max=45, storeResult=var "Ran Float")
+    FloatAdd(floatVariable=var "Angle To Hero", add=var "Ran Float", everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle To Hero", speed=20, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Warp? {
+    SetIntValue(intVariable=var "Attempts", intValue=0, everyFrame=false)
+    SendRandomEventV2(events=[→"WARP", →"FINISHED"], weights=[0.75, 0.25], trackingInts=[var "Warp Ct", var "Nowarp Ct"], eventMax=[4, 2])
+    on WARP → Set Pos
+    on FINISHED → Antic
+  }
+
+  state Set Pos {
+    RandomFloat(min=var "Tele X Min", max=var "Tele X Max", storeResult=var "Tele X")
+    RandomFloat(min=var "Tele Y Min", max=var "Tele Y Max", storeResult=var "Tele Y")
+    SetVector3XYZ(vector3Variable=var "Warp Pos", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance", point1=var "Hero Pos", point2=var "Warp Pos", ignoreZ=true, everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=12, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on CANCEL → Redo
+    on FINISHED → Warp Out
+  }
+
+  state Redo {
+    IntAdd(intVariable=var "Attempts", add=1, everyFrame=false)
+    IntCompare(integer1=var "Attempts", integer2=100, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on FINISHED → Set Pos
+    on CANCEL → Antic
+  }
+
+  state Warp {
+    SetPosition(gameObject=Self, vector=var "Warp Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Warp", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Attack Pt", emit=0)
+    AudioStop(gameObject=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClips=[Marmu_long_01 (sharedassets221.assets), Marmu_long_02 (sharedassets221.assets), Marmu_long_03 (sharedassets221.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClips=[mage_knight_teleport (sharedassets6.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Antic
+  }
+
+  state Warp Out {
+    ActivateGameObject(gameObject=var "Warp Out", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Warp
+  }
+
+  state Roll Warp? {
+    SetIntValue(intVariable=var "Attempts", intValue=0, everyFrame=false)
+    SendRandomEventV2(events=[→"WARP", →"FINISHED"], weights=[0.6, 0.4], trackingInts=[var "Ct Roll Warp No", var "Nowarp Ct"], eventMax=[4, 1])
+    on FINISHED → Unroll
+    on WARP → Set Pos 2
+  }
+
+  state Set Pos 2 {
+    RandomFloat(min=var "Tele X Min", max=var "Tele X Max", storeResult=var "Tele X")
+    RandomFloat(min=var "Tele Y Min", max=var "Tele Y Max", storeResult=var "Tele Y")
+    SetVector3XYZ(vector3Variable=var "Warp Pos", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance", point1=var "Hero Pos", point2=var "Warp Pos", ignoreZ=true, everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=12, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on CANCEL → Redo 2
+    on FINISHED → Warp Out 2
+  }
+
+  state Redo 2 {
+    IntAdd(intVariable=var "Attempts", add=1, everyFrame=false)
+    IntCompare(integer1=var "Attempts", integer2=100, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on FINISHED → Set Pos 2
+    on CANCEL → Unroll
+  }
+
+  state Warp Out 2 {
+    ActivateGameObject(gameObject=var "Warp Out", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStop(gameObject=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClips=[Marmu_short_01 (sharedassets221.assets), Marmu_short_02 (sharedassets221.assets), Marmu_short_03 (sharedassets221.assets), Marmu_short_04 (sharedassets221.assets), Marmu_short_05 (sharedassets221.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Warp 2
+  }
+
+  state Warp 2 {
+    SetPosition(gameObject=Self, vector=var "Warp Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    RandomFloat(min=1, max=3, storeResult=var "Roll Time")
+    SetFloatValue(floatVariable=var "Roll Timer", floatValue=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Warp", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Attack Pt", emit=0)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClips=[mage_knight_teleport (sharedassets6.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Antic
+  }
+
+  state Hit Voice {
+    AudioStop(gameObject=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClips=[Marmu_short_01 (sharedassets221.assets), Marmu_short_02 (sharedassets221.assets), Marmu_short_03 (sharedassets221.assets), Marmu_short_04 (sharedassets221.assets), Marmu_short_05 (sharedassets221.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Chase
+  }
+
+  state Start {
+    BoolTest(boolVariable=var "Init", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Init", boolValue=true, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    on FINISHED → Init
+  }
+
+  var Tele X Max: float = 86.21
+  var Tele X Min: float = 54.64
+  var Tele Y Max: float = 19.61
+  var Tele Y Min: float = 12.58
+
+  var Angle To Hero: float = 0
+  var Distance: float = 0
+  var Ran Float: float = 0
+  var Roll Time: float = 0
+  var Roll Timer: float = 0
+  var Tele X: float = 0
+  var Tele Y: float = 0
+  var Attempts: int = 0
+  var Ct Roll Warp No: int = 0
+  var Nowarp Ct: int = 0
+  var Warp Ct: int = 0
+  var Init: bool = false
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Warp Pos: vector3 = (0, 0, 0)
+  var Attack Pt: gameObject = Warrior/Ghost Warrior Marmu/Attack Pt
+  var Hit Idle: gameObject = Warrior/Ghost Warrior Marmu/Hit Idle
+  var Self: gameObject = <null>
+  var Voice Player: gameObject = <null>
+  var Warp: gameObject = Warrior/Ghost Warrior Marmu/Warp
+  var Warp Out: gameObject = Warrior/Ghost Warrior Marmu/Warp Out
+  var White Flash: gameObject = Warrior/Ghost Warrior Marmu/White Flash
+}

@@ -1,0 +1,123 @@
+# Bonk Hero
+# 1 location(s):
+#   Aqueduct_05_festival / Caravan_States/Flea Festival/Flea Game - Dodging/Giant Flea DodgeGame
+
+// uses template: fleagame_bonk_hero
+fsm Bonk Hero {
+  start Init
+  on GAME END → Game Ended  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Flea Folder")
+    GetGrandparent(gameObject=Self, storeResult=var "Game Control")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Trigger2dEventV2(gameObject=Self, trigger=0, collideTag="", collideLayer=Hero Box(20), sendEvent=→"BONK", storeCollider=var "")
+    on BONK → Bonk Dir
+    on HORNET BONKED → Bonk Invuln
+  }
+
+  state Bonk {
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    PlayAudioEvent(audioClip=var "Impact Audio", pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTableV2(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=true)
+    SendEventToRegister(eventName="FSM CANCEL")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Bonk Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Spike Death")
+    SetVelocityAsAngle(gameObject=var "Hero", angle=var "Angle", speed=var "Bonk Speed Crt", everyFrame=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    AddForce2d(gameObject=var "Hero", forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=var "Drop Force", vector3=(unset), everyFrame=true)
+    CheckIsCharacterGrounded(Target=var "Hero", RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    on FINISHED → Hero Flip
+    on HORNET BONKED → Bonk Recover
+    on LAND → Bonk Land
+  }
+
+  state Bonk Dir {
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "X Velocity", float2=0, tolerance=0, equal=(none), lessThan=→"L", greaterThan=→"R", everyFrame=false)
+    SendRandomEvent(events=[→"L", →"R"], weights=[1, 1], delay=0)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"R", leftEvent=→"L", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)  // disabled
+    on L → Bonk L
+    on R → Bonk R
+  }
+
+  state Bonk L {
+    SetFloatValue(floatVariable=var "Angle", floatValue=150, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    on FINISHED → Set Fatigue
+  }
+
+  state Bonk R {
+    SetFloatValue(floatVariable=var "Angle", floatValue=30, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on FINISHED → Set Fatigue
+  }
+
+  state Hero Flip {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="DownSpikeBounce 1")
+    Wait(time=0.05, finishEvent=→"FINISHED", realTime=false)
+    CheckIsCharacterGrounded(Target=var "Hero", RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    on FINISHED → Return Control
+    on HORNET BONKED → Bonk Recover
+    on LAND → Bonk Land
+  }
+
+  state Return Control {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Bonk Recover
+  }
+
+  state Bonk Recover {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Bonk Invuln {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Set Fatigue {
+    SendEventToRegisterV2(EventName=var "Bonk Event", ExcludeTarget=Self)
+    GetFsmFloat(gameObject=var "Game Control", fsmName="Fatigue Control", variableName="Fatigue", storeValue=var "Fatigue", everyFrame=false)
+    FloatOperator(float1=var "Fatigue", float2=100, operation=Divide, storeResult=var "Fatigue Multiplier", everyFrame=false)
+    FloatOperator(float1=-40, float2=var "Fatigue Multiplier", operation=Multiply, storeResult=var "Drop Force", everyFrame=false)
+    FloatOperator(float1=6, float2=var "Fatigue Multiplier", operation=Multiply, storeResult=var "Bonk Speed Boost", everyFrame=false)
+    FloatOperator(float1=var "Bonk Speed Base", float2=var "Bonk Speed Boost", operation=Add, storeResult=var "Bonk Speed Crt", everyFrame=false)
+    on FINISHED → Bonk
+  }
+
+  state Bonk Land {
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Bonked Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Return Control
+  }
+
+  state Game Ended {
+    Wait(time=3, finishEvent=(none), realTime=false)
+    on FINISHED → Idle
+  }
+
+  var Bonk Event: string = "HORNET BONKED HEAVY"
+  var Impact Audio: object = bell_ball_bounce_1 (sfxstatic_assets_areabell.bundle)
+
+  var Angle: float = 0
+  var Bonk Speed Base: float = 18
+  var Bonk Speed Crt: float = 22
+  var Fatigue: float = 0
+  var Drop Force: float = 0
+  var X Velocity: float = 0
+  var Fatigue Multiplier: float = 0
+  var Bonk Speed Boost: float = 0
+  var Bonk Effect: gameObject = <null>
+  var Flea Folder: gameObject = <null>
+  var Game Control: gameObject = <null>
+}

@@ -1,0 +1,373 @@
+# Dialogue
+# 1 location(s):
+#   Coral_40 / Mapper Sit NPC
+
+fsm Dialogue {
+  start Pause
+  on LEAVE → Gone  // from any state
+  on CLOSE SHOP WINDOW → Reset  // from any state
+
+  state Shop Up {
+    GetProperty(targetProperty=ShopOwner.ShopObject on Mapper Sit NPC@ShopOwner, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Shop Object"), sendEvent="SHOP UP", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on SHOP CLOSED → Reset
+    on SHOP NO STOCK → Stock Depleted
+  }
+
+  state Pause {
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Quest?
+  }
+
+  state Reset {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Reset Hum
+  }
+
+  state Idle {
+    AudioPlayInState(gameObject=var "Audio Loop Scribble", volume=1)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=1.5, MaxReactDelay=1.8, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    AudioPlayDelay(gameObject=var "Audio Loop Voice", volume=1, oneShotClip=<null>, delay=0.8)
+    on INTERACT → Common
+    on BENCH REACT → Bench React Pause
+    on SING → Sing
+    on STARTLE → Startle
+    on DID TAUNT POSHANKA → Ring Greet Pause
+  }
+
+  state Hide Box {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Shop has stock?
+  }
+
+  state Generic Greymoor {
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_GREYMOOR", trueString="MAPPER_GENERIC_GREYMOOR_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state Shop has stock? {
+    ShopHasStock(Target=Self, trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Reset
+    on TRUE → Shop Up
+  }
+
+  state Set Seen {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="MapperLeavePreviousLocations", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    StringCompare(stringVariable=var "Seen Bool", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetPlayerDataVariable(VariableName=var "Seen Bool", SetValue=true)
+    on FINISHED → Idle
+  }
+
+  state Wait For Seen {
+    ActivateGameObject(gameObject=var "Not Here Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateInteractible(Target=var "Linked Bench", Activate=true, AllowQueueing=false, UseChildren=false)
+    CheckTrackTriggerCount(target=Mapper Sit NPC/Seen Detector, count=0, test=MoreThan, everyFrame=true, successEvent=→"SEEN")
+    on SEEN → Set Seen
+  }
+
+  state Common {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    BoolTest(boolVariable=var "Activated", isTrue=(none), isFalse=→"SKIP", everyFrame=false)
+    RunFSM(fsmTemplateControl=template=5949541641312236317, finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → Hide Box
+    on SKIP → Location
+  }
+
+  state Location {
+    ShopHasStock(Target=Self, trueEvent=(none), falseEvent=(none), storeValue=var "Shop Has Stock")
+    BoolTestMulti(boolVariables=[var "Activated", var "Shop Has Stock", var "Did No Stock Convo"], boolStates=[true, false, false], trueEvent=→"SHOP NO STOCK", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    StringSwitch(stringVariable=var "Seen Bool", compareTo=["SeenMapperGreymoor", "SeenMapperBellhart", "SeenMapperPilgrimsRest", "SeenMapperWilds", "SeenMapperEnclave", "SeenMapperShellwood", "SeenMapperDustpens", "SeenMapperBonetown", "SeenMapperShadow", "SeenMapperCoralCaverns", "SeenMapperHuntersNest"], sendEvent=[→"GREYMOOR", →"BELLHART", →"PIGRIMSREST", →"WILDS", →"ENCLAVE", →"SHELLWOOD", →"DUSTPENS", →"BONEBOTTOM", →"SHADOW", →"CORAL CAVERNS", →"HUNTERS NEST"], everyFrame=false)
+    on GREYMOOR → Generic Greymoor
+    on BELLHART → Bellhart
+    on PIGRIMSREST → Generic Pilgrims Rest
+    on WILDS → Wilds Generic
+    on FINISHED → Set Area Met
+    on SHELLWOOD → Shellwood Generic
+    on DUSTPENS → Dustpens
+    on BONEBOTTOM → Generic Bonebottom
+    on SHADOW → Shadow
+    on CORAL CAVERNS → Coral Caverns
+    on HUNTERS NEST → Hunters Nest
+    on SHOP NO STOCK → No Stock Convo
+  }
+
+  state Generic Bellhart Meet {
+    GetPlayerDataBool(boolName="visitedBellhartHaunted", storeValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="MAPPER_GENERIC_BELLHART_ALT", trueString="MAPPER_GENERIC_BELLHART", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state Set Area Met {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    on FINISHED → Hide Box
+  }
+
+  state Eval Location {
+    ActivateGameObject(gameObject=var "Not Here Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateInteractible(Target=var "Linked Bench", Activate=false, AllowQueueing=false, UseChildren=false)
+    RunFSM(fsmTemplateControl=template=-4316080613879258652 in[Seen Bool<-var "Seen Bool"], finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → Start Hum
+  }
+
+  state Generic Pilgrims Rest {
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_PILGRIMSREST", trueString="MAPPER_GENERIC_PILGRIMSREST_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state Wilds Generic {
+    PlayerDataBoolTest(boolName="mapperMentorConvo", isTrue=(none), isFalse=→"MENTOR MEET")
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_WILDS", trueString="MAPPER_GENERIC_WILDS_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+    on MENTOR MEET → Mentor Meet
+  }
+
+  state Shellwood Generic {
+    GetPlayerDataBool(boolName="spinnerDefeated", storeValue=var "Bellhart Saved")
+    GetPlayerDataBool(boolName="visitedBellhart", storeValue=var "Visited Bellhart")
+    GetPlayerDataBool(boolName="mapperHauntedBellhartConvo", storeValue=var "Did HauntedBellhart Convo")
+    BoolTestMulti(boolVariables=[var "Bellhart Saved", var "Visited Bellhart", var "Did HauntedBellhart Convo"], boolStates=[false, true, false], trueEvent=→"HAUNTED BELLHART", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName="mapperMentorConvo", isTrue=(none), isFalse=→"MENTOR MEET")
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_SHELLWOOD", trueString="MAPPER_GENERIC_SHELLWOOD_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+    on HAUNTED BELLHART → Haunted Bellhart
+    on MENTOR MEET → Mentor Meet
+  }
+
+  state Haunted Bellhart {
+    SetPlayerDataBool(boolName="mapperHauntedBellhartConvo", value=true)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_GENERIC_SHELLWOOD_RAPTURED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Hide Box
+  }
+
+  state Dustpens {
+    GetPlayerDataBool(boolName="FixedDustBellBench", storeValue=var "Fixed Dust Bell Bench")
+    GetPlayerDataBool(boolName="mapperBrokenBenchConvo", storeValue=var "Did Bench Convo")
+    BoolTestMulti(boolVariables=[var "Saw Broken Bench", var "Fixed Dust Bell Bench", var "Did Bench Convo", var "Activated"], boolStates=[true, false, false, true], trueEvent=→"BROKEN BENCH", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName="mapperMentorConvo", isTrue=(none), isFalse=→"MENTOR MEET")
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_DUSTPENS", trueString="MAPPER_GENERIC_DUSTPENS_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+    on BROKEN BENCH → Broken Bench
+    on MENTOR MEET → Mentor Meet
+  }
+
+  state Generic Bonebottom {
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_BONEBOTTOM", trueString="MAPPER_GENERIC_BONEBOTTOM_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state No Stock Convo {
+    SetBoolValue(boolVariable=var "Did No Stock Convo", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_NOSTOCK", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Conversing", boolValue=true, everyFrame=false)
+    on CONVO_END → Reset
+  }
+
+  state Stock Depleted {
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_STOCKDEPLETED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Conversing", boolValue=true, everyFrame=false)
+    on CONVO_END → Reset
+  }
+
+  state Shadow {
+    PlayerDataBoolTest(boolName="mapperMentorConvo", isTrue=(none), isFalse=→"MENTOR MEET")
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_SHADOW", trueString="MAPPER_GENERIC_SHADOW_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+    on MENTOR MEET → Mentor Meet
+  }
+
+  state Coral Caverns {
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_CORALCAVERNS", trueString="MAPPER_GENERIC_CORALCAVERNS_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state Quest? {
+    CheckQuestState(NotTrackedEvent=→"FINISHED", TrackedEvent=→"CANCEL", CompletedEvent=→"FINISHED", Quest=Shakra Final Quest (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on CANCEL → Gone
+    on FINISHED → Eval Location
+  }
+
+  state Gone {
+    ActivateInteractible(Target=var "Linked Bench", Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Not Here Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Bellhart {
+    BoolTest(boolVariable=var "Activated", isTrue=(none), isFalse=→"MEET", everyFrame=false)
+    PlayerDataVariableTest(VariableName="mapperBellhartConvo", ExpectedValue=false, IsExpectedEvent=→"CONVO 1", IsNotExpectedEvent=(none))
+    PlayerDataVariableTest(VariableName="mapperBellhartConvoTimePassed", ExpectedValue=false, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=(none))
+    PlayerDataVariableTest(VariableName="mapperBellhartConvo2", ExpectedValue=false, IsExpectedEvent=→"CONVO 2", IsNotExpectedEvent=(none))
+    on MEET → Generic Bellhart Meet
+    on CONVO 1 → Generic Bellhart Talk 1
+    on CONVO 2 → Generic Bellhart Talk 2
+    on FINISHED → Generic Bellhart Repeat
+  }
+
+  state Generic Bellhart Talk 1 {
+    SetPlayerDataVariable(VariableName="mapperBellhartConvo", SetValue=true)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_GENERIC_BELLHART_TALK1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state Generic Bellhart Repeat {
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_GENERIC_BELLHART_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state Hunters Nest {
+    ConvertBoolToString(boolVariable=var "Activated", stringVariable=var "Convo Cell Name", falseString="MAPPER_GENERIC_HUNTERSNEST_DEEP", trueString="MAPPER_GENERIC_HUNTERSNEST_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key=var "Convo Cell Name", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state Broken Bench {
+    SetPlayerDataBool(boolName="mapperBrokenBenchConvo", value=true)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_DUSTPENS_BROKENBENCH", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Hide Box
+  }
+
+  state Bench React {
+    SetPlayerDataBool(boolName="mapperReactedToBrokenBellBench", value=true)
+    SetBoolValue(boolVariable=var "Did Bench React", boolValue=true, everyFrame=false)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="React Right", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_startle (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Bench React End
+  }
+
+  state Bench React End {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Reset Hum
+  }
+
+  state Bench React Pause {
+    PlayerDataBoolTest(boolName="mapperReactedToBrokenBellBench", isTrue=→"CANCEL", isFalse=(none))
+    BoolTest(boolVariable=var "Did Bench React", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)  // disabled
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Bench React
+    on CANCEL → Idle
+  }
+
+  state Mentor Meet {
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_MENTOR_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataBool(boolName="mapperMentorConvo", value=true)
+    on CONVO_END → Set Area Met
+  }
+
+  state Generic Bellhart Talk 2 {
+    SetPlayerDataVariable(VariableName="mapperBellhartConvo2", SetValue=true)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_GENERIC_BELLHART_TALK2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Set Area Met
+  }
+
+  state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.5, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Shakra_call (sfxdynamic_assets_mapper.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  sequence state Sing End {
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Sing End", AnimationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Reset Hum
+  }
+
+  sequence state Startle {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")  // disabled
+    Wait(time=0.4, finishEvent=→"CANCEL", realTime=false)  // disabled
+    PlayRandomAudioClipTable(Table=Shakra_startle (sfxdynamic_assets_mapper.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=Shakra_startle (sfxdynamic_assets_mapper.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)  // disabled
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Startle", AnimationCompleteEvent=(none))
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Reset Hum
+  }
+
+  state Start Hum {
+    GetRandomAudioClipFromTable(Table=Shakra_hum_loop (sfxdynamic_assets_mapper.bundle), ForcePlay=false, StoreClip=var "Audio Clip")
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=var "Audio Clip", autoPlay=false, stopOnExit=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Voice", volume=1, oneShotClip=<null>)
+    RandomiseAudioPosition(gameObject=var "Audio Loop Voice", timeMin=0, timeMax=0)
+    on FINISHED → Wait For Seen
+  }
+
+  state Reset Hum {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    GetRandomAudioClipFromTable(Table=Shakra_hum_loop (sfxdynamic_assets_mapper.bundle), ForcePlay=false, StoreClip=var "Audio Clip")
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=var "Audio Clip", autoPlay=false, stopOnExit=false)
+    on FINISHED → Idle
+  }
+
+  state Ring Greet Pause {
+    GetDistanceV2(gameObject=Self, target=var "Hero", targetOffsetX=0, targetOffsetY=0, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=15, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    Wait(time=0.4, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Ring Greet
+    on CANCEL → Idle
+  }
+
+  state Ring Greet {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    PlayRandomAudioClipTable(Table=Shakra_battle_poshanka (sfxdynamic_assets_mapper.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Sing End
+  }
+
+  var Seen Bool: string = "SeenMapperCoralCaverns"
+  var Not Here Folder: gameObject = <null>
+  var Shop Camlock: gameObject = Mapper Sit NPC/CameraLockArea Shop
+  var Linked Bench: gameObject = <null>
+
+  var Distance: float = 0
+  var Activated: bool = false
+  var Bellhart Saved: bool = false
+  var Conversing: bool = false
+  var Did HauntedBellhart Convo: bool = false
+  var Visited Bellhart: bool = false
+  var Has Met: bool = false
+  var Did Bellhart Convo: bool = false
+  var Fixed Dust Bell Bench: bool = false
+  var Saw Broken Bench: bool = false
+  var Did Bench Convo: bool = false
+  var Did Bench React: bool = false
+  var Test: bool = false
+  var Did No Stock Convo: bool = false
+  var Shop Has Stock: bool = false
+  var Convo Cell Name: string = ""
+  var Dlg: string = ""
+  var Shop Object: gameObject = <null>
+  var Audio Loop Scribble: gameObject = Mapper Sit NPC/Audio Loop Scribble
+  var Audio Loop Voice: gameObject = Mapper Sit NPC/Audio Loop Voice
+  var Audio Clip: object = <null>
+}

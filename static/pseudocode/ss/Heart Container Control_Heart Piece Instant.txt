@@ -1,0 +1,78 @@
+# Heart Container Control
+# 1 location(s):
+#   heartpieceupgrade_assets_all.bundle / Heart Piece Instant
+
+fsm Heart Container Control {
+  start Init
+  on DISABLE → State 1  // from any state
+
+  state Get {
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=true)
+    GetOwner(storeGameObject=var "Self")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_heartPiece())
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Self", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    FindGameObject(objectName="", withTag="CameraParent", store=var "Camera")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor 2D (audioobjects_assets_all.bundle), spawnPoint=var "Hero", audioClip=heartpiece_collect, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Heart Piece")
+    SetGravity2dScale(gameObject=var "Hero", gravityScale=0)
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="GET", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Get Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    SpawnRandomObjects(gameObject=Heart Piece Orb, spawnPoint=var "Hero", position=(unset), spawnMin=20, spawnMax=20, speedMin=18, speedMax=25, angleMin=0, angleMax=360, originVariation=1)
+    on FINISHED → On Ground?
+  }
+
+  state UI {
+    CreateObject(gameObject=Heart Container UI, spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "UI")  // disabled
+    CreateObjectV2(gameObject=Heart Container UI, canPreSpawn=true, spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "UI")
+    on HEART PIECE SAVE → Save
+  }
+
+  state On Ground? {
+    CheckIsCharacterGrounded(Target=var "Hero", RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"TRUE", NotGroundedEvent=→"FALSE", EveryFrame=false)
+    on FALSE → Wait
+    on TRUE → Kick Up
+  }
+
+  state Kick Up {
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 5), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Wait
+  }
+
+  state Wait {
+    DecelerateV2(gameObject=var "Hero", deceleration=0.9, brakeOnExit=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → UI
+  }
+
+  state Save {
+    RemoveHeroInputBlocker(Blocker=Self)
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=false)  // disabled
+  }
+
+  state Take Control? {
+    CancelDoQueuedSaveGame()
+    SendEventToRegister(eventName="CLOSE SHOP WINDOW INACTIVE")
+    CheckIsInQuestBoardDepositSequence(trueEvent=→"FINISHED", falseEvent=(none), storeValue=(unset))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Get
+  }
+
+  state Init {
+    AddHeroInputBlocker(Blocker=Self)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Take Control?
+  }
+
+  state State 1 {
+    RemoveHeroInputBlocker(Blocker=Self)
+  }
+
+  var Pieces: int = 0
+  var Camera: gameObject = <null>
+  var Get Anim: gameObject = <null>
+  var Self: gameObject = <null>
+  var UI: gameObject = <null>
+}

@@ -1,0 +1,570 @@
+# Convo
+# 1 location(s):
+#   Bone_12 / Black Thread States/Normal World/Pin Gallery States/Here/Lady Bug Large
+
+fsm Convo {
+  start Init
+
+  state Init {
+    SetTransformParent(gameObject=var "Game Enter Detector", parent=<null>, worldPositionStays=true)
+    EnableFSM(gameObject=Self, fsmName="Duck Reaction", enable=false, resetOnExit=false)
+    WaitForHeroInPosition(sendEvent=(none), skipIfAlreadyPositioned=true)
+    on FINISHED → Silent Wake Check
+  }
+
+  state Idle {
+    SetProperty(targetProperty=PlayMakerNPC.TalkPosition on Black Thread States/Normal World/Pin Gallery States/Here/Lady Bug Large@PlayMakerNPC, everyFrame=false)  // disabled
+    CheckAlertRange(alertRange=var "Awake Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"REST", OutOfRangeDelay=8, everyFrame=true)
+    EnableFSM(gameObject=Self, fsmName="Duck Reaction", enable=false, resetOnExit=false)
+    on INTERACT → Met?
+    on REST → Idle to Rest
+  }
+
+  state Met? {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="LADYBUG_LARGE")
+    CheckIsInEditor(trueEvent=→"TEST", falseEvent=(none), storeValue=(unset))  // disabled
+    PlayerdataIntCompare(playerdataInt="PinGalleryWallet", compareTo=0, equal=→"DEPLETED", lessThan=→"DEPLETED", greaterThan=(none))
+    PlayerDataVariableTest(VariableName="WasInPinChallenge", ExpectedValue=true, IsExpectedEvent=→"CHALLENGE", IsNotExpectedEvent=(none))
+    PlayerDataVariableTest(VariableName="MetPinChallengeBug", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Offer
+    on TRUE → Reoffer
+    on CHALLENGE → Was In Challenge
+    on DEPLETED → Depleted Repeat
+    on TEST → Finished Challenge 1A
+  }
+
+  state Offer {
+    SetPlayerDataVariable(VariableName="MetPinChallengeBug", SetValue=true)
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_OFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Yes No
+  }
+
+  state Reoffer {
+    GetPlayerDataInt(intName="pinGalleriesCompleted", storeValue=var "Galleries Completed")
+    IntSwitch(intVariable=var "Galleries Completed", compareTo=[1, 2], sendEvent=[→"WIN 1", →"WIN 2"], everyFrame=false)
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_REOFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Yes No
+    on WIN 1 → Reoffer Level 2
+    on WIN 2 → Will Offer Challenge 3?
+  }
+
+  state End Dialogue {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    on FINISHED → Idle
+  }
+
+  sequence state Yes No {
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    GetCostFromReference(Reference=Pin Gallery Cost (dataassets_assets_assets/dataassets/costs.bundle), StoreValue=var "Cost")
+    DialogueYesNoV2(TranslationSheet="Forge", TranslationKey="LADY_BUG_OFFER_PROMPT", UseCurrency=true, CurrencyCost=var "Cost", CurrencyType=Money, ConsumeCurrency=true, WillGetItem=<null>, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Declined
+    on TRUE → Accepted
+  }
+
+  state Declined {
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_DECLINED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Accepted {
+    SetInteractableDetector(detector=var "Game Enter Detector", allowNullDetector=false, previousDetector=var "Original Detector", Target=Self)
+    SetBoolValue(boolVariable=var "Challenge Failed", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Challenge End", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Disqualified", boolValue=false, everyFrame=false)
+    GetPlayerDataInt(intName="PinGalleryWallet", storeValue=var "Wallet")
+    IntAdd(intVariable=var "Wallet", add=var "Cost", everyFrame=false)
+    IntClamp(intVariable=var "Wallet", minValue=0, maxValue=9999, everyFrame=false)
+    SetPlayerDataInt(intName="PinGalleryWallet", value=var "Wallet")
+    GetPlayerDataInt(intName="pinGalleriesCompleted", storeValue=var "Galleries Completed")
+    IntAdd(intVariable=var "Galleries Completed", add=1, everyFrame=false)
+    ConvertIntToString(intVariable=var "Galleries Completed", stringVariable=var "Galleries Completed String", format="", everyFrame=false)
+    BuildString(stringParts=["LADY_BUG_ACCEPTED_", var "Galleries Completed String"], separator="", addToEnd=true, storeResult=var "Convo Key", everyFrame=false)
+    RunDialogueV4(CustomText="", Sheet="Forge", Key=var "Convo Key", TextColor=(unset), NpcVoiceTableOverride=loddie_talk (sfxdynamic_assets_areabone.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 2
+  }
+
+  state Challenge Idle {
+    SetProperty(targetProperty=PlayMakerNPC.TalkPosition on Black Thread States/Normal World/Pin Gallery States/Here/Lady Bug Large@PlayMakerNPC, everyFrame=false)  // disabled
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    BoolTest(boolVariable=var "Disqualified", isTrue=→"DISQUALIFIED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Challenge Failed", isTrue=→"PIN CHALLENGE FAIL", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Challenge End", isTrue=→"PIN CHALLENGE END", isFalse=(none), everyFrame=false)
+    EnableFSM(gameObject=Self, fsmName="Duck Reaction", enable=true, resetOnExit=false)
+    FloatAdd(floatVariable=var "Emote Timer", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Emote Timer", minValue=0, maxValue=2, everyFrame=true)
+    on PIN CHALLENGE END → Take control wait
+    on DISQUALIFIED → Disqualified
+    on PIN CHALLENGE FAIL → Fail Wait
+    on INTERACT → In Challenge
+    on EMOTE LADYBUG SCORE → Score Emote
+    on EMOTE LADYBUG MISS → Miss Emote
+  }
+
+  state End Dialogue 2 {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    on FINISHED → Start Challenge
+  }
+
+  state In Challenge {
+    EnableFSM(gameObject=Self, fsmName="Duck Reaction", enable=false, resetOnExit=false)
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_IN_CHALLENGE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="LADYBUG_LARGE")
+    on CONVO_END → End Dialogue 3
+  }
+
+  state End Dialogue 3 {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    on FINISHED → Challenge Idle
+  }
+
+  state Start Challenge {
+    SetFloatValue(floatVariable=var "Emote Timer", floatValue=1, everyFrame=false)
+    SetPlayerDataVariable(VariableName="WasInPinChallenge", SetValue=true)
+    SendEventToRegister(eventName="PIN CHALLENGE START")
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Turn to Tiny?
+    on DISQUALIFIED → Disqualified
+  }
+
+  state End Challenge {
+    SetPlayerDataVariable(VariableName="WasInPinChallenge", SetValue=false)
+    SetInteractableDetector(detector=var "Original Detector", allowNullDetector=true, previousDetector=var "", Target=Self)
+    on FINISHED → Idle
+  }
+
+  state Was In Challenge {
+    SetPlayerDataVariable(VariableName="WasInPinChallenge", SetValue=false)
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_LEFT_IN_CHALLENGE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Yes No
+  }
+
+  state Resting {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Large Rest", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckAlertRange(alertRange=var "Awake Range", storeResult=(unset), InRangeEvent=→"WAKE", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    on WAKE → Wake Voice?
+  }
+
+  state Rest to Idle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Large Rest to Idle Left", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Idle
+    on INTERACT → Met?
+  }
+
+  state Idle to Rest {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Large Idle Left to Rest", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Resting
+  }
+
+  sequence state Challenge Failed {
+    EnableFSM(gameObject=Self, fsmName="Duck Reaction", enable=false, resetOnExit=false)
+    PlayerDataBoolTest(boolName="PinGalleryLastChallengeOpen", isTrue=→"FINAL", isFalse=(none))
+    RunFSM(fsmTemplateControl=template=-5127244416333177452, finishEvent=(none), everyFrame=false)
+    GetFsmInt(gameObject=var "Challenge Controller", fsmName="Pin Challenge", variableName="Current Hits", storeValue=var "Current Hits", everyFrame=false)
+    GetFsmInt(gameObject=var "Challenge Controller", fsmName="Pin Challenge", variableName="Target Hits", storeValue=var "Target Hits", everyFrame=false)
+    GetLanguageString(sheetName="Forge", convName="LADY_BUG_CHALLENGE_FAILED", storeValue=var "Dialogue Text")
+    FormatString(format=var "Dialogue Text", variables=[var "Current Hits", var "Target Hits"], storeResult=var "Dialogue Text", everyFrame=false)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="LADYBUG_LARGE")
+    RunDialogueV4(CustomText=var "Dialogue Text", Sheet="Forge", Key="LADY_BUG_DISQUALIFIED", TextColor=(unset), NpcVoiceTableOverride=loddie_talk_gameend (sfxdynamic_assets_areabone.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 4
+    on FINAL → Win Wait
+  }
+
+  state Turn to Tiny? {
+    FloatSignTest(floatValue=var "Scale X", isPositive=(none), isNegative=→"FINISHED", everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Large Turn", AnimationCompleteEvent=(none))
+    on FINISHED → Call to Action
+    on DISQUALIFIED → Disqualified
+  }
+
+  sequence state Call to Action {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=loddie_talk_gamestart (sfxdynamic_assets_areabone.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Large Call", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Large Idle Left")
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    SendEventToRegister(eventName="PIN CHALLENGE CALL")
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Challenge Idle
+    on DISQUALIFIED → Disqualified
+  }
+
+  state End Dialogue 4 {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    on FINISHED → End Challenge
+  }
+
+  sequence state Finished Challenge 1A {
+    RunFSM(fsmTemplateControl=template=-5127244416333177452, finishEvent=(none), everyFrame=false)
+    GetFsmInt(gameObject=var "Challenge Controller", fsmName="Pin Challenge", variableName="Current Hits", storeValue=var "Current Hits", everyFrame=false)
+    GetFsmInt(gameObject=var "Challenge Controller", fsmName="Pin Challenge", variableName="Target Hits", storeValue=var "Target Hits", everyFrame=false)
+    GetLanguageString(sheetName="Forge", convName="LADY_BUG_CHALLENGE_WIN_1", storeValue=var "Dialogue Text")
+    FormatString(format=var "Dialogue Text", variables=[var "Current Hits", var "Target Hits"], storeResult=var "Dialogue Text", everyFrame=false)
+    RunDialogueV4(CustomText=var "Dialogue Text", Sheet="Forge", Key="LADY_BUG_DISQUALIFIED", TextColor=(unset), NpcVoiceTableOverride=loddie_talk_gameend (sfxdynamic_assets_areabone.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on LINE_END → Convo Wait 2
+  }
+
+  sequence state Disqualified {
+    RunFSM(fsmTemplateControl=template=5120264638226263702, finishEvent=(none), everyFrame=false)
+    RunFSM(fsmTemplateControl=template=-5127244416333177452, finishEvent=(none), everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Wait Duck Reaction
+  }
+
+  sequence state Fail Wait {
+    RunFSM(fsmTemplateControl=template=5120264638226263702, finishEvent=(none), everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Duck Wait
+    on DISQUALIFIED → Duck Wait
+  }
+
+  sequence state Win Wait {
+    EnableFSM(gameObject=Self, fsmName="Duck Reaction", enable=false, resetOnExit=false)
+    RunFSM(fsmTemplateControl=template=5120264638226263702, finishEvent=(none), everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Win Level Check
+  }
+
+  state Reward 1 {
+    SetPlayerDataInt(intName="pinGalleriesCompleted", value=1)
+    RunFSM(fsmTemplateControl=template=-7694940084789001237, finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → Return HUD
+  }
+
+  sequence state Win Level Check {
+    HeroTurnToFace(Target=Self)
+    GetPlayerDataInt(intName="pinGalleriesCompleted", storeValue=var "Galleries Completed")
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="LADYBUG_LARGE")
+    IntSwitch(intVariable=var "Galleries Completed", compareTo=[0, 1, 2], sendEvent=[→"WIN 1", →"WIN 2", →"WIN 3"], everyFrame=false)
+    on WIN 1 → Finished Challenge 1A
+    on WIN 2 → Finished Challenge 2A
+    on WIN 3 → Evaluation
+  }
+
+  sequence state Finished Challenge 2A {
+    RunFSM(fsmTemplateControl=template=-5127244416333177452, finishEvent=(none), everyFrame=false)
+    GetFsmInt(gameObject=var "Challenge Controller", fsmName="Pin Challenge", variableName="Current Hits", storeValue=var "Current Hits", everyFrame=false)
+    GetFsmInt(gameObject=var "Challenge Controller", fsmName="Pin Challenge", variableName="Target Hits", storeValue=var "Target Hits", everyFrame=false)
+    RunDialogueV4(CustomText="", Sheet="Forge", Key="LADY_BUG_CHALLENGE_WIN_2A", TextColor=(unset), NpcVoiceTableOverride=loddie_talk_gameend (sfxdynamic_assets_areabone.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on LINE_END → Convo Wait
+  }
+
+  state Reward 2 {
+    CollectableItemCollect(Amount=1, Item=Rosary_Set_Large (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    SetPlayerDataInt(intName="pinGalleriesCompleted", value=2)
+    on FINISHED → Return HUD
+  }
+
+  sequence state Finished Challenge 3A {
+    RunFSM(fsmTemplateControl=template=-5127244416333177452, finishEvent=(none), everyFrame=false)
+    RunDialogueV4(CustomText=var "Dialogue Text", Sheet="Forge", Key="LADY_BUG_DISQUALIFIED", TextColor=(unset), NpcVoiceTableOverride=loddie_talk_gameend (sfxdynamic_assets_areabone.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)  // disabled
+    on LINE_END → Finished Challenge 3B
+  }
+
+  state Reoffer Level 2 {
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_REOFFER_2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Yes No
+  }
+
+  state Challenge Not Ready {
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_REST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Will Offer Challenge 3? {
+    PlayerDataBoolTest(boolName="PinGalleryLastChallengeOpen", isTrue=→"TRUE", isFalse=→"FALSE")
+    on TRUE → Reoffer Level 3
+    on FALSE → Challenge Not Ready
+  }
+
+  state Reoffer Level 3 {
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_REOFFER_3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Yes No
+  }
+
+  state End Dialogue 1 {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reward 1
+  }
+
+  state End Dialogue 5 {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reward 2
+  }
+
+  state Evaluation {
+    RunFSM(fsmTemplateControl=template=-5127244416333177452, finishEvent=(none), everyFrame=false)
+    GetFsmInt(gameObject=var "Challenge Controller", fsmName="Pin Challenge", variableName="Rosary Payout", storeValue=var "Rosary Payout", everyFrame=false)
+    IntCompare(integer1=var "Rosary Payout", integer2=0, equal=→"LV 1", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Rosary Payout", integer2=var "Cost", equal=→"LV 2", lessThan=→"LV 2", greaterThan=→"LV 3", everyFrame=false)
+    on LV 1 → LV 1
+    on LV 2 → LV 2
+    on LV 3 → LV 3
+  }
+
+  state LV 1 {
+    RunDialogueV2(CustomText="", Sheet="Forge", Key="LADY_BUG_CHALLENGE_FINAL_FAIL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 4
+  }
+
+  state LV 2 {
+    RunDialogueV2(CustomText="", Sheet="Forge", Key="LADY_BUG_CHALLENGE_FINAL_POOR", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 6
+  }
+
+  state Award Rosaries {
+    SetPlayerDataBool(boolName="PinGalleryHasPlayedFinalChallenge", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AddGeo", parameters=[var "Rosary Payout"], storeResult=(unset var), EveryFrame=false)
+    IntOperator(integer1=var "Rosary Payout", integer2=-1, operation=Multiply, storeResult=var "Rosary Payout", everyFrame=false)
+    PlayerDataIntAdd(intName="PinGalleryWallet", amount=var "Rosary Payout")
+    on FINISHED → Return HUD
+  }
+
+  state End Dialogue 6 {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wallet Depleted?
+  }
+
+  state LV 3 {
+    RunDialogueV2(CustomText="", Sheet="Forge", Key="LADY_BUG_CHALLENGE_FINAL_WIN", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 6
+  }
+
+  state Return HUD {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → End Challenge
+  }
+
+  state Wallet Depleted? {
+    GetPlayerDataInt(intName="PinGalleryWallet", storeValue=var "Wallet")
+    IntCompare(integer1=var "Rosary Payout", integer2=var "Wallet", equal=→"DEPLETED", lessThan=(none), greaterThan=→"DEPLETED", everyFrame=false)
+    on DEPLETED → Award Final Rosaries
+    on FINISHED → Award Rosaries
+  }
+
+  state Award Final Rosaries {
+    SetPlayerDataInt(intName="PinGalleryWallet", value=0)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AddGeo", parameters=[var "Wallet"], storeResult=(unset var), EveryFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Depleted Convo A
+  }
+
+  state Depleted Convo A {
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_DEPLETED_A", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Depleted Convo B
+  }
+
+  state Depleted Repeat {
+    RunDialogue(Sheet="Forge", Key="LADY_BUG_DEPLETED_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Duck Wait {
+    GetFsmBool(gameObject=Self, fsmName="Duck Reaction", variableName="Is Ducked", storeValue=var "Is Ducked", everyFrame=false)
+    BoolTest(boolVariable=var "Is Ducked", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Duck Reaction"), sendEvent="DUCK CANCEL", delay=0, everyFrame=false)
+    GetFsmBool(gameObject=Self, fsmName="Duck Reaction", variableName="Is Ducked", storeValue=var "Is Ducked", everyFrame=true)
+    BoolTest(boolVariable=var "Is Ducked", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Check Should Move
+  }
+
+  state Silent Wake Check {
+    CheckAlertRange(alertRange=var "Awake Range", storeResult=(unset), InRangeEvent=→"WAKE", InRangeDelay=0, OutOfRangeEvent=→"FINISHED", OutOfRangeDelay=0, everyFrame=true)
+    on WAKE → Rest to Idle Silent
+    on FINISHED → Resting
+  }
+
+  state Rest to Idle Silent {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    CallMethodProper(gameObject=Self, behaviour="tk2dLookAnimNPC", methodName="SuppressTurnAudio", parameters=[0.1], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Activate
+  }
+
+  sequence state Disqualified 2 {
+    EnableFSM(gameObject=Self, fsmName="Duck Reaction", enable=false, resetOnExit=false)
+    SendEventToRegister(eventName="PIN CHALLENGE FAIL")
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="LADYBUG_LARGE")
+    RunDialogueV4(CustomText="", Sheet="Forge", Key="LADY_BUG_DISQUALIFIED", TextColor=(unset), NpcVoiceTableOverride=loddie_talk_gameend (sfxdynamic_assets_areabone.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 4
+  }
+
+  state Duck Wait 2 {
+    GetFsmBool(gameObject=Self, fsmName="Duck Reaction", variableName="Is Ducked", storeValue=var "Is Ducked", everyFrame=false)
+    BoolTest(boolVariable=var "Is Ducked", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Duck Reaction"), sendEvent="DUCK CANCEL", delay=0, everyFrame=false)
+    GetFsmBool(gameObject=Self, fsmName="Duck Reaction", variableName="Is Ducked", storeValue=var "Is Ducked", everyFrame=true)
+    BoolTest(boolVariable=var "Is Ducked", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Ensure Distance From Target
+  }
+
+  sequence state Take control wait {
+    RunFSM(fsmTemplateControl=template=5120264638226263702, finishEvent=(none), everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on FINISHED → Duck Wait 2
+  }
+
+  sequence state Ensure Distance From Target {
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "NPC Position X", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=var "Hero Position X", y=(unset), space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Hero Position X", subtract=var "NPC Position X", everyFrame=false, perSecond=false)
+    FloatSign(Value=var "Hero Position X", StoreValue=var "Hero Direction X", EveryFrame=false)
+    FloatAbs(floatVariable=var "Hero Direction X", everyFrame=false)
+    FloatCompare(float1=var "Hero Position X", float2=var "Target X Distance", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    FloatMultiply(floatVariable=var "Hero Direction X", multiplyBy=var "Target X Distance", everyFrame=false)
+    FloatAdd(floatVariable=var "NPC Position X", add=var "Hero Direction X", everyFrame=false, perSecond=false)
+    MoveHeroToPosX(Hero=var "Hero", PositionTarget=var "", PositionX=var "NPC Position X", FinishEvent=(none))
+    HeroTurnToFace(Target=Self)
+    on FINISHED → Win Wait
+  }
+
+  sequence state Ensure Distance From Target 2 {
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "NPC Position X", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=var "Hero Position X", y=(unset), space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Hero Position X", subtract=var "NPC Position X", everyFrame=false, perSecond=false)
+    FloatSign(Value=var "Hero Position X", StoreValue=var "Hero Direction X", EveryFrame=false)
+    FloatAbs(floatVariable=var "Hero Direction X", everyFrame=false)
+    FloatCompare(float1=var "Hero Position X", float2=var "Target X Distance", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    FloatMultiply(floatVariable=var "Hero Direction X", multiplyBy=var "Target X Distance", everyFrame=false)
+    FloatAdd(floatVariable=var "NPC Position X", add=var "Hero Direction X", everyFrame=false, perSecond=false)
+    MoveHeroToPosX(Hero=var "Hero", PositionTarget=var "", PositionX=var "NPC Position X", FinishEvent=(none))
+    HeroTurnToFace(Target=Self)
+    on FINISHED → Challenge Failed
+  }
+
+  state Wait Duck Reaction {
+    GetFsmBool(gameObject=Self, fsmName="Duck Reaction", variableName="Is Ducked", storeValue=var "Is Ducked", everyFrame=false)
+    BoolTest(boolVariable=var "Is Ducked", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Duck Reaction"), sendEvent="DUCK CANCEL", delay=0, everyFrame=true)
+    GetFsmBool(gameObject=Self, fsmName="Duck Reaction", variableName="Is Ducked", storeValue=var "Is Ducked", everyFrame=true)
+    BoolTest(boolVariable=var "Is Ducked", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Disqualified 2
+  }
+
+  state Check Should Move {
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Y", space=0, everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Owner Y", space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Hero Y", subtract=var "Owner Y", everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Hero Y", float2=5, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on FINISHED → Ensure Distance From Target 2
+    on CANCEL → Challenge Failed
+  }
+
+  state Score Emote {
+    FloatCompare(float1=var "Emote Timer", float2=2, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Large CallToIdle")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=loddie_emote_score (sfxdynamic_assets_areabone.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetFloatValue(floatVariable=var "Emote Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Challenge Idle
+  }
+
+  state Miss Emote {
+    FloatCompare(float1=var "Emote Timer", float2=1.5, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Large CallToIdle")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=loddie_emote_miss (sfxdynamic_assets_areabone.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetFloatValue(floatVariable=var "Emote Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Challenge Idle
+  }
+
+  state Wake Voice? {
+    BoolTest(boolVariable=var "Greeted Hero", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=loddie_greet (sfxdynamic_assets_areabone.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Greeted Hero", boolValue=true, everyFrame=false)
+    on FINISHED → Rest to Idle
+  }
+
+  state Finished Challenge 2B {
+    RunDialogueV4(CustomText="", Sheet="Forge", Key="LADY_BUG_CHALLENGE_WIN_2B", TextColor=(unset), NpcVoiceTableOverride=loddie_talk_nervous (sfxdynamic_assets_areabone.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on LINE_END → Convo Wait 3
+  }
+
+  state Depleted Convo B {
+    RunDialogueV4(CustomText="", Sheet="Forge", Key="LADY_BUG_DEPLETED_B", TextColor=(unset), NpcVoiceTableOverride=loddie_talk_nervous (sfxdynamic_assets_areabone.bundle), OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on LINE_END → Convo Wait 4
+  }
+
+  state Convo Wait 2 {
+    on CONVO_END → End Dialogue 1
+  }
+
+  state Finished Challenge 3B {
+    on CONVO_END → Evaluation
+  }
+
+  sequence state Convo Wait {
+    on CONVO_END → Finished Challenge 2B
+  }
+
+  sequence state Convo Wait 3 {
+    on CONVO_END → End Dialogue 5
+  }
+
+  sequence state Convo Wait 4 {
+    on CONVO_END → End Dialogue 4
+  }
+
+  var Challenge Controller: gameObject = Black Thread States/Normal World/Pin Gallery States/Here/Pin Challenge
+
+  var Scale X: float = 0
+  var NPC Position X: float = 0
+  var Hero Position X: float = 0
+  var Hero Direction X: float = 0
+  var Target X Distance: float = 3
+  var Hero Y: float = 0
+  var Owner Y: float = 0
+  var Emote Timer: float = 0
+  var Cost: int = 0
+  var Current Hits: int = 0
+  var Galleries Completed: int = 0
+  var Reward: int = 0
+  var Target Hits: int = 0
+  var Rosary Payout: int = 0
+  var Rosary Reward: int = 0
+  var Wallet: int = 0
+  var Challenge End: bool = false
+  var Challenge Failed: bool = false
+  var Disqualified: bool = false
+  var Has Played Final Challenge: bool = false
+  var Is Ducked: bool = false
+  var Greeted Hero: bool = false
+  var Dialogue Text: string = ""
+  var Galleries Completed String: string = ""
+  var Convo Key: string = ""
+  var Game Enter Detector: gameObject = Black Thread States/Normal World/Pin Gallery States/Here/Lady Bug Large/Game Enter Detector
+  var Original Detector: gameObject = <null>
+  var Audio Loop Voice: gameObject = Black Thread States/Normal World/Pin Gallery States/Here/Lady Bug Large/Audio Loop Voice
+  var Awake Range: object = Black Thread States/Normal World/Pin Gallery States/Here/Lady Bug Large/Awake Range@AlertRange
+}

@@ -1,0 +1,519 @@
+# Mantis Lord
+# 3 location(s):
+#   Fungus2_15_boss / Mantis Battle/Battle Main/Mantis Lord
+#   GG_Mantis_Lords / Mantis Battle/Battle Main/Mantis Lord
+#   GG_Mantis_Lords_V / Mantis Battle/Battle Main/Mantis Lord
+
+fsm Mantis Lord {
+  start Pause
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Pt Dash", storeResult=var "Pt Dash")
+    FindChild(gameObject=Self, childName="Pt Land", storeResult=var "Pt Land")
+    SetGameObject(variable=var "Hero Object", gameObject=var "Hero", everyFrame=false)
+    GetPosition(gameObject=Self, vector=var "Away Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    on FINISHED → Start Pause
+  }
+
+  state Idle {
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    BoolTest(boolVariable=var "Sub", isTrue=→"SUB", isFalse=(none), everyFrame=false)
+    on FINISHED → Attack Choice
+    on SUB → Sub Idle
+  }
+
+  state Dash Dir {
+    GetPosition(gameObject=var "Hero Object", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Dash Hero L", tolerance=0, equal=(none), lessThan=→"RIGHT", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Dash Hero R", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"LEFT", everyFrame=false)
+    SendRandomEvent(events=[→"LEFT", →"RIGHT"], weights=[1, 1], delay=0)
+    on LEFT → Dash R
+    on RIGHT → Dash L
+  }
+
+  state Dash R {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Dash X L", y=var "Dash Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Dash Speed Crt", floatValue=var "Dash Speed", everyFrame=false)
+    SetBoolValue(boolVariable=var "Attacking R", boolValue=true, everyFrame=false)
+    on FINISHED → Dash Arrive
+  }
+
+  state Dash L {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Dash X R", y=var "Dash Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Dash Speed Crt", floatValue=var "Dash Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Dash Speed Crt", multiplyBy=-1, everyFrame=false)
+    SetBoolValue(boolVariable=var "Attacking R", boolValue=false, everyFrame=false)
+    on FINISHED → Dash Arrive
+  }
+
+  state Dash Arrive {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_land_on_ground (sharedassets180.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Arrive", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetCollider(gameObject=Self, active=true)
+    on FINISHED → Dash Antic
+  }
+
+  state Dash Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dash Attack
+  }
+
+  state Dash Attack {
+    PlayParticleEmitter(gameObject=var "Pt Dash", emit=0)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_horizontal_dash (sharedassets180.assets))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dash Attack")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Dash Speed Crt", y=(unset), everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Dash X R", tolerance=0, equal=→"END R", lessThan=(none), greaterThan=→"END R", everyFrame=true)  // disabled
+    FloatCompare(float1=var "Self X", float2=var "Dash X L", tolerance=0, equal=→"END L", lessThan=→"END L", greaterThan=(none), everyFrame=true)  // disabled
+    FloatTestToBool(float1=var "Self X", float2=var "Dash X R", tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Past R", everyFrame=true)
+    FloatTestToBool(float1=var "Self X", float2=var "Dash X L", tolerance=0, equalBool=(unset), lessThanBool=var "Past L", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Past R", var "Attacking R"], sendEvent=→"END R", storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Past L", var "Attacking R"], boolStates=[true, false], trueEvent=→"END L", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Dash Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on END R → End R
+    on END L → End L
+  }
+
+  state End R {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Dash X R", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dash Recover
+  }
+
+  state End L {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Dash X L", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dash Recover
+  }
+
+  state Dash Recover {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    StopParticleEmitter(gameObject=var "Pt Dash")
+    on FINISHED → Dash Hit Off
+  }
+
+  state Dash Leave {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_jump_off_ground (sharedassets180.assets))
+    SetCollider(gameObject=Self, active=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dash Leave", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Away
+  }
+
+  state Away {
+    SetPosition(gameObject=Self, vector=var "Away Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false)
+    on FINISHED → Idle
+  }
+
+  state Sleep {
+    on MLORD START MAIN → Start Pause
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Dash Hit Off {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Dash Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Dash Leave
+  }
+
+  state Dstab Pos {
+    GetPosition(gameObject=var "Hero Object", vector=(unset), x=var "Dstab X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Dstab X", minValue=var "Dstab X Min", maxValue=var "Dstab X Max", everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Dstab X", y=var "Dstab Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[1, 1], delay=0)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Shift?
+  }
+
+  state Dstab Arrive {
+    SetMeshRenderer(gameObject=Self, active=true)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_whoosh_to_above (sharedassets180.assets))
+    SetCollider(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dstab Arrive", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dstab Attack
+  }
+
+  state Dstab Attack {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_down_slash (sharedassets180.assets))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dstab Attack")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Dstab Speed", everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=var "Land Y", tolerance=0, equal=→"LAND", lessThan=→"LAND", greaterThan=(none), everyFrame=true)
+    ChaseObjectGround(gameObject=Self, target=var "Hero Object", speedMax=7, acceleration=7, animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0)
+    on LAND → Dstab Land
+  }
+
+  state Dstab Land {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_down_slash_impact (sharedassets180.assets))
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Land Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dstab Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Pt Land", emit=0)
+    on FINISHED → Dstab Leave
+  }
+
+  state Dstab Leave {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dstab Leave", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_jump_off_ground (sharedassets180.assets))
+    on FINISHED → Away
+  }
+
+  state Shift? {
+    SendRandomEvent(events=[→"FINISHED", (none)], weights=[1, 1], delay=0)
+    RandomFloat(min=-4, max=4, storeResult=var "Random")
+    FloatAdd(floatVariable=var "Dstab X", add=var "Random", everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Dstab X", minValue=var "Dstab X Min", maxValue=var "Dstab X Max", everyFrame=false)
+    on FINISHED → Shift Y?
+  }
+
+  state Throw Pos {
+    RandomBool(storeResult=(unset))
+    RandomFloat(min=var "Wall Y Min", max=var "Wall Y Max", storeResult=var "Random")  // disabled
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)  // disabled
+    GetPosition(gameObject=var "Hero Object", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Throw Hero L", tolerance=0, equal=(none), lessThan=→"RIGHT", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Throw Hero R", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"LEFT", everyFrame=false)
+    SendRandomEvent(events=[→"LEFT", →"RIGHT"], weights=[1, 1], delay=0)
+    on LEFT → Throw L
+    on RIGHT → Throw R
+  }
+
+  state Throw R {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Wall X R", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Throw R", boolValue=false, everyFrame=false)
+    on FINISHED → Set Throws
+  }
+
+  state Throw L {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Wall X L", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Throw R", boolValue=true, everyFrame=false)
+    on FINISHED → Set Throws
+  }
+
+  state Throw Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Throw
+  }
+
+  state Set Throws {
+    SetIntValue(intVariable=var "Throws Crt", intValue=var "Throws", everyFrame=false)
+    on FINISHED → Arrive
+  }
+
+  state Throw {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=ruin_shield_sentry_sword_2 (sharedassets34.assets))
+    SpawnObjectFromGlobalPool(gameObject=Shot Mantis Lord (sharedassets180.assets), spawnPoint=var "Throw Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    SetFsmBool(gameObject=var "Projectile", fsmName="Control", variableName="Throw R", setValue=var "Throw R", everyFrame=false)
+    SetFsmBool(gameObject=var "Projectile", fsmName="Control", variableName="No Dust", setValue=var "No Dust", everyFrame=false)
+    SetFsmBool(gameObject=var "Projectile", fsmName="Control", variableName="Throw UD", setValue=var "Throw UD", everyFrame=false)
+    FireAtTarget(gameObject=var "Projectile", target=var "Hero Object", speed=var "Lance Speed", position=(0, -0.5, 0), spread=0, everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "No Dust", boolValue=false, everyFrame=false)
+    on FINISHED → Throw CD
+  }
+
+  state Throw CD {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    GGCheckIfBossScene(bossSceneEvent=→"FINISHED", regularSceneEvent=(none))  // disabled
+    on FINISHED → Keep Throwing?
+    on GG BOSS → Short GG
+  }
+
+  state Keep Throwing? {
+    IntOperator(integer1=var "Throws Crt", integer2=1, operation=Subtract, storeResult=var "Throws Crt", everyFrame=false)  // disabled
+    IntCompare(integer1=var "Throws Crt", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)  // disabled
+    SendEvent(eventTarget=Self, sendEvent=→"CANCEL", delay=0, everyFrame=false)
+    on FINISHED → Throw Antic
+    on CANCEL → Leave Pause
+  }
+
+  state Wall Leave 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Leave 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_jump_off_cage (sharedassets180.assets))
+    on FINISHED → Wall Leave 2
+  }
+
+  state Wall Leave 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Leave 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → After Throw Pause
+  }
+
+  state Arrive {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_land_cage (sharedassets180.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Arrive", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetCollider(gameObject=Self, active=true)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Throw Antic
+  }
+
+  state Start Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    BoolTest(boolVariable=var "Sub", isTrue=→"SUB", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+    on SUB → Sub Idle
+  }
+
+  state Attack Choice {
+    SendEvent(eventTarget=Self, sendEvent=→"THROW", delay=0, everyFrame=false)  // disabled
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=var "Hero Y", z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero Y", float2=19, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"HIGH THROW", everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=20.16, tolerance=0, equal=(none), lessThan=→"HIGH THROW", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=39.87, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"HIGH THROW", everyFrame=false)
+    SendRandomEventV3(events=[→"DASH", →"DSTAB", →"THROW"], weights=[1, 1, 1], trackingInts=[var "Ct Dash", var "Ct Dstab", var "Ct Throw"], eventMax=[2, 3, 2], trackingIntsMissed=[var "Ms Dash", var "Ms Dstab", var "Ms Throw"], missedMax=[5, 5, 5])
+    on DASH → Dash Dir
+    on DSTAB → Dstab Pos
+    on THROW → Throw UD?
+    on HIGH THROW → High Check LR
+  }
+
+  state Sub Idle {
+    BoolTest(boolVariable=var "Sub", isTrue=(none), isFalse=→"CANCEL", everyFrame=true)
+    on DASH → Dash Dir
+    on DSTAB → Dstab Pos
+    on THROW → Throw UD?
+    on DASH L → Dash L
+    on DASH R → Dash R
+    on SLOW THROW R → S Throw R
+    on SLOW THROW L → S Throw L
+    on CANCEL → Idle
+    on WIDE THROW L → Wide Throw L
+    on WIDE THROW R → Wide Throw R
+    on NARROW THROW L → Narrow Throw L
+    on NARROW THROW R → Narrow Throw R
+    on HIGH THROW → High Check LR
+  }
+
+  state S Throw R {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Wall X R", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    RandomFloat(min=11.5, max=12.5, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Throw UD", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Throw R", boolValue=false, everyFrame=false)
+    on FINISHED → Set Throws
+  }
+
+  state S Throw L {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Wall X L", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Throw UD", boolValue=false, everyFrame=false)
+    RandomFloat(min=9.5, max=10, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Throw R", boolValue=true, everyFrame=false)
+    on FINISHED → Set Throws
+  }
+
+  state Throw Antic 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Throw 2
+  }
+
+  state Set Throws 2 {
+    SetIntValue(intVariable=var "Throws Crt", intValue=var "Throws", everyFrame=false)
+    on FINISHED → Arrive 2
+  }
+
+  state Throw 2 {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=ruin_shield_sentry_sword_2 (sharedassets34.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SpawnObjectFromGlobalPool(gameObject=Shot Mantis Lord (sharedassets180.assets), spawnPoint=var "Throw Point", position=(unset), rotation=(unset), storeObject=var "Projectile")
+    SendEventByName(eventTarget=GameObjectFSM(var "Projectile", fsm="Control"), sendEvent=var "Shot Event", delay=0, everyFrame=false)
+    on FINISHED → Throw CD
+  }
+
+  state Throw CD 2 {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Keep Throwing? 2
+  }
+
+  state Keep Throwing? 2 {
+    IntOperator(integer1=var "Throws Crt", integer2=1, operation=Subtract, storeResult=var "Throws Crt", everyFrame=false)
+    IntCompare(integer1=var "Throws Crt", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    on FINISHED → Throw Antic 2
+    on CANCEL → Leave Pause
+  }
+
+  state Arrive 2 {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mantis_lord_land_on_ground (sharedassets180.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Arrive", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetCollider(gameObject=Self, active=true)
+    on FINISHED → Throw Antic 2
+  }
+
+  state Throw Pos 2 {
+    RandomFloat(min=var "Wall Y Min", max=var "Wall Y Max", storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Set Throws 2
+  }
+
+  state Arrive Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Throw Antic 2
+  }
+
+  state Leave Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    GGCheckIfBossScene(bossSceneEvent=→"FINISHED", regularSceneEvent=(none))  // disabled
+    on FINISHED → Wall Leave 1
+    on GG BOSS → Short GG 2
+  }
+
+  state Throw UD? {
+    RandomBool(storeResult=var "Throw UD")
+    SetBoolValue(boolVariable=var "Throw UD", boolValue=false, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Throw UD", isTrue=→"THROW UD", isFalse=→"THROW DU", everyFrame=false)
+    on THROW UD → Pos UD
+    on THROW DU → Pos DU
+  }
+
+  state Pos UD {
+    RandomFloat(min=11.5, max=12.5, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Throw Pos
+  }
+
+  state Pos DU {
+    RandomFloat(min=9.5, max=10, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Throw Pos
+  }
+
+  state After Throw Pause {
+    SetPosition(gameObject=Self, vector=var "Away Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false)
+    Wait(time=0.65, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Wide Throw L {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    RandomFloat(min=14.5, max=15.5, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Wall X L", y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetStringValue(stringVariable=var "Shot Event", stringValue="WIDE L", everyFrame=false)
+    on FINISHED → Arrive 2
+  }
+
+  state Wide Throw R {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    RandomFloat(min=14.5, max=15.5, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Wall X R", y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetStringValue(stringVariable=var "Shot Event", stringValue="WIDE R", everyFrame=false)
+    on FINISHED → Arrive 2
+  }
+
+  state Narrow Throw L {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    RandomFloat(min=14.5, max=15.5, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Wall X L", y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetStringValue(stringVariable=var "Shot Event", stringValue="NARROW L", everyFrame=false)
+    on FINISHED → Arrive 2
+  }
+
+  state Narrow Throw R {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    RandomFloat(min=14.5, max=15.5, storeResult=var "Random")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Wall X R", y=var "Random", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetStringValue(stringVariable=var "Shot Event", stringValue="NARROW R", everyFrame=false)
+    on FINISHED → Arrive 2
+  }
+
+  state High Check LR {
+    SetBoolValue(boolVariable=var "Throw UD", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "No Dust", boolValue=true, everyFrame=false)
+    RandomFloat(min=21, max=21, storeResult=var "Random")  // disabled
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=var "Hero Y", z=(unset), space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Hero Y", subtract=1, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Hero Y", minValue=9, maxValue=21.93, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    FloatCompare(float1=var "Hero X", float2=var "Throw Hero L", tolerance=0, equal=(none), lessThan=→"RIGHT", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Throw Hero R", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"LEFT", everyFrame=false)
+    SendRandomEvent(events=[→"LEFT", →"RIGHT"], weights=[1, 1], delay=0)
+    on LEFT → Throw L
+    on RIGHT → Throw R
+  }
+
+  state Shift Y? {
+    GetPosition(gameObject=var "Hero Object", vector=(unset), x=(unset), y=var "Hero Y", z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero Y", float2=12, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=19.2, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Dstab Arrive
+  }
+
+  state Short GG {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Keep Throwing?
+  }
+
+  state Short GG 2 {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wall Leave 1
+  }
+
+  var Sub: bool = false
+
+  var Angle: float = 0
+  var Dash Hero L: float = 29.98
+  var Dash Hero R: float = 30.18
+  var Dash Speed: float = 55
+  var Dash Speed Crt: float = 0
+  var Dash X L: float = 22.25
+  var Dash X R: float = 37.65
+  var Dash Y: float = 10.28
+  var Dstab Speed: float = -65
+  var Dstab X: float = 0
+  var Dstab X Max: float = 38.5
+  var Dstab X Min: float = 21.5
+  var Dstab Y: float = 16.96
+  var Hero X: float = 0
+  var Hero Y: float = 0
+  var Lance Speed: float = 32
+  var Land Y: float = 8.99
+  var Random: float = 0
+  var Self X: float = 0
+  var Self Y: float = 0
+  var Throw Hero L: float = 22
+  var Throw Hero R: float = 37
+  var Wall X L: float = 18.2
+  var Wall X R: float = 41.77
+  var Wall Y Max: float = 16.92
+  var Wall Y Min: float = 10.96
+  var Ct Dash: int = 0
+  var Ct Dstab: int = 0
+  var Ct Throw: int = 0
+  var Ms Dash: int = 0
+  var Ms Dstab: int = 0
+  var Ms Throw: int = 0
+  var Throws: int = 2
+  var Throws Crt: int = 0
+  var Attacking R: bool = false
+  var No Dust: bool = false
+  var Past L: bool = false
+  var Past R: bool = false
+  var Throw R: bool = false
+  var Throw UD: bool = false
+  var Shot Event: string = ""
+  var Away Pos: vector3 = (0, 0, 0)
+  var Dash Hit: gameObject = Mantis Battle/Battle Main/Mantis Lord/Dash Hit
+  var Hero Object: gameObject = <null>
+  var Projectile: gameObject = <null>
+  var Pt Dash: gameObject = <null>
+  var Pt Land: gameObject = Mantis Battle/Battle Main/Mantis Lord/Pt Land
+  var Self: gameObject = <null>
+  var Throw Point: gameObject = Mantis Battle/Battle Main/Mantis Lord/Throw Point
+  var Voice Player: gameObject = <null>
+}

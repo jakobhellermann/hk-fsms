@@ -1,0 +1,125 @@
+# Journal Msg
+# 1 location(s):
+#   prompts_assets_all.bundle / Journal Update Msg
+
+fsm Journal Msg {
+  start Init
+  on DESTROY JOURNAL MSG → End  // from any state
+  on DISABLE → Ended  // from any state
+
+  sequence state Init {
+    GGCheckIsBossRushMode(trueEvent=→"CANCEL", falseEvent=(none), storeValue=(unset))
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Animation", storeResult=var "Animation")
+    FindChild(gameObject=Self, childName="Text", storeResult=var "Text")
+    SetMeshRenderer(gameObject=var "Animation", active=false)
+    ActivateGameObject(gameObject=var "Backboard Small", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Backboard Large", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Text", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="UiMsgPopupFsmProxy", methodName="Activated", parameters=[], storeResult=(unset var), EveryFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    BoolTest(boolVariable=var "Full", isTrue=→"FULL", isFalse=→"HALF", everyFrame=false)
+    on FULL → Full
+    on HALF → Half
+    on CANCEL → End
+  }
+
+  state Full {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=ui_bestiary_cross_out_v2 (sfxstatic_assets_ui.bundle))
+    GetLanguageString(sheetName="Journal", convName="NOTIFICATION_FULL", storeValue=var "Text Str")
+    Tk2dPlayAnimation(gameObject=var "Animation", animLibName="", clipName="Journal Full")
+    SetMeshRenderer(gameObject=var "Animation", active=true)
+    SetTextMeshProText(gameObject=var "Text", textString=var "Text Str")
+    SetStringValue(stringVariable=var "Anim Down", stringValue="Journal Full Down", everyFrame=false)
+    PlayerDataBoolTest(boolName="seenJournalMsg", isTrue=→"SEEN", isFalse=(none))
+    SetPlayerDataBool(boolName="seenJournalMsg", value=true)
+    on FINISHED → Unseen
+    on SEEN → Seen
+  }
+
+  state Half {
+    Tk2dPlayAnimation(gameObject=var "Animation", animLibName="", clipName="Journal Half")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=ui_bestiary_update_v2 (sfxstatic_assets_ui.bundle))
+    SetMeshRenderer(gameObject=var "Animation", active=true)
+    GetLanguageString(sheetName="Journal", convName="NOTIFICATION_HALF", storeValue=var "Text Str")
+    SetPosition(gameObject=var "Animation", vector=(unset), x=(unset), y=-0.04, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetTextMeshProText(gameObject=var "Text", textString=var "Text Str")
+    SetStringValue(stringVariable=var "Anim Down", stringValue="Journal Half Down", everyFrame=false)
+    PlayerDataBoolTest(boolName="seenJournalMsg", isTrue=→"SEEN", isFalse=(none))
+    SetPlayerDataBool(boolName="seenJournalMsg", value=true)
+    on FINISHED → Unseen
+    on SEEN → Seen
+  }
+
+  state Up {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="UP", delay=0, everyFrame=false)
+    Wait(time=var "Wait Time", finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Down
+  }
+
+  state Down {
+    Tk2dPlayAnimation(gameObject=var "Animation", animLibName="", clipName=var "Anim Down")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=true)
+    on FINISHED → Check Quest
+  }
+
+  state Destroy {
+    DestroyObject(gameObject=var "Self", delay=0, detachChildren=false)
+  }
+
+  state Seen {
+    ActivateGameObject(gameObject=var "Backboard Small", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Backboard Large", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Text", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Time", floatValue=3, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Up
+  }
+
+  state Unseen {
+    ActivateGameObject(gameObject=var "Backboard Small", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Backboard Large", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Text", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Time", floatValue=4.25, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Up
+  }
+
+  state Recycle {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN INSTANT", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state End {
+    CallMethodProper(gameObject=Self, behaviour="UiMsgPopupFsmProxy", methodName="Deactivated", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Should Recycle", isTrue=→"RECYCLE", isFalse=→"DESTROY", everyFrame=false)
+    on DESTROY → Destroy
+    on RECYCLE → Recycle
+  }
+
+  state Ended {
+    CallMethodProper(gameObject=Self, behaviour="UiMsgPopupFsmProxy", methodName="Deactivated", parameters=[], storeResult=(unset var), EveryFrame=false)
+  }
+
+  state Check Quest {
+    PlayerDataBoolTest(boolName="seenJournalQuestUpdateMsg", isTrue=→"CANCEL", isFalse=(none))
+    CanEndQuestV2(RequireActive=true, CannotEndEvent=→"CANCEL", CanEndEvent=(none), StoreValue=(unset), Quest=var "Journal")
+    ShowQuestUpdatedStandalone(Quest=var "Journal")
+    SetPlayerDataBool(boolName="seenJournalQuestUpdateMsg", value=true)
+    on FINISHED → End
+    on CANCEL → End
+  }
+
+  var Wait Time: float = 0
+  var Full: bool = false
+  var Should Recycle: bool = false
+  var Anim Down: string = ""
+  var Text Str: string = ""
+  var Animation: gameObject = <null>
+  var Backboard Large: gameObject = Journal Update Msg/Backboard Large
+  var Backboard Small: gameObject = Journal Update Msg/Backboard Small
+  var Self: gameObject = <null>
+  var Text: gameObject = <null>
+  var Journal: object = Journal (dataassets_assets_assets/dataassets/questsystem/quests.bundle)
+}

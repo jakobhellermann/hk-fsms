@@ -1,0 +1,191 @@
+# Chase
+# 2 location(s):
+#   Deepnest_Spider_Town / Zombie Spider Wake/Zombie Spider 1 (1)
+#   Deepnest_Spider_Town / Zombie Spider Wake/Zombie Spider 2
+
+// uses template: corpse_crawler
+fsm Chase {
+  start Init
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Air")
+    on FINISHED → Hit Ground
+  }
+
+  state Chase {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.4)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    ChaseObjectGround(gameObject=Self, target=var "Hero", speedMax=var "Speed Max", acceleration=var "Accel", animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    WaitRandom(timeMin=var "Wait Min", timeMax=var "Wait Max", finishEvent=→"CHANGE", realTime=false)
+    on TOOK DAMAGE → Hit Slow
+    on WALL → Check No Climb
+    on CHANGE → Decision
+  }
+
+  state Hit Slow {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Decision
+  }
+
+  state Hit Ground {
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"FINISHED", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on FINISHED → Check Battle
+  }
+
+  state Flip {
+    AudioStop(gameObject=Self)
+    Tk2dPlayAnimationV2(gameObject=Self, animLibName="", clipName="Burst", doNotResetCurrentClip=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.006, space=0, everyFrame=false, lateUpdate=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[spider_zombie_transform], weights=[1], pitchMin=0.85, pitchMax=1.15, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Active
+  }
+
+  state Wait {
+    WaitRandom(timeMin=3, timeMax=5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check
+  }
+
+  state Active {
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetActive(false))
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0)
+    on FINISHED → Pause
+  }
+
+  state Climb {
+    SetBoolValue(boolVariable=var "Wall L", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Wall R", boolValue=true, everyFrame=false)
+    RandomFloat(min=8, max=14, storeResult=var "Hop Speed")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Hop Speed", everyFrame=true)
+    CheckCollisionSide(topHit=(unset), rightHit=var "Wall R", bottomHit=(unset), leftHit=var "Wall L", topHitEvent=→"STOP", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    BoolNoneTrue(boolVariables=[var "Wall L", var "Wall R"], sendEvent=→"STOP", storeResult=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Climb")
+    on STOP → Chase
+  }
+
+  state Burst Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Burst Antic", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    WaitRandom(timeMin=1, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    SetAudioClip(gameObject=Self, audioClip=spider_zombie_shake)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Flip
+  }
+
+  state Pause {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    WaitRandom(timeMin=0.25, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    SetAudioClip(gameObject=Self, audioClip=spider_zombie_spider_run_loop)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Decision
+  }
+
+  state Check {
+    SendRandomEvent(events=[→"SPIDER", →"NORMAL"], weights=[0.5, 0.5], delay=0)
+    on SPIDER → Burst Antic
+    on NORMAL → Inert
+  }
+
+  state Inert {
+  }
+
+  state Battle Inert {
+    on BATTLE START → Wait 2
+  }
+
+  state Check Battle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Land")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    BoolTest(boolVariable=var "Wait For Battle", isTrue=→"BATTLE", isFalse=(none), everyFrame=false)
+    on FINISHED → Wait
+    on BATTLE → Battle Inert
+  }
+
+  state Wait 2 {
+    BoolTest(boolVariable=var "Instant Wake", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    WaitRandom(timeMin=3, timeMax=5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Burst Antic
+  }
+
+  state Decision {
+    SendRandomEvent(events=[→"CHASE", →"WAIT", →"AWAY"], weights=[0.5, 0.2, 0.3], delay=0)
+    on CHASE → Set Chase
+    on AWAY → Set Away
+    on WAIT → Idle
+  }
+
+  state Set Chase {
+    RandomFloat(min=5, max=10, storeResult=var "Speed Max")
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Max", floatValue=6, everyFrame=false)
+    SetFloatValue(floatVariable=var "Accel", floatValue=0.4, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Set Away {
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Max", floatValue=3, everyFrame=false)
+    SetFloatValue(floatVariable=var "Accel", floatValue=-0.4, everyFrame=false)
+    RandomFloat(min=5, max=8, storeResult=var "Speed Max")
+    on FINISHED → Chase Away
+  }
+
+  state Idle {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    WaitRandom(timeMin=0.25, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    SetFloatValue(floatVariable=var "Accel", floatValue=0.4, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Chase Away {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.4)
+    ChaseObjectGround(gameObject=Self, target=var "Hero", speedMax=var "Speed Max", acceleration=var "Accel", animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    WaitRandom(timeMin=var "Wait Min", timeMax=var "Wait Max", finishEvent=→"CHANGE", realTime=false)
+    on TOOK DAMAGE → Hit Slow
+    on WALL → Decision
+    on CHANGE → Decision
+  }
+
+  state Chase No Climb {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.4)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    ChaseObjectGround(gameObject=Self, target=var "Hero", speedMax=var "Speed Max", acceleration=var "Accel", animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    on FINISHED → Chase
+  }
+
+  state Check No Climb {
+    BoolTest(boolVariable=var "No Climb", isTrue=→"CANCEL", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Climb
+    on CANCEL → Chase No Climb
+  }
+
+  var Instant Wake: bool = true
+  var Wait For Battle: bool = true
+
+  var Accel: float = 0
+  var Hop Speed: float = 0
+  var Pitch: float = 0
+  var Speed Max: float = 0
+  var Wait Max: float = 0
+  var Wait Min: float = 0
+  var Alert Range: bool = false
+  var No Climb: bool = false
+  var Wall L: bool = false
+  var Wall R: bool = false
+  var SFX Player: gameObject = <null>
+  var Self: gameObject = <null>
+}

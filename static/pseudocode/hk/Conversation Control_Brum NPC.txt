@@ -1,0 +1,129 @@
+# Conversation Control
+# 1 location(s):
+#   Grimm_Main_Tent / Brum NPC
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+  on LIGHTS UP → Stop accordion  // from any state
+  on CHEST APPEAR → Disappear  // from any state
+
+  state Idle {
+    on CONVO START → Check Flames
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    Wait(time=1.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Start Accordion
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="IGOR", everyFrame=false)
+    on FINISHED → Choice
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Meet {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["IGOR_MEET", "CP2"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="metBrum", value=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Brumm_talk_01 (sharedassets305.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Choice {
+    BoolTest(boolVariable=var "Flames Full", isTrue=→"ALL FLAMES", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="gotCharm_40", isTrue=→"GOT CHARM", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metBrum", isTrue=→"REPEAT", isFalse=→"MEET")
+    on MEET → Meet
+    on REPEAT → Repeat
+    on GOT CHARM → Got Charm
+    on ALL FLAMES → All Flames
+  }
+
+  state Repeat {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["IGOR_SPEAK", "CP2"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Brumm_talk_02 (sharedassets305.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Got Charm {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["IGOR_FLAME", "CP2"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Brumm_talk_03 (sharedassets236.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Stop accordion {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="ACCORDION END", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Check Flames {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="flamesRequired", storeValue=var "Flames Required")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="flamesCollected", storeValue=var "Flames Collected")
+    IntTestToBool(int1=var "Flames Collected", int2=var "Flames Required", equalBool=var "Flames Full", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=false)
+    on FINISHED → Hero Anim
+  }
+
+  state All Flames {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_40", isTrue=(none), isFalse=→"NO CHILD")
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["IGOR_FINAL", "CP2"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Brumm_talk_03 (sharedassets236.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+    on NO CHILD → No Child
+  }
+
+  state Start Accordion {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Idle
+  }
+
+  state Disappear {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state No Child {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BRUMM_REMINDER", "CP2"], storeResult=(unset var))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Brumm_talk_03 (sharedassets236.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  var Flames Collected: int = 0
+  var Flames Required: int = 0
+  var Flames Full: bool = false
+  var Spoken: bool = false
+  var Area Title: gameObject = <null>
+  var Self: gameObject = <null>
+}

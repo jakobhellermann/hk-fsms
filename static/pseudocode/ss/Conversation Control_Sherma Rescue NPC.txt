@@ -1,0 +1,259 @@
+# Conversation Control
+# 1 location(s):
+#   Ward_09 / Sherma Rescue Scene/Activation Folder/Sherma Rescue NPC
+
+fsm Conversation Control {
+  start Init
+  on BATTLE END → End Pause  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Activation Folder")
+    FindNamedChild(gameObject=var "Activation Folder", storeResult=var "Battle Scene")
+    FindNamedChild(gameObject=Self, storeResult=var "CamLock LookBack")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    HeroTalkAnimationSetBlocked(Value=true)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=2, MaxReactDelay=2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetRandomAudioClipFromTable(Table=sherma_scared_loop (sfxdynamic_assets_sherma.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0.5)
+    on INTERACT → Meet 1
+    on SING → Sing
+  }
+
+  state Meet 1 {
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=1)
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="SHERMA")
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Speaking", setValue=true, everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_RESCUE_MEET1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Turn Back
+  }
+
+  state Turn Back {
+    ApplyMusicCue(musicCue=Enemy Battle Grind (audiocuesdynamic_assets_battle.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Action Only (audioobjects_assets_all.bundle), transitionTime=2)
+    SendEventToRegister(eventName="JUNK BATTLE ANTIC")
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    ActivateGameObject(gameObject=var "CamLock LookBack", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Stop Chime", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Speaking", setValue=false, everyFrame=false)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.3, finishEvent=(none), realTime=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Turn Head Backward", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Audio Loop Enemy", audioClip=enemy_bone_crack_1 (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Audio Loop Enemy", audioClip=enemy_bone_crack_2 (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.25, storePlayer=<null>)
+    AudioPlaySimple(gameObject=var "Audio Loop Enemy", volume=1, oneShotClip=<null>)
+    on FINISHED → Look Back
+  }
+
+  state Look Back {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle Backward")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Meet 2
+  }
+
+  state Meet 2 {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Talking Backward")
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_RESCUE_MEET2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state End Dialogue {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="TurnToChallengeIdle")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Turn Quick", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Battle
+  }
+
+  state Start Battle {
+    TransitionToAudioSnapshot(snapshot=Action and Sub (audioobjects_assets_all.bundle), transitionTime=2)
+    SendMessage(gameObject=var "Battle Scene", delivery=SendMessage, options=0, functionCall=StartBattle())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Stop Chime", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Battle Started", setValue=true, everyFrame=false)
+    ActivateGameObjectDelay(gameObject=var "CamLock LookBack", activate=false, resetOnExit=false, delay=0.5)
+    AudioStopV2(gameObject=var "Audio Loop Enemy", fadeTime=1, cancelOnEarlyExit=false)
+    SendEventToRegister(eventName="JUNK BATTLE START")
+    SetRandomAudioClipFromTable(Table=sherma_scared_loop (sfxdynamic_assets_sherma.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=1)
+  }
+
+  state End Pause {
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Stop Chime", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Speaking", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Battle Started", setValue=false, everyFrame=false)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    HeroTalkAnimationSetBlocked(Value=false)
+    SetNPCSpeakingAudioTable(Target=Self, Table=sherma_talk_sad (sfxdynamic_assets_sherma.bundle))
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.5, cancelOnEarlyExit=false)
+    on FINISHED → Hop Down
+  }
+
+  state Hop Down {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=sherma_ward_hop_down (sfxdynamic_assets_sherma.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    EnableFSM(gameObject=Self, fsmName="Anim", enable=false, resetOnExit=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.0042, space=0, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=trobbio_recover_or_general_foley_movement (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Emerge From Scared", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AnimateYPositionTo(GameObject=Self, ToValue=-6.638, localSpace=true, time=0.15, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    on FINISHED → Land Idle
+  }
+
+  state Land Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Can Talk
+  }
+
+  state Can Talk {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=1.4, MaxReactDelay=1.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on INTERACT → Quest End 1
+    on SING → Sing 2
+    on STARTLE → Startle 2
+  }
+
+  state Quest End 1 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Listen")
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="SHERMA")
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_RESCUE_END1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue 3
+  }
+
+  state End Quest {
+    EndQuestV2(ConsumeCurrency=false, ShowPrompt=true, Quest=Save Sherma (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on FINISHED → Quest End 2
+  }
+
+  state Quest End 2 {
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_RESCUE_END2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="SHERMA")
+    on CONVO_END → End Dialogue 2
+  }
+
+  state End Dialogue 2 {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    CancelDoQueuedSaveGame()
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    on FINISHED → Hornet Reach
+  }
+
+  state Hornet Reach {
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Stand 1")
+    Wait(time=0.75, finishEvent=(none), realTime=false)
+    on FINISHED → Get Spool Piece
+  }
+
+  state Get Spool Piece {
+    CreateObject(gameObject=Silk Spool Instant (silkspoolupgrade_assets_all.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Listen End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetNPCSpeakingAudioTable(Target=Self, Table=sherma_talk_ward_final (sfxdynamic_assets_sherma.bundle))
+    on FINISHED → End Idle
+  }
+
+  state End Idle {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=1.4, MaxReactDelay=1.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Repeat Convo
+    on SING → Sing 3
+    on STARTLE → Startle 3
+  }
+
+  state End Dialogue 3 {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    on FINISHED → End Quest
+  }
+
+  state Repeat Convo {
+    RunDialogue(Sheet="Wanderers", Key="SHERMA_RESCUE_END_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="SHERMA")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Listen")
+    on CONVO_END → End Dialogue 4
+  }
+
+  state End Dialogue 4 {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Listen End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → End Idle
+  }
+
+  state Startle {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FLINCH", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Sing {
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=sherma_sing_scared (sfxdynamic_assets_sherma.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Singing", setValue=true, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    on END → Sing End
+  }
+
+  state Sing End {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    SetFsmBool(gameObject=Self, fsmName="Anim", variableName="Singing", setValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Sing 2 {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="EXCITED", delay=0, everyFrame=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=sherma_sing_scared (sfxdynamic_assets_sherma.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on END → Sing End 2
+  }
+
+  state Sing End 2 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="EXCITED END", delay=0, everyFrame=false)
+    on READY → Can Talk
+  }
+
+  state Startle 2 {
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=sherma_alert_subdued (sfxdynamic_assets_sherma.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle F", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Can Talk
+  }
+
+  state Sing 3 {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="EXCITED", delay=0, everyFrame=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=sherma_sing_scared (sfxdynamic_assets_sherma.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on END → Sing End 3
+  }
+
+  state Sing End 3 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="EXCITED END", delay=0, everyFrame=false)
+    on READY → End Idle
+  }
+
+  state Startle 3 {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle F", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=sherma_alert_subdued (sfxdynamic_assets_sherma.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → End Idle
+  }
+
+  var Activation Folder: gameObject = <null>
+  var Battle Scene: gameObject = <null>
+  var CamLock LookBack: gameObject = <null>
+  var Audio Loop Enemy: gameObject = Sherma Rescue Scene/Activation Folder/Sherma Rescue NPC/Audio Loop Enemy
+  var Audio Loop Voice: gameObject = Sherma Rescue Scene/Activation Folder/Sherma Rescue NPC/Audio Loop Voice
+}

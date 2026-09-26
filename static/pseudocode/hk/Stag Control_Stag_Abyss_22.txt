@@ -1,0 +1,614 @@
+# Stag Control
+# 1 location(s):
+#   Abyss_22 / Stag
+
+fsm Stag Control {
+  start Pause
+  on CONVO START → Convo  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetFsmBool(gameObject=Self, fsmName="npc_control", variableName="Can Talk", setValue=false, everyFrame=false)
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    FindGameObject(objectName="", withTag="Stag Grate", store=var "Grate")
+    FindChild(gameObject=Self, childName="Travel Range", storeResult=var "Travel Range")
+    FindChild(gameObject=Self, childName="Arrival Dust", storeResult=var "Arrival Dust")
+    FindChild(gameObject=Self, childName="Arrival Anim", storeResult=var "Arrival Anim")
+    FindChild(gameObject=Self, childName="Dream Dialogue", storeResult=var "Dream Dialogue")
+    FindChild(gameObject=var "Self", childName="Prompt Marker Trv", storeResult=var "Prompt Marker")
+    SetStringValue(stringVariable=var "Prompt Name", stringValue="Travel", everyFrame=false)
+    on FINISHED → Reset HUD and Flower Check
+  }
+
+  state Check if Station Opened {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "Station Opened Bool", isTrue=→"OPENED", isFalse=→"CLOSED")
+    on OPENED → Station Opened
+    on CLOSED → Station Closed
+  }
+
+  state Station Closed {
+    SetBoolValue(boolVariable=var "Station Opened", boolValue=false, everyFrame=false)
+    SetFsmBool(gameObject=Self, fsmName="npc_control", variableName="Can Talk", setValue=false, everyFrame=false)
+    on FINISHED → Away
+  }
+
+  state Station Opened {
+    DestroyObject(gameObject=var "Grate", delay=0, detachChildren=false)
+    SetBoolValue(boolVariable=var "Station Opened", boolValue=true, everyFrame=false)
+    on FINISHED → Check Position
+  }
+
+  state Check Position {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="stagPosition", storeValue=var "Current Position")
+    IntCompare(integer1=var "Current Position", integer2=var "Station Position Number", equal=→"PRESENT", lessThan=→"AWAY", greaterThan=→"AWAY", everyFrame=false)
+    on PRESENT → Activate
+    on AWAY → Away
+  }
+
+  state Away {
+    SetMeshRenderer(gameObject=Self, active=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Set Can Talk
+  }
+
+  state Opened? {
+    SetPlayerDataInt(intName="stagPosition", value=var "Station Position Number")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "Station Opened Bool", isTrue=→"OPENED", isFalse=→"CLOSED")
+    on OPENED → Arrive Pause
+    on CLOSED → Open Grate
+  }
+
+  state Open Grate {
+    SetPlayerDataBool(boolName=var "Station Opened Bool", value=true)
+    SetBoolValue(boolVariable=var "Station Opened", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Grate", clipName="Grate_disappear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Remove Grate
+  }
+
+  state Arrive Pause {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=stag_arrive (sharedassets9.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetIntValue(intVariable=var "Current Position", intValue=var "Station Position Number", everyFrame=false)
+    SetPlayerDataInt(intName="stagPosition", value=var "Station Position Number")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Arrive Anim
+  }
+
+  state Arrive Anim {
+    SetMeshRenderer(gameObject=var "Arrival Anim", active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Arrival Anim", clipName="Arrive", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetMeshRenderer(gameObject=var "Arrival Dust", active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Arrival Dust", clipName="Arrive_smoke", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Shaking
+  }
+
+  state Remove Grate {
+    DestroyObject(gameObject=var "Grate", delay=0, detachChildren=false)
+    on FINISHED → Arrive Pause
+  }
+
+  state Activate {
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetMeshRenderer(gameObject=var "Arrival Dust", active=false)
+    SetMeshRenderer(gameObject=var "Arrival Anim", active=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Dream Dialogue", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true)
+    on FINISHED → Activate 2
+  }
+
+  state Idle {
+    SetFsmBool(gameObject=Self, fsmName="npc_control", variableName="Can Talk", setValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)  // disabled
+    HidePromptMarker(storedObject=var "Prompt")
+    on IN RANGE → Show Prompt
+  }
+
+  state In Range {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="UP", delay=0, everyFrame=false)  // disabled
+    ListenForDown(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForUp(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    on OUT OF RANGE → Idle
+    on UP PRESSED → Can Talk?
+  }
+
+  state Activate 2 {
+    ActivateGameObject(gameObject=var "Travel Range", activate=true, recursive=true, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Travel Range", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Met Before?
+  }
+
+  state Met Before? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metStag", isTrue=→"FINISHED", isFalse=(none))
+    SetFsmString(gameObject=var "Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Listen", everyFrame=false)  // disabled
+    SetStringValue(stringVariable=var "Prompt Name", stringValue="Listen", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="CHANGE LABEL", delay=0, everyFrame=false)  // disabled
+    on FINISHED → Start Audio
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Range
+  }
+
+  state Can Talk? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanInput", parameters=[], storeResult=var "Can Input")
+    BoolTest(boolVariable=var "Can Input", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["onGround"], storeResult=var "On Ground")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["attacking"], storeResult=var "Attacking")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["upAttacking"], storeResult=var "Attacking Up")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["downAttacking"], storeResult=var "Attacking Down")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["dashing"], storeResult=var "Dashing")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["backDashing"], storeResult=var "Backdashing")
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolAnyTrue(boolVariables=[var "Attacking", var "Attacking Down", var "Attacking Up", var "Backdashing", var "Dashing"], sendEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Take Control
+  }
+
+  state Take Control {
+    AudioStop(gameObject=Self)
+    SetBoolValue(boolVariable=var "Talking", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Ranges Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)  // disabled
+    HidePromptMarker(storedObject=var "Prompt")
+    SetStringValue(stringVariable=var "Prompt Name", stringValue="Travel", everyFrame=false)
+    on FINISHED → Check Proximity
+  }
+
+  state Meeting {
+    ActivateGameObject(gameObject=var "Travel Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Stag_01 (sharedassets9.assets), Stag_02 (sharedassets9.assets), Stag_03 (sharedassets9.assets), Stag_04 (sharedassets9.assets), Stag_05 (sharedassets9.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetPlayerDataBool(boolName="metStag", value=true)
+    SetFsmBool(gameObject=var "Self", fsmName="advance_conversation", variableName="Conversing", setValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["STAG_MEET", "Stag"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down
+  }
+
+  state Box Up {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    CreateObject(gameObject=Area Title (sharedassets9.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Area Title", networkInstantiate=false, networkGroup=0)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="STAG", everyFrame=false)
+    on FINISHED → Convo Choice
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    SetFsmString(gameObject=var "Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Travel", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="CHANGE LABEL", delay=0, everyFrame=false)
+    on FINISHED → Open map
+  }
+
+  state Meeting End {
+    SetFsmBool(gameObject=var "Self", fsmName="advance_conversation", variableName="Conversing", setValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Travel Range", activate=true, recursive=true, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Talking", boolValue=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    on FINISHED → Start Audio
+  }
+
+  state Check Proximity {
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Left Prox", floatValue=var "Self X", everyFrame=false)
+    FloatSubtract(floatVariable=var "Left Prox", subtract=var "Move To Offset", everyFrame=false, perSecond=false)
+    SetFloatValue(floatVariable=var "Right Prox", floatValue=var "Self X", everyFrame=false)
+    FloatAdd(floatVariable=var "Right Prox", add=var "Move To Offset", everyFrame=false, perSecond=false)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Self X", upperValue=var "Right Prox", boolVariable=(unset), trueEvent=→"MOVE RIGHT", falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Left Prox", upperValue=var "Self X", boolVariable=(unset), trueEvent=→"MOVE LEFT", falseEvent=(none), everyFrame=false)
+    GetScale(gameObject=var "Hero", vector=(unset), xScale=var "Hero X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Hero X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Facing Right", greaterThanBool=var "Hero Facing Left", everyFrame=false)
+    FloatTestToBool(float1=var "Hero X", float2=var "Self X", tolerance=0, equalBool=(unset), lessThanBool=var "Hero On Left", greaterThanBool=var "Hero On Right", everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Facing Right", var "Hero On Right"], sendEvent=→"TURN LEFT", storeResult=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Facing Left", var "Hero On Left"], sendEvent=→"TURN RIGHT", storeResult=(unset), everyFrame=false)
+    on TURN LEFT → Turn Hero Left
+    on TURN RIGHT → Turn Hero Right
+    on FINISHED → Convo?
+  }
+
+  state Turn Hero Right {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Convo?
+  }
+
+  state Turn Hero Left {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Convo?
+  }
+
+  state Fade {
+    SetPlayerDataBool(boolName="travelling", value=true)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_rodeStag(var "To Scene"))
+    SetPlayerDataBool(boolName="kingsStationNonDisplay", value=false)
+    SetPlayerDataBool(boolName="queensStationNonDisplay", value=false)
+    TransitionToAudioSnapshot(snapshot=Silent (resources.assets), transitionTime=1)
+    TransitionToAudioSnapshot(snapshot=Off (resources.assets), transitionTime=1)
+    TransitionToAudioSnapshot(snapshot=at None (resources.assets), transitionTime=1)
+    SetPlayerDataString(gameObject=var "GameManager", stringName="nextScene", value=var "To Scene")
+    SendEventByName(eventTarget=GameObject(var "MainCamera"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    SetFsmFloat(gameObject=var "HUD Blanker", fsmName="Blanker Control", variableName="Fade Time", setValue=1, everyFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE IN", delay=0, everyFrame=false)  // disabled
+    Wait(time=1, finishEvent=→"AWAY", realTime=false)
+    on AWAY → Time Passes
+  }
+
+  state Go To Stag Cutscene {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="ChangeToScene", parameters=["", (unset var), (unset var)], storeResult=(unset var))  // disabled
+    SetPlayerDataString(gameObject=var "GameManager", stringName="nextScene", value=var "To Scene")
+    SetPlayerDataInt(intName="stagPosition", value=var "To Position")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SaveLevelState", parameters=[false], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var))
+    LoadLevel(levelName="Cinematic_Stag_travel", additive=false, async=false, loadedEvent=(none), dontDestroyOnLoad=false, failedEvent=(none))
+  }
+
+  state Convo {
+    SetFsmString(gameObject=var "Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Travel", everyFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="CHANGE LABEL", delay=0, everyFrame=false)  // disabled
+    SetStringValue(stringVariable=var "Prompt Name", stringValue="Travel", everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Set Can Talk {
+    SetFsmBool(gameObject=Self, fsmName="npc_control", variableName="Can Talk", setValue=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    on STAG BELL RUNG → Opened?
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    WaitForBossLoad(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Open map {
+    ActivateGameObject(gameObject=var "Travel Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Stag_01 (sharedassets9.assets), Stag_02 (sharedassets9.assets), Stag_03 (sharedassets9.assets), Stag_04 (sharedassets9.assets), Stag_05 (sharedassets9.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    SetFsmGameObject(gameObject=var "MenuHolder", fsmName="Open Stag", variableName="Requester", setValue=var "Self", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "MenuHolder"), sendEvent="OPEN STAG MENU", delay=0, everyFrame=false)
+    on CONTINUE → Check Result
+  }
+
+  state Check Result {
+    SendEventByName(eventTarget=Self, sendEvent=var "Selection Result", delay=0, everyFrame=false)
+    on Crossroads → Crossroads
+    on Dirtmouth → Dirtmouth
+    on Forest Of Bones → 
+    on Fungal Wastes → Fungal Wastes
+    on Greenpath → Greenpath
+    on Palace Grounds → 
+    on Resting Grounds → Resting Grounds
+    on Royal Gardens → Royal Gardens
+    on City Storerooms → City Storerooms
+    on Kings Station → Kings Station
+    on Deepnest → Deepnest
+    on Stag Nest → Stag Nest
+    on Hidden Station → Hidden Station
+  }
+
+  state Crossroads {
+    SetIntValue(intVariable=var "To Position", intValue=1, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Crossroads_47", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Dirtmouth {
+    SetIntValue(intVariable=var "To Position", intValue=0, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Room_Town_Stag_Station", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Current Location Check {
+    IntCompare(integer1=var "Current Position", integer2=var "To Position", equal=→"CANCEL", lessThan=(none), greaterThan=(none), everyFrame=false)
+    on CANCEL → HUD Return
+    on FINISHED → Fade
+  }
+
+  state Greenpath {
+    SetIntValue(intVariable=var "To Position", intValue=2, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Fungus1_16_alt", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Fungal Wastes {
+    SetIntValue(intVariable=var "To Position", intValue=3, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Fungus2_02", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Time Passes {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=TimePasses())
+    on FINISHED → Go To Stag Cutscene
+  }
+
+  state City Storerooms {
+    SetIntValue(intVariable=var "To Position", intValue=5, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Ruins1_29", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Shaking {
+    Tk2dWatchAnimationEvents(gameObject=var "Arrival Anim", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=true, everyFrame=false)
+    on FINISHED → Shake
+  }
+
+  state Shake {
+    Tk2dWatchAnimationEvents(gameObject=var "Arrival Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    on FINISHED → Activate
+  }
+
+  state Resting Grounds {
+    SetIntValue(intVariable=var "To Position", intValue=7, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="RestingGrounds_09", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Kings Station {
+    SetIntValue(intVariable=var "To Position", intValue=6, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Ruins2_08", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Deepnest {
+    SetIntValue(intVariable=var "To Position", intValue=8, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Deepnest_09", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Convo? {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metStag", isTrue=(none), isFalse=→"MEET")
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="hasXunFlower", falseBool="xunFlowerBroken", isTrue=→"FLOWER", isFalse=(none))
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="stagEggInspected", falseBool="stagHopeConvo", isTrue=→"HOPE", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="openedStagNest", isTrue=→"FINISHED", isFalse=(none))
+    GetPlayerDataBool(boolName="stagRemember1", storeValue=var "Remember Convo 1")
+    GetPlayerDataBool(boolName="stagRemember2", storeValue=var "Remember Convo 2")
+    GetPlayerDataBool(boolName="stagRemember3", storeValue=var "Remember Convo 3")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="stationsOpened", storeValue=var "Stations Opened")
+    IntTestToBool(int1=var "Stations Opened", int2=2, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Opened 3", everyFrame=false)
+    IntTestToBool(int1=var "Stations Opened", int2=5, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Opened 6", everyFrame=false)
+    IntTestToBool(int1=var "Stations Opened", int2=8, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Opened 9", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Remember Convo 3", var "Opened 9"], boolStates=[false, true], trueEvent=→"REMEMBER 3", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Remember Convo 2", var "Opened 6"], boolStates=[false, true], trueEvent=→"REMEMBER 2", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Remember Convo 1", var "Opened 3"], boolStates=[false, true], trueEvent=→"REMEMBER 1", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Open map
+    on REMEMBER 1 → Title Check
+    on REMEMBER 2 → Title Check
+    on REMEMBER 3 → Title Check
+    on MEET → Title Check
+    on HOPE → Title Check
+    on FLOWER → Title Check
+  }
+
+  state Convo Choice {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metStag", isTrue=(none), isFalse=→"MEET")
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="stagEggInspected", falseBool="stagHopeConvo", isTrue=→"HOPE", isFalse=(none))
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="hasXunFlower", falseBool="xunFlowerBroken", isTrue=→"FLOWER", isFalse=(none))
+    BoolTestMulti(boolVariables=[var "Remember Convo 3", var "Opened 9"], boolStates=[false, true], trueEvent=→"REMEMBER 3", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Remember Convo 2", var "Opened 6"], boolStates=[false, true], trueEvent=→"REMEMBER 2", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Remember Convo 1", var "Opened 3"], boolStates=[false, true], trueEvent=→"REMEMBER 1", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → 
+    on REMEMBER 1 → Remember 1
+    on REMEMBER 2 → Remember 2
+    on REMEMBER 3 → Remember 3
+    on MEET → Meeting
+    on HOPE → Hope 1
+    on FLOWER → Flower
+  }
+
+  state Remember 1 {
+    ActivateGameObject(gameObject=var "Travel Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Stag_01 (sharedassets9.assets), Stag_02 (sharedassets9.assets), Stag_03 (sharedassets9.assets), Stag_04 (sharedassets9.assets), Stag_05 (sharedassets9.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetFsmBool(gameObject=var "Self", fsmName="advance_conversation", variableName="Conversing", setValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="stagRemember1", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["STAG_REMEMBER_1", "Stag"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down
+  }
+
+  state Remember 2 {
+    ActivateGameObject(gameObject=var "Travel Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Stag_01 (sharedassets9.assets), Stag_02 (sharedassets9.assets), Stag_03 (sharedassets9.assets), Stag_04 (sharedassets9.assets), Stag_05 (sharedassets9.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetFsmBool(gameObject=var "Self", fsmName="advance_conversation", variableName="Conversing", setValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="stagRemember1", value=true)
+    SetPlayerDataBool(boolName="stagRemember2", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["STAG_REMEMBER_2", "Stag"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down
+  }
+
+  state Remember 3 {
+    ActivateGameObject(gameObject=var "Travel Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Stag_01 (sharedassets9.assets), Stag_02 (sharedassets9.assets), Stag_03 (sharedassets9.assets), Stag_04 (sharedassets9.assets), Stag_05 (sharedassets9.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetFsmBool(gameObject=var "Self", fsmName="advance_conversation", variableName="Conversing", setValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="stagRemember1", value=true)
+    SetPlayerDataBool(boolName="stagRemember2", value=true)
+    SetPlayerDataBool(boolName="stagRemember3", value=true)
+    SetPlayerDataBool(boolName="openedStagNest", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["STAG_REMEMBER_3", "Stag"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down
+  }
+
+  state Royal Gardens {
+    SetIntValue(intVariable=var "To Position", intValue=4, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Fungus3_40", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Stag Nest {
+    SetIntValue(intVariable=var "To Position", intValue=9, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Cliffs_03", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state HUD Return {
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    on FINISHED → Meeting End
+  }
+
+  state Reset HUD and Flower Check {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="travelling", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="travelling", value=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="hasXunFlower", falseBool="xunFlowerBroken", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="xunFlowerBroken", value=true)
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="xunFlowerBrokeTimes")
+    CreateObject(gameObject=Relic Get Msg (resources.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Msg", networkInstantiate=false, networkGroup=0)
+    FindChild(gameObject=var "Msg", childName="Text", storeResult=var "Msg Text")
+    FindChild(gameObject=var "Msg", childName="Icon", storeResult=var "Msg Item")
+    SetSpriteRendererSprite(gameObject=var "Msg Item", sprite=White_Flower_Half (resources.assets))
+    GetLanguageString(sheetName="UI", convName="NOTIFICATION_FLOWER_BREAK", storeValue=var "Item Name")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Item Name")
+    on FINISHED → Check if Station Opened
+  }
+
+  state Title Check {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="stagHopeConvo", isTrue=→"OLD", isFalse=→"LAST")
+    on LAST → Last
+    on OLD → Old
+  }
+
+  state Last {
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="STAG", everyFrame=false)
+    on FINISHED → Box Up
+  }
+
+  state Old {
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="STAG2", everyFrame=false)
+    on FINISHED → Box Up
+  }
+
+  state Hope 1 {
+    SetPlayerDataBool(boolName="stagHopeConvo", value=true)
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["STAG_HOPE_1", "Stag"], storeResult=(unset var))
+    on CONVO_FINISH → Hope 2
+  }
+
+  state Hope 2 {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    CreateObject(gameObject=Area Title Extra (sharedassets9.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Area Title", networkInstantiate=false, networkGroup=0)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="STAG2", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["STAG_HOPE_2", "Stag"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down
+  }
+
+  state Flower {
+    ActivateGameObject(gameObject=var "Travel Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Stag_01 (sharedassets9.assets), Stag_02 (sharedassets9.assets), Stag_03 (sharedassets9.assets), Stag_04 (sharedassets9.assets), Stag_05 (sharedassets9.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetFsmBool(gameObject=var "Self", fsmName="advance_conversation", variableName="Conversing", setValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["STAG_FLOWER_WARNING", "Stag"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down
+  }
+
+  state Start Audio {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Idle
+  }
+
+  state Hidden Station {
+    SetIntValue(intVariable=var "To Position", intValue=10, everyFrame=false)
+    SetStringValue(stringVariable=var "To Scene", stringValue="Abyss_22", everyFrame=false)
+    on FINISHED → Current Location Check
+  }
+
+  state Hidden Station? {
+    IntCompare(integer1=var "Station Position Number", integer2=10, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)
+    on FINISHED → In Range
+    on L → Prompt L
+    on R → Prompt R
+  }
+
+  state Prompt L {
+    SetPosition(gameObject=var "Prompt", vector=(unset), x=36.89, y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → In Range
+  }
+
+  state Prompt R {
+    SetPosition(gameObject=var "Prompt", vector=(unset), x=50.16, y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → In Range
+  }
+
+  state Show Prompt {
+    ShowPromptMarker(prefab=Arrow Prompt New (resources.assets), labelName=var "Prompt Name", spawnPoint=var "Prompt Marker", storeObject=var "Prompt")
+    on FINISHED → Hidden Station?
+  }
+
+  var Move To Offset: float = 2
+  var Station Position Number: int = 10
+  var Station Opened Bool: string = "openedHiddenStation"
+
+  var Axis Vert: float = 0
+  var Hero X: float = 0
+  var Hero X Scale: float = 0
+  var Left Prox: float = 0
+  var Right Prox: float = 0
+  var Self X: float = 0
+  var Current Position: int = 0
+  var Stations Opened: int = 0
+  var To Position: int = 0
+  var Attacking: bool = false
+  var Attacking Down: bool = false
+  var Attacking Up: bool = false
+  var Backdashing: bool = false
+  var Can Input: bool = false
+  var Dashing: bool = false
+  var Hero Facing Left: bool = false
+  var Hero Facing Right: bool = false
+  var Hero On Left: bool = false
+  var Hero On Right: bool = false
+  var On Ground: bool = false
+  var Opened 3: bool = false
+  var Opened 6: bool = false
+  var Opened 9: bool = false
+  var Remember Convo 1: bool = false
+  var Remember Convo 2: bool = false
+  var Remember Convo 3: bool = false
+  var Station Opened: bool = false
+  var Talking: bool = false
+  var Item Name: string = ""
+  var Prompt Name: string = "openedRuins2"
+  var Selection Result: string = "openedHiddenStation"
+  var To Scene: string = "Room_Town_Stag_Station"
+  var Area Title: gameObject = <null>
+  var Arrival Anim: gameObject = <null>
+  var Arrival Dust: gameObject = <null>
+  var Dream Dialogue: gameObject = <null>
+  var Grate: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Msg: gameObject = <null>
+  var Msg Item: gameObject = <null>
+  var Msg Text: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Prompt Marker: gameObject = <null>
+  var Ranges Folder: gameObject = <null>
+  var Self: gameObject = <null>
+  var Travel Range: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

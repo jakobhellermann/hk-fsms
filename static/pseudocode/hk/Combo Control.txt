@@ -1,0 +1,93 @@
+# Combo Control
+# 1 location(s):
+#   GG_Nailmasters / Brothers
+
+fsm Combo Control {
+  start Init
+
+  state Init {
+    on FINISHED → Oro Battle
+  }
+
+  state Idle {
+    IntCompare(integer1=var "Attacks Until Combo", integer2=0, equal=→"COMBO", lessThan=→"COMBO", greaterThan=(none), everyFrame=false)
+    on ATTACK → Decrement
+    on COMBO → Combo Choice
+    on DEFEATED → Defeated 1
+  }
+
+  state Reset {
+    RandomInt(min=4, max=6, storeResult=var "Attacks Until Combo", inclusiveMax=true)
+    SetFsmBool(gameObject=var "Mato", fsmName="nailmaster", variableName="Do Dash Slash", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Oro", fsmName="nailmaster", variableName="Do Dash Slash", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Mato", fsmName="nailmaster", variableName="Do Cyclone", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Oro", fsmName="nailmaster", variableName="Do Cyclone", setValue=false, everyFrame=false)
+    on FINISHED → Idle
+    on DEFEATED → Defeated 1
+  }
+
+  state Decrement {
+    IntOperator(integer1=var "Attacks Until Combo", integer2=1, operation=Subtract, storeResult=var "Attacks Until Combo", everyFrame=false)
+    on FINISHED → Idle
+    on DEFEATED → Defeated 1
+  }
+
+  state Combo Choice {
+    SendEventByName(eventTarget=Self, sendEvent="CYCLONE", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV2(events=[→"CYCLONE", →"DASH"], weights=[1, 1], trackingInts=[var "Ct Cyclone", var "Ct Dash"], eventMax=[2, 2])
+    on CYCLONE → Set Cyclone
+    on DASH → Set Dash
+    on DEFEATED → Defeated 1
+  }
+
+  state Set Dash {
+    SetFsmBool(gameObject=var "Mato", fsmName="nailmaster", variableName="Do Dash Slash", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Oro", fsmName="nailmaster", variableName="Do Dash Slash", setValue=true, everyFrame=false)
+    on COMBO COMPLETED → Reset
+    on DEFEATED → Defeated 1
+  }
+
+  state Set Cyclone {
+    SetFsmBool(gameObject=var "Mato", fsmName="nailmaster", variableName="Do Cyclone", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Oro", fsmName="nailmaster", variableName="Do Cyclone", setValue=true, everyFrame=false)
+    on COMBO COMPLETED → Reset
+    on DEFEATED → Defeated 1
+  }
+
+  state Oro Battle {
+    on NEXT → Reset
+  }
+
+  state Defeated 1 {
+    on DEFEATED → Journal
+  }
+
+  state Defeated 2 {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    TransitionToAudioSnapshot(snapshot=Silent (resources.assets), transitionTime=1)  // disabled
+    on FINISHED → Bow
+  }
+
+  state Bow {
+    SendEventByName(eventTarget=GameObject(var "Mato"), sendEvent="BOW", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Oro"), sendEvent="BOW", delay=0, everyFrame=false)
+  }
+
+  state Journal {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="killedNailBros", isTrue=→"FINISHED", isFalse=(none))
+    SetPlayerDataBool(boolName="killedNailBros", value=true)
+    SetPlayerDataBool(boolName="newDataNailBros", value=true)
+    SetPlayerDataInt(intName="killsNailBros", value=0)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasJournal", isTrue=(none), isFalse=→"FINISHED")
+    CreateObject(gameObject=Journal Update Msg (resources.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    on FINISHED → Defeated 2
+  }
+
+  var Mato: gameObject = Brothers/Mato
+  var Oro: gameObject = Brothers/Oro
+
+  var Attacks Until Combo: int = 0
+  var Ct Cyclone: int = 0
+  var Ct Dash: int = 0
+  var Battlers: bool = false
+}

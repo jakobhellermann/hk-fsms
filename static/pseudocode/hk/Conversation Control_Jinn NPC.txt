@@ -1,0 +1,237 @@
+# Conversation Control
+# 1 location(s):
+#   Room_Jinn / Jinn NPC
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    FindChild(gameObject=Self, childName="Talk NPC", storeResult=var "Talk NPC")
+    on FINISHED → Met?
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="JINN", everyFrame=false)
+    on FINISHED → Meet?
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="TALK END", delay=0, everyFrame=false)
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Meet {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="metJinn", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_MEET", "Minor NPC"], storeResult=(unset var))
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    SetFsmString(gameObject=var "Arrow Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Trade", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Arrow Prompt"), sendEvent="CHANGE LABEL", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Talk NPC", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on CONVO_FINISH → Has Egg?
+  }
+
+  state Meet? {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Talk NPC", audioClips=[Jinn_generic_01 (sharedassets29.assets), Jinn_generic_02 (sharedassets29.assets), Jinn_generic_03 (sharedassets29.assets), Jinn_generic_04 (sharedassets29.assets), Jinn_generic_05 (sharedassets29.assets)], weights=[1, 1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="TALK", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "No Eggs", isTrue=→"NO EGG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Sold Egg", isTrue=→"SOLD EGG", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REPEAT", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metJinn", isTrue=→"GREET", isFalse=→"MEET")
+    on MEET → Meet
+    on GREET → Greet
+    on SOLD EGG → Re-Offer
+    on NO EGG → No Egg Repeat
+    on REPEAT → Re-Offer 2
+  }
+
+  state Greet {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_RETURN", "Minor NPC"], storeResult=(unset var))
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    on CONVO_FINISH → Has Egg?
+  }
+
+  state Has Egg? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="rancidEggs", storeValue=var "Rancid Eggs")
+    IntCompare(integer1=var "Rancid Eggs", integer2=0, equal=→"NO EGG", lessThan=→"NO EGG", greaterThan=→"HAS EGG", everyFrame=false)
+    on HAS EGG → Offer
+    on NO EGG → No Egg
+  }
+
+  state No Egg {
+    SetBoolValue(boolVariable=var "No Eggs", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_NOEGG", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state No Egg Repeat {
+    SetBoolValue(boolVariable=var "No Eggs", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JONN_NOEGG_REPEAT", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Has Egg? R {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="rancidEggs", storeValue=var "Rancid Eggs")
+    IntCompare(integer1=var "Rancid Eggs", integer2=0, equal=→"NO EGG", lessThan=→"NO EGG", greaterThan=→"HAS EGG", everyFrame=false)
+    on HAS EGG → Box Down 2
+    on NO EGG → No Egg
+  }
+
+  state Offer {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_OFFER", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Re-Offer {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_REOFFER", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Has Egg? R
+  }
+
+  state Box Down 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="TALK END", delay=0, everyFrame=false)
+    on FINISHED → Box Up YN
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=0, everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_OFFER", "Prompts"], storeResult=(unset var))
+    on NO → Decline
+    on YES → Accept
+  }
+
+  state Decline {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="TALK", delay=0, everyFrame=false)
+    on FINISHED → Box Up 2
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Decline Msg
+  }
+
+  state Decline Msg {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_REFUSE", "Minor NPC"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Talk NPC", audioClips=[Jinn_generic_07 (sharedassets29.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Accept {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="TALK", delay=0, everyFrame=false)
+    on FINISHED → Box Up 3
+  }
+
+  state Box Up 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Accept Msg
+  }
+
+  state Accept Msg {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Talk NPC", audioClips=[Jinn_generic_06 (sharedassets29.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    BoolTest(boolVariable=var "Sold Egg", isTrue=→"SOLD EGG", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Sold Egg", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_ACCEPT", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 3
+    on SOLD EGG → Accept Msg 2
+  }
+
+  state Accept Msg 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_ACCEPT_REPEAT", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 3
+  }
+
+  state Box Down 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Transaction
+  }
+
+  state Transaction {
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="rancidEggs", amount=var "Decrement")
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="jinnEggsSold")
+    RandomInt(min=var "Price Min", max=var "Price Max", storeResult=var "Geo Payout", inclusiveMax=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AddGeo", parameters=[var "Geo Payout"], storeResult=(unset var))
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveGame())
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Talk Finish
+  }
+
+  state Met? {
+    FindGameObject(objectName="Arrow Prompt", withTag="Untagged", store=var "Arrow Prompt")  // disabled
+    GetFsmGameObject(gameObject=Self, fsmName="npc_control", variableName="Prompt", storeValue=var "Arrow Prompt", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metJinn", isTrue=(none), isFalse=→"FINISHED")
+    SetFsmString(gameObject=var "Arrow Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Trade", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Arrow Prompt"), sendEvent="CHANGE LABEL", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Talk NPC", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    on FINISHED → Idle
+  }
+
+  state Re-Offer 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JINN_OFFER", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Has Egg? R
+  }
+
+  var Price Max: int = 450
+  var Price Min: int = 290
+
+  var Decrement: int = -1
+  var Geo Payout: int = 0
+  var Rancid Eggs: int = 0
+  var No Eggs: bool = false
+  var Sold Egg: bool = false
+  var Spoken: bool = false
+  var Area Title: gameObject = <null>
+  var Arrow Prompt: gameObject = <null>
+  var Self: gameObject = <null>
+  var Talk NPC: gameObject = <null>
+}

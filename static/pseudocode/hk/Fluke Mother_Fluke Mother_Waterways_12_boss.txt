@@ -1,0 +1,178 @@
+# Fluke Mother
+# 1 location(s):
+#   Waterways_12_boss / Fluke Mother
+
+fsm Fluke Mother {
+  start Init
+
+  state Init {
+    GetHP(target=Self, storeValue=var "Start Health")
+    GetChild(gameObject=Self, childName="Vines", withTag="Untagged", storeResult=var "Vines")
+    FindGameObject(objectName="", withTag="Extra Tag", store=var "Cage")
+    GetChild(gameObject=Self, childName="Spawn Points", withTag="Untagged", storeResult=var "Spawn Points")
+    GetOwner(storeGameObject=var "Self")
+    SetParent(gameObject=var "Flukeflys", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=var "Flukeflys", vector=(unset), x=0, y=0, z=0, space=0, everyFrame=false, lateUpdate=false)
+    BoolTest(boolVariable=var "Skip PlayerData", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    GetPlayerDataBool(boolName="flukeMotherEncountered", storeValue=var "Encountered")
+    on FINISHED → GG?
+  }
+
+  state Idle {
+    Tk2dStopAnimation(gameObject=Self)
+    GetHP(target=Self, storeValue=var "HP")
+    IntCompare(integer1=var "HP", integer2=var "Start Health", equal=(none), lessThan=→"ALERT", greaterThan=(none), everyFrame=false)
+    WaitRandom(timeMin=1, timeMax=4, finishEvent=→"FINISHED", realTime=false)
+    BoolAllTrue(boolVariables=[var "Alert Range", var "Encountered"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    on FINISHED → Play Idle
+    on TOOK DAMAGE → Roar Start
+    on ALERT → Roar Start
+  }
+
+  state Rage {
+    WaitRandom(timeMin=3, timeMax=3, finishEvent=→"SPAWN", realTime=false)
+    on ZERO HP → Dead
+    on SPAWN → Select Point
+  }
+
+  state Dead {
+    SetVisibility(gameObject=var "Vines", toggle=false, visible=false, resetOnExit=false)
+    SendEventToRegister(eventName="CENTIPEDE DEATH")
+  }
+
+  state Check Spawn {
+    GetChildCount(gameObject=var "Flukeflys", storeResult=var "Spawned")
+    IntCompare(integer1=var "Spawned", integer2=var "Spawned Max", equal=→"CANCEL", lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on FINISHED → Select Point
+    on CANCEL → Rage
+  }
+
+  state Select Point {
+    GetRandomChild(gameObject=var "Spawn Points", storeResult=var "Spawn Point")
+    SetGameObject(variable=var "Fluke Fly", gameObject=<null>, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Spawn Point"), sendEvent="ANTIC", delay=0, everyFrame=false)
+    on FINISHED → Select Point 2
+  }
+
+  state Spawn {
+    GetRandomChild(gameObject=var "Cage", storeResult=var "Fluke Fly")
+    GameObjectIsNull(gameObject=var "Fluke Fly", isNull=→"CANCEL", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Spawn Point"), sendEvent="END", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Spawn Point", vector=(unset), x=var "Spawn X", y=var "Spawn Y", z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Fluke Fly", vector=(unset), x=var "Spawn X", y=var "Spawn Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Fluke Fly"), sendEvent="SPAWN", delay=0, everyFrame=false)
+    GetFsmFloat(gameObject=var "Spawn Point", fsmName="flukemother_spawn_point", variableName="Angle", storeValue=var "Angle", everyFrame=false)
+    SetVelocityAsAngle(gameObject=var "Fluke Fly", angle=var "Angle", speed=20, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Rage
+    on CANCEL → Spawn 1 Cancel
+  }
+
+  state Play Idle {
+    Tk2dPlayAnimation(gameObject=var "Vines", animLibName="", clipName="Vine Twitch")
+    Tk2dPlayFrame(gameObject=var "Vines", frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Rest Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    BoolAllTrue(boolVariables=[var "Alert Range", var "Encountered"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    on FINISHED → Idle
+    on TOOK DAMAGE → Roar Start
+    on ALERT → Roar Start
+  }
+
+  state Roar Start {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=fluke_mother_roar (sharedassets361.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioStop(gameObject=Self)
+    SetPlayerDataBool(boolName="flukeMotherEncountered", value=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=var "Vines", animLibName="", clipName="Vine Rage")
+    TransitionToAudioSnapshot(snapshot=Action (resources.assets), transitionTime=1)
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="Visited", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="FLUKEMARM", everyFrame=false)
+    on FINISHED → Roar End
+  }
+
+  state Roar End {
+    SendEventByName(eventTarget=GameObject(var "Roar Emitter"), sendEvent="END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BATTLE STARTED", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rage Idle")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetAudioClip(gameObject=Self, audioClip=Fluke_Mother_aggressive_loop (sharedassets361.assets))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → Rage
+  }
+
+  state Select Point 2 {
+    GetRandomChild(gameObject=var "Spawn Points", storeResult=var "Spawn Point 2")
+    GameObjectCompare(gameObjectVariable=var "Spawn Point", compareTo=var "Spawn Point 2", equalEvent=→"REPICK", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Spawn Point 2"), sendEvent="ANTIC", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spawn 2
+    on REPICK → Repick
+  }
+
+  state Spawn 2 {
+    GetRandomChild(gameObject=var "Cage", storeResult=var "Fluke Fly")
+    GameObjectIsNull(gameObject=var "Fluke Fly", isNull=→"CANCEL", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Spawn Point 2"), sendEvent="END", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Spawn Point 2", vector=(unset), x=var "Spawn X", y=var "Spawn Y", z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Fluke Fly", vector=(unset), x=var "Spawn X", y=var "Spawn Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Fluke Fly"), sendEvent="SPAWN", delay=0, everyFrame=false)
+    GetFsmFloat(gameObject=var "Spawn Point 2", fsmName="flukemother_spawn_point", variableName="Angle", storeValue=var "Angle", everyFrame=false)
+    SetVelocityAsAngle(gameObject=var "Fluke Fly", angle=var "Angle", speed=20, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=mawlek_spit_b (sharedassets34.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hatcher_give_birth (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Spawn
+    on CANCEL → Spawn 2 Cancel
+  }
+
+  state Repick {
+    on FINISHED → Select Point 2
+  }
+
+  state Spawn 2 Cancel {
+    SendEventByName(eventTarget=GameObject(var "Spawn Point 2"), sendEvent="CANCEL", delay=0, everyFrame=false)
+    on FINISHED → Spawn
+  }
+
+  state Spawn 1 Cancel {
+    SendEventByName(eventTarget=GameObject(var "Spawn Point"), sendEvent="CANCEL", delay=0, everyFrame=false)
+    on FINISHED → Rage
+  }
+
+  state GG? {
+    GGCheckIfBossScene(bossSceneEvent=→"GG BOSS", regularSceneEvent=→"FINISHED")
+    on GG BOSS → Delay Roar
+    on FINISHED → Idle
+  }
+
+  state Delay Roar {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Roar Start
+  }
+
+  var Skip PlayerData: bool = false
+
+  var Angle: float = 0
+  var Spawn X: float = 0
+  var Spawn Y: float = 0
+  var HP: int = 0
+  var Spawned: int = 0
+  var Spawned Max: int = 8
+  var Start Health: int = 0
+  var Alert Range: bool = false
+  var Encountered: bool = false
+  var Area Title: gameObject = <null>
+  var Cage: gameObject = <null>
+  var Fluke Fly: gameObject = <null>
+  var Flukeflys: gameObject = Fluke Mother/Flukeflys
+  var Roar Emitter: gameObject = <null>
+  var Self: gameObject = <null>
+  var Spawn Point: gameObject = <null>
+  var Spawn Point 2: gameObject = <null>
+  var Spawn Points: gameObject = <null>
+  var Vines: gameObject = <null>
+}

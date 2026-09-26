@@ -1,0 +1,156 @@
+# Cutscene Control
+# 1 location(s):
+#   Belltown_cutscene / Cinematic Player
+
+fsm Cutscene Control {
+  start Init
+
+  sequence state Wait {
+    WaitForFinishedEnteringScene(sendEvent=(none))
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    NextFrameEvent(sendEvent=(none))
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    Wait(time=1, finishEvent=(none), realTime=false)
+    on FINISHED → Check Entry
+  }
+
+  state Check Entry {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetEntryGateName", parameters=[], storeResult=var "Entry Gate", EveryFrame=false)
+    StringCompare(stringVariable=var "Entry Gate", compareTo="left3", equalEvent=→"DOOR_LEFT", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Entry Gate", compareTo="right2", equalEvent=→"DOOR_RIGHT", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on DOOR_LEFT → Door Left
+    on DOOR_RIGHT → Door Right
+    on FINISHED → Door Right
+  }
+
+  state Set Audio Door {
+    CallMethodProper(gameObject=Self, behaviour="CinematicPlayer", methodName="SetAdditionalAudio", parameters=[Door Entry Audio@AudioSource, true], storeResult=(unset var), EveryFrame=false)
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Start Cinematic
+  }
+
+  state Start Cinematic {
+    TransitionToAudioSnapshot(snapshot=Cinematic (audioobjects_assets_all.bundle), transitionTime=2)
+    CallMethodProper(gameObject=Self, behaviour="CinematicPlayer", methodName="TriggerStartVideo", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Wait
+  }
+
+  state Save {
+    QueueSaveGame()
+  }
+
+  state Door Left {
+    SetGameObject(variable=var "Hero Pos Marker", gameObject=Left End Pos, everyFrame=false)
+    SetBoolValue(boolVariable=var "Hero Face Right", boolValue=true, everyFrame=false)
+    on FINISHED → Take Control
+  }
+
+  state Door Right {
+    SetGameObject(variable=var "Hero Pos Marker", gameObject=Right End Pos, everyFrame=false)
+    SetBoolValue(boolVariable=var "Hero Face Right", boolValue=false, everyFrame=false)
+    on FINISHED → Take Control
+  }
+
+  state Init {
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopPlayingAudio, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Frame Wait
+  }
+
+  state Position Hero {
+    GetPosition2D(gameObject=var "Hero Pos Marker", vector=var "Hero Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    PositionColliderOnGroundV2(Target=var "Hero", GroundPos=var "Hero Pos")
+    ConvertBoolToFloat(boolVariable=var "Hero Face Right", floatVariable=var "Hero Scale X", falseValue=1, trueValue=-1, everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=var "Hero Scale X", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Position Camera Up
+  }
+
+  state Take Control {
+    SendEventToRegister(eventName="FSM CANCEL")
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    AddHeroInputBlocker(Blocker=Self)
+    BoolTest(boolVariable=var "Hero Face Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on LEFT → Face Left
+    on RIGHT → Face Right
+  }
+
+  state Give Control {
+    EndFreeCameraMode()
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    RemoveHeroInputBlocker(Blocker=Self)
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Quest Prompt
+  }
+
+  state Fade In {
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=2)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=2)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wait for title
+  }
+
+  state Frame Wait {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Set Audio Door
+  }
+
+  state Face Left {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Looking Up
+  }
+
+  state Face Right {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Looking Up
+  }
+
+  state Wait for title {
+    on TITLE DISPLAYED → Move Camera Down
+  }
+
+  state Looking Up {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="LookUp", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Position Hero
+  }
+
+  sequence state Position Camera Up {
+    CameraRepositionToHero()
+    NextFixedFrameEvent(SendEvent=(none))
+    NextFixedFrameEvent(SendEvent=(none))
+    Wait(time=1, finishEvent=(none), realTime=false)
+    StartFreeCameraMode(StoreObject=var "Camera Target")
+    GetPosition(gameObject=var "Camera Target", vector=var "Initial Camera Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    Translate(gameObject=var "Camera Target", vector=(unset), x=(unset), y=1.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    CallMethodProper(gameObject=Self, behaviour="CinematicPlayer", methodName="UnlockSkip", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on CINEMATIC END → Fade In
+  }
+
+  state Move Camera Down {
+    iTweenMoveTo(gameObject=var "Camera Target", id="", transformPosition=var "", vectorPosition=var "Initial Camera Pos", time=2.5, delay=0, speed=(unset), space=0, easeType=2, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=false)
+    on FINISHED → Give Control
+  }
+
+  sequence state Quest Prompt {
+    SetPlayerDataVariable(VariableName="SeenBelltownCutscene", SetValue=true)
+    SetPlayerDataVariable(VariableName="visitedBellhart", SetValue=true)
+    BeginQuest(Quest=The Threadspun Town (dataassets_assets_assets/dataassets/questsystem/mainquests.bundle))
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    on FINISHED → Save
+  }
+
+  var Hero Scale X: float = 0
+  var Hero Face Right: bool = false
+  var Entry Gate: string = ""
+  var Hero Pos: vector2 = (0, 0)
+  var Initial Camera Pos: vector3 = (0, 0, 0)
+  var Hero Pos Marker: gameObject = <null>
+  var Camera Target: gameObject = <null>
+}

@@ -1,0 +1,250 @@
+# shop_control
+# 1 location(s):
+#   shopui_assets_all.bundle / Shop Menu
+
+fsm shop_control {
+  start Init
+  on RESET SHOP WINDOW → Reset Fade Out  // from any state
+  on CLOSE SHOP WINDOW INACTIVE → Special Close To Inactive  // from any state
+  on CLOSE SHOP WINDOW → Special Close  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FadeNestedFadeGroup(Target=Self, ToAlpha=0, FadeTime=0)
+    SetPosition(gameObject=Self, vector=(unset), x=8.53, y=1.54, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    BoolTest(boolVariable=var "init", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "init", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Item List", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Was Open", boolValue=false, everyFrame=false)
+    SetIntValue(intVariable=var "Current Item", intValue=0, everyFrame=false)
+    on SHOP UP → Stock?
+  }
+
+  state Open Window {
+    PlayAudioEvent(audioClip=ui_shop_or_questboard_appear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FadeNestedFadeGroup(Target=var "Window", ToAlpha=1, FadeTime=var "Fade Time")
+    SendEventByName(eventTarget=FSMComponent, sendEvent="FLUERS UP", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHOP WINDOW UP", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="ShopMenuStock", methodName="SetWasItemPurchased", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Was Open", boolValue=true, everyFrame=false)
+    CountShopItems(Target=Self, MatchFlag=Map, PurchasedOnly=true, StoreCount=var "Map Count Before")
+    CountShopItems(Target=Self, MatchFlag=MapUpdateItem, PurchasedOnly=true, StoreCount=var "Map Item Count Before")
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reset Instant
+  }
+
+  state Item List Up {
+    SetBoolValue(boolVariable=var "In Second Menu", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="UP", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Item List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Item List", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=Self, ToAlpha=1, FadeTime=var "Fade Time")
+    Wait(time=var "Fade Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Activate
+  }
+
+  state Open {
+    ListenForMenuActions(eventTarget=Self, submitPressed=(none), cancelPressed=→"CLOSE", ignoreAttack=false)
+    ListenForInventory(eventTarget=Self, wasPressed=→"CLOSE", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on CLOSE → In Second Menu?
+    on CLOSE SHOP WINDOW TEMP → Temp Closed
+  }
+
+  state Down {
+    PlayAudioEvent(audioClip=ui_shop_or_questboard_dissapear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DestroyAllChildren(gameObject=var "Item List", disable=true)
+    FadeNestedFadeGroup(Target=var "Window", ToAlpha=0, FadeTime=var "Fade Time")
+    SendEventByName(eventTarget=FSMComponent, sendEvent="FLUERS DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Item List"), sendEvent="UI INACTIVE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    FadeNestedFadeGroup(Target=Self, ToAlpha=0, FadeTime=var "Fade Time")
+    on FINISHED → Send Event
+  }
+
+  state Send Event {
+    ActivateGameObject(gameObject=var "Item List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Item List"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHOP CLOSED", delay=0, everyFrame=false)
+    on FINISHED → Hide Geo
+  }
+
+  state In Second Menu? {
+    BoolTest(boolVariable=var "In Second Menu", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Down
+    on CANCEL → Open
+  }
+
+  state Stock? {
+    CallMethodProper(gameObject=Self, behaviour="ShopMenuStock", methodName="StockLeft", parameters=[], storeResult=var "Stock Left", EveryFrame=false)
+    BoolTest(boolVariable=var "Stock Left", isTrue=→"FINISHED", isFalse=→"NO STOCK", everyFrame=false)
+    on NO STOCK → No Stock
+    on FINISHED → Show Geo
+  }
+
+  state Special Close {
+    BoolTest(boolVariable=var "Was Open", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    PlayAudioEvent(audioClip=ui_shop_or_questboard_dissapear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DestroyAllChildren(gameObject=var "Item List", disable=true)
+    ActivateGameObject(gameObject=var "Action Cancel", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Action Confirm", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Window", ToAlpha=0, FadeTime=var "Fade Time")
+    SendEventByName(eventTarget=FSMComponent, sendEvent="FLUERS DOWN", delay=0, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Confirm", ToAlpha=0, FadeTime=var "Fade Time")
+    FadeNestedFadeGroup(Target=Self, ToAlpha=0, FadeTime=var "Fade Time")
+    SendEventByName(eventTarget=GameObject(var "Item List"), sendEvent="UI INACTIVE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Arrow D", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Arrow U", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Confirm UI List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Confirm", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Item List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Item List"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHOP REGION INACTIVE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Notch Cost", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=var "Fade Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stock? 2
+    on CANCEL → Idle
+  }
+
+  state Special Close To Inactive {
+    BoolTest(boolVariable=var "Was Open", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    PlayAudioEvent(audioClip=ui_shop_or_questboard_dissapear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DestroyAllChildren(gameObject=var "Item List", disable=true)
+    ActivateGameObject(gameObject=var "Action Cancel", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Action Confirm", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeGroupDown(target=var "Window", fast=false)  // disabled
+    FadeNestedFadeGroup(Target=var "Window", ToAlpha=0, FadeTime=var "Fade Time")
+    SendEventByName(eventTarget=FSMComponent, sendEvent="FLUERS DOWN", delay=0, everyFrame=false)
+    FadeGroupDown(target=var "Confirm", fast=false)  // disabled
+    FadeNestedFadeGroup(Target=var "Confirm", ToAlpha=0, FadeTime=var "Fade Time")
+    FadeGroupDown(target=Self, fast=false)  // disabled
+    FadeNestedFadeGroup(Target=Self, ToAlpha=0, FadeTime=var "Fade Time")
+    SendEventByName(eventTarget=GameObject(var "Item List"), sendEvent="UI INACTIVE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Arrow D", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Arrow U", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Confirm UI List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Confirm", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Item List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Item List"), sendEvent="RESET", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHOP REGION INACTIVE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Notch Cost", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Send Event
+    on CANCEL → Idle
+  }
+
+  state No Stock {
+    SendEventToRegister(eventName="SHOP NO STOCK")
+    on FINISHED → Idle
+  }
+
+  state Show Geo {
+    CallMethodProper(gameObject=Self, behaviour="ShopMenuStock", methodName="DisplayCurrencyCounters", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Open Window
+  }
+
+  state Hide Geo {
+    CallMethodProper(gameObject=Self, behaviour="ShopMenuStock", methodName="HideCurrencyCounters", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Send Event After Close
+  }
+
+  state Reset Fade Out {
+    ActivateGameObject(gameObject=var "Confirm UI List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Item Confirm Group", ToAlpha=0, FadeTime=var "Fade Time")
+    Wait(time=var "Fade Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reset Fade In
+  }
+
+  state Reset Instant {
+    ActivateGameObject(gameObject=var "Confirm UI List", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Item List Group", ToAlpha=1, FadeTime=0)
+    FadeNestedFadeGroup(Target=var "Item Confirm Group", ToAlpha=0, FadeTime=0)
+    on FINISHED → Item List Up
+  }
+
+  state Reset Fade In {
+    FadeNestedFadeGroup(Target=var "Item List Group", ToAlpha=1, FadeTime=var "Fade Time")
+    on FINISHED → Item List Up
+  }
+
+  state Send Event After Close {
+    StringCompare(stringVariable=var "Send Event After Close", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEventToRegister(eventName=var "Send Event After Close")
+    SetStringValue(stringVariable=var "Send Event After Close", stringValue="", everyFrame=false)
+    on FINISHED → Bought Map?
+  }
+
+  state Bought Map? {
+    ShopClosedGameMapUpdate(didUpdateEvent=→"FINISHED")
+    PlayerDataVariableTest(VariableName="CanUpdateMap", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    CountShopItems(Target=Self, MatchFlag=Map, PurchasedOnly=true, StoreCount=var "Map Count After")
+    CountShopItems(Target=Self, MatchFlag=MapUpdateItem, PurchasedOnly=true, StoreCount=var "Map Item Count After")
+    IntOperator(integer1=var "Map Count Before", integer2=var "Map Item Count Before", operation=Add, storeResult=var "Map Check Before", everyFrame=false)
+    IntOperator(integer1=var "Map Count After", integer2=var "Map Item Count After", operation=Add, storeResult=var "Map Check After", everyFrame=false)
+    IntCompare(integer1=var "Map Check After", integer2=var "Map Check Before", equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    CreateObject(gameObject=Map Update Msg (localpoolprefabs_assets_shared.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="UpdateGameMap", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Temp Closed {
+    PlayAudioEvent(audioClip=ui_shop_or_questboard_dissapear (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FadeNestedFadeGroup(Target=var "Window", ToAlpha=0, FadeTime=var "Fade Time")
+    SendEventByName(eventTarget=FSMComponent, sendEvent="FLUERS DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Item List"), sendEvent="UI INACTIVE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN", delay=0, everyFrame=false)
+    FadeNestedFadeGroup(Target=Self, ToAlpha=0, FadeTime=var "Fade Time")
+    CallMethodProper(gameObject=Self, behaviour="ShopMenuStock", methodName="HideCurrencyCounters", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on GET ITEM MSG END → Stock?
+  }
+
+  state Activate {
+    SendEventByName(eventTarget=GameObject(var "Item List"), sendEvent="UI ACTIVE", delay=0, everyFrame=false)
+    on FINISHED → Open
+  }
+
+  state Stock? 2 {
+    CallMethodProper(gameObject=Self, behaviour="ShopMenuStock", methodName="StockLeft", parameters=[], storeResult=var "Stock Left", EveryFrame=false)
+    BoolTest(boolVariable=var "Stock Left", isTrue=→"FINISHED", isFalse=→"NO STOCK", everyFrame=false)
+    on NO STOCK → No Stock 2
+    on FINISHED → Send Event
+  }
+
+  state No Stock 2 {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHOP NO STOCK", delay=0, everyFrame=false)
+    on FINISHED → Send Event
+  }
+
+  var Notch Cost: gameObject = <null>
+
+  var Fade Time: float = 0.2
+  var Current Item: int = 0
+  var Map Count After: int = 0
+  var Map Count Before: int = 0
+  var Map Item Count Before: int = 0
+  var Map Item Count After: int = 0
+  var Map Check Before: int = 0
+  var Map Check After: int = 0
+  var In Second Menu: bool = false
+  var Stock Left: bool = false
+  var Map Updated: bool = false
+  var Was Open: bool = false
+  var init: bool = false
+  var Send Event After Close: string = ""
+  var Action Cancel: gameObject = Shop Menu/Action Cancel
+  var Action Confirm: gameObject = Shop Menu/Action Confirm
+  var Arrow D: gameObject = Shop Menu/Item List Group/Arrow D
+  var Arrow U: gameObject = Shop Menu/Item List Group/Arrow U
+  var Confirm: gameObject = Shop Menu/Item Confirm Group/Confirm
+  var Confirm UI List: gameObject = Shop Menu/Item Confirm Group/Confirm/UI List
+  var Item Confirm Group: gameObject = Shop Menu/Item Confirm Group
+  var Item List: gameObject = Shop Menu/Item List Group/Item List
+  var Item List Group: gameObject = Shop Menu/Item List Group
+  var Self: gameObject = <null>
+  var Window: gameObject = Shop Menu/Window
+}

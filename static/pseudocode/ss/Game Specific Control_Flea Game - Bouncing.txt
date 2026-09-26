@@ -1,0 +1,210 @@
+# Game Specific Control
+# 1 location(s):
+#   Aqueduct_05_festival / Caravan_States/Flea Festival/Flea Game - Bouncing
+
+fsm Game Specific Control {
+  start Init
+  on GAME END PLAY → Reset Game  // from any state
+  on GAME FAILED → Stop Spawning  // from any state
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Bellfleas")
+    FindNamedChild(gameObject=Self, storeResult=var "Kratt BounceGame")
+    FindNamedChild(gameObject=Self, storeResult=var "Bellflea Bouncer Giant")
+    on FINISHED → Inactive
+  }
+
+  state Inactive {
+    on GAME BEGIN PLAY → Start Pause
+    on PREPARE FLEA GAME → Prepare Game
+  }
+
+  state Start Pause {
+    ActivateGameObject(gameObject=var "Out of Bounds Region Raft", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SetFloatValue(floatVariable=var "Flea Speed", floatValue=var "Flea Speed Initial", everyFrame=false)
+    SetIntValue(intVariable=var "Score", intValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Spawn Frequency", floatValue=1.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Flea Speed Modifier", floatValue=0, everyFrame=false)
+    on FINISHED → Spawn
+  }
+
+  state Reset Game {
+    SendEventToRegister(eventName="RESET FLEA GAMES")
+    on FINISHED → Inactive
+  }
+
+  state Spawn {
+    GetRandomChild(gameObject=var "Bellfleas", storeResult=var "Next Flea")
+    FloatOperator(float1=var "Flea Speed", float2=var "Flea Speed Modifier", operation=Add, storeResult=var "Flea Speed Crt", everyFrame=false)
+    SetFsmFloat(gameObject=var "Next Flea", fsmName="Control", variableName="Fly Speed", setValue=var "Flea Speed Crt", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Next Flea"), sendEvent="ENTER", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Special?
+  }
+
+  state Increase Difficulty {
+    ActivateGameObject(gameObject=var "Out of Bounds Region Raft", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FloatAdd(floatVariable=var "Flea Speed", add=0.125, everyFrame=false, perSecond=false)
+    IntAdd(intVariable=var "Score", add=1, everyFrame=false)
+    FloatClamp(floatVariable=var "Flea Speed", minValue=0, maxValue=25, everyFrame=false)
+    on FINISHED → Add Giant?
+  }
+
+  state Spawn Wait {
+    FloatAddRandom(floatVariable=var "Timer", addMin=-0.5, addMax=0.5)
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Spawn Frequency", tolerance=0, equal=→"SPAWN", lessThan=(none), greaterThan=→"SPAWN", everyFrame=true)
+    on SCORE → Increase Difficulty
+    on SPAWN → Wave Flea?
+  }
+
+  state High Flea? {
+    IntCompare(integer1=var "Score", integer2=4, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    SendRandomEventV4(events=[(none), →"CANCEL"], weights=[0.175, 0.825], eventMax=[1, 5], missedMax=[5, 1], activeBool=(unset))
+    on CANCEL → Spawn
+    on FINISHED → Spawn High
+  }
+
+  state Spawn High {
+    GetRandomChild(gameObject=var "Bellfleas", storeResult=var "Next Flea")
+    FloatOperator(float1=var "Flea Speed", float2=var "Flea Speed Modifier", operation=Add, storeResult=var "Flea Speed Crt", everyFrame=false)
+    SetFsmFloat(gameObject=var "Next Flea", fsmName="Control", variableName="Fly Speed", setValue=var "Flea Speed Crt", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Next Flea"), sendEvent="ENTER HIGH", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Special?
+  }
+
+  state Bubbler {
+    GetRandomChild(gameObject=var "Bellfleas", storeResult=var "Next Flea")
+    SetFsmFloat(gameObject=var "Next Flea", fsmName="Control", variableName="Fly Speed", setValue=var "Flea Speed", everyFrame=false)
+    SetFsmBool(gameObject=var "Next Flea", fsmName="Control", variableName="Quickened", setValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Next Flea"), sendEvent="ENTER", delay=0, everyFrame=false)
+    on FINISHED → Spawn Wait
+  }
+
+  state Kratt {
+    SendEventByName(eventTarget=GameObject(var "Kratt BounceGame"), sendEvent="ENTER", delay=0, everyFrame=false)
+    on FINISHED → Spawn Wait
+  }
+
+  state Special? {
+    IntCompare(integer1=var "Score", integer2=8, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    SendRandomEventV4(events=[(none), →"CANCEL"], weights=[0.1, 0.9], eventMax=[1, 8], missedMax=[8, 1], activeBool=(unset))
+    SendRandomEventV4(events=[→"KRATT", →"BUBBLER"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on CANCEL → Spawn Wait
+    on KRATT → Kratt
+    on BUBBLER → Bubbler
+  }
+
+  state Stop Spawning {
+  }
+
+  state Shorten Pause? {
+    IntCompare(integer1=var "Score", integer2=25, equal=(none), lessThan=(none), greaterThan=→"INCREASE", everyFrame=false)
+    FloatAdd(floatVariable=var "Spawn Frequency", add=-0.02, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Spawn Frequency", minValue=1, maxValue=1.5, everyFrame=false)
+    on INCREASE → Lengthen Pause
+    on FINISHED → Spawn Wait
+  }
+
+  state Lengthen Pause {
+    FloatAdd(floatVariable=var "Spawn Frequency", add=0.02, everyFrame=false, perSecond=false)
+    FloatClamp(floatVariable=var "Spawn Frequency", minValue=1, maxValue=1.5, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Flea Speed", addMin=-3, addMax=1)  // disabled
+    RandomFloat(min=-3, max=1, storeResult=var "Flea Speed Modifier")
+    on FINISHED → Spawn Wait
+  }
+
+  state Wave Flea? {
+    SendEvent(eventTarget=Self, sendEvent=→"TEST", delay=0, everyFrame=false)  // disabled
+    IntCompare(integer1=var "Score", integer2=10, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Score", integer2=20, equal=(none), lessThan=→"CHANCE 1", greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Score", integer2=30, equal=(none), lessThan=→"CHANCE 2", greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Score", integer2=40, equal=(none), lessThan=→"CHANCE 3", greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Score", integer2=50, equal=(none), lessThan=→"CHANCE 4", greaterThan=(none), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"CHANCE 5", delay=0, everyFrame=false)
+    on FINISHED → High Flea?
+    on CHANCE 1 → Wave Chance 1
+    on CHANCE 2 → Wave Chance 2
+    on CHANCE 3 → Wave Chance 3
+    on CHANCE 4 → Wave Chance 4
+    on CHANCE 5 → Wave Chance 5
+    on CHANCE 6 → 
+    on TEST → Spawn Wave
+  }
+
+  state Wave Chance 1 {
+    SendRandomEventV4(events=[→"WAVE", →"FINISHED"], weights=[0.175, 0.825], eventMax=[1, 5], missedMax=[5, 1], activeBool=(unset))
+    on WAVE → Spawn Wave
+    on FINISHED → High Flea?
+  }
+
+  state Spawn Wave {
+    GetRandomChild(gameObject=var "Bellfleas", storeResult=var "Next Flea")
+    FloatOperator(float1=var "Flea Speed", float2=var "Flea Speed Modifier", operation=Add, storeResult=var "Flea Speed Crt", everyFrame=false)
+    SetFsmFloat(gameObject=var "Next Flea", fsmName="Control", variableName="Fly Speed", setValue=var "Flea Speed Crt", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Next Flea"), sendEvent="ENTER WAVE", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    on FINISHED → Special?
+  }
+
+  state Wave Chance 2 {
+    SendRandomEventV4(events=[→"WAVE", →"FINISHED"], weights=[0.2, 0.8], eventMax=[1, 4], missedMax=[4, 1], activeBool=(unset))
+    on WAVE → Spawn Wave
+    on FINISHED → High Flea?
+  }
+
+  state Wave Chance 3 {
+    SendRandomEventV4(events=[→"WAVE", →"FINISHED"], weights=[0.25, 0.75], eventMax=[2, 5], missedMax=[5, 2], activeBool=(unset))
+    on WAVE → Spawn Wave
+    on FINISHED → High Flea?
+  }
+
+  state Wave Chance 4 {
+    SendRandomEventV4(events=[→"WAVE", →"CANCEL"], weights=[0.33, 0.66], eventMax=[2, 4], missedMax=[4, 2], activeBool=(unset))
+    on WAVE → Spawn Wave
+    on FINISHED → High Flea?
+  }
+
+  state Wave Chance 5 {
+    SendRandomEventV4(events=[→"WAVE", →"CANCEL"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on WAVE → Spawn Wave
+    on FINISHED → High Flea?
+  }
+
+  state TEST high difficulty {
+    SetFloatValue(floatVariable=var "Flea Speed", floatValue=25, everyFrame=false)  // disabled
+    SetFloatValue(floatVariable=var "Spawn Frequency", floatValue=1.5, everyFrame=false)  // disabled
+    on FINISHED → Spawn Wait
+  }
+
+  state Add Giant? {
+    BoolTest(boolVariable=var "Added Giant", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    IntCompare(integer1=var "Score", integer2=35, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    SetParent(gameObject=var "Bellflea Bouncer Giant", parent=var "Bellfleas", resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValue(boolVariable=var "Added Giant", boolValue=true, everyFrame=false)
+    on FINISHED → Shorten Pause?
+  }
+
+  state Prepare Game {
+    ActivateGameObject(gameObject=var "Bellfleas", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Kratt BounceGame", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Bellflea Bouncer Giant", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Inactive
+  }
+
+  var Spawn Frequency: float = 1.5
+  var Flea Speed: float = 4
+  var Timer: float = 0
+  var Flea Speed Initial: float = 4
+  var Flea Speed Modifier: float = 0
+  var Flea Speed Crt: float = 0
+  var Score: int = 0
+  var Added Giant: bool = false
+  var Bellfleas: gameObject = <null>
+  var Next Flea: gameObject = <null>
+  var Kratt BounceGame: gameObject = <null>
+  var Out of Bounds Region Raft: gameObject = Caravan_States/Flea Festival/Flea Game - Bouncing/Active While Playing/Out of Bounds Region Raft
+  var Bellflea Bouncer Giant: gameObject = <null>
+}

@@ -1,0 +1,539 @@
+# Control
+# 1 location(s):
+#   localpoolprefabs_assets_areaabyss.bundle / Gloomfly
+
+fsm Control {
+  start Init
+  on GRAB HERO → Grab Start  // from any state
+  on ZERO HP → Die  // from any state
+  on GLOOMFLY CLEANUP → Fly Away  // from any state
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    on FINISHED → Respawner?
+  }
+
+  state Follow {
+    RandomFloat(min=6, max=8.5, storeResult=var "Distance")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hatchling Fly")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Hatchling TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=6, acceleration=0.3, targetsHeight=false, height=(unset), minAboveHero=2)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    RandomFloat(min=1, max=2, storeResult=var "Attack Time")
+    SetBoolValueAtTime(BoolVariable=var "Attack Ready", BoolValue=true, Time=var "Attack Time", SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "Attack Ready", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    UnalertTimer(alertRange=var "Unalert Range", timerVariable=(unset), unalertTime=4, eventTarget=Self, unalertEvent=→"UNALERT", resetOnStateEntry=true)
+    ShoveFromWall(gameObject=Self, shoveForce=15, rayLength=2, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    RandomFloat(min=0.9, max=1.1, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=(unset), oneShotClip=<null>)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance To Hero", everyFrame=true)
+    FloatTestToBool(float1=var "Distance To Hero", float2=6.5, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Nearby", greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Hero Nearby", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hero Nearby", var "Hornet Dead"], boolStates=[true, false], trueEvent=→"ATTACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on ATTACK → Attack Pause
+    on UNALERT → Start Unalert
+    on GLOOMFLY ATTACK → Follow
+    on GO UP → Go Up
+    on TOOK DAMAGE → Attack Pause
+  }
+
+  state Attack Antic {
+    GetFsmBool(gameObject=var "Hero", fsmName="Roar and Wound States", variableName="Is Grabbed", storeValue=var "Hero Is Grabbed", everyFrame=false)
+    BoolTest(boolVariable=var "Hero Is Grabbed", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    PlayAudioEvent(audioClip=gloomfly_antic (sfxstatic_assets_areaabyss.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventToRegister(eventName="GLOOMFLY ATTACK")
+    PlayAudioEventRandom(audioClips=[coral_goomba_large_vox_medium_1 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_2 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_3 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_4 (sfxstatic_assets_areacoral.bundle)], pitchMin=1.6, pitchMax=1.8, volume=0.7, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatchling Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=1, storeAngle=var "Fire Angle", pause=0, everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Fire Angle", speed=-10, everyFrame=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    on FINISHED → Attack
+    on CANCEL → Follow
+    on GO UP → Go Up
+  }
+
+  state Attack {
+    PlayAudioEvent(audioClip=gloomfly_dash (sfxstatic_assets_areaabyss.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetDamageHero(Target=Self, Enabled=false)
+    ActivateGameObject(gameObject=var "Dash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hatchling Dart")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Fire Angle", speed=33, everyFrame=false)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    ChaseObjectWisp(gameObject=Self, target=var "Hero", accelerationForce=30, offsetX=0, offsetY=0, speedMax=25, speedMin=0)
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"COLLIDE", storeCollider=var "", storeForce=(unset))
+    Collision2dEvent(gameObject=Self, collision=1, collideTag="", sendEvent=→"COLLIDE", storeCollider=var "", storeForce=(unset))
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=false, DistancePast=6, StoreResult=var "Passed Hero", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Can End Attack", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "Can End Attack", var "Passed Hero"], sendEvent=→"END", storeResult=(unset), everyFrame=true)
+    Wait(time=1, finishEvent=→"END", realTime=false)
+    SetCollider(gameObject=var "Grab Collider", active=true, resetOnExit=true)
+    on COLLIDE → Wall Bounce
+    on END → Attack End
+  }
+
+  state Wall Bounce {
+    SpawnObjectFromGlobalPool(gameObject=Block Hit Silent (sharedeffects_assets_all.bundle), spawnPoint=var "Block Hit", position=(unset), rotation=(unset), storeObject=var "Block Effect")
+    MatchScaleSign(Target=var "Block Effect", MatchTo=var "Self", EveryFrame=false)
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Rotation", add=180, everyFrame=false, perSecond=false)
+    SetRotation(gameObject=var "Block Effect", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Rotation", space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Block Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=1.25, pitchMax=1.35, volume=0.75, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetDamageHero(Target=Self, Enabled=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatchling Bonk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    GetCollision2dInfo(gameObjectHit=var "", relativeVelocity=(unset), relativeSpeed=(unset), contactPoint=(unset), contactNormal=var "Contact Normal", shapeCount=(unset), physics2dMaterialName="")
+    Vector2Multiply(vector2Variable=(unset), multiplyBy=1, everyFrame=false)
+    GetVector3XYZ(vector3Variable=var "Contact Normal", storeX=var "Speed X", storeY=var "Speed Y", storeZ=(unset), everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed X", multiplyBy=10, everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed Y", multiplyBy=10, everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=var "Velocity Y", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Velocity X", add=var "Speed X", everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Velocity Y", add=var "Speed Y", everyFrame=false, perSecond=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=var "Velocity Y", everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Follow
+  }
+
+  state Attack End {
+    SetDamageHero(Target=Self, Enabled=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatchling Bonk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    PlayAudioEvent(audioClip=gloomfly_antic (sfxstatic_assets_areaabyss.bundle), pitchMin=0.75, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Follow
+  }
+
+  state Grab Start {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="IsHealthCritical", parameters=[], storeResult=var "Hero Health Critical", EveryFrame=false)
+    BoolTest(boolVariable=var "Hero Health Critical", isTrue=→"UNGRAB", isFalse=(none), everyFrame=false)
+    RunFSM(fsmTemplateControl=template=-5200671031615995940 in[Bypass Checks<-false, Dont Deal Damage<-var "Dont Deal Damage", No Hero Invuln<-true, Grab Effect Point<-<null>], finishEvent=(none), everyFrame=false)
+    on CANCEL → Grab Cancel
+    on FINISHED → Set Facing
+    on UNGRAB → Deal Damage To Hero
+  }
+
+  state Grab Cancel {
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=true, pauseBetweenTurns=false, pauseTime=0)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    ChaseObjectWisp(gameObject=Self, target=var "Hero", accelerationForce=30, offsetX=0, offsetY=0, speedMax=25, speedMin=0)
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"COLLIDE", storeCollider=var "", storeForce=(unset))
+    Collision2dEvent(gameObject=Self, collision=1, collideTag="", sendEvent=→"COLLIDE", storeCollider=var "", storeForce=(unset))
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=false, DistancePast=6, StoreResult=var "Passed Hero", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Can End Attack", BoolValue=true, Time=0.1, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "Can End Attack", var "Passed Hero"], sendEvent=→"END", storeResult=(unset), everyFrame=true)
+    Wait(time=0.5, finishEvent=→"END", realTime=false)
+    on END → Attack End
+    on COLLIDE → Wall Bounce
+  }
+
+  state Capture {
+    SetIntValue(intVariable=var "Struggle HP", intValue=3, everyFrame=false)
+    SetAudioClip(gameObject=Self, audioClip=gloomfly_hornet_sucking_on_loop (sfxstatic_assets_areaabyss.bundle), autoPlay=true, stopOnExit=false)
+    SetAudioPitch(gameObject=Self, pitch=1, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[coral_goomba_large_vox_medium_1 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_2 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_3 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_4 (sfxstatic_assets_areacoral.bundle)], pitchMin=1.6, pitchMax=1.8, volume=0.7, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetAudioVolume(gameObject=Self, volume=1, everyFrame=false)
+    SetBoolValue(boolVariable=var "Grabbing Hero", boolValue=true, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hatchling Capture")
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Hero", xOffset=0, yOffset=0, everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=var "Velocity", x=(unset), y=(unset), space=0, everyFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=var "Velocity", x=(unset), y=(unset), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    DecelerateV2(gameObject=var "Hero", deceleration=0.9, brakeOnExit=false)
+    PlayRandomAudioClipTable(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetFloatValue(floatVariable=var "Can Struggle Timer", floatValue=0.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Chomp Timer", floatValue=0, everyFrame=false)
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=true, Delay=0, RepeatDelay=0.2)
+    TransitionToAudioSnapshot(snapshot=Sound Options - Muffled (audioobjects_assets_all.bundle), transitionTime=0.25)
+    TransitionToAudioSnapshot(snapshot=Normal - MuffledOrgan (audioobjects_assets_all.bundle), transitionTime=0.25)
+    on FINISHED → Check Weight
+    on HERO DAMAGED → Die
+  }
+
+  state Capture Rise {
+    FloatAdd(floatVariable=var "Can Struggle Timer", add=1, everyFrame=true, perSecond=true)
+    FloatAdd(floatVariable=var "Chomp Timer", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Can Struggle Timer", minValue=0, maxValue=100, everyFrame=true)
+    FloatTestToBool(float1=var "Can Struggle Timer", float2=0.5, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Can Struggle", everyFrame=true)
+    AccelerateToY(gameObject=var "Hero", accelerationFactor=0.25, targetSpeed=2)
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Hero", xOffset=0, yOffset=0, everyFrame=true)
+    DecelerateXY(gameObject=var "Hero", decelerationX=0.95, decelerationY=(unset), brakeOnExit=false)
+    ListenForJump(eventTarget=Self, wasPressed=→"STRUGGLE U", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=var "Can Struggle", stateEntryOnly=false)
+    ListenForAttackV2(EventTarget=Self, WasPressed=→"STRUGGLE", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=var "Can Struggle")
+    ListenForLeft(eventTarget=Self, wasPressed=→"STRUGGLE L", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=var "Can Struggle", stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=→"STRUGGLE R", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=var "Can Struggle", stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForUp(eventTarget=Self, wasPressed=→"STRUGGLE", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=var "Can Struggle", stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"STRUGGLE D", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), queueBool=(unset), pressedTimer=(unset), activeBool=var "Can Struggle", stateEntryOnly=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=6, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"RISE END", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    FloatCompare(float1=var "Chomp Timer", float2=var "Chomp Time", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CHOMP", everyFrame=true)
+    ShoveFromWall(gameObject=var "Hero", shoveForce=4, rayLength=1.5, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    AddForce2d(gameObject=var "Hero", forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=var "Weight Force", vector3=(unset), everyFrame=true)
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=true, Delay=0, RepeatDelay=0.2)
+    on RISE END → Capture Float
+    on STRUGGLE → Struggle F
+    on STRUGGLE D → Struggle D
+    on STRUGGLE L → Struggle L
+    on STRUGGLE R → Struggle R
+    on STRUGGLE U → Struggle U
+    on CHOMP → Chomp
+    on HERO DAMAGED → Die
+  }
+
+  state Capture Float {
+    FloatAdd(floatVariable=var "Can Struggle Timer", add=1, everyFrame=true, perSecond=true)
+    FloatAdd(floatVariable=var "Chomp Timer", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Can Struggle Timer", minValue=0, maxValue=100, everyFrame=true)
+    FloatTestToBool(float1=var "Can Struggle Timer", float2=0.5, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Can Struggle", everyFrame=true)
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Hero", xOffset=0, yOffset=0, everyFrame=true)
+    DecelerateXY(gameObject=var "Hero", decelerationX=0.95, decelerationY=0.95, brakeOnExit=false)
+    ListenForJump(eventTarget=Self, wasPressed=→"STRUGGLE U", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), activeBool=var "Can Struggle", stateEntryOnly=false)
+    ListenForAttackV2(EventTarget=Self, WasPressed=→"STRUGGLE", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=var "Can Struggle")
+    ListenForLeft(eventTarget=Self, wasPressed=→"STRUGGLE L", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=var "Can Struggle", stateEntryOnly=false, ignoreIfRightPressed=false)
+    ListenForRight(eventTarget=Self, wasPressed=→"STRUGGLE R", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=var "Can Struggle", stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForUp(eventTarget=Self, wasPressed=→"STRUGGLE U", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=var "Can Struggle", stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"STRUGGLE D", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), queueBool=(unset), pressedTimer=(unset), activeBool=var "Can Struggle", stateEntryOnly=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=6, minDepth=(unset), maxDepth=(unset), hitEvent=→"RISE START", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    FloatCompare(float1=var "Chomp Timer", float2=var "Chomp Time", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CHOMP", everyFrame=true)
+    ShoveFromWall(gameObject=var "Hero", shoveForce=4, rayLength=1.5, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    AddForce2d(gameObject=var "Hero", forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=var "Weight Force", vector3=(unset), everyFrame=true)
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=true, Delay=0, RepeatDelay=0.2)
+    on RISE START → Capture Rise
+    on STRUGGLE → Struggle F
+    on STRUGGLE D → Struggle D
+    on STRUGGLE L → Struggle L
+    on STRUGGLE R → Struggle R
+    on STRUGGLE U → Struggle U
+    on CHOMP → Chomp
+    on HERO DAMAGED → Die
+  }
+
+  state Do Struggle {
+    SpawnObjectFromGlobalPool(gameObject=Strike Nail R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hatchling Chomp")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    PlayAudioEventRandom(audioClips=[coral_goomba_large_vox_medium_1 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_2 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_3 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_4 (sfxstatic_assets_areacoral.bundle)], pitchMin=1.6, pitchMax=1.8, volume=0.7, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hmm enemy damage maybe (sfxstatic_assets_areaabyssareaaqueduct.bundle), pitchMin=1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hornet_witch_downslash_contact (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayRandomAudioClipTable(Table=Grunt Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetBoolValue(boolVariable=var "Can Struggle", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Can Struggle Timer", floatValue=0, everyFrame=false)
+    IntAdd(intVariable=var "Struggle HP", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Struggle HP", integer2=0, equal=→"ZERO HP", lessThan=→"ZERO HP", greaterThan=(none), everyFrame=false)
+    FloatClamp(floatVariable=var "Chomp Timer", minValue=0.25, maxValue=10, everyFrame=false)
+    on FINISHED → Capture Rise
+  }
+
+  state Struggle F {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Struggle Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Struggle Speed", multiplyBy=-10, everyFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=var "Struggle Speed", y=(unset), everyFrame=false)
+    RandomFloat(min=-3, max=4, storeResult=var "Struggle Speed")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Struggle Speed", everyFrame=false)
+    on FINISHED → Do Struggle
+  }
+
+  state Struggle D {
+    RandomlyFlipScale(gameObject=Self)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Struggle Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Struggle Speed", multiplyBy=-3, everyFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=var "Struggle Speed", y=-10, everyFrame=false)
+    on FINISHED → Do Struggle
+  }
+
+  state Struggle U {
+    RandomlyFlipScale(gameObject=Self)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Struggle Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Struggle Speed", multiplyBy=-3, everyFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=var "Struggle Speed", y=10, everyFrame=false)
+    on FINISHED → Do Struggle
+  }
+
+  state Struggle L {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Struggle F
+  }
+
+  state Struggle R {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Struggle F
+  }
+
+  state Die {
+    AudioStop(gameObject=Self, fadeTime=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=CancelRecoil())
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Death Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SetIsDead(target=Self, setValue=true)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    on FINISHED → Ungrab Hero?
+  }
+
+  state Ungrab Hero? {
+    BoolTest(boolVariable=var "Grabbing Hero", isTrue=→"UNGRAB", isFalse=→"FINISHED", everyFrame=false)
+    on UNGRAB → Ungrab
+    on FINISHED → End
+  }
+
+  state End {
+    BoolTest(boolVariable=var "Respawner", isTrue=→"RESPAWNER", isFalse=(none), everyFrame=false)
+    on RESPAWNER → Respawn Ready
+  }
+
+  state Ungrab {
+    PlayRandomAudioClipTable(Table=Grunt Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    TransitionToAudioSnapshot(snapshot=Sound Options - Default (audioobjects_assets_all.bundle), transitionTime=0.25)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.25)
+    PlayAudioEvent(audioClip=hornet_gooped_break_free (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hornet_witch_downslash_contact (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="HERO GRAB RELEASE", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ActivateVoidAcid", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    on FINISHED → End
+  }
+
+  state Chomp {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="IsHealthCritical", parameters=[], storeResult=var "Hero Health Critical", EveryFrame=false)
+    BoolTest(boolVariable=var "Hero Health Critical", isTrue=→"UNGRAB", isFalse=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Chomp Timer", floatValue=-0.25, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hatchling Capture")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    SpawnObjectFromGlobalPool(gameObject=standard_health_hit (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    PlayAudioEvent(audioClip=grab_damage (sfxstatic_assets_areamemory.bundle), pitchMin=1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Grab Effect Point", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=flower_mask_crack (sfxstatic_assets_areashellwood.bundle), pitchMin=0.85, pitchMax=1.15, volume=0.75, audioPlayerPrefab=var "", spawnPoint=var "Grab Effect Point", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeChompDamage", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayRandomAudioClipTable(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    RandomlyFlipScale(gameObject=Self)
+    RandomFloat(min=0, max=360, storeResult=var "Fire Angle")
+    SetVelocityAsAngle(gameObject=var "Hero", angle=var "Fire Angle", speed=6, everyFrame=false)
+    on FINISHED → Capture Rise
+    on UNGRAB → Deal Damage To Hero
+  }
+
+  state Respawner? {
+    BoolTest(boolVariable=var "Respawner", isTrue=→"RESPAWNER", isFalse=(none), everyFrame=false)
+    on FINISHED → Egg Emerge
+    on RESPAWNER → Respawn Ready
+  }
+
+  state Respawn Ready {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    AddHP(target=Self, amount=(unset), healToMax=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SetParent(gameObject=Self, parent=var "Respawn Folder", resetLocalPosition=false, resetLocalRotation=false)
+    on HATCH → Hatch Out
+  }
+
+  state Start Unalert {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Unalert Fly
+  }
+
+  state Unalert Fly {
+    IdleBuzzV2(gameObject=Self, waitMin=0.5, waitMax=1, speedMax=2.5, accelerationMax=15, roamingRangeX=4, roamingRangeY=4, manualStartPos=(unset))
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Hatchling TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckOutOfCamera(gameObject=Self, margin=6, outsideEvent=(none), insideEvent=(none), insideBool=false, outsideBool=var "Out Of Camera", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Out Of Camera", var "Respawner"], sendEvent=→"UNSPAWN", storeResult=(unset), everyFrame=true)
+    ShoveFromWall(gameObject=Self, shoveForce=15, rayLength=2, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ALERT → Follow
+    on TOOK DAMAGE → Follow
+    on UNSPAWN → Respawn Ready
+    on GO UP → Go Up
+  }
+
+  state Chomp End {
+    SetBoolValue(boolVariable=var "Grabbing Hero", boolValue=false, everyFrame=false)
+    DamageHeroDirectly(damager=Self, damageAmount=1, spikeHazard=false, sinkHazard=false)  // disabled
+    TransitionToAudioSnapshot(snapshot=Sound Options - Default (audioobjects_assets_all.bundle), transitionTime=0.25)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.25)
+    SendEvent(eventTarget=Self, sendEvent=→"ZERO HP", delay=0, everyFrame=false)
+  }
+
+  state Egg Emerge {
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    RandomFloat(min=5, max=10, storeResult=var "Speed Y")  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Speed Y", everyFrame=false)  // disabled
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hatchling Roll")
+    WaitRandom(timeMin=0.05, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    RandomFloat(min=0.9, max=1.1, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=(unset), oneShotClip=<null>)
+    on FINISHED → Egg Emerge 2
+  }
+
+  state Hatch Out {
+    SetIsDead(target=Self, setValue=false)
+    RandomFloat(min=1, max=1, storeResult=var "Hatch Timer")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hatchling Roll")
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    RandomFloat(min=-8, max=8, storeResult=var "Speed X")
+    RandomFloat(min=30, max=35, storeResult=var "Speed Y")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed X", y=var "Speed Y", everyFrame=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetGravity2dScale(gameObject=Self, gravityScale=1.5)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Hatch Out Air
+  }
+
+  state Unroll {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatchling Unroll", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    RandomFloat(min=0.9, max=1.1, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=(unset), oneShotClip=<null>)
+    on FINISHED → Follow
+  }
+
+  state Attack Pause {
+    BoolTest(boolVariable=var "Hornet Dead", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    WaitRandom(timeMin=0.05, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    ShoveFromWall(gameObject=Self, shoveForce=15, rayLength=2, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on FINISHED → Attack Antic
+    on GLOOMFLY ATTACK → Follow
+    on GO UP → Go Up
+    on CANCEL → Hero Dead
+  }
+
+  state Go Up {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetDamageHero(Target=Self, Enabled=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=10, everyFrame=false)
+    on FINISHED → Follow
+  }
+
+  state Egg Emerge 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hatchling Emerge", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=6, everyFrame=false)  // disabled
+    PlayAudioEventRandom(audioClips=[coral_goomba_large_vox_medium_1 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_2 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_3 (sfxstatic_assets_areacoral.bundle), coral_goomba_large_vox_medium_4 (sfxstatic_assets_areacoral.bundle)], pitchMin=1.6, pitchMax=1.8, volume=0.7, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Follow
+  }
+
+  state Check Weight {
+    SetFloatValue(floatVariable=var "Weight Force", floatValue=0, everyFrame=false)
+    CheckIfToolEquipped(Tool=Weighted Anklet (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    SetFloatValue(floatVariable=var "Weight Force", floatValue=-10, everyFrame=false)
+    on FINISHED → Capture Rise
+  }
+
+  state Hatch Out Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"COLLIDE", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"COLLIDE", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Wait(time=1.25, finishEvent=→"FINISHED", realTime=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"COLLIDE", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Bouncer(24)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on COLLIDE → Bounce
+    on FINISHED → Unroll
+  }
+
+  state Bounce {
+    PlayAudioEventRandom(audioClips=[goop_impact_1 (sfxstatic_assets_areaslab.bundle), goop_impact_2 (sfxstatic_assets_areaslab.bundle), goop_impact_3 (sfxstatic_assets_areaslab.bundle), goop_impact_4 (sfxstatic_assets_areaslab.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    RandomFloat(min=19, max=23, storeResult=var "Speed Y")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Speed Y", everyFrame=false)
+    on FINISHED → Unroll
+  }
+
+  state Fly Away {
+    PlayRandomAudioClipTable(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Hatchling Fly")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    ActivateGameObject(gameObject=var "Grab Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 40), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=3, finishEvent=(none), realTime=false)
+    on FINISHED → Leave
+  }
+
+  state Leave {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Hero Dead {
+    RandomFloat(min=1, max=2, storeResult=var "Attack Time")
+    on FINISHED → Follow
+  }
+
+  state Deal Damage To Hero {
+    DamageHeroDirectly(damager=Self, damageAmount=1, spikeHazard=false, sinkHazard=false)
+    on FINISHED → Chomp End
+  }
+
+  state Set Facing {
+    GetSceneDimensions(StoreWidth=var "Scene Middle", StoreHeight=(unset))
+    FloatDivide(floatVariable=var "Scene Middle", divideBy=2, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=0, functionCall=FaceRight())
+    CheckXPosition(gameObject=var "Hero", compareTo=var "Scene Middle", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"FINISHED", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=0, functionCall=FaceLeft())
+    on FINISHED → Capture
+  }
+
+  var Grab Effect Point: gameObject = <null>
+
+  var Distance: float = 0
+  var Attack Time: float = 0
+  var Fire Angle: float = 0
+  var Speed X: float = 0
+  var Speed Y: float = 0
+  var Velocity X: float = 0
+  var Velocity Y: float = 0
+  var Can Struggle Timer: float = 0
+  var Struggle Speed: float = 0
+  var Chomp Timer: float = 0
+  var Chomp Time: float = 1
+  var Hatch Timer: float = 0
+  var Weight Force: float = 0
+  var Pitch: float = 0
+  var Rotation: float = 0
+  var Distance To Hero: float = 0
+  var Scene Middle: float = 0
+  var Struggle HP: int = 3
+  var Attack Ready: bool = false
+  var Passed Hero: bool = false
+  var Can End Attack: bool = false
+  var Grabbing Hero: bool = false
+  var Can Struggle: bool = false
+  var Respawner: bool = false
+  var Hero Is Grabbed: bool = false
+  var Out Of Camera: bool = false
+  var Hero Health Critical: bool = false
+  var In Attack Range: bool = false
+  var Hornet Dead: bool = false
+  var Hero Nearby: bool = false
+  var Velocity: vector2 = (0, 0)
+  var Contact Normal: vector3 = (0, 0, 0)
+  var Dash Effect: gameObject = Gloomfly/Dash Effect
+  var Grab Collider: gameObject = Gloomfly/Grab Collider
+  var Death Effects: gameObject = Gloomfly/Death Effects
+  var Respawn Folder: gameObject = <null>
+  var Spit Effect: gameObject = Gloomfly/Spit Effect
+  var Block Hit: gameObject = Gloomfly/Block Hit
+  var Block Effect: gameObject = <null>
+  var Self: gameObject = Gloomfly
+  var Unalert Range: object = Gloomfly/Unalert Range@AlertRange
+}

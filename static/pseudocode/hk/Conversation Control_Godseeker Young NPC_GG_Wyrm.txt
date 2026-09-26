@@ -1,0 +1,101 @@
+# Conversation Control
+# 1 location(s):
+#   GG_Wyrm / Godseeker Young NPC
+
+fsm Conversation Control {
+  start Pause Frame
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    FadeAudio(gameObject=Self, startVolume=0, endVolume=1, time=1)
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → First Idle
+  }
+
+  state End {
+    AudioStop(gameObject=Self)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    ActivateGameObject(gameObject=var "AreaTitle", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "AreaTitle", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "AreaTitle", fsmName="", variableName="Area Event", setValue="GODSEEKER", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    AudioStop(gameObject=Self)
+    on FINISHED → Spoken?
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+    on FINISHED → 
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Greet 2 {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Repeat Cell", var "GameText Sheet"], storeResult=(unset var))
+    AudioPlayRandom(gameObject=var "Self", audioClips=[GS_engine_room_02 (sharedassets477.assets)], weights=[1], pitchMin=1, pitchMax=1)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Greet 1 {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "First Cell", var "GameText Sheet"], storeResult=(unset var))
+    AudioPlayRandom(gameObject=var "Self", audioClips=[GS_engine_room_04 (sharedassets475.assets)], weights=[1], pitchMin=1, pitchMax=1)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Spoken? {
+    SetAudioVolume(gameObject=Self, volume=1, everyFrame=false)
+    AudioStop(gameObject=Self)
+    BoolTest(boolVariable=var "Revisiting", isTrue=→"REVISIT", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Spoken", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Greet 1
+    on TRUE → Greet 2
+  }
+
+  state Pause Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state First Idle {
+    on CONVO START → Hero Anim
+  }
+
+  var First Cell: string = "GODSEEKER_ENGINE_WYRM"
+  var Repeat Cell: string = "GODSEEKER_ENGINE_WYRM_REPEAT"
+
+  var Activated: bool = false
+  var Revisiting: bool = false
+  var Spoken: bool = false
+  var GameText Sheet: string = "CP3"
+  var Area Title: gameObject = <null>
+  var Self: gameObject = <null>
+}

@@ -1,0 +1,128 @@
+# Control
+# 1 location(s):
+#   globalpoolprefabs_assets_all.bundle / Reaper Silk Bundle
+
+fsm Control {
+  start Init
+
+  state Init {
+    SetBoolValue(boolVariable=var "Clear Effects", boolValue=false, everyFrame=false)
+    PlayRandomAudioClipTable(Table=reaper_orb_spawn, AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Idle", emit=0, resetIfPlaying=false)
+    SetCircleCollider(gameObject=var "Sprite Silk", active=false)
+    SetMeshRenderer(gameObject=var "Sprite Silk", active=true)
+    ActivateGameObject(gameObject=var "Sprite Collect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Glow", ToAlpha=0, FadeTime=0)
+    FadeNestedFadeGroup(Target=var "Glow", ToAlpha=1, FadeTime=0.2)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Flinging
+  }
+
+  state Collectable {
+    BoolTest(boolVariable=var "Clear Effects", isTrue=→"DISAPPEAR", isFalse=(none), everyFrame=true)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Trigger2dEventV2(gameObject=Self, trigger=0, collideTag="", collideLayer=Hero Box(20), sendEvent=→"COLLECT", storeCollider=var "")
+    Trigger2dEventV2(gameObject=Self, trigger=0, collideTag="Nail Attack", collideLayer=Attack(17), sendEvent=→"REAP", storeCollider=var "")
+    Trigger2dEventCheckName(gameObject=Self, trigger=0, collideTag="Breaker", collideLayer=Attack(17), requiredGameObjectName="Harpoon Breaker", sendEvent=→"REAP", storeCollider=var "")
+    RandomFloat(min=8, max=8.75, storeResult=var "Wait Time")
+    Wait(time=var "Wait Time", finishEvent=→"DISAPPEAR", realTime=false)
+    FloatAdd(floatVariable=var "Wait Time", add=1, everyFrame=false, perSecond=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetSilkPartsTimeLeft", parameters=[var "Wait Time"], storeResult=(unset var), EveryFrame=false)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Water Surface", collideLayer=Soft Terrain(25), sendEvent=→"WATER", storeCollider=var "")
+    on COLLECT → Collect
+    on REAP → Reap
+    on DISAPPEAR → Disappear
+    on WATER → Water Bounce
+  }
+
+  state Collect {
+    PlayParticleEmitter(gameObject=var "Pt Collect", emit=0, resetIfPlaying=false)
+    on FINISHED → Get Silk
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Flinging {
+    EaseFloat(fromValue=0.5, toValue=1, floatVariable=var "Terrain Collider Scale", time=0.3, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    SetScale(gameObject=var "Terrain Collider", vector=(unset), x=var "Terrain Collider Scale", y=var "Terrain Collider Scale", z=(unset), everyFrame=true, lateUpdate=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Water Surface", collideLayer=Soft Terrain(25), sendEvent=→"WATER", storeCollider=var "")
+    on FINISHED → Start Collectable
+    on WATER → Water Bounce
+  }
+
+  state Recycle Pause {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Recycle
+  }
+
+  state Get Silk {
+    PlayRandomAudioClipTable(Table=reaper_orb_collect, AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SpawnObjectFromGlobalPool(gameObject=Silk_Get_Effect, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk Get Effect")
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    SetScale(gameObject=var "Silk Get Effect", vector=(unset), x=0.2, y=0.2, z=(unset), everyFrame=false, lateUpdate=false)
+    FadeNestedFadeGroup(Target=var "Glow", ToAlpha=0, FadeTime=0.2)
+    SendEventToRegister(eventName="REAPER ORB COLLECT")
+    ActivateGameObject(gameObject=var "Sprite Collect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Idle")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AddSilkParts", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetCircleCollider(gameObject=var "Sprite Silk", active=false)
+    SetMeshRenderer(gameObject=var "Sprite Silk", active=false)
+    on FINISHED → Recycle Pause
+  }
+
+  state Reap {
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Angle", space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Pt Break", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Slash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Get Silk
+  }
+
+  state Disappear {
+    PlayAudioEvent(audioClip=reaper_orb_dissapear, pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    StopParticleEmitter(gameObject=var "Pt Idle")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite Silk", clipName="Bundle Disappear", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FadeNestedFadeGroup(Target=var "Glow", ToAlpha=0, FadeTime=0.5)
+    SetCircleCollider(gameObject=var "Sprite Silk", active=false)
+    on FINISHED → Disappear Burst
+  }
+
+  state Water Bounce {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=15, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Start Collectable
+  }
+
+  state Disappear Burst {
+    PlayParticleEmitter(gameObject=var "Pt Disappear", emit=0, resetIfPlaying=false)
+    on FINISHED → Recycle Pause
+  }
+
+  state Start Collectable {
+    SetCircleCollider(gameObject=var "Sprite Silk", active=true)
+    on FINISHED → Collectable
+  }
+
+  var Terrain Collider Scale: float = 0
+  var Angle: float = 0
+  var Wait Time: float = 0
+  var Clear Effects: bool = false
+  var Pt Break: gameObject = Reaper Silk Bundle/Pt Break
+  var Pt Collect: gameObject = Reaper Silk Bundle/Pt Collect
+  var Pt Idle: gameObject = Reaper Silk Bundle/Sprite Silk/Pt Idle
+  var Sprite Collect: gameObject = Reaper Silk Bundle/Sprite Collect
+  var Sprite Silk: gameObject = Reaper Silk Bundle/Sprite Silk
+  var Terrain Collider: gameObject = Reaper Silk Bundle/Terrain Collider
+  var Slash Effect: gameObject = Reaper Silk Bundle/Slash Effect
+  var Pt Disappear: gameObject = Reaper Silk Bundle/Pt Disappear
+  var Glow: gameObject = Reaper Silk Bundle/Glow
+  var Self: gameObject = <null>
+  var Silk Get Effect: gameObject = <null>
+}

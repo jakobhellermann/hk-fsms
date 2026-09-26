@@ -1,0 +1,469 @@
+# Control
+# 1 location(s):
+#   Bellway_Centipede_Arena / Boss Scene/Giant Centipede Head
+
+fsm Control {
+  start Init
+  on DEATH → Death  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Boss Scene")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Centipede Control")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "DropBells")
+    FindChild(gameObject=var "Boss Scene", childName="Giant Centipede Butt", storeResult=var "Butt")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Coil Charge Ground")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Coil Charge Roof")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "BodyWall R")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "BodyWall L")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Audio Player CoilRumble")
+    on FINISHED → Dormant
+  }
+
+  state Away {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Away")
+    WaitBool(boolTest=var "Free Behaviour", time=0.5, finishEvent=→"ATTACK", realTime=false)
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Emerge Collider 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Emerge Collider 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    BoolTest(boolVariable=var "Wait", isTrue=→"ATTACK", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DYING", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Leave For Death", isTrue=→"LEAVE", isFalse=(none), everyFrame=true)
+    on ATTACK → Wait?
+    on DYING → Tele Pos
+    on LEAVE → Stay Away
+  }
+
+  state Tele Pos {
+    SendEvent(eventTarget=Self, sendEvent=→"TELE FLOOR", delay=0, everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Waiting", boolValue=false, everyFrame=false)
+    GetFsmBool(gameObject=var "Butt", fsmName="Control", variableName="On Ground", storeValue=var "Butt On Ground", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Free Behaviour", var "Butt On Ground"], boolStates=[true, true], trueEvent=→"TELE ROOF", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    SendRandomEventV4(events=[→"TELE FLOOR", →"TELE ROOF"], weights=[1, 1], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    on TELE FLOOR → Floor Pos
+    on TELE ROOF → Roof Pos
+  }
+
+  state Floor Pos {
+    SetBoolValue(boolVariable=var "On Ground", boolValue=true, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Arena Size
+  }
+
+  state Arena Size {
+    BoolTest(boolVariable=var "Leave For Death", isTrue=→"LEAVE", isFalse=(none), everyFrame=true)
+    GetFsmString(gameObject=var "Centipede Control", fsmName="Control", variableName="Arena Size", storeValue=var "Arena Size", everyFrame=false)
+    StringSwitch(stringVariable=var "Arena Size", compareTo=["Wide", "Tight"], sendEvent=[→"WIDE", →"TIGHT"], everyFrame=false)
+    on WIDE → Wide Pos
+    on TIGHT → Tight Pos
+    on LEAVE → Stay Away
+  }
+
+  state Wide Pos {
+    RandomFloat(min=var "Wide Min X", max=var "Wide Max X", storeResult=var "Tele X")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Check Butt
+  }
+
+  state Appear Antic {
+    Wait(time=1.2, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt Dig", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=bell_beast_underground_rumble (sfxstatic_assets_areabellway.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    BoolTest(boolVariable=var "Leave For Death", isTrue=→"LEAVE", isFalse=(none), everyFrame=true)
+    on FINISHED → Appear 1
+    on LEAVE → Stay Away
+  }
+
+  state Appear 1 {
+    AudioStop(gameObject=var "Audio Player", fadeTime=0)
+    PlayAudioEventRandom(audioClips=[bell_eater_scream_short_1 (sfxstatic_assets_areabellway.bundle), bell_eater_scream_short_2 (sfxstatic_assets_areabellway.bundle), bell_eater_scream_short_3 (sfxstatic_assets_areabellway.bundle), bell_eater_scream_short_4 (sfxstatic_assets_areabellway.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=bell_beast_underground_emerge (sfxstatic_assets_areabellway.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Head Appear", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Appear 2
+  }
+
+  state Appear 2 {
+    ActivateGameObject(gameObject=var "Emerge Collider 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Appear 3
+  }
+
+  state Appear 3 {
+    ActivateGameObject(gameObject=var "Emerge Collider 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetFsmBool(gameObject=Self, fsmName="Death Control", variableName="Killable", setValue=true, everyFrame=false)
+    on FINISHED → Appear 4
+  }
+
+  state Appear 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    StopParticleEmitter(gameObject=var "Pt Dig")
+    ActivateGameObject(gameObject=var "Body Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Head Idle")
+    Wait(time=var "Idle Time", finishEvent=→"FINISHED", realTime=false)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Leave For Death", isTrue=→"LEAVE", isFalse=(none), everyFrame=true)
+    on FINISHED → Attack
+    on LEAVE → Disappear 1
+  }
+
+  state Disappear 1 {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=bell_beast_slide (sfxstatic_assets_areabell.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Head Disappear", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Emerge Collider 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Dig", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    on FINISHED → Disappear 2
+  }
+
+  state Disappear 2 {
+    ActivateGameObject(gameObject=var "Emerge Collider 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetFsmBool(gameObject=Self, fsmName="Death Control", variableName="Killable", setValue=false, everyFrame=false)
+    on FINISHED → Call Butt
+  }
+
+  state Disappear 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Disappear End
+  }
+
+  state Disappear End {
+    StopParticleEmitter(gameObject=var "Pt Dig")
+    BoolTest(boolVariable=var "On Ground", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)  // disabled
+    GetRandomChild(gameObject=var "DropBells", storeResult=var "Drop Bell")  // disabled
+    GetPosition(gameObject=Self, vector=(unset), x=var "Drop X", y=(unset), z=(unset), space=0, everyFrame=false)  // disabled
+    SetPosition(gameObject=var "Drop Bell", vector=(unset), x=var "Drop X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)  // disabled
+    SendEventByName(eventTarget=GameObject(var "Drop Bell"), sendEvent="DROP", delay=0, everyFrame=false)  // disabled
+    on FINISHED → Away
+  }
+
+  state Roof Pos {
+    SetBoolValue(boolVariable=var "On Ground", boolValue=false, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Roof Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=180, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Arena Size
+  }
+
+  state Slash Antic {
+    PlayAudioEvent(audioClip=bell_eater_scream_medium_intensity_1 (sfxstatic_assets_areabellway.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Head Slash Antic")
+    ActivateGameObject(gameObject=var "SlashAntic Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    PlayAudioEvent(audioClip=flower_yellow_shoot_antic (sfxstatic_assets_areashellwood.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash
+  }
+
+  state Slash {
+    PlayAudioEvent(audioClip=grasshopper_fly_attack_slashy (sfxstatic_assets_areaclover.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Head Slash")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Body Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Leave For Death", isTrue=→"FINISHED", isFalse=(none), everyFrame=true)
+    on FINISHED → Slash End
+  }
+
+  state Recover {
+    StopParticleEmitter(gameObject=var "Pt Spitting")
+    ActivateGameObject(gameObject=var "Spit Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.65, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Head Idle")
+    ActivateGameObject(gameObject=var "Body Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    on FINISHED → Disappear 1
+    on LEAVE → Disappear 1
+  }
+
+  state Attack {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"SPIT", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"SLASH", →"SPIT"], weights=[1, 1], eventMax=[1, 1], missedMax=[1, 1], activeBool=var "On Ground")
+    SendRandomEventV4(events=[→"SLASH", →"SPIT"], weights=[1, 1], eventMax=[1, 2], missedMax=[2, 1], activeBool=(unset))
+    on SLASH → Slash Antic
+    on SPIT → Spit Antic
+    on SING → Sing
+  }
+
+  state Spit Antic {
+    PlayAudioEvent(audioClip=slab_fly_large_spit_antic (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=bone_worm_blue_blood_spit_1 (sfxstatic_assets_areabellway.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Head Spit")
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    PlayParticleEmitter(gameObject=var "Pt Spitting", emit=0, resetIfPlaying=false)
+    on FINISHED → Spit Type
+  }
+
+  state Spit Floor {
+    FlingObjectsFromGlobalPoolTime(gameObject=Shot Giant Centipede (localpoolprefabs_assets_areabellway.bundle), spawnPoint=var "Spit Point", position=(unset), frequency=0.2, spawnMin=1, spawnMax=1, speedMin=21, speedMax=24, angleMin=50, angleMax=85, originVariationX=0.5, originVariationY=0.25, startDelay=0.1)  // disabled
+    FlingObjectsFromGlobalPoolTime(gameObject=Shot Giant Centipede (localpoolprefabs_assets_areabellway.bundle), spawnPoint=var "Spit Point", position=(unset), frequency=0.2, spawnMin=1, spawnMax=1, speedMin=21, speedMax=24, angleMin=95, angleMax=130, originVariationX=0.5, originVariationY=0.25, startDelay=0)  // disabled
+    FlingObjectsFromGlobalPoolVelTime(gameObject=Shot Giant Centipede (localpoolprefabs_assets_areabellway.bundle), spawnPoint=var "Spit Point", position=(unset), frequency=0.2, spawnMin=1, spawnMax=1, speedMinX=-10, speedMaxX=-3, speedMinY=21, speedMaxY=24, originVariationX=0.5, originVariationY=0.25, startDelay=0)
+    FlingObjectsFromGlobalPoolVelTime(gameObject=Shot Giant Centipede (localpoolprefabs_assets_areabellway.bundle), spawnPoint=var "Spit Point", position=(unset), frequency=0.2, spawnMin=1, spawnMax=1, speedMinX=3, speedMaxX=10, speedMinY=21, speedMaxY=24, originVariationX=0.5, originVariationY=0.25, startDelay=0.1)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Leave For Death", isTrue=→"FINISHED", isFalse=(none), everyFrame=true)
+    on FINISHED → Recover
+  }
+
+  state Spit Type {
+    PlayAudioEvent(audioClip=slab_fly_mid_spit (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    PlayAudioEvent(audioClip=bell_eater_long_shooting_or_effort_2 (sfxstatic_assets_areabellway.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "On Ground", isTrue=→"TELE FLOOR", isFalse=→"TELE ROOF", everyFrame=false)
+    on TELE FLOOR → Spit Floor
+    on TELE ROOF → Spit Roof
+  }
+
+  state Spit Roof {
+    EaseFloat(fromValue=240, toValue=180, floatVariable=var "Angle Min", time=0.75, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    EaseFloat(fromValue=300, toValue=360, floatVariable=var "Angle Max", time=0.75, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    FlingObjectsFromGlobalPoolTime(gameObject=Shot Giant Centipede (localpoolprefabs_assets_areabellway.bundle), spawnPoint=var "Spit Point", position=(unset), frequency=0.1, spawnMin=1, spawnMax=1, speedMin=10, speedMax=12, angleMin=var "Angle Min", angleMax=var "Angle Max", originVariationX=0.5, originVariationY=0.25, startDelay=0)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Leave For Death", isTrue=→"FINISHED", isFalse=(none), everyFrame=true)
+    on FINISHED → Recover
+  }
+
+  state Slash End {
+    ActivateGameObject(gameObject=var "SlashAntic Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Head Slash End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DEATH", isFalse=(none), everyFrame=true)
+    on FINISHED → Recover
+  }
+
+  state Check Butt {
+    BoolTest(boolVariable=var "Free Behaviour", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Butt On Ground", var "On Ground"], boolStates=[false, false], trueEvent=(none), falseEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Butt", storeResult=var "Butt Distance", everyFrame=false)
+    FloatCompare(float1=var "Butt Distance", float2=10, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    on FINISHED → Appear Antic
+    on RETRY → Retry Frame
+  }
+
+  state Retry Frame {
+    IntAdd(intVariable=var "Retries", add=1, everyFrame=false)
+    IntCompare(integer1=var "Retries", integer2=100, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Arena Size
+  }
+
+  state Dormant {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Away")
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Emerge Collider 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Emerge Collider 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "SlashAntic Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on BATTLE START → Away
+  }
+
+  state Tight Pos {
+    RandomFloat(min=var "Tight Min X", max=var "Tight Max X", storeResult=var "Tele X")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    RandomFloatEither(value1=var "Tight Min X", value2=var "Tight Max X", storeResult=var "Tele X")
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Check Butt
+  }
+
+  state Call Butt {
+    BoolTest(boolVariable=var "Free Behaviour", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Butt"), sendEvent="ATTACK", delay=0, everyFrame=false)
+    on FINISHED → Disappear 3
+  }
+
+  state Wait? {
+    BoolTest(boolVariable=var "Wait", isTrue=(none), isFalse=→"ACT", everyFrame=false)
+    SetBoolValue(boolVariable=var "Waiting", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Leave For Death", isTrue=→"LEAVE", isFalse=(none), everyFrame=true)
+    on ACT → Do Coil?
+    on LEAVE → Stay Away
+  }
+
+  state Do Coil? {
+    BoolTest(boolVariable=var "Can Coil", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    IntCompare(integer1=var "Coil Counter", integer2=0, equal=→"COIL", lessThan=→"COIL", greaterThan=(none), everyFrame=false)
+    IntAdd(intVariable=var "Coil Counter", add=-1, everyFrame=false)
+    on FINISHED → Tele Pos
+    on COIL → Ask for Butt
+  }
+
+  state Ask for Butt {
+    SetFsmBool(gameObject=var "Butt", fsmName="Control", variableName="Wait", setValue=true, everyFrame=false)
+    GetFsmBool(gameObject=var "Butt", fsmName="Control", variableName="Waiting", storeValue=var "Butt Waiting", everyFrame=true)
+    BoolTest(boolVariable=var "Centipede Dying", isTrue=→"DYING", isFalse=(none), everyFrame=true)
+    BoolTest(boolVariable=var "Butt Waiting", isTrue=→"FINISHED", isFalse=(none), everyFrame=true)
+    on FINISHED → Coil Start Pause
+    on DYING → Tele Pos
+  }
+
+  state Coil Start Pause {
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    WaitBool(boolTest=var "Did First Coil", time=0, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Will ReCoil?
+  }
+
+  state Do Coil {
+    PlayAudioEventRandom(audioClips=[bell_eater_scream_medium_intensity_1 (sfxstatic_assets_areabellway.bundle), bell_eater_scream_medium_intensity_2 (sfxstatic_assets_areabellway.bundle), bell_eater_scream_medium_intensity_4 (sfxstatic_assets_areabellway.bundle), bell_eater_scream_medium_intensity_5 (sfxstatic_assets_areabellway.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Did First Coil", boolValue=true, everyFrame=false)
+    AudioPlaySimple(gameObject=var "Audio Player CoilRumble", volume=1, oneShotClip=<null>)
+    SelectRandomGameObject(gameObjects=[var "Coil Charge Ground", var "Coil Charge Roof"], weights=[0.5, 0.5], storeGameObject=var "Selected Coil")
+    SendEventByName(eventTarget=GameObject(var "Selected Coil"), sendEvent="ATTACK", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "BodyWall L"), sendEvent="COIL START", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "BodyWall R"), sendEvent="COIL START", delay=0, everyFrame=false)
+    Wait(time=4, finishEvent=→"FINISHED", realTime=false)
+    WaitBool(boolTest=var "Will ReCoil", time=3.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → ReCoil?
+  }
+
+  state Coil End {
+    RandomInt(min=2, max=4, storeResult=var "Coil Counter", inclusiveMax=true, noRepeat=false)
+    SetFsmBool(gameObject=var "Butt", fsmName="Control", variableName="Wait", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Butt"), sendEvent="ACT", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AudioStop(gameObject=var "Audio Player CoilRumble", fadeTime=0)
+    SendEventByName(eventTarget=GameObject(var "BodyWall L"), sendEvent="COIL END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "BodyWall R"), sendEvent="COIL END", delay=0, everyFrame=false)
+    on FINISHED → Away
+  }
+
+  state ReCoil? {
+    BoolTest(boolVariable=var "Will ReCoil", isTrue=→"COIL", isFalse=(none), everyFrame=false)
+    on FINISHED → Coil End
+    on COIL → Set ReCoil
+  }
+
+  state Do ReCoil {
+    SendEventByName(eventTarget=GameObject(var "Selected Coil"), sendEvent="ATTACK NOSCALE", delay=0, everyFrame=false)
+    Wait(time=4.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Coil End
+  }
+
+  state Set ReCoil {
+    SendRandomEventV4(events=[→"TELE FLOOR", →"TELE ROOF"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))  // disabled
+    GameObjectCompare(gameObjectVariable=var "Selected Coil", compareTo=var "Coil Charge Ground", equalEvent=→"TELE FLOOR", notEqualEvent=→"TELE ROOF", storeResult=(unset), everyFrame=false)
+    on TELE FLOOR → Change to Roof
+    on TELE ROOF → Change to Ground
+  }
+
+  state Change to Roof {
+    SetGameObject(variable=var "Selected Coil", gameObject=var "Coil Charge Roof", everyFrame=false)
+    MatchScaleSign(Target=var "Coil Charge Roof", MatchTo=var "Coil Charge Ground", EveryFrame=false)
+    FlipScale(gameObject=var "Coil Charge Roof", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)  // disabled
+    on FINISHED → Do ReCoil
+  }
+
+  state Change to Ground {
+    SetGameObject(variable=var "Selected Coil", gameObject=var "Coil Charge Ground", everyFrame=false)
+    MatchScaleSign(Target=var "Coil Charge Ground", MatchTo=var "Coil Charge Roof", EveryFrame=false)
+    FlipScale(gameObject=var "Coil Charge Ground", flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)  // disabled
+    on FINISHED → Do ReCoil
+  }
+
+  state Will ReCoil? {
+    SetBoolValue(boolVariable=var "Will ReCoil", boolValue=false, everyFrame=false)
+    SendRandomEventV4(events=[(none), →"FINISHED"], weights=[0.5, 0.5], eventMax=[2, 1], missedMax=[2, 2], activeBool=(unset))
+    SetBoolValue(boolVariable=var "Will ReCoil", boolValue=true, everyFrame=false)
+    on FINISHED → Do Coil
+  }
+
+  state Death {
+    ActivateGameObject(gameObject=var "Body Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Emerge Collider 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Emerge Collider 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "SlashAntic Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Dig")
+    SetFsmBool(gameObject=var "Butt", fsmName="Control", variableName="Centipede Dying", setValue=true, everyFrame=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Head Spit")
+    SetLayer(gameObject=Self, layer=Corpse(26))
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Death Pop
+  }
+
+  state Death Pop {
+    SpawnObjectFromGlobalPoolOverTimeV2(gameObject=Giant Centipede Death Pop v2 (localpoolprefabs_assets_areabellway.bundle), spawnPoint=var "Explode Point", position=(unset), originVariationX=3, originVariationY=3.5, rotation=(unset), frequency=0.1, scaleMin=1, scaleMax=1)
+  }
+
+  state Stay Away {
+    StopParticleEmitter(gameObject=var "Pt Dig")
+    SetBoolValue(boolVariable=var "Has Left", boolValue=true, everyFrame=false)
+  }
+
+  state Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Head Spit")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    DoCameraShakeRepeatingV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.15, vibrate=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=<null>, noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    SetBoolValueV2(boolVariable=var "Singing", boolValue=true, setOppositeOnExit=true, everyFrame=false)
+    on SING DURATION END → Attack
+  }
+
+  var Ground Y: float = 10.42613
+  var Wide Min X: float = 130.13
+  var Wide Max X: float = 148.39
+  var Tele X: float = 0
+  var Roof Y: float = 15.42
+  var Butt Distance: float = 0
+  var Drop X: float = 0
+  var Tight Min X: float = 133.7
+  var Tight Max X: float = 144.37
+  var Angle Min: float = 0
+  var Angle Max: float = 0
+  var Idle Time: float = 0.5
+  var Retries: int = 0
+  var Coil Counter: int = 0
+  var On Ground: bool = false
+  var Butt On Ground: bool = false
+  var Free Behaviour: bool = false
+  var Wait: bool = false
+  var Waiting: bool = false
+  var Can Coil: bool = false
+  var Did First Coil: bool = false
+  var Butt Waiting: bool = false
+  var Will ReCoil: bool = false
+  var Centipede Dying: bool = false
+  var Leave For Death: bool = false
+  var Has Left: bool = false
+  var Singing: bool = false
+  var Arena Size: string = ""
+  var Body Collider: gameObject = Boss Scene/Giant Centipede Head/Body Collider
+  var Boss Scene: gameObject = <null>
+  var Centipede Control: gameObject = <null>
+  var Emerge Collider 1: gameObject = Boss Scene/Giant Centipede Head/Emerge Collider 1
+  var Emerge Collider 2: gameObject = Boss Scene/Giant Centipede Head/Emerge Collider 2
+  var Pt Dig: gameObject = Boss Scene/Giant Centipede Head/Pt Dig
+  var Slash Damager: gameObject = Boss Scene/Giant Centipede Head/Slash Damager
+  var SlashAntic Collider: gameObject = Boss Scene/Giant Centipede Head/SlashAntic Collider
+  var Spit Point: gameObject = Boss Scene/Giant Centipede Head/Spit Point
+  var Butt: gameObject = <null>
+  var DropBells: gameObject = <null>
+  var Drop Bell: gameObject = <null>
+  var Coil Charge Ground: gameObject = <null>
+  var Coil Charge Roof: gameObject = <null>
+  var Selected Coil: gameObject = <null>
+  var Explode Point: gameObject = Boss Scene/Giant Centipede Head/Death Point
+  var BodyWall R: gameObject = <null>
+  var BodyWall L: gameObject = <null>
+  var Pt Spitting: gameObject = Boss Scene/Giant Centipede Head/Pt Spitting
+  var Spit Effect: gameObject = Boss Scene/Giant Centipede Head/Spit Effect
+  var Audio Player: gameObject = <null>
+  var Audio Player CoilRumble: gameObject = <null>
+  var Audio Loop Voice: gameObject = Boss Scene/Giant Centipede Head/Audio Loop Voice
+}

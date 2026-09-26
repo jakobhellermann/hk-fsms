@@ -1,0 +1,193 @@
+# Attack
+# 2 location(s):
+#   Shellwood_02 / Stick Insect Charger
+#   Shellwood_20 / Stick Insect Charger
+
+fsm Attack {
+  start Init
+  on CANCEL ATTACK → Cancel Attack  // from any state
+
+  state Inert {
+    on ATTACK → Face Hero
+  }
+
+  state Return {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Behaviour Base"), sendEvent="RETURN", delay=0, everyFrame=false)
+    on FINISHED → Inert
+  }
+
+  state Charge Antic {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=stick_insect_charge_antic (sfxstatic_assets_areashellwood.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Charge Antic 2
+  }
+
+  state Init {
+    GetHero(storeResult=var "Hero")
+    FindChild(gameObject=Self, childName="Attack Damager", storeResult=var "Attack Damager")  // disabled
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=0)  // disabled
+    FindChild(gameObject=Self, childName="Skid Dust", storeResult=var "Skid Dust")
+    on FINISHED → Inert
+  }
+
+  state Charge {
+    PlayAudioEvent(audioClip=stick_insect_charging_burst (sfxstatic_assets_areashellwood.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_chirp (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetAudioClip(gameObject=Self, audioClip=stick_insect_charging_loop (sfxstatic_assets_areashellwood.bundle), autoPlay=true, stopOnExit=false)
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=1)  // disabled
+    ActivateGameObject(gameObject=var "Attack Blade", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)  // disabled
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Facing Direction", yScale=(unset), zScale=(unset), space=0, everyFrame=false)  // disabled
+    FloatSign(Value=var "Facing Direction", StoreValue=var "Facing Direction", EveryFrame=false)  // disabled
+    FloatOperator(float1=var "Facing Direction", float2=15, operation=Multiply, storeResult=var "Charge Speed", everyFrame=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Charge Speed", y=(unset), everyFrame=false)  // disabled
+    AccelerateToXByScale(gameObject=Self, accelerationFactor=1, targetSpeed=15)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Attack", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"CANCEL", bottomHitEvent=(none), leftHitEvent=→"CANCEL", otherLayer=true, otherLayerNumber=8, ignoreTriggers=true)
+    MovedPastTargetEvent(Mover=Self, Target=var "Hero", DistancePast=(4, 0), MinTime=0.5, PassedXEvent=→"CANCEL", PassedYEvent=(none))
+    DetectGroundEdge(Body=Self, EdgeDistance=2.25, GroundDistance=1, EveryFixedUpdate=true, FoundWall=→"CANCEL", FoundEdge=→"CANCEL")
+    PlayParticleEmitter(gameObject=var "Pt Run", emit=0, resetIfPlaying=false)
+    on CANCEL → Skid
+  }
+
+  state Skid {
+    SetAudioClip(gameObject=Self, audioClip=stick_insect_charger_walk_loop (sfxstatic_assets_areashellwood.bundle), autoPlay=false, stopOnExit=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=stick_insect_charger_turn_around (sfxstatic_assets_areashellwood.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=0)  // disabled
+    SetDamageHeroAmount(target=Self, damageDealt=1)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Skid", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    tk2dGetClipDuration(ClipName="Charge Skid", StoreDuration=var "Charge Skid Duration", Target=Self)
+    TimeLimitSet(timeDelay=var "Charge Skid Duration", storeValue=var "Charge Skid End Time")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=0, brakeOnExit=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Velocity X", float2=0, tolerance=0.5, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=true)
+    PlayParticleEmitterInState(gameObject=var "Skid Dust")  // disabled
+    on FINISHED → Wait For Anim
+  }
+
+  state End {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Face Hero
+  }
+
+  state Face Hero {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Target X", y=(unset), z=(unset), space=0, everyFrame=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=false, facingEvent=→"DISABLE", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="Turn", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    tk2dGetClipDuration(ClipName="Turn", StoreDuration=var "Turn Duration", Target=Self)
+    Wait(time=var "Turn Duration", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Choice
+  }
+
+  state Wait For Anim {
+    StopParticleEmitter(gameObject=var "Pt Run")
+    TimeLimitCheck(storedValue=var "Charge Skid End Time", aboveEvent=→"FINISHED", belowEvent=(none), EveryFrame=true)
+    on FINISHED → End
+  }
+
+  state Cancel Attack {
+    SetDamageHeroAmount(target=var "Attack Damager", damageDealt=0)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    on FINISHED → Return
+  }
+
+  state Choice {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="", outOfRangeEvent="CANCEL", everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"CANCEL", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_chirp_short (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    RayCast2dV2(fromGameObject=var "Jump Check 1", fromPosition=(unset), direction=(0, 1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=→"CHARGE", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Jump Check 2", fromPosition=(unset), direction=(0, 1), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"CHARGE", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Jump Check 1", fromPosition=(unset), direction=(1, 0), space=1, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"LEAP", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SendRandomEventV4(events=[→"CHARGE", →"LEAP"], weights=[1, 1], eventMax=[2, 2], missedMax=[3, 3], activeBool=(unset))
+    on CHARGE → Charge Antic
+    on LEAP → Leap Antic
+    on CANCEL → Return
+  }
+
+  state Leap Antic {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=stick_insect_charge_antic (sfxstatic_assets_areashellwood.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=stick_insect_puncher_and_charger_shing_antic (sfxstatic_assets_areashellwood.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Leap Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="LEAP START", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=4, resetOnStateExit=true)
+    on FINISHED → Leap
+  }
+
+  state Leap {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=stick_insect_charger_spin_attack (sfxstatic_assets_areashellwood.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Stick_Insect_voice_chirp (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Target X", float2=var "Self X", operation=Subtract, storeResult=var "Jump X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.8, everyFrame=false)
+    FloatClamp(floatVariable=var "Jump X", minValue=-20, maxValue=20, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=36, everyFrame=false)
+    on FINISHED → Air
+  }
+
+  state Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LEAP LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LEAP LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Circle Blade", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on LEAP LAND → Land
+    on MULTI HIT CONNECT → Multihitting
+  }
+
+  state Land {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="LEAP END", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=song_scholar_acolyte_land_1 (sfxstatic_assets_arealibrary.bundle), pitchMin=1.1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Face Hero
+  }
+
+  state Multihitting {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.36, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Bounce Off
+  }
+
+  state Bounce Off {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap Soft")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=15, everyFrame=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LEAP LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LEAP LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LEAP LAND → Land
+  }
+
+  state Charge Antic 2 {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=stick_insect_puncher_and_charger_shing_antic (sfxstatic_assets_areashellwood.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Charge
+  }
+
+  var Charge Skid Duration: float = 0
+  var Charge Skid End Time: float = 0
+  var Charge Speed: float = 0
+  var Facing Direction: float = 0
+  var Jump X: float = 36.53
+  var Self X: float = 0
+  var Target X: float = 0
+  var Turn Duration: float = 0
+  var Velocity X: float = 0
+  var Gravity: float = 2
+  var Attack Damager: gameObject = Stick Insect Charger/Attack Damager
+  var Hero: gameObject = <null>
+  var Skid Dust: gameObject = Stick Insect Charger/Skid Dust
+  var Jump Check 1: gameObject = Stick Insect Charger/Jump Check 1
+  var Jump Check 2: gameObject = Stick Insect Charger/Jump Check 2
+  var Pt Run: gameObject = Stick Insect Charger/Pt Run
+  var Circle Blade: gameObject = Stick Insect Charger/Circle Blade
+  var Attack Blade: gameObject = Stick Insect Charger/Attack Blade
+  var Audio Charge Loop: gameObject = Stick Insect Charger/Audio Charge Loop
+  var Audio Loop Voice: gameObject = Stick Insect Charger/Audio Loop Voice
+}

@@ -1,0 +1,626 @@
+# Interaction
+# 1 location(s):
+#   Shellwood_19 / Bone Beast NPC
+
+fsm Interaction {
+  start Init
+  on DISABLE → Stop Rumbles  // from any state
+  on TEST ARRIVE → Wait Finished Entering  // from any state
+  on DISABLE → Disable  // from any state
+
+  state Init {
+    AddHeroInputBlocker(Blocker=Self)
+    ActivateGameObject(gameObject=var "Antic Bell Shaker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Travel Interaction", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Temp Warmth Region", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Active From Arrive", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Antic Particles", storeResult=var "Antic Particle Parent")
+    FindChild(gameObject=Self, childName="Burst Particles", storeResult=var "Burst Particle Parent")
+    FindChild(gameObject=Self, childName="Sleep Hit Response", storeResult=var "Sleep Hit Response")
+    ActivateGameObject(gameObject=var "Sleep Hit Response", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Awake Hit Response", storeResult=var "Awake Hit Response")
+    ActivateGameObject(gameObject=var "Awake Hit Response", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Burst Out Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Burst Effects", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Wait For Boss Load
+  }
+
+  state Idle {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=var "Start Facing Left", Target=Self)
+    ActivateInteractible(Target=var "Travel Interaction", Activate=true, AllowQueueing=false, UseChildren=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.5, MaxReactDelay=3, None=(none), ActiveInner=(none), ActiveOuter=→"SING", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    WaitRandom(timeMin=5, timeMax=15, finishEvent=→"SHAKE", realTime=false)
+    CheckTrackTriggerCountV2(Target=Bone Beast NPC/Look Detector Exit, Count=0, Test=LessThanOrEqual, EveryFrame=true, SetBool=(unset), SuccessEvent=→"EXIT", FailEvent=(none))
+    on INTERACT → Open map
+    on SING → Start Sing
+    on SHAKE → Wait for Turn
+    on HIT → Hit
+    on EXIT → Outside Range
+  }
+
+  state End Travel Interaction {
+    GetDirection2D(From=Self, To=var "Hero", StoreVector=(unset), StoreX=var "Direction To Hero", StoreY=(unset), EveryFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Direction To Hero", float2=var "X Scale", operation=Multiply, storeResult=var "Direction To Hero", everyFrame=false)
+    FloatSignToBool(Value=var "Direction To Hero", StoreIsPositive=var "Start Facing Left", EveryFrame=false)
+    BoolFlip(boolVariable=var "Start Facing Left")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=var "Travel Interaction", UseChildren=true)
+    on FINISHED → Idle
+  }
+
+  state Is Already Present? {
+    GetPlayerDataVariable(VariableName="FastTravelNPCLocation", StoreValue=var "Current Location")
+    EnumCompare(enumVariable=var "Current Location", compareTo=var "This Location", equalEvent=→"TRUE", notEqualEvent=→"FALSE", storeResult=(unset), everyFrame=false)
+    on FALSE → Wait For Call
+    on TRUE → Start State
+  }
+
+  state Activate {
+    SetPlayerDataVariable(VariableName="travelling", SetValue=false)
+    ActivateGameObject(gameObject=var "Travel Interaction", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetInteractableLabel(Target=var "Travel Interaction", Label=Travel, UseChildren=true)
+    ActivateGameObject(gameObject=var "Awake Hit Response", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Purr Audio"), sendEvent="ACTIVE", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Start Shake {
+    ActivateGameObject(gameObject=var "Travel Interaction", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="BELL RUMBLE START")
+    DoCameraShake(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Bone Beast NPC Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitterChildren(gameObject=var "Antic Particle Parent", resetTimeIfPlaying=false, stopOnStateExit=false)
+    ConvertBoolToFloat(boolVariable=var "Is First Appear", floatVariable=var "Appear Time", falseValue=2, trueValue=3, everyFrame=false)
+    AudioPlay(gameObject=var "Rumble Audio", volume=1, oneShotClip=<null>, WaitForEndOfClip=false, finishedEvent=(none))
+    FadeAudio(gameObject=var "Rumble Audio", startVolume=0, endVolume=1, time=0.2)
+    ActivateGameObject(gameObject=var "Antic Bell Shaker", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=var "Appear Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Appear
+  }
+
+  state Appear {
+    ActivateGameObject(gameObject=var "Entry Jostler", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetTag(gameObject=Self, tag="Bellbeast NPC")
+    SendEventToRegister(eventName="BELL RUMBLE END")
+    SendEventToRegister(eventName="BELL SHAKE")
+    SendEventToRegister(eventName="BEAST APPEAR")
+    SetMeshRenderer(gameObject=Self, active=true)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Bone Beast NPC Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    DoCameraShake(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Big Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    StopParticleEmittersInChildren(gameObject=var "Antic Particle Parent")
+    PlayParticleEmitterChildren(gameObject=var "Burst Particle Parent", resetTimeIfPlaying=false, stopOnStateExit=false)
+    ActivateGameObject(gameObject=var "Burst Out Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Burst Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStop(gameObject=var "Rumble Audio", fadeTime=0)
+    PlayAudioEvent(audioClip=bell_beast_bellway_emerge_and_spin (sfxstatic_assets_areabellway.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventToRegister(eventName="MOTHER ARRIVED")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Arrive", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Burst Out End
+  }
+
+  state Sing {
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Purr Audio"), sendEvent="INACTIVE", delay=0, everyFrame=false)
+    TimeLimitSetV2(TimeDelay=1, StoreValue=var "Sing Time Min", CanSet=(unset), EveryFrame=false)
+    TimeLimitCheckV2(StoredValue=var "Sing Time Min", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Can End Sing", EveryFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=true, ActiveBool=var "Can End Sing", StoreState=None, EveryFrame=true)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=true, Target=Self)
+    SetAudioVolume(gameObject=var "Sing Player", volume=1, everyFrame=false)
+    ActivateInteractible(Target=var "Travel Interaction", Activate=false, AllowQueueing=true, UseChildren=true)
+    AudioPlay(gameObject=var "Sing Player", volume=1, oneShotClip=<null>, WaitForEndOfClip=false, finishedEvent=(none))
+    ConvertBoolToString(boolVariable=var "Was Facing Left", stringVariable=var "Anim", falseString="Sing Right", trueString="Sing", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventToRegister(eventName="BELL RUMBLE START")
+    DoCameraShake(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    SendEventToRegister(eventName="BELL RUMBLE END")
+    SetBoolValue(boolVariable=var "Start Facing Left", boolValue=var "Was Facing Left", everyFrame=false)
+    StartFadeOutAudioSource(Target=var "Sing Player", Duration=0.2, RecycleOnEnd=false)
+    ConvertBoolToString(boolVariable=var "Was Facing Left", stringVariable=var "Anim", falseString="Sing End Right", trueString="Sing End", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Activate
+  }
+
+  state Shake {
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Purr Audio"), sendEvent="INACTIVE", delay=0, everyFrame=false)
+    PlayAudioEvent(audioClip=bell_beast_bellway_stamp (sfxstatic_assets_areabellway.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Shake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Antic Bell Shaker", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="BELL RUMBLE START")
+    DoCameraShake(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Bone Beast NPC Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    PlayParticleEmitterChildren(gameObject=var "Antic Particle Parent", resetTimeIfPlaying=false, stopOnStateExit=false)
+    on FINISHED → Shake End
+  }
+
+  state Shake End {
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Bone Beast NPC Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    SendEventToRegister(eventName="BELL RUMBLE END")
+    StopParticleEmittersInChildren(gameObject=var "Antic Particle Parent")
+    SetBoolValue(boolVariable=var "Start Facing Left", boolValue=true, everyFrame=false)
+    DoCameraShake(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    ActivateGameObject(gameObject=var "Antic Bell Shaker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Activate
+  }
+
+  state Start State {
+    SetTag(gameObject=Self, tag="Bellbeast NPC")
+    PlayerDataVariableTest(VariableName="IsTeleporting", ExpectedValue=true, IsExpectedEvent=→"WAKE", IsNotExpectedEvent=(none))
+    PlayerDataVariableTest(VariableName="travelling", ExpectedValue=true, IsExpectedEvent=→"TRAVEL", IsNotExpectedEvent=(none))
+    SendRandomEvent(events=[→"WAKE", →"SLEEP"], weights=[0.8, 0.2], delay=0)
+    SendEvent(eventTarget=Self, sendEvent=→"SLEEP", delay=0, everyFrame=false)  // disabled
+    on WAKE → Wake Up
+    on SLEEP → Start Asleep
+    on TRAVEL → Wait Finished Entering
+  }
+
+  state Start Asleep {
+    AudioPlay(gameObject=var "Sleep Player", volume=1, oneShotClip=<null>, WaitForEndOfClip=false, finishedEvent=(none))
+    StartHeroVibrationRegion(target=var "Vibration Region", stopOnExit=true)
+    SendEventToRegister(eventName="MOTHER ASLEEP")
+    SetBoolValue(boolVariable=var "Was Asleep", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sleep Hit Response", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sleep", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.7, None=(none), ActiveInner=(none), ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    ActivateGameObject(gameObject=var "Travel Interaction", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetInteractableLabel(Target=var "Travel Interaction", Label=Call, UseChildren=true)
+    on INTERACT → Hero Call
+    on WAKE → Wake
+  }
+
+  state Wake {
+    SetBoolValue(boolVariable=var "Has Entered Range", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Travel Interaction", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sleep Hit Response", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Awake Hit Response", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    SendEventToRegister(eventName="BELL SHAKE")
+    SendEventToRegister(eventName="MOTHER WAKE")
+    AudioStopV2(gameObject=var "Sleep Player", fadeTime=0, cancelOnEarlyExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=Self, audioClipTable=Hornet_Bell_Beast_Wake (sfxdynamic_assets_areabellway.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Activate
+  }
+
+  state Hit {
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Purr Audio"), sendEvent="INACTIVE", delay=0, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[bellbeast_movement_grunt_1 (sfxstatic_assets_areabellway.bundle), bellbeast_movement_grunt_2 (sfxstatic_assets_areabellway.bundle), bellbeast_movement_grunt_3 (sfxstatic_assets_areabellway.bundle), bellbeast_movement_grunt_4 (sfxstatic_assets_areabellway.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=true, Target=Self)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=(none), notFacingEvent=(none), facingBool=var "Start Facing Left", notFacingBool=(unset))
+    ConvertBoolToString(boolVariable=var "Start Facing Left", stringVariable=var "Anim", falseString="Hit React Right", trueString="Hit React Left", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hit End
+  }
+
+  state Fade {
+    AddHeroInputBlocker(Blocker=Self)
+    ToolsCutsceneControl(SetInCutscene=true)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    EndDialogue(ReturnControl=true, ReturnHUD=false, Target=var "Travel Interaction", UseChildren=true)
+    ActivateInteractible(Target=var "Travel Interaction", Activate=false, AllowQueueing=false, UseChildren=true)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=1)
+    TransitionToAudioSnapshot(snapshot=Off (audioobjects_assets_all.bundle), transitionTime=1)
+    TransitionToAudioSnapshot(snapshot=at None (audioobjects_assets_all.bundle), transitionTime=1)
+    FadeOutTransitionAudioFaders()
+    SendEventToRegister(eventName="REST AREA MUSIC STOP FAST")
+    on FINISHED → Hero Jump
+  }
+
+  state Go To Stag Cutscene {
+    TransitionToAudioSnapshot(snapshot=at None (audioobjects_assets_all.bundle), transitionTime=0)
+    SendEventToRegister(eventName="END FOLLOWERS INSTANT")
+    ClearHeroEffectsLite()
+    SetPlayerDataString(gameObject=var "GameManager", stringName="nextScene", value=var "To Scene")
+    SetPlayerDataVariable(VariableName="FastTravelNPCLocation", SetValue=var "Target Location")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SaveLevelState", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())  // disabled
+    LoadSceneSingleCustom(LevelName="Cinematic_Stag_travel")
+  }
+
+  state Open map {
+    OpenFastTravelUI(SpawnedUI=var "Spawned Map", ClosedEvent=→"CONTINUE", StoreLocation=var "Target Location", ThisLocation=var "This Location", StoreDestinationTune=var "Destination Tune")
+    on CONTINUE → Choose Scene
+  }
+
+  state Time Passes {
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataVariable(VariableName="travelling", SetValue=true)
+    SetPlayerDataString(gameObject=var "GameManager", stringName="nextScene", value=var "To Scene")
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=TimePasses())
+    EndFreeCameraMode()
+    on FINISHED → Go To Stag Cutscene
+  }
+
+  state Choose Scene {
+    EnumCompare(enumVariable=var "Target Location", compareTo=var "This Location", equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    EnumCompare(enumVariable=var "Target Location", compareTo=None, equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    GetFastTravelScene(Location=var "Target Location", StoreSceneName=var "To Scene", InvalidEvent=→"INVALID")
+    StartPreloadingScene(SceneName="Cinematic_Stag_travel", LoadMode=LoadSceneMode(0))
+    on CANCEL → End Travel Interaction
+    on INVALID → Invalid
+    on FINISHED → Fade
+  }
+
+  state Invalid {
+    DebugLogConsole(logLevel=2, text="Fast travel target not implemented!", sendToUnityLog=true)
+    on FINISHED → End Travel Interaction
+  }
+
+  state Wait For Boss Load {
+    WaitForBossLoad(sendEvent=→"FINISHED")
+    on FINISHED → Wait For Position
+  }
+
+  state Instantiate {
+    CreateObject(gameObject=Fast Travel Map (localpoolprefabs_assets_areabellway.bundle), spawnPoint=var "", position=(unset), rotation=(unset), storeObject=var "Spawned Map")
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Purr Audio"), sendEvent="INACTIVE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Temp Warmth Region", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Is Unlocked?
+  }
+
+  state Stop Rumbles {
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Bone Beast NPC Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+  }
+
+  state Burst Out End {
+    PlayVibrationV3(vibrationDataAsset=bell_beast_bellway_emerge_and_spin (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    SetBoolValue(boolVariable=var "Has Entered Range", boolValue=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → First Appear?
+  }
+
+  state Wait For Enter {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetBoolValue(boolVariable=var "Is First Appear", boolValue=true, everyFrame=false)
+    CheckTrackTriggerCount(target=var "First Appear Trigger", count=0, test=MoreThan, everyFrame=true, successEvent=→"ENTER")
+    on ENTER → Take Control Rumble
+  }
+
+  state Take Control Rumble {
+    StartRoarEmitter(spawnPoint=Bone Beast NPC/Roar Point, delay=0.16666669, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=true, forceThroughBind=false, stopOnExit=false)
+    SetPlayerDataVariable(VariableName="UnlockedFastTravel", SetValue=true)
+    on FINISHED → Start Shake
+  }
+
+  state Roar {
+    StartRoarEmitterV2(spawnPoint=Bone Beast NPC/Roar Point, delay=0.1666667, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, noRecoil=true, stopOnExit=true)
+    PlayAudioEvent(audioClip=bellbeast_roar_happy (sfxstatic_assets_areabellway.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=2.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Roar End Wait
+  }
+
+  state First Appear? {
+    ActivateGameObject(gameObject=var "Antic Bell Shaker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Is First Appear", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Activate
+    on TRUE → Roar
+  }
+
+  state Travel Arrive Start {
+    SetBoolValue(boolVariable=var "Has Entered Range", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Antic Bell Shaker", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="BELL RUMBLE START")
+    DoCameraShake(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Bone Beast NPC Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    PlayParticleEmitterChildren(gameObject=var "Antic Particle Parent", resetTimeIfPlaying=false, stopOnStateExit=false)
+    ConvertBoolToFloat(boolVariable=var "Is First Appear", floatVariable=var "Wait Time", falseValue=1.75, trueValue=3, everyFrame=false)
+    AudioPlayInState(gameObject=var "Rumble Audio", volume=1)
+    Wait(time=var "Wait Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Travel Burst Out
+  }
+
+  state Travel Burst Out {
+    SendEventToRegister(eventName="BELL RUMBLE END")
+    SendEventToRegister(eventName="BELL SHAKE")
+    SendEventToRegister(eventName="BEAST APPEAR")
+    SetMeshRenderer(gameObject=Self, active=true)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Bone Beast NPC Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    DoCameraShake(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Big Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    StopParticleEmittersInChildren(gameObject=var "Antic Particle Parent")
+    PlayParticleEmitterChildren(gameObject=var "Burst Particle Parent", resetTimeIfPlaying=false, stopOnStateExit=false)
+    ActivateGameObject(gameObject=var "Burst Out Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Burst Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[bell_beast_bellway_emerge_and_spin_variation1 (sfxstatic_assets_areabellway.bundle), bell_beast_bellway_emerge_and_spin_variation2 (sfxstatic_assets_areabellway.bundle), bell_beast_bellway_emerge_and_spin_variation3 (sfxstatic_assets_areabellway.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventToRegister(eventName="MOTHER ARRIVED")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Arrive", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Hero Fing Out
+  }
+
+  state Travel Arrive End {
+    RemoveHeroInputBlocker(Blocker=Self)
+    DoQueuedSaveGame()
+    ActivateGameObject(gameObject=var "Antic Bell Shaker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Activate
+  }
+
+  state Take Control {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Travel Arrive Start
+  }
+
+  state Hero Fing Out {
+    ToolsCutsceneControl(SetInCutscene=false)
+    PlayVibrationV3(vibrationDataAsset=bell_beast_bellway_emerge_and_spin (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    PlayVibrationV3(vibrationDataAsset=hornet_jump (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Hero Fling Out"), sendEvent="FLING", delay=0, everyFrame=false)
+    CallStaticMethod(className="DeliveryQuestItem", methodName="BreakAll", parameters=[], storeResult=(unset var), everyFrame=false)
+    SendEventByNameV2(eventTarget=GameObject(var "Active From Arrive"), sendEvent="NEXT", delay=0, everyFrame=false)
+    on FINISHED → Travel Arrive End
+  }
+
+  state Wait For Position {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Instantiate
+  }
+
+  state Wait Finished Entering {
+    AddHeroInputBlocker(Blocker=Self)
+    ToolsCutsceneControl(SetInCutscene=true)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    ActivateGameObject(gameObject=var "Active From Arrive", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Temp Warmth Region", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Hero Fling Out"), sendEvent="POSITION", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Take Control
+  }
+
+  sequence state Roar End Wait {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=var "Start Facing Left", Target=Self)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    on FINISHED → Activate
+  }
+
+  state Is Unlocked? {
+    RemoveHeroInputBlocker(Blocker=Self)
+    PlayerDataBoolTest(boolName="UnlockedFastTravel", isTrue=→"TRUE", isFalse=(none))
+    GameObjectCompare(gameObjectVariable=var "First Appear Trigger", compareTo=<null>, equalEvent=(none), notEqualEvent=→"UNLOCK", storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName="UnlockedFastTravel", isTrue=(none), isFalse=→"FALSE")
+    on FALSE → Locked
+    on UNLOCK → Wait For Enter
+    on TRUE → Can Appear
+  }
+
+  state Locked {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Wait For Call {
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Travel Interaction", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateInteractible(Target=var "Travel Interaction", Activate=true, AllowQueueing=false, UseChildren=true)
+    SetInteractableLabel(Target=var "Travel Interaction", Label=Call, UseChildren=true)
+    AddEventRegister(target=Self, eventName="DID TAUNT")
+    AddEventRegister(target=Self, eventName="NEEDOLIN START")
+    AddEventRegister(target=Self, eventName="NEEDOLIN END")
+    on INTERACT → Hero Call
+    on NEEDOLIN START → Needolin Wait
+    on DID TAUNT → Check Call
+  }
+
+  sequence state Hero Call {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=hornet_run_start_1 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=Hornet_Bell_Beast_Call (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Bellway Call", AnimationCompleteEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    AddHeroInputBlocker(Blocker=Self)
+    ActivateInteractible(Target=var "Travel Interaction", Activate=false, AllowQueueing=false, UseChildren=true)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=var "Travel Interaction", UseChildren=true)
+    RemoveHeroInputBlocker(Blocker=Self)
+    BoolTest(boolVariable=var "Was Asleep", isTrue=→"SLEEP", isFalse=(none), everyFrame=false)
+    on FINISHED → Appear Delay
+    on SLEEP → Wake
+  }
+
+  state Can Appear {
+    GetGuidReferenceHolderGameObject(Target=Self, StoreGameObject=var "Unlock Toll Machine")
+    GameObjectCompare(gameObjectVariable=var "Unlock Toll Machine", compareTo=<null>, equalEvent=→"TRUE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    GetFsmString(gameObject=var "Unlock Toll Machine", fsmName="Unlock Behaviour", variableName="Pickup PlayerData Bool", storeValue=var "Unlock PD Bool", everyFrame=false)
+    PlayerDataBoolTest(boolName=var "Unlock PD Bool", isTrue=→"TRUE", isFalse=→"FALSE")
+    on FALSE → Wait For Unlock
+    on TRUE → Centipede?
+  }
+
+  state Wait For Unlock {
+    SetMeshRenderer(gameObject=Self, active=false)
+    AddEventRegister(target=Self, eventName="BELLWAY UNLOCKED")
+    on BELLWAY UNLOCKED → Can Appear 2
+  }
+
+  state Can Appear 2 {
+    PlayerDataBoolTest(boolName=var "Unlock PD Bool", isTrue=→"TRUE", isFalse=→"FALSE")
+    on FALSE → Wait For Unlock
+    on TRUE → Centipede?
+  }
+
+  sequence state Check Call {
+    NextFrameEvent(sendEvent=(none))
+    CheckTrackTriggerCountV2(Target=Bone Beast NPC/Look Detector Exit, Count=0, Test=LessThanOrEqual, EveryFrame=false, SetBool=(unset), SuccessEvent=→"CANCEL", FailEvent=(none))
+    on CANCEL → Wait For Call
+    on FINISHED → Appear Delay
+  }
+
+  state Needolin Wait {
+    Wait(time=1, finishEvent=(none), realTime=false)
+    on NEEDOLIN END → Wait For Call
+    on FINISHED → Check Call
+  }
+
+  state Appear Delay {
+    ActivateGameObject(gameObject=var "Travel Interaction", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayerDataVariableTest(VariableName="BellCentipedeLocked", ExpectedValue=true, IsExpectedEvent=→"CENTIPEDE", IsNotExpectedEvent=(none))
+    SetPlayerDataVariable(VariableName="FastTravelNPCLocation", SetValue=var "This Location")
+    PlayerDataVariableTest(VariableName="BellCentipedeWaiting", ExpectedValue=true, IsExpectedEvent=→"CENTIPEDE", IsNotExpectedEvent=(none))
+    SendEventToRegister(eventName="BELLBEAST CALL LOCK")
+    Wait(time=1, finishEvent=(none), realTime=false)
+    on CENTIPEDE → Centipede Call
+    on FINISHED → Start Shake
+  }
+
+  sequence state First Enter? {
+    BoolTest(boolVariable=var "Has Entered Range", isTrue=→"FALSE", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Has Entered Range", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="tk2dLookAnimNPC", methodName="IsFacingLeft", parameters=[], storeResult=var "Was Facing Left", EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="tk2dLookAnimNPC", methodName="IsFacingLeftScaled", parameters=[], storeResult=var "Was Facing Left Scaled", EveryFrame=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=true, Target=Self)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=var "Is Hero Left", selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Was Facing Left Scaled", var "Is Hero Left"], boolStates=[false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Was Facing Left Scaled", var "Is Hero Left"], boolStates=[true, true], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    ConvertBoolToString(boolVariable=var "Was Facing Left", stringVariable=var "Anim", falseString="Turn Left", trueString="Turn Right", everyFrame=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName=var "Anim", AnimationCompleteEvent=(none))
+    CallMethodProper(gameObject=Self, behaviour="tk2dLookAnimNPC", methodName="TargetEntered", parameters=[var "Hero"], storeResult=(unset var), EveryFrame=false)
+    BoolFlip(boolVariable=var "Was Facing Left")
+    BoolFlip(boolVariable=var "Was Facing Left Scaled")
+    CallMethodProper(gameObject=Self, behaviour="tk2dLookAnimNPC", methodName="ResetState", parameters=[var "Was Facing Left"], storeResult=(unset var), EveryFrame=false)
+    on FALSE → Idle
+    on FINISHED → Sing
+  }
+
+  state Wait for Turn {
+    SetIntValue(intVariable=var "Hit Count", intValue=0, everyFrame=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=true, Target=Self)
+    ActivateInteractible(Target=var "Travel Interaction", Activate=false, AllowQueueing=true, UseChildren=true)
+    GetProperty(targetProperty=tk2dLookAnimNPC.IsTurning on Bone Beast NPC@tk2dLookAnimNPC, everyFrame=true)
+    BoolTest(boolVariable=var "Is Turning", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Shake
+  }
+
+  state Hit End {
+    IntAddV2(intVariable=var "Hit Count", add=1, everyFrame=false)
+    RandomInt(min=3, max=5, storeResult=var "Hit Count Target", inclusiveMax=true, noRepeat=false)
+    IntCompare(integer1=var "Hit Count", integer2=var "Hit Count Target", equal=→"SHAKE", lessThan=→"FINISHED", greaterThan=→"SHAKE", everyFrame=false)
+    on FINISHED → Activate
+    on SHAKE → Wait for Turn
+  }
+
+  state Outside Range {
+    CheckTrackTriggerCountV2(Target=Bone Beast NPC/Look Detector Exit, Count=0, Test=MoreThan, EveryFrame=true, SetBool=(unset), SuccessEvent=→"ENTER", FailEvent=(none))
+    on ENTER → First Enter?
+  }
+
+  state Centipede Setup {
+    on FINISHED → Wait For Call
+  }
+
+  state Centipede? {
+    PlayerDataVariableTest(VariableName="BellCentipedeLocked", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=(none))
+    PlayerDataVariableTest(VariableName="BellCentipedeWaiting", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on TRUE → Centipede Setup
+    on FALSE → Is Already Present?
+  }
+
+  state Centipede Call {
+    SendEventToRegister(eventName="CALL CENTIPEDE")
+    on CALL CENTIPEDE FINISHED → Centipede Setup
+  }
+
+  state Wake Up {
+    SendEventToRegister(eventName="MOTHER AWAKE")
+    on FINISHED → Activate
+  }
+
+  state Hero Jump {
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.8)
+    TimeLimitSetV2(TimeDelay=1, StoreValue=var "Fade End Time", CanSet=(unset), EveryFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Fast Travel Leap", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=hornet_jump_ss (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTableV3(Table=Hornet Voice Action Grunt (herodynamic_assets_all.bundle), AudioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    on FINISHED → Hero Fire
+  }
+
+  state Hero Fire {
+    PlayVibrationV3(vibrationDataAsset=hornet_jump (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    CameraFreezeInPlace(freezeTargetAlso=true)
+    PlayAudioEvent(audioClip=hornet_sprint_jump_first_spin (herosfxstatic_assets_all.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Temp Warmth Region", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=var "Target Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    CalculateProjectileVelocity(Target=var "Hero", TargetPosition=var "Target Pos", FireAngle=var "Hero Exit Angle", ImpulseVelocity=var "Fire Velocity", EveryFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=var "Fire Velocity", x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Jump Sing
+  }
+
+  state Start Sing {
+    CallMethodProper(gameObject=Self, behaviour="tk2dLookAnimNPC", methodName="IsFacingLeft", parameters=[], storeResult=var "Was Facing Left", EveryFrame=false)
+    on FINISHED → Sing
+  }
+
+  state Jump Sing {
+    CallMethodProper(gameObject=Self, behaviour="tk2dLookAnimNPC", methodName="IsFacingLeft", parameters=[], storeResult=var "Was Facing Left", EveryFrame=false)
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="Purr Audio"), sendEvent="INACTIVE", delay=0, everyFrame=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=true, Target=Self)
+    SetAudioVolume(gameObject=var "Sing Player", volume=1, everyFrame=false)  // disabled
+    ActivateInteractible(Target=var "Travel Interaction", Activate=false, AllowQueueing=false, UseChildren=true)
+    AudioPlay(gameObject=var "Sing Player", volume=1, oneShotClip=<null>, WaitForEndOfClip=false, finishedEvent=(none))  // disabled
+    PlayAudioEvent(audioClip=bell_beast_sing (sfxstatic_assets_areabellway.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Sing Audio Ref")
+    FadeAudio(gameObject=var "Sing Audio Ref", startVolume=1, endVolume=0, time=5)
+    ConvertBoolToString(boolVariable=var "Was Facing Left", stringVariable=var "Anim", falseString="Sing Right", trueString="Sing", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventToRegister(eventName="BELL RUMBLE START")
+    DoCameraShakeV3(VisibleRenderer=var "", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0, Vibrate=false)
+    TimeLimitCheckV2(StoredValue=var "Fade End Time", AboveEvent=→"FINISHED", BelowEvent=(none), StoreBool=(unset), EveryFrame=true)
+    on FINISHED → Time Passes
+  }
+
+  state Disable {
+    RemoveHeroInputBlocker(Blocker=Self)
+  }
+
+  var Hero Exit Angle: float = 57.5
+  var Active From Arrive: gameObject = <null>
+  var First Appear Trigger: gameObject = <null>
+  var This Location: enum = FastTravelLocations(12)
+
+  var Appear Time: float = 0
+  var Direction To Hero: float = 0
+  var Wait Time: float = 0
+  var X Scale: float = 0
+  var Sing Time Min: float = 0
+  var Fade End Time: float = 0
+  var Hit Count: int = 0
+  var Hit Count Target: int = 0
+  var Is First Appear: bool = false
+  var Start Facing Left: bool = true
+  var Was Asleep: bool = false
+  var Can End Sing: bool = false
+  var Has Entered Range: bool = false
+  var Is Turning: bool = false
+  var Was Facing Left: bool = false
+  var Is Hero Left: bool = false
+  var Was Facing Left Scaled: bool = false
+  var To Scene: string = "Room_Town_Stag_Station"
+  var Unlock PD Bool: string = ""
+  var Anim: string = ""
+  var Target Pos: vector2 = (0, 0)
+  var Fire Velocity: vector2 = (0, 0)
+  var Antic Bell Shaker: gameObject = Bone Beast NPC/Antic Bell Shaker
+  var Antic Particle Parent: gameObject = <null>
+  var Awake Hit Response: gameObject = <null>
+  var Burst Effects: gameObject = Bone Beast NPC/Burst Effects
+  var Burst Out Damager: gameObject = Bone Beast NPC/Burst Out Damager
+  var Burst Particle Parent: gameObject = <null>
+  var Entry Jostler: gameObject = Bone Beast NPC/Entry Bonker
+  var Rumble Audio: gameObject = Bone Beast NPC/Underground Rumble Loop
+  var Sing Player: gameObject = Bone Beast NPC/Sing Audio Loop
+  var Sleep Hit Response: gameObject = <null>
+  var Sleep Player: gameObject = Bone Beast NPC/Snore Audio Loop
+  var Spawned Map: gameObject = <null>
+  var Temp Warmth Region: gameObject = Bone Beast NPC/Temp Warmth Region
+  var Travel Interaction: gameObject = Bone Beast NPC/Travel Interaction
+  var Unlock Toll Machine: gameObject = <null>
+  var Vibration Region: gameObject = Bone Beast NPC/Hero Vibration Region Bone Beast
+  var Sing Audio Ref: gameObject = <null>
+  var Destination Tune: object = <null>
+  var Current Location: enum = FastTravelLocations(0)
+  var Target Location: enum = FastTravelLocations(0)
+}

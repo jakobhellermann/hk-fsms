@@ -1,0 +1,286 @@
+# Conversation Control
+# 1 location(s):
+#   Fungus3_35 / Banker
+
+fsm Conversation Control {
+  start Pause
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Box Down  // from any state
+
+  state Idle {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_visited("Banker"))
+    on CONVO START → Check Direction
+  }
+
+  state Convo Choice {
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="BANKER", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metBanker", isTrue=(none), isFalse=→"MEET")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="bankerAccountPurchased", isTrue=→"GREET", isFalse=→"REMEET")
+    on MEET → Meet
+    on REMEET → Remeet
+    on GREET → Greet
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetLanguageString(sheetName="Prices", convName="BANK_OPEN_ACCT", storeValue=var "Cost String")
+    ConvertStringToInt(stringVariable=var "Cost String", intVariable=var "Account Cost", everyFrame=false)
+    FindGameObject(objectName="", withTag="Shop Window", store=var "Bank Menu")
+    on FINISHED → Check Theft
+  }
+
+  state End {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+    DestroyObject(gameObject=var "Voice Player", delay=0, detachChildren=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    on FINISHED → Hero Look Back
+  }
+
+  state Check Direction {
+    AudioStop(gameObject=Self)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"RIGHT", leftEvent=→"LEFT", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)
+    on RIGHT → Talk Anim
+    on LEFT → 
+  }
+
+  state Talk Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Look Start")
+    on FINISHED → Hero Look
+  }
+
+  state Hero Look {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo Choice
+  }
+
+  state Meet {
+    SetPlayerDataBool(boolName="metBanker", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_MEET", "Banker"], storeResult=(unset var))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Banker_talk_01 (sharedassets218.assets))
+    on CONVO_FINISH → Dial Box Down
+  }
+
+  state Hero Look Back {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpEnd")
+    on FINISHED → End
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=var "Account Cost", everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_ACCOUNT", "Prompts"], storeResult=(unset var))
+    on NO → Decline Pause
+    on YES → Yes
+  }
+
+  state Yes {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=3.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up 3
+  }
+
+  state Dial Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up YN
+  }
+
+  state Remeet {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_REMEET", "Banker"], storeResult=(unset var))
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Banker_talk_02 (sharedassets218.assets))
+    on CONVO_FINISH → Dial Box Down
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Declined
+  }
+
+  state First Decline {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_ACCT_DECLINE", "Banker"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="bankerDeclined", value=true)
+    on CONVO_FINISH → End Anim
+  }
+
+  state Check Declined {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Banker_talk_03 (sharedassets218.assets))
+    GetPlayerDataInt(gameObject=var "GameManager", intName="geo", storeValue=var "Player Geo")
+    IntCompare(integer1=var "Player Geo", integer2=var "Account Cost", equal=→"ENOUGH", lessThan=→"NOT ENOUGH", greaterThan=→"ENOUGH", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="bankerDeclined", isTrue=→"DECLINE 2", isFalse=→"DECLINE 1")
+    on DECLINE 1 → First Decline
+    on DECLINE 2 → Decline Again
+    on NOT ENOUGH → Not Enough Geo 2
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Decline Again {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_ACCT_DECLINE_AGAIN", "Banker"], storeResult=(unset var))
+    on CONVO_FINISH → End Anim
+  }
+
+  state End Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="LookToIdle")
+    on FINISHED → Talk Finish
+  }
+
+  state Decline Pause {
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    on FINISHED → Box Up 2
+  }
+
+  state Talk Finish 2 {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state End Anim 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="LookToIdle")
+    on FINISHED → Talk Finish 2
+  }
+
+  state Account Opened {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Banker_talk_05 (sharedassets218.assets))
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_ACCT_OPEN", "Banker"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="bankerAccountPurchased", value=true)
+    on CONVO_FINISH → Close Box
+  }
+
+  state Open Bank {
+    SendEventByName(eventTarget=GameObject(var "Bank Menu"), sendEvent="SHOP UP", delay=0, everyFrame=false)
+    on SHOP CLOSED → Box Up 4
+  }
+
+  state Close Box {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Open Bank
+  }
+
+  state Box Up 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Account Opened
+  }
+
+  state Greet {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Banker_talk_05 (sharedassets218.assets))
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_GREET", "Banker"], storeResult=(unset var))
+    on CONVO_FINISH → Close Box
+  }
+
+  state Box Up 4 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Farewell
+  }
+
+  state Farewell {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Banker_talk_04 (sharedassets218.assets))
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_FAREWELL", "Banker"], storeResult=(unset var))
+    SetPlayerDataBool(boolName="bankerAccountPurchased", value=true)
+    on CONVO_FINISH → End Anim 2
+  }
+
+  state Check Theft {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="bankerTheft", storeValue=var "Theft State")
+    IntCompare(integer1=var "Theft State", integer2=0, equal=(none), lessThan=(none), greaterThan=→"LEFT", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="bankerTheftCheck", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="bankerTheftCheck", value=false)
+    GetLanguageString(sheetName="Prices", convName="BANK_THEFT_LIMIT", storeValue=var "Theft Balance Str")
+    ConvertStringToInt(stringVariable=var "Theft Balance Str", intVariable=var "Theft Balance", everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="bankerBalance", storeValue=var "Balance")
+    IntCompare(integer1=var "Balance", integer2=var "Theft Balance", equal=(none), lessThan=(none), greaterThan=→"LEAVE", everyFrame=false)
+    on LEAVE → Leave
+    on LEFT → Destroy
+    on FINISHED → Grimmchild?
+  }
+
+  state Destroy {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_visited("Banker... but she's already gone"))
+    DestroySelf(detachChildren=false)
+  }
+
+  state Leave {
+    ConvertIntToFloat(intVariable=var "Balance", floatVariable=var "Balance Float", everyFrame=false)
+    FloatMultiply(floatVariable=var "Balance Float", multiplyBy=1.5, everyFrame=false)
+    ConvertFloatToInt(floatVariable=var "Balance Float", intVariable=var "Balance", rounding=Nearest, everyFrame=false)
+    SetPlayerDataInt(intName="bankerBalance", value=var "Balance")
+    SetPlayerDataInt(intName="bankerTheft", value=1)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BANKER LEFT", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_visited("Banker... but where is she?"))
+    on FINISHED → Destroy
+  }
+
+  state Not Enough Geo 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["BANKER_ACCT_NOTENOUGH", "Banker"], storeResult=(unset var))
+    on CONVO_FINISH → End Anim
+  }
+
+  state Grimmchild? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="grimmChildLevel", storeValue=var "Grimmchild Lv")
+    IntCompare(integer1=var "Grimmchild Lv", integer2=2, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_40", isTrue=→"GRIMM", isFalse=(none))
+    on GRIMM → Grimm Ready
+    on FINISHED → Idle
+  }
+
+  state Grimm Ready {
+    SetCollider(gameObject=Self, active=false)
+    FindChild(gameObject=Self, childName="Dream Dialogue", storeResult=var "Dream Dialogue")
+    SetFsmString(gameObject=var "Dream Dialogue", fsmName="npc_dream_dialogue", variableName="Convo Name", setValue="BANKER_DREAM_SPA", everyFrame=false)
+    on GRIMMBALL → Yelp Away
+  }
+
+  state Yelp Away {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Grimm Hide")
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=Banker_Spa_yelp_04 (sharedassets87.assets))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Banker_Spa_yelp_02 (sharedassets87.assets), pitchMin=1, pitchMax=1, volume=1, delay=0.75, storePlayer=<null>)
+  }
+
+  var Balance Float: float = 0
+  var Account Cost: int = 0
+  var Balance: int = 0
+  var Grimmchild Lv: int = 0
+  var Player Geo: int = 0
+  var Theft Balance: int = 0
+  var Theft State: int = 0
+  var Cost String: string = ""
+  var NPC Name: string = ""
+  var Theft Balance Str: string = ""
+  var Area Title: gameObject = <null>
+  var Bank Menu: gameObject = <null>
+  var Dream Dialogue: gameObject = <null>
+  var Self: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

@@ -1,0 +1,449 @@
+# Hero Death Anim
+# 1 location(s):
+#   resources.assets / Hero Death
+
+fsm Hero Death Anim {
+  start Map Zone
+
+  state Start {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death")  // disabled
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hero_death_v2, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hero_damage, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    TransitionToAudioSnapshot(snapshot=Silent, transitionTime=1)
+    TransitionToAudioSnapshot(snapshot=Normal (sharedassets0.assets), transitionTime=0.5)
+    FindChild(gameObject=var "GameManager", childName="Music", storeResult=var "Music Folder")
+    FindChild(gameObject=var "Music Folder", childName="Track 1", storeResult=var "Track 1")
+    SetFsmFloat(gameObject=var "Track 1", fsmName="Music Player", variableName="Fade Vol End", setValue=0, everyFrame=false)
+    SetFsmFloat(gameObject=var "Track 1", fsmName="Music Player", variableName="Fade Time", setValue=1, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Track 1"), sendEvent="FADE", delay=0, everyFrame=false)
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Notify Geo Counter
+  }
+
+  state Blow {
+    CreateObject(gameObject=Corpse Nail Hero, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Sword", networkInstantiate=false, networkGroup=0)
+    SetVelocityAsAngle(gameObject=var "Sword", angle=var "Sword Throw Angle", speed=20, everyFrame=false)
+    AddTorque2d(gameObject=var "Sword", forceMode=0, torque=var "Sword Throw Torque", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Camera"), sendEvent="MedRumble", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Camera", fsmName="", variableName="RumblingMed", setValue=true, everyFrame=false)
+    on FINISHED → Perma Burst?
+  }
+
+  state Initiate {
+    FindGameObject(objectName="", withTag="Vignette", store=var "Vignette")
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    FindGameObject(objectName="", withTag="HeroLight", store=var "HeroLight")
+    FindChild(gameObject=Self, childName="Shade Particles", storeResult=var "Shade Particles")
+    FindChild(gameObject=Self, childName="Shade", storeResult=var "Shade")
+    SetParent(gameObject=var "Shade Particles", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindGameObject(objectName="", withTag="CameraParent", store=var "Camera")
+    CreateObject(gameObject=Death Crack, spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Hit Crack", networkInstantiate=false, networkGroup=0)  // disabled
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(0))
+    SpawnRandomObjectsV2(gameObject=Slash Effect GhostDark1, spawnPoint=var "Self", position=(unset), spawnMin=8, spawnMax=8, speedMin=20, speedMax=35, angleMin=0, angleMax=360, originVariationX=0, originVariationY=0)
+    SpawnRandomObjectsV2(gameObject=Slash Effect GhostDark2, spawnPoint=var "Self", position=(unset), spawnMin=8, spawnMax=8, speedMin=20, speedMax=35, angleMin=0, angleMax=360, originVariationX=0, originVariationY=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player NoDestroy, spawnPoint=var "Self", audioClip=hero_death_extra_details, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Face Right
+    on FALSE → Face Left
+  }
+
+  state Face Right {
+    SetFloatValue(floatVariable=var "Sword Throw Angle", floatValue=120, everyFrame=false)
+    SetFloatValue(floatVariable=var "Sword Throw Torque", floatValue=120, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Start
+  }
+
+  state Face Left {
+    SetFloatValue(floatVariable=var "Sword Throw Angle", floatValue=60, everyFrame=false)
+    SetFloatValue(floatVariable=var "Sword Throw Torque", floatValue=-120, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Start
+  }
+
+  state End {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StartSoulLimiter())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SOUL LIMITER UP", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SaveLevelState", parameters=[], storeResult=(unset var))  // disabled
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveLevelState())
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="UpdateGeo", parameters=[], storeResult=(unset var))  // disabled
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=0, functionCall=UpdateGeo())
+    SendEventByName(eventTarget=GameObject(var "HeroLight"), sendEvent="DEATH", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Vignette"), sendEvent="DEATH", delay=0, everyFrame=false)
+    DestroySelf(detachChildren=true)  // disabled
+    RecycleSelf()  // disabled
+    SetMeshRenderer(gameObject=Self, active=false)
+    on FINISHED → Shade?
+  }
+
+  state Facing Check {
+    StopParticleEmitter(gameObject=var "Ash L")
+    StopParticleEmitter(gameObject=var "Ash R")
+    SetFsmBool(gameObject=var "Camera", fsmName="", variableName="RumblingMed", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Camera"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Head Right
+    on FALSE → Head Left
+  }
+
+  state Head Left {
+    CreateObject(gameObject=Corpse Head, spawnPoint=var "Self", position=(-0.2, -0.02, -0.01), rotation=(unset), storeObject=var "Head", networkInstantiate=false, networkGroup=0)
+    Rotate(gameObject=var "Head", vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=20, space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetVelocityAsAngle(gameObject=var "Head", angle=80, speed=15, everyFrame=false)
+    AddTorque2d(gameObject=var "Head", forceMode=0, torque=-20, everyFrame=false)
+    on FINISHED → End
+  }
+
+  state Head Right {
+    CreateObject(gameObject=Corpse Head, spawnPoint=var "Self", position=(0.2, -0.02, -0.01), rotation=(unset), storeObject=var "Head", networkInstantiate=false, networkGroup=0)
+    Rotate(gameObject=var "Head", vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=-15, space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetVelocityAsAngle(gameObject=var "Head", angle=100, speed=15, everyFrame=false)
+    AddTorque2d(gameObject=var "Head", forceMode=0, torque=20, everyFrame=false)
+    on FINISHED → End
+  }
+
+  state Ash Spew {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SpawnRandomObjectsOverTimeV2(gameObject=Ash 1, spawnPoint=var "Self", position=var "Ash Spawn", frequency=0.05, spawnMin=2, spawnMax=2, speedMin=25, speedMax=45, angleMin=-30, angleMax=30, originVariationX=0.1, originVariationY=0.3, scaleMin=1, scaleMax=1)
+    SpawnRandomObjectsOverTimeV2(gameObject=Ash 1, spawnPoint=var "Self", position=var "Ash Spawn", frequency=0.05, spawnMin=2, spawnMax=2, speedMin=25, speedMax=45, angleMin=150, angleMax=210, originVariationX=0.1, originVariationY=0.3, scaleMin=1, scaleMax=1)
+    SpawnRandomObjectsOverTimeV2(gameObject=Ash 2, spawnPoint=var "Self", position=var "Ash Spawn", frequency=0.05, spawnMin=2, spawnMax=2, speedMin=25, speedMax=45, angleMin=-30, angleMax=30, originVariationX=0.1, originVariationY=0.3, scaleMin=1, scaleMax=1)
+    SpawnRandomObjectsOverTimeV2(gameObject=Ash 2, spawnPoint=var "Self", position=var "Ash Spawn", frequency=0.05, spawnMin=2, spawnMax=2, speedMin=25, speedMax=45, angleMin=150, angleMax=210, originVariationX=0.1, originVariationY=0.3, scaleMin=1, scaleMax=1)
+    SpawnRandomObjectsOverTimeV2(gameObject=Ash 3, spawnPoint=var "Self", position=var "Ash Spawn", frequency=0.05, spawnMin=2, spawnMax=2, speedMin=25, speedMax=45, angleMin=-30, angleMax=30, originVariationX=0.1, originVariationY=0.3, scaleMin=1, scaleMax=1)
+    SpawnRandomObjectsOverTimeV2(gameObject=Ash 3, spawnPoint=var "Self", position=var "Ash Spawn", frequency=0.05, spawnMin=2, spawnMax=2, speedMin=25, speedMax=45, angleMin=150, angleMax=210, originVariationX=0.1, originVariationY=0.3, scaleMin=1, scaleMax=1)
+    on FINISHED → Facing Check
+  }
+
+  state Set Shade {
+    GetOwner(storeGameObject=var "Self")
+    SendMessage(gameObject=var "Game Map", delivery=SendMessage, options=1, functionCall=PositionCompass(true))
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetSceneNameString", parameters=[], storeResult=var "Scene Name")
+    SetPlayerDataString(gameObject=var "GameManager", stringName="shadeScene", value=var "Scene Name")
+    SetPlayerDataString(gameObject=var "GameManager", stringName="shadeMapZone", value=var "Map Zone")
+    FindClosest(gameObject=Self, withTag="Shade Marker", ignoreOwner=true, mustBeVisible=false, storeObject=var "Shade Marker", storeDistance=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Shade Marker", vector=var "Shade Marker Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetFsmFloat(gameObject=var "Shade Marker", fsmName="Spawn Offset", variableName="X", storeValue=var "Shade Offset X", everyFrame=false)
+    GetFsmFloat(gameObject=var "Shade Marker", fsmName="Spawn Offset", variableName="Y", storeValue=var "Shade Offset Y", everyFrame=false)
+    GetFsmInt(gameObject=var "Shade Marker", fsmName="Spawn Offset", variableName="Special Type", storeValue=var "Shade Special Type", everyFrame=false)
+    SetPlayerDataInt(intName="shadeSpecialType", value=var "Shade Special Type")
+    Vector3AddXYZ(vector3Variable=var "Shade Marker Pos", addX=var "Shade Offset X", addY=var "Shade Offset Y", addZ=0, everyFrame=false, perSecond=false)
+    GetVector3XYZ(vector3Variable=var "Shade Marker Pos", storeX=var "Shade X", storeY=var "Shade Y", storeZ=(unset), everyFrame=false)
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionX", value=var "Shade X")
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionY", value=var "Shade Y")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="maxHealth", storeValue=var "Shade HP")
+    IntOperator(integer1=var "Shade HP", integer2=2, operation=Divide, storeResult=var "Shade HP", everyFrame=false)
+    IntClamp(intVariable=var "Shade HP", minValue=1, maxValue=99, everyFrame=false)
+    SetPlayerDataInt(intName="shadeHealth", value=var "Shade HP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="fireballLevel", storeValue=var "Shade Fireball")
+    SetPlayerDataInt(intName="shadeFireballLevel", value=var "Shade Fireball")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="quakeLevel", storeValue=var "Shade Quake")
+    SetPlayerDataInt(intName="shadeQuakeLevel", value=var "Shade Quake")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="screamLevel", storeValue=var "Shade Scream")
+    SetPlayerDataInt(intName="shadeScreamLevel", value=var "Shade Scream")
+    SendEventByName(eventTarget=Self, sendEvent=var "Map Zone", delay=0, everyFrame=false)
+    on FINISHED → Shade Marker Check
+    on COLOSSEUM → Colosseum Shade
+    on FINAL_BOSS → Final Boss Shade
+  }
+
+  state Notify Geo Counter {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_18", isTrue=→"FINISHED", isFalse=(none))
+    FindGameObject(objectName="", withTag="GeoCounter", store=var "Geo Counter")
+    SendEventByName(eventTarget=GameObject(var "Geo Counter"), sendEvent="TO ZERO", delay=0, everyFrame=false)
+    on FINISHED → Drain Soul
+  }
+
+  state Time Passes {
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=TimePasses())
+    on FINISHED → Initiate
+  }
+
+  state Send Events {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="K HATCHLING END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO LEAVE", delay=0, everyFrame=false)
+    on FINISHED → Time Passes
+  }
+
+  state Drain Soul {
+    SetPlayerDataInt(intName="MPCharge", value=0)
+    SetPlayerDataInt(intName="MPReserve", value=0)
+    SendEventByName(eventTarget=GameObject(var "HUD Camera"), sendEvent="MP LOSE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Camera"), sendEvent="MP RESERVE ZERO", delay=0, everyFrame=false)
+    on FINISHED → Blow
+  }
+
+  state Check MP {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPReserveMax", storeValue=var "MP Reserve Max")
+    IntSwitch(intVariable=var "MP Reserve Max", compareTo=[0, 33, 66, 99, 132], sendEvent=[(none), (none), (none), (none), (none)], everyFrame=false)
+    on 1 → MP 1
+    on 2 → MP 2
+    on 3 → MP 3
+    on 4 → MP 4
+    on 5 → MP 5
+  }
+
+  state Save {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SaveLevelState", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SaveGame", parameters=[], storeResult=(unset var))  // disabled
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=SaveGame())
+    on FINISHED → Send Events
+  }
+
+  state MP 1 {
+    SetPlayerDataInt(intName="shadeMP", value=1)
+    on FINISHED → Save
+  }
+
+  state MP 2 {
+    SetPlayerDataInt(intName="shadeMP", value=2)
+    on FINISHED → Save
+  }
+
+  state MP 3 {
+    SetPlayerDataInt(intName="shadeMP", value=3)
+    on FINISHED → Save
+  }
+
+  state MP 4 {
+    SetPlayerDataInt(intName="shadeMP", value=4)
+    on FINISHED → Save
+  }
+
+  state MP 5 {
+    SetPlayerDataInt(intName="shadeMP", value=5)
+    on FINISHED → Save
+  }
+
+  state Map Zone {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="GetCurrentMapZone", parameters=[], storeResult=var "Map Zone")
+    StringCompare(stringVariable=var "Map Zone", compareTo="DREAM_WORLD", equalEvent=→"DREAM", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Map Zone", compareTo="WHITE_PALACE", equalEvent=→"DREAM", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Break Glass HP
+    on DREAM → Anim Start
+  }
+
+  state Anim Start {
+    GetOwner(storeGameObject=var "Self")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SaveLevelState", parameters=[], storeResult=(unset var))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Dream")
+    Wait(time=0.42, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="K HATCHLING END", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=0, functionCall=TimePasses())
+    FindChild(gameObject=Self, childName="Shade Particles", storeResult=var "Shade Particles")
+    FindChild(gameObject=Self, childName="Shade", storeResult=var "Shade")
+    SetParent(gameObject=var "Shade Particles", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO LEAVE", delay=0, everyFrame=false)
+    FindGameObject(objectName="", withTag="CameraParent", store=var "Camera")
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(0))
+    SpawnRandomObjectsV2(gameObject=Slash Effect GhostDark1, spawnPoint=var "Self", position=(unset), spawnMin=8, spawnMax=8, speedMin=20, speedMax=35, angleMin=0, angleMax=360, originVariationX=0, originVariationY=0)
+    SpawnRandomObjectsV2(gameObject=Slash Effect GhostDark2, spawnPoint=var "Self", position=(unset), spawnMin=8, spawnMax=8, speedMin=20, speedMax=35, angleMin=0, angleMax=360, originVariationX=0, originVariationY=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hero_death_v2, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=hero_damage, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    TransitionToAudioSnapshot(snapshot=Silent, transitionTime=1)
+    TransitionToAudioSnapshot(snapshot=Normal (sharedassets0.assets), transitionTime=0.5)
+    on FINISHED → Drain Soul 2
+  }
+
+  state Drain Soul 2 {
+    SetPlayerDataInt(intName="MPCharge", value=0)
+    SetPlayerDataInt(intName="MPReserve", value=0)
+    SendEventByName(eventTarget=GameObject(var "HUD Camera"), sendEvent="MP LOSE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Camera"), sendEvent="MP RESERVE ZERO", delay=0, everyFrame=false)
+    on FINISHED → Bursting
+  }
+
+  state Bursting {
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dream Burst Pt", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dream Impact", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmFloat(gameObject=var "HUD Blanker White", fsmName="Blanker Control", variableName="Fade Time", setValue=1.5, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    Wait(time=1.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → WP Check
+  }
+
+  state Dream Return {
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=MaxHealth())
+    SetFsmBool(gameObject=var "MainCamera", fsmName="CameraFade", variableName="No Fade", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Hero", fsmName="Dream Return", variableName="Dream Returning", setValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="EnterWithoutInput", parameters=[true], storeResult=(unset var))
+    GetPlayerDataString(gameObject=var "GameManager", stringName="dreamReturnScene", storeValue=var "Return Scene")
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="ChangeToScene", parameters=[var "Return Scene", "door_dreamReturn", 0], storeResult=(unset var))
+  }
+
+  state Shade Marker Check {
+    GameObjectIsNull(gameObject=var "Shade Marker", isNull=(none), isNotNull=→"FINISHED", storeResult=(unset), everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Shade X", y=var "Shade Y", z=(unset), space=0, everyFrame=false)
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionX", value=var "Shade X")
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionY", value=var "Shade Y")
+    on FINISHED → Check MP
+  }
+
+  state Break Glass HP {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_23", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="brokenCharm_23", value=true)
+    SetPlayerDataBool(boolName="equippedCharm_23", value=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=UnequipCharm(23))
+    SetBoolValue(boolVariable=var "Charm Break Msg", boolValue=true, everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="charmSlotsFilled", storeValue=var "Charm Slots Filled")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="charmCost_23", storeValue=var "Charm Cost")
+    IntOperator(integer1=var "Charm Slots Filled", integer2=var "Charm Cost", operation=Subtract, storeResult=var "Charm Slots Filled", everyFrame=false)
+    SetPlayerDataInt(intName="charmSlotsFilled", value=var "Charm Slots Filled")
+    on FINISHED → Break Glass Geo
+  }
+
+  state Break Glass Geo {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_24", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="brokenCharm_24", value=true)
+    SetPlayerDataBool(boolName="equippedCharm_24", value=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=UnequipCharm(24))
+    SetBoolValue(boolVariable=var "Charm Break Msg", boolValue=true, everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="charmSlotsFilled", storeValue=var "Charm Slots Filled")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="charmCost_24", storeValue=var "Charm Cost")
+    IntOperator(integer1=var "Charm Slots Filled", integer2=var "Charm Cost", operation=Subtract, storeResult=var "Charm Slots Filled", everyFrame=false)
+    SetPlayerDataInt(intName="charmSlotsFilled", value=var "Charm Slots Filled")
+    on FINISHED → Break Glass Attack
+  }
+
+  state Break Glass Attack {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_25", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="brokenCharm_25", value=true)
+    SetPlayerDataBool(boolName="equippedCharm_25", value=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=UnequipCharm(25))
+    SetBoolValue(boolVariable=var "Charm Break Msg", boolValue=true, everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="charmSlotsFilled", storeValue=var "Charm Slots Filled")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="charmCost_25", storeValue=var "Charm Cost")
+    IntOperator(integer1=var "Charm Slots Filled", integer2=var "Charm Cost", operation=Subtract, storeResult=var "Charm Slots Filled", everyFrame=false)
+    SetPlayerDataInt(intName="charmSlotsFilled", value=var "Charm Slots Filled")
+    on FINISHED → Break Msg
+  }
+
+  state Break Msg {
+    BoolTest(boolVariable=var "Charm Break Msg", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CreateObject(gameObject=Relic Get Msg, spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Msg", networkInstantiate=false, networkGroup=0)
+    FindChild(gameObject=var "Msg", childName="Text", storeResult=var "Msg Text")
+    FindChild(gameObject=var "Msg", childName="Icon", storeResult=var "Msg Icon")
+    SetSpriteRendererSprite(gameObject=var "Msg Icon", sprite=glass_charm_shattered_UI)
+    GetLanguageString(sheetName="UI", convName="NOTIFICATION_CHARM_BREAK", storeValue=var "Break Msg")
+    SetTextMeshProText(gameObject=var "Msg Text", textString=var "Break Msg")
+    SendEvent(eventTarget=Self, sendEvent=→"CHECK OC", delay=0, everyFrame=false)
+    on FINISHED → Remove Geo
+    on CHECK OC → Remove Overcharm
+  }
+
+  state Remove Geo {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_18", isTrue=→"FINISHED", isFalse=(none))  // disabled
+    GetPlayerDataInt(gameObject=var "GameManager", intName="geo", storeValue=var "Current Geo")
+    SetPlayerDataInt(intName="geoPool", value=var "Current Geo")
+    SetPlayerDataInt(intName="geo", value=0)
+    on FINISHED → Set Shade
+  }
+
+  state Remove Overcharm {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="overcharmed", isTrue=(none), isFalse=→"FINISHED")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="charmSlotsFilled", storeValue=var "Charm Slots Filled")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="charmSlots", storeValue=var "Charm Slots")
+    IntCompare(integer1=var "Charm Slots Filled", integer2=var "Charm Slots", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetPlayerDataBool(boolName="overcharmed", value=false)
+    on FINISHED → Remove Geo
+  }
+
+  state WP Check {
+    StringCompare(stringVariable=var "Map Zone", compareTo="WHITE_PALACE", equalEvent=→"WHITE PALACE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Dream Return
+    on WHITE PALACE → Wait for HeroController
+  }
+
+  state Wait for HeroController {
+  }
+
+  state Colosseum Shade {
+    SetPlayerDataString(gameObject=var "GameManager", stringName="shadeScene", value="Room_Colosseum_02")
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionX", value=27.2)
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionY", value=45.6)
+    on FINISHED → Check MP
+  }
+
+  state Final Boss Shade {
+    SetPlayerDataString(gameObject=var "GameManager", stringName="shadeScene", value="Room_Final_Boss_Atrium")
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionX", value=219)
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionY", value=10)
+    on FINISHED → Check MP
+  }
+
+  state Ash Particle {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Ash L", emit=0)
+    PlayParticleEmitter(gameObject=var "Ash R", emit=0)
+    on FINISHED → Facing Check
+  }
+
+  state Perma Burst? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="permadeathMode", storeValue=var "PermaDeath Mode")
+    IntCompare(integer1=var "PermaDeath Mode", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    FindChild(gameObject=Self, childName="perma_death_looping_effects", storeResult=var "perma_death_looping_effects")
+    ActivateGameObject(gameObject=var "perma_death_looping_effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Ash Particle
+  }
+
+  state Shade? {
+    IntCompare(integer1=var "PermaDeath Mode", integer2=0, equal=(none), lessThan=(none), greaterThan=→"PERMA", everyFrame=false)
+    ActivateGameObject(gameObject=var "Shade", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on PERMA → No Shade
+  }
+
+  state No Shade {
+  }
+
+  var Facing Right: bool = false
+
+  var Shade Offset X: float = 0
+  var Shade Offset Y: float = 0
+  var Shade X: float = 0
+  var Shade Y: float = 0
+  var Sword Throw Angle: float = 0
+  var Sword Throw Torque: float = 0
+  var Charm Cost: int = 0
+  var Charm Slots: int = 0
+  var Charm Slots Filled: int = 0
+  var Current Geo: int = 0
+  var MP Reserve Max: int = 0
+  var PermaDeath Mode: int = 0
+  var Shade Fireball: int = 0
+  var Shade HP: int = 0
+  var Shade MP: int = 0
+  var Shade Quake: int = 0
+  var Shade Scream: int = 0
+  var Shade Special Type: int = 0
+  var Charm Break Msg: bool = false
+  var Break Msg: string = ""
+  var Map Zone: string = ""
+  var Return Scene: string = "Crossroads_10"
+  var Scene Name: string = ""
+  var Ash Spawn: vector3 = (0, -0.5, 0)
+  var Shade Marker Pos: vector3 = (0, 0, 0)
+  var Ash L: gameObject = Hero Death/Ash L
+  var Ash R: gameObject = Hero Death/Ash R
+  var Camera: gameObject = <null>
+  var Dream Burst Pt: gameObject = Hero Death/Dream Burst Pt
+  var Dream Impact: gameObject = Hero Death/Dream Impact
+  var Geo Counter: gameObject = <null>
+  var Head: gameObject = <null>
+  var Hero: gameObject = <null>
+  var HeroLight: gameObject = <null>
+  var Hit Crack: gameObject = <null>
+  var Msg: gameObject = <null>
+  var Msg Icon: gameObject = <null>
+  var Msg Text: gameObject = <null>
+  var Music Folder: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shade: gameObject = <null>
+  var Shade Marker: gameObject = <null>
+  var Shade Particles: gameObject = Hero Death/Shade
+  var Sword: gameObject = <null>
+  var Track 1: gameObject = <null>
+  var Vignette: gameObject = <null>
+  var perma_death_looping_effects: gameObject = <null>
+}

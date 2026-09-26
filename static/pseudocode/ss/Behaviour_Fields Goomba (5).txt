@@ -1,0 +1,114 @@
+# Behaviour
+# 1 location(s):
+#   Bone_East_14b / Fields Goomba (5)
+
+fsm Behaviour {
+  start Init
+  on TOOK DAMAGE → Damaged  // from any state
+
+  state Idle {
+    RandomBoolPercent(storeResult=var "Will Call", trueChance=50)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    RandomFloat(min=1, max=1.5, storeResult=var "Wait Time")
+    WaitBool(boolTest=var "Idle Walk", time=var "Wait Time", finishEvent=→"WALK", realTime=false)
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=→"RUN AWAY", InRangeDelay=0.1, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    SetParticleEmissionChildren(Target=var "Pt Run", SetEmission=false, EveryFrame=false, stopOnExit=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    BoolTestMulti(boolVariables=[var "Will Call", var "Did Call"], boolStates=[true, false], trueEvent=(none), falseEvent=(none), storeResult=var "Do Call", everyFrame=false)
+    WaitBool(boolTest=var "Do Call", time=0.5, finishEvent=→"CALL", realTime=false)
+    on WALK → Walk
+    on RUN AWAY → Run Away
+    on SING → Sing
+    on CALL → Call Antic
+  }
+
+  state Walk {
+    RandomBool(storeResult=var "Schedule Turn")
+    StartCrawler(Target=Self, ScheduleTurn=var "Schedule Turn")
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=→"IDLE", realTime=false)
+    SetParticleEmissionChildren(Target=var "Pt Run", SetEmission=true, EveryFrame=false, stopOnExit=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetBoolValue(boolVariable=var "Did Call", boolValue=false, everyFrame=false)
+    on IDLE → To Idle
+    on SING → Sing
+  }
+
+  state Init {
+    StopCrawler(Target=Self, WaitForTurn=true)
+    FindNamedChild(gameObject=Self, storeResult=var "Wake Range")
+    GameObjectIsNull(gameObject=var "Wake Range", isNull=(none), isNotNull=→"WAITING", storeResult=(unset), everyFrame=false)
+    on FINISHED → Idle
+    on WAITING → Waiting
+  }
+
+  sequence state To Idle {
+    SetParticleEmissionChildren(Target=var "Pt Run", SetEmission=false, EveryFrame=false, stopOnExit=false)
+    StopCrawler(Target=Self, WaitForTurn=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    on FINISHED → Idle
+    on SING → Sing
+  }
+
+  state Run Away {
+    SetBoolValue(boolVariable=var "Should Face Away", boolValue=false, everyFrame=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=false, facingEvent=(none), notFacingEvent=(none), facingBool=var "Should Face Away", notFacingBool=(unset))
+    StartCrawler(Target=Self, ScheduleTurn=var "Should Face Away")
+    WaitRandom(timeMin=1, timeMax=1.5, finishEvent=→"IDLE", realTime=false)
+    SetParticleEmissionChildren(Target=var "Pt Run", SetEmission=true, EveryFrame=false, stopOnExit=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetBoolValue(boolVariable=var "Did Call", boolValue=false, everyFrame=false)
+    on IDLE → To Idle
+    on SING → Sing
+  }
+
+  state Damaged {
+    on FINISHED → Run Away
+  }
+
+  state Sing {
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=fields_goomba_singing (sfxdynamic_assets_areawilds.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    StopCrawler(Target=Self, WaitForTurn=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetParticleEmissionChildren(Target=var "Pt Run", SetEmission=false, EveryFrame=false, stopOnExit=false)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Waiting {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="RUN AWAY", outOfRangeEvent="", everyFrame=true)
+    on RUN AWAY → Walk
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Call Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Call", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Call
+  }
+
+  state Call {
+    SetBoolValue(boolVariable=var "Did Call", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoice(gameObject=var "Audio Loop Voice", audioClips=[fields_goomba_alert_1 (sfxstatic_assets_areawilds.bundle), fields_goomba_alert_2 (sfxstatic_assets_areawilds.bundle), fields_goomba_alert_3 (sfxstatic_assets_areawilds.bundle)], weights=[1, 1, 1], pitchMin=0.85, pitchMax=1.15, stopPreviousSound=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+    on TOOK DAMAGE → Run Away
+  }
+
+  var Wait Time: float = 0
+  var Schedule Turn: bool = false
+  var Should Face Away: bool = false
+  var Will Call: bool = false
+  var Did Call: bool = false
+  var Do Call: bool = false
+  var Idle Walk: bool = true
+  var Pt Run: gameObject = Fields Goomba (5)/Pt Run
+  var Wake Range: gameObject = <null>
+  var Audio Loop Voice: gameObject = Fields Goomba (5)/Audio Loop Voice
+  var Alert Range: object = Fields Goomba (5)/Alert Range@AlertRange
+}

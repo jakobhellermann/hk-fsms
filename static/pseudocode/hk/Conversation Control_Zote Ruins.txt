@@ -1,0 +1,129 @@
+# Conversation Control
+# 1 location(s):
+#   Ruins1_06 / Zote Ruins
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Box Down  // from any state
+
+  state Idle {
+    on CONVO START → Check Direction
+  }
+
+  state Convo Choice {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="zoteSpokenCity", isTrue=→"REPEAT", isFalse=→"GREET")
+    on GREET → Greet
+    on REPEAT → Repeat
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Pause
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    DestroyObject(gameObject=var "Voice Player", delay=0, detachChildren=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    on FINISHED → Check Direction 2
+  }
+
+  state Check Direction {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"RIGHT", leftEvent=→"LEFT", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)
+    on RIGHT → Talk R
+    on LEFT → Talk Back
+  }
+
+  state Talk R {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk L")
+    on FINISHED → Box Up
+  }
+
+  state Talk Back {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk R")
+    on FINISHED → Box Up
+  }
+
+  state Box Up {
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="ZOTE", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo Choice
+  }
+
+  state Check Direction 2 {
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"RIGHT", leftEvent=→"LEFT", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)
+    on RIGHT → Face Right
+    on LEFT → Face Left
+  }
+
+  state Face Right {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Look Right")
+    on FINISHED → End
+  }
+
+  state Face Left {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Look Left")
+    on FINISHED → End
+  }
+
+  state Greet {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Zote_05 (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    SetPlayerDataBool(boolName="zoteSpokenCity", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["ZOTE_CITY_GREET", "Zote"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Check Active {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="zote", storeValue=var "NPC State")  // disabled
+    IntSwitch(intVariable=var "NPC State", compareTo=[0], sendEvent=[→"DESTROY"], everyFrame=false)  // disabled
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="zoteRescuedBuzzer", isTrue=(none), isFalse=→"DESTROY")
+    on FINISHED → Remove Enemies
+    on DESTROY → Destroy
+  }
+
+  state Destroy {
+    DestroySelf(detachChildren=false)
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Repeat {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Zote_05 (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["ZOTE_CITY_REPEAT", "Zote"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Pause 2
+  }
+
+  state Pause 2 {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Check Active
+  }
+
+  state Remove Enemies {
+    FindGameObject(objectName="_Enemies", withTag="Untagged", store=var "Enemies Folder")
+    ActivateGameObject(gameObject=var "Enemies Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var NPC State: int = 0
+  var Area Title: gameObject = <null>
+  var Enemies Folder: gameObject = <null>
+  var Self: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

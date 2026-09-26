@@ -1,0 +1,480 @@
+# Control
+# 2 location(s):
+#   Hive_05 / Battle Scene/Hive Knight
+#   GG_Hive_Knight / Battle Scene/Hive Knight
+
+// uses template: hive_knight
+fsm Control {
+  start Init
+  on STUN → Stun Start  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Stab Hit", storeResult=var "Stab Hit")
+    FindChild(gameObject=Self, childName="Slash 1", storeResult=var "Slash 1")
+    FindChild(gameObject=Self, childName="Slash 2", storeResult=var "Slash 2")
+    FindChild(gameObject=Self, childName="Slam Effect", storeResult=var "Slam Effect")
+    FindChild(gameObject=Self, childName="Stinger Flash", storeResult=var "Stinger Flash")
+    FindChild(gameObject=Self, childName="Mouth Swarm", storeResult=var "Mouth Swarm")
+    FindChild(gameObject=Self, childName="Stun Loop", storeResult=var "Stun Loop")
+    FindChild(gameObject=Self, childName="Pt Dash", storeResult=var "Pt Dash")
+    FindChild(gameObject=Self, childName="Pt Land", storeResult=var "Pt Land")
+    FindChild(gameObject=Self, childName="Slam", storeResult=var "Slam")
+    FindChild(gameObject=Self, childName="Pt Jump", storeResult=var "Pt Jump")
+    on FINISHED → Variant
+  }
+
+  state Sleep {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false)
+    on WAKE → Wake
+  }
+
+  state Wake {
+    on FINISHED → Fall
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true)
+    Wait(time=var "Idle Time", finishEvent=→"FINISHED", realTime=false)
+    SetBoxCollider2DSize(gameObject1=Self, width=1.754768, height=3.378689, offsetX=0.1264763, offsetY=-0.9895897)
+    on FINISHED → Phase Check
+    on TOOK DAMAGE → Phase Check
+  }
+
+  state Stun Start {
+    AudioStop(gameObject=Self)
+    SpawnObjectFromGlobalPool(gameObject=Stun Effect (resources.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=HK_stun_01, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    SetBoxCollider2DSize(gameObject1=Self, width=1.754768, height=3.378689, offsetX=0.1264763, offsetY=-0.9895897)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Stun Air Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Speed Crt", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Air")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed Crt", y=20, everyFrame=false)
+    ActivateGameObject(gameObject=var "Stab Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Stun Air
+  }
+
+  state Stun Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Stun Land
+  }
+
+  state Stun Land {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Land")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Wait(time=3, finishEvent=→"RECOVER", realTime=false)
+    AudioPlayInState(gameObject=var "Stun Loop", volume=1)
+    on RECOVER → Stun Recover
+    on TOOK DAMAGE → Stun Recover
+  }
+
+  state Stun Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Dash Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stab Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=HK_antic_short)
+    on FINISHED → Dash
+  }
+
+  state Dash {
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Dash Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Speed Crt", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed Crt", y=0, everyFrame=false)
+    Wait(time=0.18, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Stab Hit", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stab")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hive_knight_dash, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[HK_attack_long_03, HK_attack_long_02, HK_attack_long_01], weights=[1, 1, 1], pitchMin=1, pitchMax=1)
+    PlayParticleEmitterInState(gameObject=var "Pt Dash")
+    on FINISHED → Dash Recover
+  }
+
+  state Dash Recover {
+    ActivateGameObject(gameObject=var "Stab Hit", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.875, decelerationY=(unset))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stab End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dash End
+  }
+
+  state Dash End {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Jump Antic {
+    SetBoolValue(boolVariable=var "Will Jump", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    on FINISHED → Aim Jump
+  }
+
+  state Aim Jump {
+    RandomFloat(min=var "Left X", max=var "Right X", storeResult=var "Jump X")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatSubtract(floatVariable=var "Jump X", subtract=var "Self X", everyFrame=false, perSecond=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.25, everyFrame=false)
+    on FINISHED → Jump
+  }
+
+  state Jump {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hive_knight_jump)
+    SetBoxCollider2DSize(gameObject1=Self, width=1.754768, height=2.332678, offsetX=0.1264763, offsetY=-1.512595)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Air")
+    RandomFloat(min=60, max=60, storeResult=var "Jump Y")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=var "Jump Y", everyFrame=false)
+    Wait(time=0.05, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt Jump", emit=0)
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Land
+  }
+
+  state Land {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hive_knight_land)
+    SetBoxCollider2DSize(gameObject1=Self, width=1.754768, height=3.378689, offsetX=0.1264763, offsetY=-0.9895897)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Land", emit=0)
+    ActivateGameObject(gameObject=var "Slam", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state TeleOut 1 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → TeleOut 2
+  }
+
+  state TeleOut 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetCollider(gameObject=Self, active=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=HK_antic_02)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hive_knight_teleport, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Tele Pause
+  }
+
+  state Tele Pos {
+    SetMeshRenderer(gameObject=Self, active=true)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"R", leftEvent=→"L", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)
+    on L → Aim L
+    on R → Aim R
+  }
+
+  state Aim R {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "X Pos", y=var "Y Pos", z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "X Pos", add=6, everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Y Pos", add=1.3, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "X Pos", float2=var "Right X", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"L", everyFrame=false)
+    on L → Aim L
+    on FINISHED → TeleIn 1
+  }
+
+  state Aim L {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "X Pos", y=var "Y Pos", z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "X Pos", add=-6, everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Y Pos", add=1.3, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "X Pos", float2=var "Left X", tolerance=0, equal=(none), lessThan=→"R", greaterThan=(none), everyFrame=false)
+    on R → Aim R
+    on FINISHED → TeleIn 1
+  }
+
+  state TeleIn 1 {
+    SetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=var "Y Pos", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → TeleIn 2
+  }
+
+  state TeleIn 2 {
+    SetCollider(gameObject=Self, active=true)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In 2", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Slash 1
+  }
+
+  state Slash 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Slash 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ruin_fat_sentry_sword (sharedassets33.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Slash 1", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Slash Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Speed Crt", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Speed Crt", y=0, everyFrame=false)
+    on FINISHED → Slash 2
+  }
+
+  state Slash 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Slash 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash 2", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash 1", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Slash Recover
+  }
+
+  state Slash Recover {
+    ActivateGameObject(gameObject=var "Slash 2", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Slash Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset))
+    on FINISHED → Start Fall
+  }
+
+  state Start Fall {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Air")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    on FINISHED → In Air
+  }
+
+  state Attack Choice {
+    BoolTest(boolVariable=var "Will Jump", isTrue=→"JUMP", isFalse=(none), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"BEE ROAR", delay=0, everyFrame=false)
+    SendRandomEvent(events=[→"DASH", →"JUMP", →"TELE"], weights=[1, 1, 1], delay=0)
+    on DASH → Dash Antic
+    on JUMP → Jump Antic
+    on TELE → TeleOut 1
+    on GLOB → Glob Antic 1
+    on BEE ROAR → Bee Roar Antic
+  }
+
+  state Glob Antic 1 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="G Stab Antic 1", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hollow_knight_self_stab_prepare (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Glob Antic 2
+  }
+
+  state Glob Strike {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="G Stab", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=false_knight_land_1st_time (sharedassets6.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)  // disabled
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Globs Container"), sendEvent="FIRE", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Glob Recover
+  }
+
+  state Glob Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Jump Antic
+  }
+
+  state Glob Antic 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="G Stab Antic 2", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Stinger Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hive_boss_sword_ground_slam, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Glob Strike
+  }
+
+  state Bee Roar Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetParent(gameObject=var "Mouth Swarm", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=var "Mouth Swarm", vector=(unset), x=0.2700043, y=0.5599995, z=-0.006121, space=1, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Mouth Swarm", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar Antic", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hive_boss_mouth_explosion_antic, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    on FINISHED → Roar
+  }
+
+  state Roar {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=HK_roar_peaking_a_bit)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hive_boss_mouth_explosion, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Swarm Audio", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Mouth Swarm", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Mouth Swarm", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Roar Recover
+  }
+
+  state Roar Recover {
+    SendEventByName(eventTarget=GameObject(var "Droppers"), sendEvent="SWARM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=10)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Will Jump", boolValue=true, everyFrame=false)
+    on FINISHED → Roar Cooldown
+  }
+
+  state Phase Check {
+    GetHP(target=Self, storeValue=var "HP")
+    IntCompare(integer1=var "HP", integer2=var "P2 HP", equal=→"P1", lessThan=(none), greaterThan=→"P1", everyFrame=false)
+    IntCompare(integer1=var "HP", integer2=var "P3 HP", equal=→"P2", lessThan=→"P3", greaterThan=→"P2", everyFrame=false)
+    on P1 → Phase 1
+    on P2 → Phase 2
+    on P3 → Phase 3
+  }
+
+  state Phase 1 {
+    BoolTest(boolVariable=var "Will Jump", isTrue=→"JUMP", isFalse=(none), everyFrame=false)
+    SendRandomEventV3(events=[→"DASH", →"TELE", →"JUMP"], weights=[0.4, 0.4, 0.2], trackingInts=[var "Ct Dash", var "Ct Tele", var "Ct Jump"], eventMax=[2, 2, 1], trackingIntsMissed=[var "Ms Dash", var "Ms Tele", var "Ms Jump"], missedMax=[3, 3, 4])
+    on DASH → Dash Antic
+    on JUMP → Jump Antic
+    on TELE → TeleOut 1
+  }
+
+  state Phase 2 {
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=0.5, everyFrame=false)
+    BoolTest(boolVariable=var "Will Jump", isTrue=→"JUMP", isFalse=(none), everyFrame=false)
+    SendRandomEventV3(events=[→"DASH", →"TELE", →"GLOB"], weights=[0.4, 0.4, 0.2], trackingInts=[var "Ct Dash", var "Ct Tele", var "Ct Glob"], eventMax=[2, 2, 2], trackingIntsMissed=[var "Ms Dash", var "Ms Tele", var "Ms Glob"], missedMax=[3, 3, 3])
+    on DASH → Dash Antic
+    on TELE → TeleOut 1
+    on GLOB → Glob Antic 1
+    on JUMP → Jump Antic
+  }
+
+  state Phase 3 {
+    BoolTest(boolVariable=var "Will Jump", isTrue=→"JUMP", isFalse=(none), everyFrame=false)
+    SendRandomEventV3(events=[→"DASH", →"TELE", →"GLOB", →"BEE ROAR"], weights=[0.25, 0.25, 0.25, 0.25], trackingInts=[var "Ct Dash", var "Ct Tele", var "Ct Glob", var "Ct Roar"], eventMax=[2, 2, 2, 2], trackingIntsMissed=[var "Ms Dash", var "Ms Tele", var "Ms Glob", var "Ms Roar"], missedMax=[4, 4, 3, 4])
+    on DASH → Dash Antic
+    on TELE → TeleOut 1
+    on GLOB → Glob Antic 1
+    on BEE ROAR → Bee Roar Antic
+    on JUMP → Jump Antic
+  }
+
+  state Fall {
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetVelocity2d(gameObject=Self, vector=(0, -30), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Air")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Y Pos", z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Pos", float2=var "Ground Y", tolerance=0, equal=→"LAND", lessThan=→"LAND", greaterThan=(none), everyFrame=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hive_knight_fall_from_top, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on LAND → Intro Land
+  }
+
+  state Intro Land {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=hive_knight_land)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Ground Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="Visited", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="Display Right", setValue=false, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="HIVE_KNIGHT", everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Land", emit=0)
+    ActivateGameObject(gameObject=var "Slam", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Intro
+  }
+
+  state Intro {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Intro")
+    CreateObject(gameObject=Roar Wave Emitter (sharedassets13.assets), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Roar Emitter", networkInstantiate=false, networkGroup=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=HK_roar_peaking_a_bit, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Intro End
+  }
+
+  state Intro End {
+    SendEventByName(eventTarget=GameObject(var "Roar Emitter"), sendEvent="END", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    on FINISHED → Music
+  }
+
+  state Activate {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetCollider(gameObject=Self, active=true)
+    SendEventByName(eventTarget=Self, sendEvent="CANCEL SHAKE", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Roar Cooldown {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Dash Antic
+  }
+
+  state Tele Pause {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on FINISHED → Tele Pos
+  }
+
+  state Music {
+    GGCheckIfBossScene(bossSceneEvent=→"FINISHED", regularSceneEvent=(none))
+    ApplyMusicCue(musicCue=HiveKnight, delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (resources.assets), transitionTime=0)
+    on FINISHED → Activate
+  }
+
+  state Variant {
+    CheckGGBossLevel(notGG=→"FINISHED", level1=→"FINISHED", level2=(none), level3=(none))
+    SetIntValue(intVariable=var "P2 HP", intValue=9999, everyFrame=false)
+    SetIntValue(intVariable=var "P3 HP", intValue=9999, everyFrame=false)
+    on FINISHED → Sleep
+  }
+
+  var Left X: float = 58.3
+  var Right X: float = 79.6
+  var P2 HP: int = 780
+  var P3 HP: int = 550
+  var Droppers: gameObject = Battle Scene/Droppers
+  var Globs Container: gameObject = Battle Scene/Globs
+  var Swarm Audio: gameObject = Battle Scene/Swarm Audio
+
+  var Dash Speed: float = -50
+  var Gravity: float = 2.5
+  var Ground Y: float = 28.69393
+  var Idle Time: float = 0.75
+  var Jump X: float = 36.53
+  var Jump Y: float = 36.53
+  var Self X: float = 0
+  var Slash Speed: float = -36
+  var Speed Crt: float = 0
+  var Stun Air Speed: float = 0
+  var X Pos: float = 0
+  var X Scale: float = 0
+  var Y Pos: float = 0
+  var Ct Dash: int = 0
+  var Ct Glob: int = 0
+  var Ct Jump: int = 0
+  var Ct Roar: int = 0
+  var Ct Tele: int = 0
+  var HP: int = 0
+  var Ms Dash: int = 0
+  var Ms Glob: int = 0
+  var Ms Jump: int = 0
+  var Ms Roar: int = 0
+  var Ms Tele: int = 0
+  var Will Jump: bool = false
+  var Area Title: gameObject = <null>
+  var Mouth Swarm: gameObject = <null>
+  var Pt Dash: gameObject = <null>
+  var Pt Jump: gameObject = <null>
+  var Pt Land: gameObject = <null>
+  var Roar Emitter: gameObject = <null>
+  var Self: gameObject = <null>
+  var Slam: gameObject = <null>
+  var Slam Effect: gameObject = <null>
+  var Slash 1: gameObject = <null>
+  var Slash 2: gameObject = <null>
+  var Stab Hit: gameObject = <null>
+  var Stinger Flash: gameObject = <null>
+  var Stun Loop: gameObject = <null>
+}

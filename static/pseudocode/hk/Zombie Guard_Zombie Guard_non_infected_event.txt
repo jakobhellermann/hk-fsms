@@ -1,0 +1,529 @@
+# Zombie Guard
+# 1 location(s):
+#   Crossroads_21 / non_infected_event/Zombie Guard
+
+fsm Zombie Guard {
+  start Initiate
+
+  state Dormant {
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "In Alert Range", var "Can See Hero"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    on ATTACK ALERT → Wake
+    on TAKE DAMAGE → Wake
+    on TOOK DAMAGE → Wake
+  }
+
+  state Initiate {
+    FindChild(gameObject=Self, childName="Attack Range", storeResult=var "Attack Range")
+    GetOwner(storeGameObject=var "Self")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Roam R", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Roam L", floatValue=var "Roam R", everyFrame=false)
+    FloatAdd(floatVariable=var "Roam R", add=var "Roam Distance", everyFrame=false, perSecond=false)
+    FloatSubtract(floatVariable=var "Roam L", subtract=var "Roam Distance", everyFrame=false, perSecond=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dormant")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Idle Spot Left", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Spot Right", floatValue=var "Idle Spot Left", everyFrame=false)
+    FloatAdd(floatVariable=var "Idle Spot Right", add=1, everyFrame=false, perSecond=false)
+    FloatSubtract(floatVariable=var "Idle Spot Left", subtract=1, everyFrame=false, perSecond=false)
+    SendEvent(eventTarget=GameObject(Self), sendEvent=→"RAYCAST START", delay=0, everyFrame=false)
+    FindChild(gameObject=Self, childName="Burst Rocks Club", storeResult=var "Burst Rocks Club")
+    FindChild(gameObject=Self, childName="Burst Rocks Stomp", storeResult=var "Burst Rocks Stomp")
+    GetHero(storeResult=var "Hero")
+    SetGameObject(variable=var "Camera", gameObject=var "CameraParent", everyFrame=false)
+    FindChild(gameObject=Self, childName="Dust Hit Marker", storeResult=var "Dust Hit Marker")
+    BoolTest(boolVariable=var "Start Facing Left", isTrue=→"LEFT", isFalse=→"RIGHT", everyFrame=false)
+    on LEFT → Start Left
+    on RIGHT → Start Right
+  }
+
+  state Start Left {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recoil", floatValue=5, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Start Right {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recoil", floatValue=-5, everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Wake {
+    SetScale(gameObject=var "Attack Range", vector=(unset), x=10, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    TransitionToAudioSnapshot(snapshot=Action (resources.assets), transitionTime=1)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[zombie_guard_awake (sharedassets58.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    GetOwner(storeGameObject=var "Self")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wake")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Cooldown
+  }
+
+  state Idle {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Roam L", upperValue=var "Roam R", boolVariable=var "Hero In Range", trueEvent=(none), falseEvent=(none), everyFrame=true)
+    SetBoolValue(boolVariable=var "Running", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "In Attack Range", var "Can See Hero"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "In Alert Range", var "Can See Hero", var "Hero In Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    Wait(time=4, finishEvent=→"WAIT", realTime=false)
+    on ATTACK ALERT → Face Hero
+    on ALERT → In Roam Distance?
+    on WAIT → Return Check
+  }
+
+  state Attack {
+    ActivateGameObject(gameObject=var "Swipe", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack2")
+    Wait(time=0.201, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Impact
+  }
+
+  state Anticipate {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[zombie_guard_club_prepare (sharedassets58.assets), zombie_guard_club_prepare_2 (sharedassets58.assets), zombie_guard_club_prepare_3 (sharedassets58.assets)], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetBoolValue(boolVariable=var "Running", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Anticipate")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Attack
+  }
+
+  state Cooldown {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.21, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Idle
+  }
+
+  state Attack Recoil {
+    PlayParticleEmitter(gameObject=var "Burst Rocks Club", emit=0)
+    SpawnObjectFromGlobalPool(gameObject=Slam Effect R (resources.assets), spawnPoint=var "Self", position=var "Slam Origin", rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Recoil", y=(unset), everyFrame=true)
+    Wait(time=0.14, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Attack End
+  }
+
+  state Attack End {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Cooldown
+  }
+
+  state Check Left {
+    SetFloatValue(floatVariable=var "Walk Speed", floatValue=-5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Run Speed", floatValue=-10, everyFrame=false)
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Chase
+    on TRUE → Turn Left
+  }
+
+  state Turn Left {
+    AudioStop(gameObject=Self)
+    StopParticleEmitter(gameObject=var "Run Dust")
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Recoil", floatValue=5, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Turn")
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Idle
+    on HERO ABOVE → Anticipate
+  }
+
+  state Check Right {
+    SetFloatValue(floatVariable=var "Walk Speed", floatValue=5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Run Speed", floatValue=10, everyFrame=false)
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Chase
+    on FALSE → Turn Right
+  }
+
+  state Turn Right {
+    AudioStop(gameObject=Self)
+    StopParticleEmitter(gameObject=var "Run Dust")
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Recoil", floatValue=-5, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Turn")
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Idle
+    on HERO ABOVE → Anticipate
+  }
+
+  state Alert {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    TransitionToAudioSnapshot(snapshot=Action (resources.assets), transitionTime=1)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Self X", tolerance=0, equal=(none), lessThan=→"HERO LEFT", greaterThan=→"HERO RIGHT", everyFrame=true)
+    on HERO LEFT → Check Left
+    on HERO RIGHT → Check Right
+  }
+
+  state Chase {
+    BoolTest(boolVariable=var "Running", isTrue=→"RUN", isFalse=(none), everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=var "Chase Distance", tolerance=0, equal=→"WALK", lessThan=→"WALK", greaterThan=→"RUN", everyFrame=false)
+    on WALK → Walk
+    on RUN → Run
+  }
+
+  state Walk {
+    AudioStop(gameObject=Self)
+    StopParticleEmitter(gameObject=var "Run Dust")
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed", y=(unset), everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=var "Chase Distance", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RUN", everyFrame=true)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Attack Range"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    BoolTest(boolVariable=var "Can See Hero", isTrue=(none), isFalse=→"LOSE HERO", everyFrame=true)
+    BoolTest(boolVariable=var "In Alert Range", isTrue=(none), isFalse=→"LOSE HERO", everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Roam R", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"LOSE HERO", everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Roam L", tolerance=0, equal=(none), lessThan=→"LOSE HERO", greaterThan=(none), everyFrame=true)
+    NextFrameEvent(sendEvent=→"WAIT")
+    on RUN → Run
+    on ATTACK ALERT → Face Hero
+    on LOSE HERO → Stop Walk
+    on WAIT → Alert
+  }
+
+  state Run {
+    PlayParticleEmitter(gameObject=var "Run Dust", emit=0)
+    AudioPlayV2(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="SmallRumble", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=true, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    SetBoolValue(boolVariable=var "Running", boolValue=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Run Speed", y=(unset), everyFrame=true)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Attack Range"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    BoolTest(boolVariable=var "Can See Hero", isTrue=(none), isFalse=→"LOSE HERO", everyFrame=true)
+    BoolTest(boolVariable=var "In Alert Range", isTrue=(none), isFalse=→"LOSE HERO", everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Roam R", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"LOSE HERO", everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Roam L", tolerance=0, equal=(none), lessThan=→"LOSE HERO", greaterThan=(none), everyFrame=true)
+    NextFrameEvent(sendEvent=→"WAIT")
+    on ATTACK ALERT → Face Hero
+    on LOSE HERO → Stop Run
+    on WAIT → Alert
+  }
+
+  state Stop Run {
+    StopParticleEmitter(gameObject=var "Run Dust")
+    AudioStop(gameObject=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stop Run")
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetBoolValue(boolVariable=var "Running", boolValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    on WAIT → Idle
+  }
+
+  state Stop Walk {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stop Walk")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    on WAIT → Idle
+  }
+
+  state Return Check {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Idle Spot Right", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"LEFT", everyFrame=false)
+    FloatCompare(float1=var "Self X", float2=var "Idle Spot Left", tolerance=0, equal=(none), lessThan=→"RIGHT", greaterThan=(none), everyFrame=false)
+    NextFrameEvent(sendEvent=→"WAIT")
+    on RIGHT → Facing Right?
+    on LEFT → Facing Left?
+    on WAIT → Idle
+  }
+
+  state Return Right {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    TransitionToAudioSnapshot(snapshot=var "Scene Snapshot", transitionTime=6)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Roam L", upperValue=var "Roam R", boolVariable=var "Hero In Range", trueEvent=(none), falseEvent=(none), everyFrame=true)
+    SetBoolValue(boolVariable=var "Woken", boolValue=false, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    SetBoolValue(boolVariable=var "Running", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=5, y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Walk")
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "In Attack Range", var "Can See Hero"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "In Alert Range", var "Can See Hero", var "Hero In Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Idle Spot Left", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TRUE", everyFrame=true)
+    on ATTACK ALERT → Face Hero
+    on ALERT → Alert
+    on TRUE → Idle
+  }
+
+  state Turn Right 2 {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Recoil", floatValue=-5, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Turn")
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Return Right
+  }
+
+  state Facing Right? {
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Return Right
+    on FALSE → Turn Right 2
+  }
+
+  state Facing Left? {
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"FALSE", isFalse=→"TRUE", everyFrame=false)
+    on TRUE → Return Left
+    on FALSE → Turn Left 2
+  }
+
+  state Turn Left 2 {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Recoil", floatValue=5, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Turn")
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Return Left
+  }
+
+  state Return Left {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    TransitionToAudioSnapshot(snapshot=var "Scene Snapshot", transitionTime=6)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Roam L", upperValue=var "Roam R", boolVariable=var "Hero In Range", trueEvent=(none), falseEvent=(none), everyFrame=true)
+    SetBoolValue(boolVariable=var "Woken", boolValue=false, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    SetBoolValue(boolVariable=var "Running", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-5, y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Walk")
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "In Attack Range", var "Can See Hero"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "In Alert Range", var "Can See Hero", var "Hero In Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Idle Spot Right", tolerance=0, equal=(none), lessThan=→"TRUE", greaterThan=(none), everyFrame=true)
+    on ATTACK ALERT → Face Hero
+    on ALERT → Alert
+    on TRUE → Idle
+  }
+
+  state Face Hero {
+    AudioStop(gameObject=Self)
+    TransitionToAudioSnapshot(snapshot=Action (resources.assets), transitionTime=1)
+    StopParticleEmitter(gameObject=var "Run Dust")
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="StopRumble", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Camera", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Self X", tolerance=0, equal=(none), lessThan=→"HERO LEFT", greaterThan=→"HERO RIGHT", everyFrame=true)
+    on HERO LEFT → Check Left 2
+    on HERO RIGHT → Check Right 2
+  }
+
+  state Check Left 2 {
+    SetFloatValue(floatVariable=var "Walk Speed", floatValue=-5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Run Speed", floatValue=-10, everyFrame=false)
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Attack Choice
+    on TRUE → Turn Left
+  }
+
+  state Check Right 2 {
+    SetFloatValue(floatVariable=var "Walk Speed", floatValue=5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Run Speed", floatValue=10, everyFrame=false)
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Attack Choice
+    on FALSE → Turn Right
+  }
+
+  state Woken? {
+    BoolTest(boolVariable=var "Woken", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Alert
+    on FALSE → Startle
+  }
+
+  state Startle {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[zombie_guard_awake (sharedassets58.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    TransitionToAudioSnapshot(snapshot=Action (resources.assets), transitionTime=1)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Startle")
+    SetBoolValue(boolVariable=var "Woken", boolValue=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    on WAIT → Alert
+  }
+
+  state In Roam Distance? {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Roam R", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FALSE", everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Roam L", tolerance=0, equal=(none), lessThan=→"FALSE", greaterThan=(none), everyFrame=true)
+    NextFrameEvent(sendEvent=→"TRUE")
+    on TRUE → Woken?
+    on FALSE → Wait
+  }
+
+  state Wait {
+    NextFrameEvent(sendEvent=→"WAIT")
+    on WAIT → Idle
+  }
+
+  state Impact {
+    PlayParticleEmitter(gameObject=var "Dust Hit Marker", emit=0)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[zombie_guard_club (sharedassets34.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on LEFT → Impact Left
+    on RIGHT → Impact Right
+  }
+
+  state Impact Left {
+    SetVector3XYZ(vector3Variable=var "Slam Origin", vector3Value=(unset), x=-4.633, y=-3, z=0.01, everyFrame=false)
+    on FINISHED → Attack Recoil
+  }
+
+  state Impact Right {
+    SetVector3XYZ(vector3Variable=var "Slam Origin", vector3Value=(unset), x=4.633, y=-3, z=0.01, everyFrame=false)
+    on FINISHED → Attack Recoil
+  }
+
+  state Attack Choice {
+    SendRandomEvent(events=[→"CLUB", →"STOMP"], weights=[0.75, 0.25], delay=0)
+    on CLUB → Club Repeat Check
+    on STOMP → Stomp Repeat Check
+  }
+
+  state Club Repeat Check {
+    IntCompare(integer1=var "Clubs In A Row", integer2=4, equal=→"CANCEL", lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    IntAdd(intVariable=var "Clubs In A Row", add=1, everyFrame=false)
+    SetIntValue(intVariable=var "Stomps In A Row", intValue=0, everyFrame=false)
+    on CANCEL → Attack Choice
+    on FINISHED → Anticipate
+  }
+
+  state Stomp Repeat Check {
+    IntCompare(integer1=var "Stomps In A Row", integer2=2, equal=→"CANCEL", lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    IntAdd(intVariable=var "Stomps In A Row", add=1, everyFrame=false)
+    SetIntValue(intVariable=var "Clubs In A Row", intValue=0, everyFrame=false)
+    on CANCEL → Attack Choice
+    on FINISHED → Stomp Antic
+  }
+
+  state Stomp Antic {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[zombie_guard_club_prepare (sharedassets58.assets), zombie_guard_club_prepare_2 (sharedassets58.assets), zombie_guard_club_prepare_3 (sharedassets58.assets)], weights=[1, 1, 1], pitchMin=0.9, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stomp Antic")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stomp Jump
+  }
+
+  state Stomp Jump {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=false_knight_jump (sharedassets48.assets), pitchMin=1.2, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stomp Jump")
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on LEFT → Jump L
+    on RIGHT → Jump R
+  }
+
+  state Jump L {
+    SetFloatValue(floatVariable=var "Jump Velocity", floatValue=10, everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  state Jump R {
+    SetFloatValue(floatVariable=var "Jump Velocity", floatValue=-10, everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump Velocity", y=(unset), everyFrame=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Land
+  }
+
+  state Land {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=false_knight_land_1st_time (sharedassets6.assets), pitchMin=1.2, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    PlayParticleEmitter(gameObject=var "Burst Rocks Stomp", emit=0)
+    PlayParticleEmitter(gameObject=var "Stomp Dust", emit=0)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "Camera", fsm="CameraShake"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stomp Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SpawnObjectFromGlobalPool(gameObject=Slam Effect R (resources.assets), spawnPoint=var "Self", position=(0, -3.77, 0), rotation=(unset), storeObject=var "")
+    SpawnObjectFromGlobalPool(gameObject=Shockwave Wave (sharedassets48.assets), spawnPoint=var "Self", position=(0, -4, -0.001), rotation=(unset), storeObject=var "Shockwave")
+    SetScale(gameObject=var "Shockwave", vector=(unset), x=1.25, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFsmBool(gameObject=var "Shockwave", fsmName="shockwave", variableName="Facing Right", setValue=true, everyFrame=false)
+    SetFsmFloat(gameObject=var "Shockwave", fsmName="shockwave", variableName="Speed", setValue=18, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Shockwave Wave (sharedassets48.assets), spawnPoint=var "Self", position=(0, -4, -0.001), rotation=(unset), storeObject=var "Shockwave")
+    SetScale(gameObject=var "Shockwave", vector=(unset), x=1.25, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFsmBool(gameObject=var "Shockwave", fsmName="shockwave", variableName="Facing Right", setValue=false, everyFrame=false)
+    SetFsmFloat(gameObject=var "Shockwave", fsmName="shockwave", variableName="Speed", setValue=18, everyFrame=false)
+    on FINISHED → Stomp Cooldown
+  }
+
+  state Stomp Cooldown {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.4, finishEvent=→"WAIT", realTime=false)
+    on FINISHED → Cooldown
+  }
+
+  var Roam Distance: float = 23.5
+  var Start Facing Left: bool = false
+  var Scene Snapshot: object = Normal (resources.assets)
+
+  var Chase Distance: float = 9
+  var Distance: float = 10
+  var Hero X: float = 0
+  var Idle Spot Left: float = 0
+  var Idle Spot Right: float = 0
+  var Jump Velocity: float = 0
+  var Recoil: float = 19
+  var Roam L: float = 20
+  var Roam R: float = 0
+  var Run Speed: float = 0
+  var Scale: float = 0
+  var Self X: float = 0
+  var Walk Speed: float = 0
+  var Clubs In A Row: int = 0
+  var Stomps In A Row: int = 0
+  var Can See Hero: bool = false
+  var Facing Right: bool = false
+  var Hero In Range: bool = false
+  var In Alert Range: bool = false
+  var In Attack Range: bool = false
+  var Running: bool = false
+  var Woken: bool = true
+  var Slam Origin: vector3 = (0, 0, 0)
+  var Alert Range: gameObject = <null>
+  var Attack Range: gameObject = <null>
+  var Burst Rocks Club: gameObject = <null>
+  var Burst Rocks Stomp: gameObject = <null>
+  var Camera: gameObject = <null>
+  var Dust Hit Marker: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Run Dust: gameObject = non_infected_event/Zombie Guard/Run Dust
+  var Self: gameObject = <null>
+  var Shockwave: gameObject = <null>
+  var Stomp Dust: gameObject = non_infected_event/Zombie Guard/Stomp Dust
+  var Swipe: gameObject = non_infected_event/Zombie Guard/Swipe
+}

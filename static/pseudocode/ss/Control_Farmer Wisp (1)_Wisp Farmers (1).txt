@@ -1,0 +1,817 @@
+# Control
+# 1 location(s):
+#   Wisp_07 / Wisp Farmers (1)/Farmer Wisp (1)
+
+fsm Control {
+  start Pause
+  on FALL TELE → Fall Tele  // from any state
+
+  state Init {
+    CreateEmptyObject(gameObject=<null>, spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Wisp Folder")
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    FindAlertRange(target=Self, storeResult=var "Patrol Range", childName="Patrol Range")
+    SetParent(gameObject=var "Patrol Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindGameObject(objectName="", withTag="Orb Target", store=var "Summon Controller")
+    StringCompare(stringVariable=var "Clip", compareTo="Tele In", equalEvent=→"TELE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetIntValue(intVariable=var "Wisps To Spawn", intValue=2, everyFrame=false)
+    RandomInt(min=2, max=3, storeResult=var "Wisps To Spawn", inclusiveMax=true, noRepeat=false)  // disabled
+    on FINISHED → Spawn Wisps
+    on TELE → Ambush Wait
+  }
+
+  state Walking {
+    CheckAlertRange(alertRange=var "Patrol Range", storeResult=var "In Patrol Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Start Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wisp Attack Range", storeResult=var "In Wisp Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Alerted", var "In Wisp Attack Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    BoolAllTrue(boolVariables=[var "In Patrol Range", var "Alerted", var "Has Minion"], sendEvent=→"TELE", storeResult=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Walk Light")
+    PlayParticleEmitterInState(gameObject=var "Pt Driftfly Idle")
+    SetRandomAudioClipFromTable(Table=BB_idle_mutter (sfxdynamic_assets_areawisp.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on ALERT → Call Minion?
+    on SING → Sing
+    on TOOK DAMAGE → Call Minion?
+    on TELE → Tele Out 1
+  }
+
+  state Wisp Antic {
+    GetChildCount(gameObject=var "Wisp Folder", storeResult=var "Current Wisps")
+    IntCompare(integer1=var "Current Wisps", integer2=2, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=BB_cast (sfxdynamic_assets_areawisp.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    PlayAudioEvent(audioClip=farmer_wisp_summon_antic (sfxstatic_assets_areawisp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetBoolValue(boolVariable=var "Did Tele", boolValue=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Light", clipName="Antic Light", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioPlaySimple(gameObject=var "Audio Summon", volume=1, oneShotClip=<null>)
+    on FINISHED → Cast Start
+    on CANCEL → Tele Out 1
+  }
+
+  state Cast Start {
+    SetIntValue(intVariable=var "Wisps To Spawn", intValue=var "Wisp Summon Amount", everyFrame=false)
+    SetAudioClip(gameObject=Self, audioClip=farmer_whisp_lanturn_shake_loop (sfxstatic_assets_areawisp.bundle), autoPlay=false, stopOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Cast Light")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    SetParent(gameObject=var "Cast Point", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition2D(GameObject=var "Cast Point", Vector=(unset), X=-1.22, Y=1.43, Space=1, EveryFrame=false)
+    on FINISHED → Summon Wisp
+  }
+
+  state Cast End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Light", clipName="Recover Light", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioStop(gameObject=Self, fadeTime=0)
+    SetParent(gameObject=var "Cast Point", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Driftfly Idle")
+    StopParticleEmitter(gameObject=var "Pt Driftfly Summon")
+    AudioStop(gameObject=var "Audio Summon", fadeTime=0)
+    PlayAudioEvent(audioClip=farmer_wisp_summon_finish (sfxstatic_assets_areawisp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Cast Recover
+  }
+
+  state Cast Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Idle Light")
+    Wait(time=0.5, finishEvent=→"NEXT", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Driftfly Idle")
+    on NEXT → Chase Tele?
+    on TOOK DAMAGE → Chase Tele?
+  }
+
+  state Start Walker {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    StartWalkerV2(stopOnExit=false, Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Walking
+  }
+
+  state Charge Antic {
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=BB_charge (sfxdynamic_assets_areawisp.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    PlayAudioEvent(audioClip=farmer_wisp_run_antic (sfxstatic_assets_areawisp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Light", clipName="Charge Antic Light", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    RayCast2dV2(fromGameObject=var "Charge Ray Pt", fromPosition=(unset), direction=(0, -1), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Charge
+    on CANCEL → Walking
+    on SING → Sing
+  }
+
+  state Charge {
+    SetAudioClip(gameObject=Self, audioClip=farmer_wisp_run_loop (sfxstatic_assets_areawisp.bundle), autoPlay=true, stopOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Light", clipName="Charge Light", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-15, ySpeed=(unset), everyFrame=false)
+    Wait(time=0.75, finishEvent=→"NEXT", realTime=false)
+    ActivateGameObject(gameObject=var "Charge Hit", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Charge")
+    RayCast2dV2(fromGameObject=var "Charge Ray Pt", fromPosition=(unset), direction=(0, -1), space=0, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Floor Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetBoolValueAtTime(BoolVariable=var "Can End Run", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    BoolTestMulti(boolVariables=[var "Can End Run", var "Floor Ahead"], boolStates=[true, false], trueEvent=→"NEXT", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on NEXT → Run End
+  }
+
+  state Run End {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Light", clipName="Recover Light", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FloatCompare(float1=var "Distance", float2=30, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RANGE OUT", everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Driftfly Idle")
+    on FINISHED → Start Walker
+  }
+
+  state Sing {
+    SendEventByName(eventTarget=GameObject(var "Idle Wisps"), sendEvent="SING", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Light", clipName="Sing Light", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=BB_sing (sfxdynamic_assets_areawisp.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    SendEventByName(eventTarget=GameObject(var "Idle Wisps"), sendEvent="SING END", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Light", clipName="Sing End Light", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Choice
+  }
+
+  sequence state Summon Wisps Multiple {
+    RandomBool(storeResult=var "Will Escape")
+    GetHP(target=Self, storeValue=var "Current HP")
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Cast Point", position=(unset), rotation=(unset), storeObject=var "Wisp")
+    SetFsmGameObject(gameObject=var "Wisp", fsmName="Control", variableName="Wisp Fireball Master", setValue=var "Wisp Fireball Master", everyFrame=false)
+    SetFsmBool(gameObject=var "Wisp", fsmName="Control", variableName="Flame In", setValue=true, everyFrame=false)
+    SetParent(gameObject=var "Wisp", parent=var "Wisp Folder", resetLocalPosition=false, resetLocalRotation=false)
+    RandomFloat(min=60, max=120, storeResult=var "Spawn Angle")
+    SetVelocityAsAngle(gameObject=var "Wisp", angle=var "Spawn Angle", speed=6, everyFrame=false)
+    Wait(time=0.95, finishEvent=(none), realTime=false)
+    GetHP(target=Self, storeValue=var "New HP")
+    IntCompareToBool(integer1=var "New HP", integer2=var "Current HP", equalBool=(unset), lessThanBool=var "HP Dropped", greaterThanBool=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "HP Dropped", var "Will Escape"], sendEvent=→"ESCAPE", storeResult=(unset), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Cast Point", position=(unset), rotation=(unset), storeObject=var "Wisp")
+    SetFsmGameObject(gameObject=var "Wisp", fsmName="Control", variableName="Wisp Fireball Master", setValue=var "Wisp Fireball Master", everyFrame=false)
+    SetFsmBool(gameObject=var "Wisp", fsmName="Control", variableName="Flame In", setValue=true, everyFrame=false)
+    SetParent(gameObject=var "Wisp", parent=var "Wisp Folder", resetLocalPosition=false, resetLocalRotation=false)
+    RandomFloat(min=60, max=120, storeResult=var "Spawn Angle")
+    SetVelocityAsAngle(gameObject=var "Wisp", angle=var "Spawn Angle", speed=6, everyFrame=false)
+    Wait(time=0.95, finishEvent=(none), realTime=false)
+    on FINISHED → Cast End
+    on ESCAPE → Fall Tele
+  }
+
+  state Choice {
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    StopWalkerV2(Target=Self)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"TELE", delay=0, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Hornet Dead", isTrue=→"HORNET DEAD", isFalse=(none), everyFrame=false)
+    GameObjectIsNull(gameObject=var "Master", isNull=(none), isNotNull=(none), storeResult=var "Master Is Null", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Is Minion", var "Master Is Null"], boolStates=[true, true], trueEvent=→"UNMINION", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Prepare To Cast", isTrue=→"PREPARE", isFalse=(none), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Charge Range", storeResult=var "In Charge Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    SendRandomEventV4(events=[→"IDLE", →"TELE"], weights=[1, 1], eventMax=[1, 2], missedMax=[2, 1], activeBool=var "Is Minion")
+    SendRandomEventV4(events=[→"CHARGE", →"WISP", →"TELE"], weights=[1, 1, 1], eventMax=[1, 1, 1], missedMax=[3, 3, 3], activeBool=var "In Charge Range")
+    SendRandomEventV4(events=[→"TELE", →"WISP"], weights=[1, 1], eventMax=[1, 1], missedMax=[1, 1], activeBool=(unset))
+    on WISP → Wisp Antic
+    on CHARGE → Charge Antic
+    on TELE → Tele Out 1
+    on IDLE → Idle
+    on PREPARE → Minion Prepares
+    on UNMINION → Unminion
+    on HORNET DEAD → Hornet Dead
+    on SING → Sing
+  }
+
+  state Tele Out 1 {
+    SetBoolValue(boolVariable=var "Did Tele", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=BB_teleport (sfxdynamic_assets_areawisp.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    PlayAudioEvent(audioClip=farmer_wisp_run_antic (sfxstatic_assets_areawisp.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetParent(gameObject=var "Cast Point", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP FALL CHECK", delay=0, everyFrame=false)
+    StopWalkerV2(Target=Self)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Tele Out Light")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Tele Out 2
+  }
+
+  state Tele Out 2 {
+    SetLayer(gameObject=Self, layer=Terrain Detector(14))
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Light Haze", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Tele Out", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=farmer_wisp_teleport (sfxstatic_assets_areawisp.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Get Teleplane
+  }
+
+  state Choose TelePoint {
+    RandomFloat(min=var "X Min", max=var "X Max", storeResult=var "Tele X")
+    GetDifferenceBetweenFloats(differenceResult=var "Distance From Hero", float1=var "Tele X", float2=var "Hero X", everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Distance From Self", float1=var "Tele X", float2=var "Self X", everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Hero", lowerValue=6, upperValue=12, boolVariable=var "Hero Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Self", lowerValue=2, upperValue=9999, boolVariable=var "Self Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    SetVector2XY(vector2Variable=var "Tele Pos", vector2Value=(unset), x=var "Tele X", y=var "Tele Height", everyFrame=false)
+    SetVector2Value(vector2Variable=var "Tele Pos L", vector2Value=var "Tele Pos", everyFrame=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos L", addX=-1, addY=0, everyFrame=false, perSecond=false)
+    SetVector2Value(vector2Variable=var "Tele Pos R", vector2Value=var "Tele Pos", everyFrame=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos R", addX=1, addY=0, everyFrame=false, perSecond=false)
+    BoolTestMulti(boolVariables=[var "Hero Distance Check", var "Self Distance Check"], boolStates=[true, true], trueEvent=(none), falseEvent=→"RETRY", storeResult=(unset), everyFrame=false)
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos L", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"RETRY", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos R", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"RETRY", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos L", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Tele Pos", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)  // disabled
+    Vector2AddXY(vector2Variable=var "Tele Pos", addX=0, addY=2, everyFrame=false, perSecond=false)  // disabled
+    on TELE → Tele Pos
+    on RETRY → Retry
+    on FINISHED → Tele Pos
+  }
+
+  state Get Teleplane {
+    GetColliderRange(gameObject=var "Patrol Range Obj", minX=var "X Min", maxX=var "X Max", minY=(unset), maxY=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetIntValue(intVariable=var "Attempts", intValue=0, everyFrame=false)
+    on FINISHED → Tele Type
+  }
+
+  state Retry {
+    IntAdd(intVariable=var "Attempts", add=1, everyFrame=false)
+    IntCompare(integer1=var "Attempts", integer2=25, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on FINISHED → Tele Type
+    on CANCEL → Cancel Pause
+  }
+
+  state Tele Pos {
+    SetPosition2D(GameObject=Self, Vector=var "Tele Pos", X=(unset), Y=(unset), Space=0, EveryFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=-10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Tele Pos", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos", addX=0, addY=2, everyFrame=false, perSecond=false)
+    SetPosition2D(GameObject=Self, Vector=var "Tele Pos", X=(unset), Y=(unset), Space=0, EveryFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetBoolValue(boolVariable=var "First Minion Appear", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Appear Flash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Tele In Antic
+  }
+
+  state Tele In 1 {
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Light", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Tele In Light")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    ActivateGameObject(gameObject=var "Light Haze", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Appear Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Tele In", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=farmer_wisp_teleport (sfxstatic_assets_areawisp.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=coral_final_judge_vertical_flame_appear (sfxstatic_assets_areacoral.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=Audio Player Actor Distant V2@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Tele In 2
+  }
+
+  state Tele In 2 {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="START FALL CHECK", delay=0, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Driftfly Idle")
+    on FINISHED → Chase Tele?
+  }
+
+  state Patrol Wait {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    SetMeshRenderer(gameObject=Self, active=true)
+    on WAKE → Start Walker
+  }
+
+  state Alert {
+    SetBoolValue(boolVariable=var "Do Tele Startle", boolValue=false, everyFrame=false)
+    StopWalkerV2(Target=Self)
+    SendEventByName(eventTarget=GameObject(var "Wisp Folder"), sendEvent="ALERT", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Alerted", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Alerted", boolValue=true, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetScale(gameObject=var "Wisp Attack Range", vector=(unset), x=30, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=farmer_wisp_summon_antic (sfxstatic_assets_areawisp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=BB_alert (sfxdynamic_assets_areawisp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Startle Light")
+    on FINISHED → Choice
+  }
+
+  state Ambush Wait {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP FALL CHECK", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    ActivateGameObject(gameObject=var "Light Haze", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Light", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Tele Startle", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Alerted", boolValue=false, everyFrame=false)
+    on CALL BUDDY → Call Pause
+    on WAKE → Ambush
+  }
+
+  state Ambush {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetLayer(gameObject=Self, layer=Terrain Detector(14))
+    on FINISHED → Tele In Antic
+  }
+
+  state Summon Wisps Controller {
+    GameObjectIsNull(gameObject=var "Summon Controller", isNull=→"CANCEL", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetParent(gameObject=var "Cast Point", parent=var "Summon Controller", resetLocalPosition=false, resetLocalRotation=false)
+    SendEventToRegister(eventName="WISP SUMMON")
+    SetPositionToObject2D(gameObject=var "Cast Point", targetObject=var "Cast Point Origin", xOffset=0, yOffset=0, everyFrame=true)
+    on FINISHED → Cast End
+    on CANCEL → Summon Wisps Multiple
+  }
+
+  state Call Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ambush
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → State
+  }
+
+  state State {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Wisp Fireball Master")
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Immolater Idle", equalEvent=→"IMMOLATER", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Is Minion", isTrue=→"MINION", isFalse=(none), everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Tele Height", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Tele Height", add=3, everyFrame=false, perSecond=false)
+    BoolTest(boolVariable=var "Has Minion", isTrue=→"MASTER", isFalse=(none), everyFrame=false)
+    on MASTER → Spawn Minion
+    on FINISHED → Init
+    on MINION → Set Is Minion
+    on IMMOLATER → Wait For Pos
+  }
+
+  state Spawn Minion {
+    CreateObject(gameObject=Wisp Farmers (1)/Farmer Wisp (1), spawnPoint=<null>, position=(-50, 50, 0), rotation=(unset), storeObject=var "Minion")
+    SetFsmGameObject(gameObject=var "Minion", fsmName="Control", variableName="Wisp Folder", setValue=var "Wisp Folder", everyFrame=false)
+    SetFsmGameObject(gameObject=var "Minion", fsmName="Control", variableName="Wisp Fireball Master", setValue=var "Wisp Fireball Master", everyFrame=false)
+    SetIsKinematic2d(gameObject=var "Minion", isKinematic=false)
+    SetFsmBool(gameObject=var "Minion", fsmName="Control", variableName="Is Minion", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Minion", fsmName="Control", variableName="Has Minion", setValue=false, everyFrame=false)
+    FindChild(gameObject=var "Minion", childName="Patrol Range", storeResult=var "Minion Patrol Range")
+    GetPosition2D(gameObject=var "Patrol Range Obj", vector=var "Patrol Range Pos", x=(unset), y=(unset), space=1, everyFrame=false)
+    SetPosition2D(GameObject=var "Minion Patrol Range", Vector=var "Patrol Range Pos", X=0, Y=0, Space=1, EveryFrame=false)
+    GetBoxCollider2DSizeVector(gameObject1=var "Patrol Range Obj", size=var "Patrol Range Size", offset=var "Patrol Range Offset")
+    SetBoxCollider2DSizeVector(gameObject1=var "Minion Patrol Range", size=var "Patrol Range Size", offset=var "Patrol Range Offset")
+    SetPositionToObject2D(gameObject=var "Minion Patrol Range", targetObject=var "Patrol Range Obj", xOffset=0, yOffset=0, everyFrame=false)
+    SetFsmFloat(gameObject=var "Minion", fsmName="Control", variableName="Tele Height", setValue=var "Tele Height", everyFrame=false)
+    SetFsmGameObject(gameObject=var "Minion", fsmName="Control", variableName="Master", setValue=var "Self", everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Set Is Minion {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    ActivateGameObject(gameObject=var "Light Haze", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP FALL CHECK", delay=0, everyFrame=false)
+    on WAKE → Get Patrol Range
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Driftfly Idle")
+    on TOOK DAMAGE → Choice
+    on FINISHED → Choice
+  }
+
+  state Get Patrol Range {
+    FindAlertRange(target=Self, storeResult=var "Patrol Range", childName="Patrol Range")
+    SetParent(gameObject=var "Patrol Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Call Pause
+  }
+
+  state Tele Type {
+    BoolTest(boolVariable=var "Is Minion", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BoolTest(boolVariable=var "First Minion Appear", isTrue=→"PINCER", isFalse=→"MINION", everyFrame=false)
+    on FINISHED → Choose TelePoint
+    on MINION → Choose TelePoint Minion
+    on PINCER → Choose TelePoint Pincer
+  }
+
+  state Choose TelePoint Minion {
+    GetPosition(gameObject=var "Master", vector=(unset), x=var "Master X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=var "X Min", max=var "X Max", storeResult=var "Tele X")
+    GetDifferenceBetweenFloats(differenceResult=var "Distance From Hero", float1=var "Tele X", float2=var "Hero X", everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Distance From Self", float1=var "Tele X", float2=var "Self X", everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Distance From Master", float1=var "Tele X", float2=var "Master X", everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Hero", lowerValue=6, upperValue=14.5, boolVariable=var "Hero Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Self", lowerValue=2, upperValue=9999, boolVariable=var "Self Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Master", lowerValue=2, upperValue=9999, boolVariable=var "Master Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    SetVector2XY(vector2Variable=var "Tele Pos", vector2Value=(unset), x=var "Tele X", y=var "Tele Height", everyFrame=false)
+    SetVector2Value(vector2Variable=var "Tele Pos L", vector2Value=var "Tele Pos", everyFrame=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos L", addX=-1, addY=0, everyFrame=false, perSecond=false)
+    SetVector2Value(vector2Variable=var "Tele Pos R", vector2Value=var "Tele Pos", everyFrame=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos R", addX=1, addY=0, everyFrame=false, perSecond=false)
+    BoolTestMulti(boolVariables=[var "Hero Distance Check", var "Self Distance Check", var "Master Distance Check"], boolStates=[true, true, true], trueEvent=(none), falseEvent=→"RETRY", storeResult=(unset), everyFrame=false)
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos L", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"RETRY", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos R", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"RETRY", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos L", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Tele Pos", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos", addX=0, addY=2, everyFrame=false, perSecond=false)
+    on TELE → Tele Pos
+    on RETRY → Retry
+    on FINISHED → Tele Pos
+  }
+
+  state Cancel Pause {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    ActivateGameObject(gameObject=var "Light Haze", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "First Minion Appear", boolValue=false, everyFrame=false)
+    on FINISHED → Get Teleplane
+  }
+
+  state Choose TelePoint Pincer {
+    GetPosition(gameObject=var "Master", vector=(unset), x=var "Master X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=var "X Min", max=var "X Max", storeResult=var "Tele X")
+    GetDifferenceBetweenFloats(differenceResult=var "Distance From Hero", float1=var "Tele X", float2=var "Hero X", everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Distance From Self", float1=var "Tele X", float2=var "Self X", everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Distance From Master", float1=var "Tele X", float2=var "Master X", everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Hero", lowerValue=6, upperValue=14.5, boolVariable=var "Hero Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Master", lowerValue=9, upperValue=9999, boolVariable=var "Master Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    SetVector2XY(vector2Variable=var "Tele Pos", vector2Value=(unset), x=var "Tele X", y=var "Tele Height", everyFrame=false)
+    SetVector2Value(vector2Variable=var "Tele Pos L", vector2Value=var "Tele Pos", everyFrame=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos L", addX=-1, addY=0, everyFrame=false, perSecond=false)
+    SetVector2Value(vector2Variable=var "Tele Pos R", vector2Value=var "Tele Pos", everyFrame=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos R", addX=1, addY=0, everyFrame=false, perSecond=false)
+    BoolTestMulti(boolVariables=[var "Hero Distance Check", var "Master Distance Check"], boolStates=[true, true], trueEvent=(none), falseEvent=→"RETRY", storeResult=(unset), everyFrame=false)
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos L", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"RETRY", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos R", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"RETRY", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=<null>, fromPosition=var "Tele Pos L", direction=(0, -1), space=1, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Tele Pos", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Vector2AddXY(vector2Variable=var "Tele Pos", addX=0, addY=2, everyFrame=false, perSecond=false)
+    on TELE → Tele Pos
+    on RETRY → Retry
+    on FINISHED → Tele Pos
+  }
+
+  state Summon Type {
+    PlayParticleEmitter(gameObject=var "Pt Driftfly Summon", emit=0, resetIfPlaying=false)
+    BoolTest(boolVariable=var "Has Minion", isTrue=→"MASTER", isFalse=→"FINISHED", everyFrame=false)
+    on FINISHED → Cast Start
+    on MASTER → Master Cast Start
+  }
+
+  state Still Master? {
+    BoolTest(boolVariable=var "Has Minion", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    GameObjectIsNull(gameObject=var "Minion", isNull=(none), isNotNull=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Has Minion", boolValue=false, everyFrame=false)
+    on FINISHED → Summon Type
+  }
+
+  state Master Cast Start {
+    SetAudioClip(gameObject=Self, audioClip=farmer_whisp_lanturn_shake_loop (sfxstatic_assets_areawisp.bundle), autoPlay=false, stopOnExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=BB_cast (sfxdynamic_assets_areawisp.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Cast Light")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetParent(gameObject=var "Cast Point", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition2D(GameObject=var "Cast Point", Vector=(unset), X=-1.22, Y=1.43, Space=1, EveryFrame=false)
+    SetFsmBool(gameObject=var "Minion", fsmName="Control", variableName="Prepare To Cast", setValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Minion", fsmName="Control", variableName="First Minion Appear", setValue=true, everyFrame=false)
+    Wait(time=0.45, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Master Cast 1
+  }
+
+  state Master Cast 1 {
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Cast Point", position=(unset), rotation=(unset), storeObject=var "Wisp")
+    RandomFloat(min=60, max=120, storeResult=var "Spawn Angle")
+    SetVelocityAsAngle(gameObject=var "Wisp", angle=var "Spawn Angle", speed=6, everyFrame=false)
+    Wait(time=0.95, finishEvent=(none), realTime=false)
+    on FINISHED → Master Cast 2
+  }
+
+  state Master Cast 2 {
+    GetFsmBool(gameObject=var "Minion", fsmName="Control", variableName="Prepared", storeValue=var "Minion Prepared", everyFrame=false)
+    BoolTest(boolVariable=var "Minion Prepared", isTrue=→"MINION", isFalse=(none), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Cast Point", position=(unset), rotation=(unset), storeObject=var "Wisp")
+    RandomFloat(min=60, max=120, storeResult=var "Spawn Angle")
+    SetVelocityAsAngle(gameObject=var "Wisp", angle=var "Spawn Angle", speed=6, everyFrame=false)
+    Wait(time=0.95, finishEvent=(none), realTime=false)
+    on FINISHED → Cast End
+    on MINION → Minion Cast
+  }
+
+  state Master Cast 3 {
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Cast Point", position=(unset), rotation=(unset), storeObject=var "Wisp")
+    RandomFloat(min=60, max=120, storeResult=var "Spawn Angle")
+    SetVelocityAsAngle(gameObject=var "Wisp", angle=var "Spawn Angle", speed=6, everyFrame=false)
+    Wait(time=0.95, finishEvent=(none), realTime=false)
+    on FINISHED → Cast End
+  }
+
+  state Minion Prepares {
+    SetAudioClip(gameObject=Self, audioClip=farmer_whisp_lanturn_shake_loop (sfxstatic_assets_areawisp.bundle), autoPlay=false, stopOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Cast Light")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetBoolValue(boolVariable=var "Prepare To Cast", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Prepared", boolValue=true, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    on FINISHED → Prepare End
+  }
+
+  state Prepare End {
+    SetBoolValue(boolVariable=var "Prepared", boolValue=false, everyFrame=false)
+    on FINISHED → Cast End
+  }
+
+  state Fall Tele {
+    SetBoolValue(boolVariable=var "Prepared", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Prepare To Cast", boolValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Minion", fsmName="Control", variableName="Prepare To Cast", setValue=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Driftfly Summon")
+    AudioStop(gameObject=var "Audio Summon", fadeTime=0)
+    on FINISHED → Tele Out 1
+  }
+
+  state Minion Cast {
+    GetFsmGameObject(gameObject=var "Minion", fsmName="Control", variableName="Cast Point", storeValue=var "Minion Cast Point", everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Minion Cast Point", position=(unset), rotation=(unset), storeObject=var "Wisp")
+    RandomFloat(min=60, max=120, storeResult=var "Spawn Angle")
+    SetVelocityAsAngle(gameObject=var "Wisp", angle=var "Spawn Angle", speed=6, everyFrame=false)
+    Wait(time=0.95, finishEvent=(none), realTime=false)
+    on FINISHED → Master Cast 3
+  }
+
+  state Unminion {
+    SetBoolValue(boolVariable=var "Is Minion", boolValue=false, everyFrame=false)
+    on FINISHED → Choice
+  }
+
+  sequence state Summon Wisp {
+    RandomBool(storeResult=var "Will Escape")
+    GetHP(target=Self, storeValue=var "Current HP")
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Cast Point", position=(unset), rotation=(unset), storeObject=var "Wisp")
+    SetFsmGameObject(gameObject=var "Wisp", fsmName="Control", variableName="Wisp Fireball Master", setValue=var "Wisp Fireball Master", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Wisp"), sendEvent="FLAME IN", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Wisp", fsmName="Control", variableName="Flame In", setValue=true, everyFrame=false)
+    SetParent(gameObject=var "Wisp", parent=var "Wisp Folder", resetLocalPosition=false, resetLocalRotation=false)
+    RandomFloat(min=60, max=120, storeResult=var "Spawn Angle")
+    SetVelocityAsAngle(gameObject=var "Wisp", angle=var "Spawn Angle", speed=6, everyFrame=false)
+    Wait(time=0.7, finishEvent=(none), realTime=false)
+    IntAdd(intVariable=var "Wisps To Spawn", add=-1, everyFrame=false)
+    on FINISHED → Summon More?
+    on ESCAPE → Fall Tele
+  }
+
+  state Spawn Wisps {
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Cast Point Origin", position=(unset), rotation=(unset), storeObject=var "Wisp")
+    SetFsmGameObject(gameObject=var "Wisp", fsmName="Control", variableName="Follow Target", setValue=var "Cast Point Origin", everyFrame=false)
+    SetFsmGameObject(gameObject=var "Wisp", fsmName="Control", variableName="Wisp Fireball Master", setValue=var "Wisp Fireball Master", everyFrame=false)
+    SetFsmBool(gameObject=var "Wisp", fsmName="Control", variableName="Flame In", setValue=false, everyFrame=false)
+    SetParent(gameObject=var "Wisp", parent=var "Wisp Folder", resetLocalPosition=false, resetLocalRotation=false)
+    IntAdd(intVariable=var "Wisps To Spawn", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Wisps To Spawn", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"REPEAT", everyFrame=false)
+    on FINISHED → Patrol Wait
+    on REPEAT → Spawn Wisps
+  }
+
+  state Summon More? {
+    IntCompare(integer1=var "Wisps To Spawn", integer2=0, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    GetChildCount(gameObject=var "Wisp Folder", storeResult=var "Current Wisps")
+    IntCompare(integer1=var "Current Wisps", integer2=1, equal=→"REPEAT", lessThan=→"REPEAT", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Cast End
+    on REPEAT → Summon Wisp
+  }
+
+  state Chase Tele? {
+    BoolTest(boolVariable=var "Do Tele Startle", isTrue=→"ALERT", isFalse=(none), everyFrame=false)
+    CheckAlertRange(alertRange=var "Patrol Range", storeResult=var "In Patrol Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wisp Attack Range", storeResult=var "In Wisp Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "In Patrol Range", var "In Wisp Attack Range"], boolStates=[true, false], trueEvent=→"TELE", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Start Walker
+    on TELE → Re-Tele Pause
+    on ALERT → Alert
+  }
+
+  state Re-Tele Pause {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Idle Light")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Tele Out 1
+    on TOOK DAMAGE → Tele Out 1
+  }
+
+  state Call Minion? {
+    BoolTest(boolVariable=var "Has Minion", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BoolTest(boolVariable=var "Called Minion", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Has Minion", var "Called Minion"], boolStates=[true, false], trueEvent=(none), falseEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Minion"), sendEvent="WAKE", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Called Minion", boolValue=true, everyFrame=false)
+    on FINISHED → Alert
+  }
+
+  state Tele In Antic {
+    SetMeshRenderer(gameObject=Self, active=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt TeleAntic", resetTimeIfPlaying=false, stopOnStateExit=false)
+    Wait(time=0.65, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayInState(gameObject=var "Audio Loop TeleAntic", volume=1)
+    SetFloatValue(floatVariable=var "Pitch", floatValue=0.85, everyFrame=false)
+    EaseFloat(fromValue=0.85, toValue=1.2, floatVariable=var "Pitch", time=0.65, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    SetAudioPitch(gameObject=var "Audio Loop TeleAntic", pitch=var "Pitch", everyFrame=true)
+    on FINISHED → Tele In 1
+  }
+
+  state Hornet Dead {
+    SendEventByName(eventTarget=GameObject(var "Idle Wisps"), sendEvent="SING", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Light", clipName="Sing Light", animationTriggerEvent=(none), animationCompleteEvent=(none))
+  }
+
+  state Immolater {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Immolater Idle Light")
+    PlayParticleEmitter(gameObject=var "Pt Driftfly Idle", emit=0, resetIfPlaying=false)
+    SetPosition2D(GameObject=var "Pt Driftfly Idle", Vector=(unset), X=-0.95, Y=0.85, Space=1, EveryFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance From Hero", everyFrame=true)
+    FloatCompare(float1=var "Distance From Hero", float2=11, tolerance=0, equal=(none), lessThan=→"ALERT", greaterThan=(none), everyFrame=true)
+    on ALERT → Immolate Antic 1
+    on TOOK DAMAGE → Immolate Antic 1
+  }
+
+  state Wait For Pos {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=false)
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "Wisp Fireball Master")
+    on FINISHED → Immolater
+  }
+
+  state Immolate Antic 1 {
+    StopParticleEmitter(gameObject=var "Pt Driftfly Idle")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Immolate", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Tk2dPlayAnimation(gameObject=var "Light", animLibName="", clipName="Immolate Light")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=BB_burn_up_start (sfxdynamic_assets_areawisp.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    on FINISHED → Immolate Antic 2
+  }
+
+  state Immolate Antic 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayAudioEvent(audioClip=slab_fly_large_cage_antic_or_attack_1 (sfxstatic_assets_areaslab.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Immolate Start
+  }
+
+  state Immolate Start {
+    SetIntValue(intVariable=var "Wisps To Spawn", intValue=3, everyFrame=false)
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=sword_terrain_temp (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Immolate FlameUp
+  }
+
+  state Immolate Explosion {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    ActivateGameObject(gameObject=var "Immolate Explosion", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Staff Chunks", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Light", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Light Haze", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=wisp_fireball_explode (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)  // disabled
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))  // disabled
+    PreventInvincibleEffect(target=Self, preventEffect=true)  // disabled
+    SetParent(gameObject=var "Staff Chunks", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Pt Immolate Antic", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Immolate Explosion", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetSpecialDeath(target=Self, hasSpecialDeath=false)
+    InstaDeath(target=Self, direction=0)
+  }
+
+  state Spawn Immolation Wisps {
+    SpawnObjectFromGlobalPool(gameObject=Wisp Fireball (localpoolprefabs_assets_areawisp.bundle), spawnPoint=var "Self", position=(0, 0, -0.002), rotation=(unset), storeObject=var "Wisp")
+    SetFsmGameObject(gameObject=var "Wisp", fsmName="Control", variableName="Wisp Fireball Master", setValue=var "Wisp Fireball Master", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Wisp"), sendEvent="FLAME IN", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "Wisp", fsmName="Control", variableName="Flame In", setValue=true, everyFrame=false)
+    RandomFloat(min=-10, max=190, storeResult=var "Spawn Angle")
+    SetVelocityAsAngle(gameObject=var "Wisp", angle=var "Spawn Angle", speed=15, everyFrame=false)
+    IntAdd(intVariable=var "Wisps To Spawn", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Wisps To Spawn", integer2=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"REPEAT", everyFrame=false)
+    on REPEAT → Spawn Immolation Wisps
+    on FINISHED → Immolate Explosion
+  }
+
+  state Immolate FlameUp {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=BB_burn_up_end (sfxdynamic_assets_areawisp.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt Immolate Antic", resetTimeIfPlaying=false, stopOnStateExit=false)
+    AudioPlayInState(gameObject=var "Audio Loop Coal", volume=1)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=farmer_wisp_generate_fireball (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=1, storePlayer=<null>)
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Spawn Immolation Wisps
+  }
+
+  var Wisp Summon Amount: int = 2
+  var Has Minion: bool = false
+
+  var Distance: float = 0
+  var Spawn Angle: float = 0
+  var Distance From Hero: float = 0
+  var Distance From Self: float = 0
+  var Self X: float = 0
+  var Tele X: float = 0
+  var X Max: float = 0
+  var X Min: float = 0
+  var Tele Height: float = 0
+  var Hero X: float = 0
+  var Master X: float = 0
+  var Distance From Master: float = 0
+  var Pitch: float = 0
+  var Attempts: int = 0
+  var Current HP: int = 0
+  var New HP: int = 0
+  var Wisps To Spawn: int = 0
+  var Current Wisps: int = 0
+  var In Charge Range: bool = false
+  var Hero Distance Check: bool = false
+  var Self Distance Check: bool = false
+  var Alerted: bool = false
+  var In Patrol Range: bool = false
+  var Did Tele: bool = false
+  var Floor Ahead: bool = false
+  var Can End Run: bool = false
+  var Called Minion: bool = false
+  var Is Minion: bool = false
+  var Master Distance Check: bool = false
+  var First Minion Appear: bool = false
+  var Prepare To Cast: bool = false
+  var Prepared: bool = false
+  var Minion Prepared: bool = false
+  var Master Is Null: bool = false
+  var Will Escape: bool = false
+  var HP Dropped: bool = false
+  var In Wisp Attack Range: bool = false
+  var Do Tele Startle: bool = false
+  var Hornet Dead: bool = false
+  var Clip: string = ""
+  var Tele Pos: vector2 = (0, 0)
+  var Tele Pos L: vector2 = (0, 0)
+  var Tele Pos R: vector2 = (0, 0)
+  var Patrol Range Pos: vector2 = (0, 0)
+  var Patrol Range Size: vector2 = (0, 0)
+  var Patrol Range Offset: vector2 = (0, 0)
+  var Appear Flash: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Appear Flash
+  var Audio Loop TeleAntic: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Audio Loop TeleAntic
+  var Audio Summon: gameObject = <null>
+  var Cast Point: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Cast Point
+  var Cast Point Origin: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Cast Point Origin
+  var Charge Hit: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Charge Hit
+  var Charge Ray Pt: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Charge Ray Pt
+  var Idle Wisps: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Lantern Point
+  var Immolate Explosion: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Immolate Explosion
+  var Light Haze: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Light Haze
+  var Master: gameObject = <null>
+  var Minion: gameObject = <null>
+  var Minion Cast Point: gameObject = <null>
+  var Minion Patrol Range: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Patrol Range Obj: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Patrol Range
+  var Pt Charge: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Pt Charge
+  var Pt Driftfly Idle: gameObject = Wisp Farmers (1)/Wisp Fireball Master
+  var Pt Driftfly Summon: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Pt Driftfly Summon
+  var Pt Immolate Antic: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Pt Immolate Antic
+  var Pt Tele In: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Pt Tele In
+  var Pt Tele Out: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Pt Tele Out
+  var Pt TeleAntic: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Pt TeleAntic
+  var Self: gameObject = Wisp Farmers (1)/Farmer Wisp (1)
+  var Staff Chunks: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Staff Chunks
+  var Summon Controller: gameObject = <null>
+  var Wisp: gameObject = <null>
+  var Wisp Attack Range: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Wisp Attack Range
+  var Wisp Fireball Master: gameObject = <null>
+  var Wisp Folder: gameObject = <null>
+  var Audio Loop Voice: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Audio Loop Voice
+  var Audio Loop Coal: gameObject = Wisp Farmers (1)/Farmer Wisp (1)/Audio Loop Coal
+  var Light: object = Wisp Farmers (1)/Farmer Wisp (1)/Light
+  var Patrol Range: object = <null>
+}

@@ -1,0 +1,293 @@
+# Control
+# 1 location(s):
+#   localpoolprefabs_assets_shared.bundle / Tool Tack
+
+fsm Control {
+  start Init
+  on TORNADO → Tornado Blast Away  // from any state
+  on LAVA → Lava Break  // from any state
+  on BREAK HERO PROJECTILE → Break  // from any state
+
+  state Init {
+    SetBoolValue(boolVariable=var "Was Limited", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Ants Picked Up", boolValue=false, everyFrame=false)
+    RandomFloat(min=0.003, max=0.0039, storeResult=var "Pos Z")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Pos Z", space=0, everyFrame=false, lateUpdate=false)
+    RandomFloat(min=1, max=1.3, storeResult=var "Scale")
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=var "Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    RandomlyFlipFloat(storeResult=var "Scale")
+    SetScale(gameObject=Self, vector=(unset), x=var "Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetIntValue(intVariable=var "Hits", intValue=2, everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Impact", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Enemy Sucker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=11, max=12, storeResult=var "Life Timer")
+    ActivateGameObject(gameObject=var "Break Effects", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetTag(gameObject=var "Tack Delayer", tag="Untagged")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Poison?
+  }
+
+  state Fly {
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=true)
+    FloatCompare(float1=var "Speed", float2=0, tolerance=1, equal=→"SETTLE", lessThan=(none), greaterThan=(none), everyFrame=true)
+    DecelerateXY(gameObject=Self, decelerationX=0.99, decelerationY=(unset), brakeOnExit=false)
+    on SETTLE → Settle
+    on LIMITED → Break
+  }
+
+  state Settle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tack Settle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Ready Anim
+    on LIMITED → End Attack Antic
+  }
+
+  state Ready {
+    BoolTest(boolVariable=var "Ants Picked Up", isTrue=→"ANTS", isFalse=(none), everyFrame=true)  // disabled
+    Trigger2dEventLayer(trigger=OnTriggerStay2D, collideTag="", collideLayer=Enemies(11), sendEvent=→"HIT ENEMY", storeCollider=var "Enemy")
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Attack(17), sendEvent=→"TINK", storeCollider=var "Tinker")
+    FloatAdd(floatVariable=var "Life Timer", add=-1, everyFrame=true, perSecond=true)  // disabled
+    FloatCompare(float1=var "Life Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)  // disabled
+    BoolTest(boolVariable=var "Was Limited", isTrue=→"LIMITED", isFalse=(none), everyFrame=false)
+    FloatAdd(floatVariable=var "Tack Shuffle Cooldown", add=-1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Tack Shuffle Cooldown", minValue=0, maxValue=10, everyFrame=true)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Hero Box(20), sendEvent=→"HERO TOUCH", storeCollider=var "Collider")
+    on HIT ENEMY → Pre Damage Pause
+    on TINK → Tink Sfx
+    on END → End Attack Antic
+    on ANTS → Ants Picked Up
+    on SHAKE → Shake
+    on LIMITED → End Attack Antic
+    on HERO TOUCH → Hero Touch
+    on TACK DEALT DAMAGE → Dmg Pause
+  }
+
+  state Pause Frame {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Tack Fly")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Fly
+  }
+
+  state Deal Damage {
+    DoDamage(damager=Self, target=var "Enemy")
+    SetTag(gameObject=var "Tack Delayer", tag="Untagged")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Tack Ready")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    IntOperator(integer1=var "Hits", integer2=1, operation=Subtract, storeResult=var "Hits", everyFrame=false)
+    ActivateGameObject(gameObject=var "Slash Impact", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    IntCompare(integer1=var "Hits", integer2=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=false)  // disabled
+    PlayAudioEventRandom(audioClips=[hornet_tool_tack_deal_damage_1 (sfxstatic_assets_shared.bundle), hornet_tool_tack_deal_damage_2 (sfxstatic_assets_shared.bundle), hornet_tool_tack_deal_damage_3 (sfxstatic_assets_shared.bundle), hornet_tool_tack_deal_damage_4 (sfxstatic_assets_shared.bundle)], pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Enemy Sucker
+  }
+
+  state Ready Anim {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Tack Ready")
+    Trigger2dEventLayer(trigger=OnTriggerStay2D, collideTag="", collideLayer=Enemies(11), sendEvent=→"HIT ENEMY", storeCollider=var "Enemy")
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Attack(17), sendEvent=→"TINK", storeCollider=var "Tinker")
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEventRandom(audioClips=[hornet_tool_tack_activate_1 (sfxstatic_assets_shared.bundle), hornet_tool_tack_activate_2 (sfxstatic_assets_shared.bundle), hornet_tool_tack_activate_3 (sfxstatic_assets_shared.bundle), hornet_tool_tack_activate_4 (sfxstatic_assets_shared.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Ready
+    on TINK → Tink
+    on LIMITED → End Attack Antic
+  }
+
+  state Recycle {
+    ActivateGameObject(gameObject=var "Enemy Sucker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    RecycleSelf()
+  }
+
+  state Tink {
+    FaceObjectV2(objectA=Self, objectB=var "Tinker", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    RandomFloat(min=-2, max=-4, storeResult=var "Speed X")
+    RandomFloat(min=0.5, max=2, storeResult=var "Speed Y")
+    SetVelocityByScale(gameObject=Self, speed=var "Speed X", ySpeed=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Tack Shake")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Ready
+  }
+
+  state Anim Pause {
+    Tk2dPlayAnimationWithEventsV2(gameObject=Self, clipName="Tack Disappear", animationTriggerEvent=(none), animationCompleteEvent=(none), animationInterruptedEvent=(none))
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Break
+  }
+
+  state End Attack Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tack Break Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Trigger2dEventLayer(trigger=OnTriggerStay2D, collideTag="", collideLayer=Enemies(11), sendEvent=→"HIT ENEMY", storeCollider=var "Enemy")
+    PlayRandomAudioClipTable(Table=metal_tacks_bounce (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → End Attack
+    on HIT ENEMY → Final Hit
+    on LIMITED → Break
+  }
+
+  state End Attack {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Tack Break")
+    RandomFloat(min=85, max=95, storeResult=var "Angle")
+    RandomFloat(min=5, max=8, storeResult=var "Speed")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    Trigger2dEventLayer(trigger=OnTriggerStay2D, collideTag="", collideLayer=Enemies(11), sendEvent=→"HIT ENEMY", storeCollider=var "Enemy")
+    on FINISHED → Tack Disappear
+    on HIT ENEMY → Final Hit
+    on LIMITED → Break
+  }
+
+  state Break {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Break Effects", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[hornet_tool_tack_activate_1 (sfxstatic_assets_shared.bundle), hornet_tool_tack_activate_2 (sfxstatic_assets_shared.bundle), hornet_tool_tack_activate_3 (sfxstatic_assets_shared.bundle), hornet_tool_tack_activate_4 (sfxstatic_assets_shared.bundle)], pitchMin=1, pitchMax=1.35, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Recycle
+  }
+
+  state Final Hit {
+    SetIntValue(intVariable=var "Hits", intValue=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Enemy Sucker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Deal Damage
+  }
+
+  state Ants Picked Up {
+    BoolTest(boolVariable=var "Ants Picked Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Ready
+  }
+
+  state Shake {
+    PlayRandomAudioClipTable(Table=tool_tack_hit (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    RandomlyFlipScale(gameObject=Self)
+    RandomFloat(min=-2, max=-4, storeResult=var "Speed X")
+    RandomFloat(min=0.5, max=2, storeResult=var "Speed Y")
+    SetVelocityByScale(gameObject=Self, speed=var "Speed X", ySpeed=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Tack Shake")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Ready
+  }
+
+  state Hit Pause {
+    Wait(time=0.35, finishEvent=(none), realTime=false)
+    IntCompare(integer1=var "Hits", integer2=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=false)
+    on FINISHED → Ready
+    on END → Anim Pause
+  }
+
+  state Tornado Blast Away {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetTag(gameObject=var "Tack Delayer", tag="Untagged")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Tack Fly")
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"BREAK", storeCollider=var "Collider", storeForce=(unset))
+    Collision2dEvent(gameObject=Self, collision=1, collideTag="", sendEvent=→"BREAK", storeCollider=var "Collider", storeForce=(unset))  // disabled
+    FlingObject(flungObject=Self, speedMin=20, speedMax=30, angleMin=40, angleMax=140)
+    Wait(time=2, finishEvent=→"BREAK", realTime=false)
+    on BREAK → Break
+  }
+
+  state Poison? {
+    CheckIfToolEquipped(Tool=Poison Pouch (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=→"CANCEL", storeValue=(unset))
+    GetPoisonTintColour(colorVariable=var "Poison Colour")
+    Tk2dSpriteSetColor(gameObject=Self, color=var "Poison Colour", everyframe=false)
+    SetParticleColour(gameObject=var "Pt Shatter", colour=var "Poison Colour")
+    PlayParticleEmitter(gameObject=var "Pt Poison Trail", emit=0, resetIfPlaying=false)
+    on FINISHED → Pause Frame
+    on CANCEL → Reset Colour
+  }
+
+  state Enemy Sucker {
+    ActivateGameObject(gameObject=var "Enemy Sucker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)  // disabled
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Hit Pause
+  }
+
+  state Tink Sfx {
+    GameObjectCompareTag(gameObject=var "Tinker", tag="Tool Tack", trueEvent=→"TACK", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayRandomAudioClipTable(Table=tool_tack_hit (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Tink
+    on TACK → Tack Shuffle?
+  }
+
+  state Tack Shuffle? {
+    FloatCompare(float1=var "Tack Shuffle Cooldown", float2=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)  // disabled
+    SetFloatValue(floatVariable=var "Tack Shuffle Cooldown", floatValue=1, everyFrame=false)  // disabled
+    on CANCEL → Ready
+    on FINISHED → Tink
+  }
+
+  state Reset Colour {
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetParticleColour(gameObject=var "Pt Shatter", colour=(1, 1, 1, 1))
+    on FINISHED → Pause Frame
+  }
+
+  state Hero Touch {
+    GetSpeed2d(gameObject=var "Hero", storeResult=var "Speed", everyFrame=false)
+    FloatCompare(float1=var "Speed", float2=10, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"SHAKE", everyFrame=false)
+    on FINISHED → Ready
+    on SHAKE → Shake
+  }
+
+  state Tack Disappear {
+    Tk2dPlayAnimationWithEventsV2(gameObject=Self, clipName="Tack Disappear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED", animationInterruptedEvent=→"FINISHED")
+    on FINISHED → Break
+    on LIMITED → Break
+  }
+
+  state Lava Break {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetTag(gameObject=var "Tack Delayer", tag="Untagged")
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Break Effects", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    on FINISHED → Recycle
+  }
+
+  state Dmg Pause {
+    Wait(time=0.1, finishEvent=(none), realTime=false)
+    on FINISHED → Ready
+    on TACK DEALT DAMAGE → Dmg Pause
+  }
+
+  state Pre Damage Pause {
+    SendEventToRegisterV2(EventName="TACK DEALT DAMAGE", ExcludeTarget=Self)
+    Wait(time=0.1, finishEvent=(none), realTime=false)
+    on FINISHED → Deal Damage
+    on TACK DEALT DAMAGE → Dmg Pause
+  }
+
+  var Pos Z: float = 0
+  var Scale: float = 0
+  var Speed: float = 0
+  var Speed X: float = 0
+  var Speed Y: float = 0
+  var Life Timer: float = 0
+  var Angle: float = 0
+  var Enemy Recoil Speed: float = 0
+  var Enemy Velocity X: float = 0
+  var Cut Speed Max: float = 10
+  var Cut Speed Min: float = -10
+  var Enemy Hold X: float = 0
+  var Tack Shuffle Cooldown: float = 0
+  var Hits: int = 0
+  var Ants Picked Up: bool = false
+  var Was Limited: bool = false
+  var Poison Colour: color = (0.9647059, 0.83137256, 0.99215686, 1)
+  var Break Effects: gameObject = Tool Tack/Break Effects
+  var Enemy: gameObject = <null>
+  var Slash Impact: gameObject = Tool Tack/Slash Impact
+  var Terrain Detector: gameObject = Tool Tack/Terrain Detector
+  var Tinker: gameObject = <null>
+  var Enemy Sucker: gameObject = Tool Tack/Enemy Sucker
+  var Pt Shatter: gameObject = <null>
+  var Pt Poison Trail: gameObject = Tool Tack/Pt Poison Trail
+  var Collider: gameObject = <null>
+  var Tack Delayer: gameObject = Tool Tack/Tack Delayer
+}

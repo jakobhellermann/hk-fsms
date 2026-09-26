@@ -1,0 +1,294 @@
+# Nail Arts
+# 1 location(s):
+#   Knight_Pickup / Knight
+
+fsm Nail Arts {
+  start Init
+  on HERO DAMAGED → Cancel All  // from any state
+  on LEAVING SCENE → Cancel All  // from any state
+  on FSM CANCEL → Cancel All  // from any state
+
+  state Inactive {
+    ListenForAttack(eventTarget=Self, wasPressed=(none), wasReleased=→"BUTTON UP", isPressed=(none), isNotPressed=(none))
+    on BUTTON UP → Can Nail Art?
+  }
+
+  state Regain Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Inactive
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Attacks", storeResult=var "Attack Folder")
+    FindChild(gameObject=var "Attack Folder", childName="Cyclone Slash", storeResult=var "Cyclone Slash")
+    FindChild(gameObject=var "Attack Folder", childName="Great Slash", storeResult=var "Great Slash Effect")
+    FindChild(gameObject=var "Attack Folder", childName="Dash Slash", storeResult=var "Dash Slash")
+    FindChild(gameObject=Self, childName="Effects", storeResult=var "Effect Folder")
+    FindChild(gameObject=var "Effect Folder", childName="SD Sharp Flash", storeResult=var "SD Sharp Flash")
+    on FINISHED → Inactive
+  }
+
+  state Cancel All {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=EndCyclone())
+    DestroyObject(gameObject=var "Audio Player", delay=0, detachChildren=false)
+    ActivateGameObject(gameObject=var "Great Slash Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cyclone Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dash Slash", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Inactive
+  }
+
+  state Can Nail Art? {
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="GetState", parameters=["dashing"], storeResult=var "Dashing")
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="CanNailArt", parameters=[], storeResult=var "Return Bool")
+    BoolTest(boolVariable=var "Return Bool", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Dashing", isTrue=→"DASH CHECK", isFalse=(none), everyFrame=false)
+    on CANCEL → Inactive
+    on FINISHED → Wallslide?
+    on DASH CHECK → Has Dash?
+  }
+
+  state Take Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControlNotVelocity())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    on FINISHED → Move Choice
+  }
+
+  state Move Choice {
+    SendEvent(eventTarget=Self, sendEvent=→"CYCLONE", delay=0, everyFrame=false)  // disabled
+    ListenForDown(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"CYCLONE", isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForUp(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"CYCLONE", isNotPressed=→"GREAT SLASH", isPressedBool=(unset), stateEntryOnly=false)
+    on CYCLONE → Has Cyclone?
+    on GREAT SLASH → Has G Slash?
+  }
+
+  state Cyclone Start {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartCyclone())
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NA Cyclone Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFloatValue(floatVariable=var "Cyclone Timer", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    ListenForAttack(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on FINISHED → Activate Slash
+    on BUTTON DOWN → Hover Start
+  }
+
+  state Cyclone Spin {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="NA Cyclone")
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatAdd(floatVariable=var "Cyclone Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=0.45, tolerance=0, equal=→"END", lessThan=(none), greaterThan=→"END", everyFrame=true)
+    FloatCompare(float1=var "Cyclone Timer", float2=1.2, tolerance=0, equal=→"END", lessThan=(none), greaterThan=→"END", everyFrame=true)
+    ListenForAttack(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on END → Cyclone End
+    on BUTTON DOWN → Cyclone Extend
+  }
+
+  state Cyclone Extend {
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=true)
+    FloatClamp(floatVariable=var "Y Velocity", minValue=-4, maxValue=9999, everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", everyFrame=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=ResetHardLandingTimer())
+    FloatSubtract(floatVariable=var "Timer", subtract=0.3, everyFrame=false, perSecond=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="NA Cyclone")
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatAdd(floatVariable=var "Cyclone Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=0.45, tolerance=0, equal=→"END", lessThan=(none), greaterThan=→"END", everyFrame=true)
+    FloatCompare(float1=var "Cyclone Timer", float2=1.2, tolerance=0, equal=→"END", lessThan=(none), greaterThan=→"END", everyFrame=true)
+    Wait(time=0.25, finishEvent=→"WAIT", realTime=false)
+    on END → Cyclone End
+    on WAIT → Cyclone Spin
+  }
+
+  state Cyclone End {
+    iTweenMoveBy(gameObject=var "Audio Player", id="", vector=(0, 0, 60), time=1, delay=0, speed=(unset), easeType=linear, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=false)
+    SendEventByName(eventTarget=GameObject(var "Cyclone Slash"), sendEvent="CYCLONE END", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NA Cyclone End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Cyc Send Msg
+  }
+
+  state Cyc Send Msg {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=EndCyclone())
+    on FINISHED → Regain Control
+  }
+
+  state Activate Slash {
+    ActivateGameObject(gameObject=var "Cyclone Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    on FINISHED → Play Audio
+  }
+
+  state Hover Start {
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Y Velocity", minValue=-4, maxValue=9999, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", everyFrame=false)
+    on FINISHED → Cyclone Start
+  }
+
+  state Flash {
+    ActivateGameObject(gameObject=var "SD Sharp Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Cyclone Start
+  }
+
+  state Wallslide? {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["wallSliding"], storeResult=var "Wall Sliding")
+    BoolTest(boolVariable=var "Wall Sliding", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlipSprite())
+    on FINISHED → Take Control
+  }
+
+  state Has Cyclone? {
+    GetPlayerDataBool(boolName="hasCyclone", storeValue=var "Has Cyclone")
+    GetPlayerDataBool(boolName="hasDashSlash", storeValue=var "Has G Slash")
+    BoolNoneTrue(boolVariables=[var "Has G Slash", var "Has Cyclone"], sendEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Has Cyclone", isTrue=(none), isFalse=→"GREAT SLASH", everyFrame=false)
+    on FINISHED → Flash
+    on GREAT SLASH → Has G Slash?
+    on CANCEL → Regain Control
+  }
+
+  state Has G Slash? {
+    GetPlayerDataBool(boolName="hasCyclone", storeValue=var "Has Cyclone")
+    GetPlayerDataBool(boolName="hasDashSlash", storeValue=var "Has G Slash")
+    BoolNoneTrue(boolVariables=[var "Has G Slash", var "Has Cyclone"], sendEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Has G Slash", isTrue=(none), isFalse=→"CYCLONE", everyFrame=false)
+    on FINISHED → Flash 2
+    on CYCLONE → Has Cyclone?
+    on CANCEL → Regain Control
+  }
+
+  state G Slash {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hero_nail_art_great_slash (resources.assets), finishedEvent=(none))
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_nail_art_great_slash (resources.assets), motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=GreatSlash (resources.assets))
+    ActivateGameObject(gameObject=var "Great Slash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0.15, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NA Big Slash", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    Wait(time=0.075, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stop Move
+  }
+
+  state Flash 2 {
+    ActivateGameObject(gameObject=var "SD Sharp Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Facing?
+  }
+
+  state G Slash End {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=ResetHardLandingTimer())
+    ActivateGameObject(gameObject=var "Great Slash Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    on FINISHED → Regain Control
+  }
+
+  state Facing? {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["facingRight"], storeResult=var "Facing Right")  // disabled
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)  // disabled
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"LEFT", negativeEvent=→"RIGHT", space=0)
+    on LEFT → Left
+    on RIGHT → Right
+  }
+
+  state Left {
+    SetFsmFloat(gameObject=var "Great Slash Effect", fsmName="damages_enemy", variableName="direction", setValue=180, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Velocity", floatValue=-25, everyFrame=false)
+    on FINISHED → G Slash
+  }
+
+  state Right {
+    SetFsmFloat(gameObject=var "Great Slash Effect", fsmName="damages_enemy", variableName="direction", setValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Velocity", floatValue=25, everyFrame=false)
+    on FINISHED → G Slash
+  }
+
+  state Stop Move {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → G Slash End
+  }
+
+  state Has Dash? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasUpwardSlash", isTrue=(none), isFalse=→"CANCEL")
+    on CANCEL → Inactive
+    on FINISHED → Dash Slash Ready
+  }
+
+  state Dash Slash Ready {
+    on DASH END → DSlash Start
+  }
+
+  state DSlash Start {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControlNotVelocity())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    ActivateGameObject(gameObject=var "SD Sharp Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Facing? 2
+  }
+
+  state Facing? 2 {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["facingRight"], storeResult=var "Facing Right")  // disabled
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)  // disabled
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"LEFT", negativeEvent=→"RIGHT", space=0)
+    on LEFT → Left 2
+    on RIGHT → Right 2
+  }
+
+  state Left 2 {
+    SetFsmFloat(gameObject=var "Dash Slash", fsmName="damages_enemy", variableName="direction", setValue=180, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Velocity", floatValue=-20, everyFrame=false)
+    on FINISHED → Dash Slash
+  }
+
+  state Right 2 {
+    SetFsmFloat(gameObject=var "Dash Slash", fsmName="damages_enemy", variableName="direction", setValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Velocity", floatValue=20, everyFrame=false)
+    on FINISHED → Dash Slash
+  }
+
+  state Dash Slash {
+    ActivateGameObject(gameObject=var "Dash Slash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hero_nail_art_great_slash (resources.assets), finishedEvent=(none))
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=hero_nail_art_great_slash (resources.assets), motors=All, loopTime=(unset), isLooping=false, tag="heroAction", gamepadVibration=DashSlash (resources.assets))
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0.15, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NA Dash Slash", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=(unset), everyFrame=false)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=true)
+    DecelerateXY(gameObject=Self, decelerationX=0.75, decelerationY=(unset))
+    on FINISHED → D Slash End
+  }
+
+  state D Slash End {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=ResetHardLandingTimer())
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    on FINISHED → Regain Control
+  }
+
+  state DSlash Move End {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → D Slash End
+  }
+
+  state Play Audio {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=hero_nail_art_cyclone_slash_long (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Audio Player")
+    SetParent(gameObject=var "Audio Player", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Cyclone Spin
+  }
+
+  var Cyclone Timer: float = 0
+  var Timer: float = 0
+  var X Velocity: float = 0
+  var Y Velocity: float = 0
+  var Dashing: bool = false
+  var Facing Right: bool = false
+  var Has Cyclone: bool = false
+  var Has G Slash: bool = false
+  var Return Bool: bool = false
+  var Wall Sliding: bool = false
+  var Attack Folder: gameObject = <null>
+  var Audio Player: gameObject = <null>
+  var Cyclone Slash: gameObject = <null>
+  var Dash Slash: gameObject = <null>
+  var Effect Folder: gameObject = <null>
+  var Great Slash Effect: gameObject = <null>
+  var SD Sharp Flash: gameObject = <null>
+  var Self: gameObject = <null>
+}

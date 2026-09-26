@@ -1,0 +1,142 @@
+# Javelin Control
+# 1 location(s):
+#   localpoolprefabs_assets_areadocks.bundle / Dock Coal Spear
+
+fsm Javelin Control {
+  start Init
+  on PROJECTILE BREAK → Hit Lava  // from any state
+
+  sequence state Init {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spear Fly")
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    ActivateGameObject(gameObject=var "Attack Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Explosion", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Broken Spear", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=-90, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Fly
+  }
+
+  state Fly {
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Terrain(8), sendEvent=→"HIT TERRAIN", storeCollider=var "")
+    FaceAngle(gameObject=Self, angleOffset=-90, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    PlayParticleEmitter(gameObject=var "Pt Trail", emit=0, resetIfPlaying=false)
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Lava", collideLayer=(unset), sendEvent=→"LAVA", storeCollider=var "")
+    on HIT TERRAIN → Stick
+    on PARRIED → Check
+    on LAVA → Hit Lava
+    on DAMAGED HERO → Hit Lava
+  }
+
+  state Stick {
+    PlayAudioEvent(audioClip=spear_impact (sfxstatic_assets_areapeak.bundle), pitchMin=0.9, pitchMax=1.1, volume=0.8, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hot_coal_damage (sfxstatic_assets_shared.bundle), pitchMin=1.1, pitchMax=1.3, volume=0.8, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Attack Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetAudioClip(gameObject=Self, audioClip=small_fireball_projectile_loop (sfxstatic_assets_areabone.bundle), autoPlay=true, stopOnExit=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spear Thunk")
+    ActivateGameObject(gameObject=var "Thunk Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.6, finishEvent=→"WAIT", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt Thunk", emit=0, resetIfPlaying=false)
+    StopParticleEmitter(gameObject=var "Pt Trail")
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Nail Attack", collideLayer=(unset), sendEvent=→"EXPLODE", storeCollider=var "")
+    on WAIT → Explode Antic
+    on EXPLODE → Explode
+    on BREAK SPEAR → Explode
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Deflect {
+    FloatAdd(floatVariable=var "Angle", add=var "Angle Mod", everyFrame=false, perSecond=false)
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed", multiplyBy=2, everyFrame=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Speed", everyFrame=false)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    on FINISHED → Fly
+  }
+
+  state Check {
+    GetVelocityAsAngle(gameObject=Self, storeAngle=var "Angle", everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=0, tolerance=1, equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Angle", float2=180, tolerance=0, equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    on L → Deflect L
+    on R → Deflect R
+    on FINISHED → Deflect Other
+  }
+
+  state Deflect L {
+    RandomFloat(min=-10, max=-13, storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Deflect R {
+    RandomFloat(min=10, max=13, storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Deflect Other {
+    RandomFloat(min=5, max=10, storeResult=var "Angle Mod")
+    RandomlyFlipFloat(storeResult=var "Angle Mod")
+    on FINISHED → Deflect
+  }
+
+  state Explode Antic {
+    ActivateGameObject(gameObject=var "Antic Glow", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.65, finishEvent=→"WAIT", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Spear Antic")
+    PlayParticleEmitterInState(gameObject=var "Pt Antic")
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="Nail Attack", collideLayer=(unset), sendEvent=→"EXPLODE", storeCollider=var "")
+    PlayAudioEvent(audioClip=coral_final_judge_ring_of_flame_appear (sfxstatic_assets_areacoral.bundle), pitchMin=1.2, pitchMax=1.2, volume=0.8, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on WAIT → Explode
+    on EXPLODE → Explode
+    on BREAK SPEAR → Explode
+  }
+
+  state Explode {
+    SetMeshRenderer(gameObject=Self, active=false)
+    PlayAudioEvent(audioClip=small_fireball_projectile_death (sfxstatic_assets_areabone.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=wisp_fireball_explode (sfxstatic_assets_shared.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStop(gameObject=Self, fadeTime=0)
+    ActivateGameObject(gameObject=var "Explosion", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Broken Spear", vector=(unset), x=0.05, y=-0.28, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=var "Broken Spear", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=148.463, space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Broken Spear", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FireAtTarget(gameObject=var "Broken Spear", target=var "Explosion", speed=-18, position=(0, 0, 0), spread=0, everyFrame=false)
+    AddForce2d(gameObject=var "Broken Spear", forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=500, vector3=(unset), everyFrame=false)
+    Wait(time=5, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Recycle
+  }
+
+  state Hit Lava {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Trail")
+    ActivateGameObject(gameObject=var "Attack Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Explode
+  }
+
+  var Angle: float = 0
+  var Angle Mod: float = 0
+  var Speed: float = 0
+  var Thunk Effect: gameObject = Dock Coal Spear/Thunk Effect
+  var Pt Thunk: gameObject = Dock Coal Spear/Pt Thunk
+  var Pt Trail: gameObject = Dock Coal Spear/Pt Trail
+  var Pt Antic: gameObject = Dock Coal Spear/Pt Antic
+  var Explosion: gameObject = Dock Coal Spear/Explosion
+  var Broken Spear: gameObject = Dock Coal Spear/Broken Spear
+  var Attack Collider: gameObject = Dock Coal Spear/Attack Collider
+  var Antic Glow: gameObject = Dock Coal Spear/Antic Glow
+}

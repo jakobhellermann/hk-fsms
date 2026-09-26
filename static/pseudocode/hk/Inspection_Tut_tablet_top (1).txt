@@ -1,0 +1,275 @@
+# Inspection
+# 1 location(s):
+#   Tutorial_01 / _Props/Tut_tablet_top (1)
+
+fsm Inspection {
+  start Pause
+  on HERO DAMAGED → Set Bool  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Completion Prompt", storeResult=var "Completion Prompt")
+    SetParent(gameObject=var "Completion Prompt", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindChild(gameObject=Self, childName="Focus_prompt_temp", storeResult=var "Focus_prompt_temp")
+    SetParent(gameObject=var "Focus_prompt_temp", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindGameObject(objectName="Prompt Blanker", withTag="Untagged", store=var "Prompt Blanker")
+    FindChild(gameObject=var "Self", childName="Prompt Marker", storeResult=var "Prompt Marker")
+    FindChild(gameObject=var "Self", childName="Enemy Counter", storeResult=var "Enemy Counter")
+    SpawnObjectFromGlobalPool(gameObject=Arrow Prompt (resources.assets), spawnPoint=var "Prompt Marker", position=(unset), rotation=(unset), storeObject=var "Prompt")
+    SetFsmString(gameObject=var "Prompt", fsmName="Prompt Control", variableName="Prompt Name", setValue="Inspect", everyFrame=false)
+    DestroyObject(gameObject=var "Prompt Marker", delay=0, detachChildren=false)
+    GetParent(gameObject=var "DialogueText", storeResult=var "DialogueTextParent")
+    FindChild(gameObject=var "DialogueTextParent", childName="Stop", storeResult=var "Stop")
+    FindChild(gameObject=var "DialogueTextParent", childName="Arrow", storeResult=var "Arrow")
+    on FINISHED → Out Of Range
+  }
+
+  state Out Of Range {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="", collideLayer="", sendEvent=→"IN RANGE", storeCollider=var "")
+    on IN RANGE → Enemy Check
+  }
+
+  state In Range {
+    GetFsmBool(gameObject=var "Enemy Counter", fsmName="detect_enemies", variableName="In Range", storeValue=var "In Range", everyFrame=true)
+    BoolTest(boolVariable=var "In Range", isTrue=→"CANCEL", isFalse=(none), everyFrame=true)
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="UP", delay=0, everyFrame=false)
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="", collideLayer="", sendEvent=→"OUT OF RANGE", storeCollider=var "")
+    GetAxis(axisName="Vertical", multiplier=1, store=var "Axis Vert", everyFrame=true)  // disabled
+    FloatCompare(float1=var "Axis Vert", float2=0.6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"UP PRESSED", everyFrame=true)  // disabled
+    ListenForUp(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    on OUT OF RANGE → Out Of Range
+    on UP PRESSED → Can Inspect?
+    on CANCEL → Enemy Check
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → In Range
+  }
+
+  state Can Inspect? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanInput", parameters=[], storeResult=var "Can Input")
+    BoolTest(boolVariable=var "Can Input", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["onGround"], storeResult=var "On Ground")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["attacking"], storeResult=var "Attacking")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["upAttacking"], storeResult=var "Attacking Up")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["downAttacking"], storeResult=var "Attacking Down")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["dashing"], storeResult=var "Dashing")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetState", parameters=["backDashing"], storeResult=var "Backdashing")
+    BoolTest(boolVariable=var "On Ground", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolAnyTrue(boolVariables=[var "Attacking", var "Attacking Down", var "Attacking Up", var "Backdashing", var "Dashing"], sendEvent=→"CANCEL", storeResult=(unset), everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Take Control
+  }
+
+  state Check Proximity {
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Left Prox", floatValue=var "Self X", everyFrame=false)
+    FloatSubtract(floatVariable=var "Left Prox", subtract=var "Move To Offset", everyFrame=false, perSecond=false)
+    SetFloatValue(floatVariable=var "Right Prox", floatValue=var "Self X", everyFrame=false)
+    FloatAdd(floatVariable=var "Right Prox", add=var "Move To Offset", everyFrame=false, perSecond=false)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Self X", upperValue=var "Right Prox", boolVariable=(unset), trueEvent=→"MOVE RIGHT", falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Left Prox", upperValue=var "Self X", boolVariable=(unset), trueEvent=→"MOVE LEFT", falseEvent=(none), everyFrame=false)
+    GetScale(gameObject=var "Hero", vector=(unset), xScale=var "Hero X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Hero X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Facing Right", greaterThanBool=var "Hero Facing Left", everyFrame=false)
+    FloatTestToBool(float1=var "Hero X", float2=var "Self X", tolerance=0, equalBool=(unset), lessThanBool=var "Hero On Left", greaterThanBool=var "Hero On Right", everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Facing Right", var "Hero On Right"], sendEvent=→"TURN LEFT", storeResult=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Facing Left", var "Hero On Left"], sendEvent=→"TURN RIGHT", storeResult=(unset), everyFrame=false)
+    on MOVE RIGHT → Move Hero Right
+    on FINISHED → Prompt Up
+    on TURN LEFT → Turn Hero Left
+    on MOVE LEFT → Move Hero Left
+    on MOVE RIGHT → 
+    on TURN RIGHT → Turn Hero Right
+  }
+
+  state Move Hero Right {
+    SetScale(gameObject=var "Hero", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Right Prox", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    on FINISHED → Turn Hero Left
+  }
+
+  state Take Control {
+    SetBoolValue(boolVariable=var "Hero Damaged", boolValue=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="PROMPT FOCUS END QUICK", delay=0, everyFrame=false)
+    on FINISHED → Prompt Up
+  }
+
+  state Turn Hero Left {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Prompt Up
+  }
+
+  state Move Hero Left {
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=-6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Left Prox", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Turn Hero Right
+  }
+
+  state Turn Hero Right {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Prompt Up
+  }
+
+  state Prompt Up {
+    AudioStop(gameObject=Self)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="TurnToBG")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Lore_Tablet_activate_temp (sharedassets6.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=Lore_Tablet_activate_temp (sharedassets6.assets), motors=All, loopTime=(unset), isLooping=false, tag="", gamepadVibration=<null>)
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=false, topRight=false, topCentre=true, topJustified=false, centreLeft=false, centreRight=false, centreCentre=false, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    SetPosition(gameObject=var "DialogueText", vector=(unset), x=(unset), y=2.44, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="LORE PROMPT UP", delay=0, everyFrame=false)
+    on FINISHED → Focus Prompt?
+  }
+
+  state Send Text {
+    SetFsmGameObject(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Convo Name", var "Sheet Name"], storeResult=(unset var))
+    on CONVO_FINISH → Down
+  }
+
+  state Down {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=false, topRight=false, topCentre=false, topJustified=false, centreLeft=false, centreRight=false, centreCentre=false, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    SetFsmFloat(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Stop Pause", setValue=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Focus_prompt_temp"), sendEvent="DOWN", delay=0, everyFrame=false)  // disabled
+    FadeColorFader(target=var "Focus_prompt_temp", fadeType=DOWN, useChildren=true)
+    SendEventByName(eventTarget=GameObject(var "Completion Prompt"), sendEvent="DOWN", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "DialogueText", vector=(unset), x=(unset), y=4.49, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="LORE PROMPT DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Prompt Blanker"), sendEvent="DOWN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Reset Text Box
+  }
+
+  state Regain Control {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Out Of Range
+  }
+
+  state Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Init
+  }
+
+  state Blanker Up {
+    SendEventByName(eventTarget=GameObject(var "Prompt Blanker"), sendEvent="UP", delay=0, everyFrame=false)
+    Wait(time=0.85, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Foc Prompt Up
+  }
+
+  state Focus Prompt? {
+    SetPosition(gameObject=var "Stop", vector=(unset), x=(unset), y=-0.23, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=var "Arrow", vector=(unset), x=(unset), y=-0.3, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    BoolNoneTrue(boolVariables=[var "Focus Prompt", var "Completion Rate Prompt"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SetFsmFloat(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Stop Pause", setValue=2, everyFrame=false)
+    SetPosition(gameObject=var "DialogueText", vector=(unset), x=(unset), y=4.45, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=var "Stop", vector=(unset), x=(unset), y=-6.71, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Blanker Up
+  }
+
+  state Foc Prompt Up {
+    BoolTest(boolVariable=var "Focus Prompt", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ActivateGameObject(gameObject=var "Focus_prompt_temp", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Focus_prompt_temp"), sendEvent="UP", delay=0, everyFrame=false)  // disabled
+    FadeColorFader(target=var "Focus_prompt_temp", fadeType=UP, useChildren=true)
+    on FINISHED → Completion Prompt
+  }
+
+  state Enemy Check {
+    GetFsmBool(gameObject=var "Enemy Counter", fsmName="detect_enemies", variableName="In Range", storeValue=var "In Range", everyFrame=false)
+    BoolTest(boolVariable=var "In Range", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    NextFrameEvent(sendEvent=→"CANCEL")
+    on CANCEL → Out Of Range
+    on FINISHED → In Range
+  }
+
+  state Reset Text Box {
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=true, topRight=false, topCentre=false, topJustified=false, centreLeft=false, centreRight=false, centreCentre=false, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    SetPosition(gameObject=var "Arrow", vector=(unset), x=(unset), y=1.695, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=var "DialogueText", vector=(unset), x=(unset), y=4.49, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=var "Stop", vector=(unset), x=(unset), y=1.695, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Turn Back
+  }
+
+  state Turn Back {
+    BoolTest(boolVariable=var "Hero Damaged", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="TurnFromBG", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Regain Control
+  }
+
+  state Completion Prompt {
+    BoolTest(boolVariable=var "Completion Rate Prompt", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetPlayerDataBool(boolName="unlockedCompletionRate", value=true)
+    ActivateGameObject(gameObject=var "Completion Prompt", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Completion Prompt"), sendEvent="UP", delay=0, everyFrame=false)
+    on FINISHED → Send Text
+  }
+
+  state Set Bool {
+    SetBoolValue(boolVariable=var "Hero Damaged", boolValue=true, everyFrame=false)
+    on FINISHED → Down
+  }
+
+  var Move To Offset: float = 1.15
+  var Completion Rate Prompt: bool = false
+  var Focus Prompt: bool = false
+  var Convo Name: string = "TUT_TAB_02"
+  var Sheet Name: string = "Lore Tablets"
+
+  var Axis Vert: float = 0
+  var Hero X: float = 0
+  var Hero X Scale: float = 0
+  var Left Prox: float = 0
+  var Right Prox: float = 0
+  var Self X: float = 0
+  var Attacking: bool = false
+  var Attacking Down: bool = false
+  var Attacking Up: bool = false
+  var Backdashing: bool = false
+  var Can Input: bool = false
+  var Dashing: bool = false
+  var Hero Damaged: bool = false
+  var Hero Facing Left: bool = false
+  var Hero Facing Right: bool = false
+  var Hero On Left: bool = false
+  var Hero On Right: bool = false
+  var In Range: bool = false
+  var On Ground: bool = false
+  var Arrow: gameObject = <null>
+  var Completion Prompt: gameObject = <null>
+  var DialogueTextParent: gameObject = <null>
+  var Enemy Counter: gameObject = <null>
+  var Focus_prompt_temp: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Prompt Blanker: gameObject = <null>
+  var Prompt Marker: gameObject = <null>
+  var Self: gameObject = <null>
+  var Stop: gameObject = <null>
+}

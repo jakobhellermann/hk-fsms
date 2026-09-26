@@ -1,0 +1,283 @@
+# Inventory Proxy
+# 6 location(s):
+#   localpoolprefabs_assets_areabellway.bundle / Fast Travel Map
+#   Belltown_Room_Relic / Relic Board
+#   Belltown_Room_Spare / Collection View Board
+#   Library_08 / Relic Board
+#   shopui_assets_all.bundle / Simple Shop Menu
+#   shopui_assets_all.bundle / Tube Travel Map
+
+// uses template: inventory_proxy
+fsm Inventory Proxy {
+  start Init
+  on PANE RESET → Wait for active  // from any state
+
+  state R Arrow {
+    SetSpriteRendererOrder(gameObject=var "Cursor Glow", order=10, delay=0.15)
+    SetInventoryItemSelected(SelectedAction=Default, CustomObject=var "Arrow R", JustDisplay=false, Target=Self)
+    CallMethodProper(gameObject=var "Cursor", behaviour="InventoryCursor", methodName="ActivateIfNotActive", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="InventoryItemManager", methodName="PlayMoveSound", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on UI LEFT → Select Rightmost
+    on UI RIGHT → Move Pane R
+    on UI CONFIRM → Move Pane R
+    on UI RS LEFT → Select Rightmost
+    on UI RS RIGHT → Move Pane R
+  }
+
+  state L Arrow {
+    SetSpriteRendererOrder(gameObject=var "Cursor Glow", order=10, delay=0.15)
+    SetInventoryItemSelected(SelectedAction=Default, CustomObject=var "Arrow L", JustDisplay=false, Target=Self)
+    CallMethodProper(gameObject=var "Cursor", behaviour="InventoryCursor", methodName="ActivateIfNotActive", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="InventoryItemManager", methodName="PlayMoveSound", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on UI LEFT → Move Pane L
+    on UI RIGHT → Select Leftmost
+    on UI CONFIRM → Move Pane L
+    on UI RS LEFT → Move Pane L
+    on UI RS RIGHT → Select Leftmost
+  }
+
+  state Move Pane R {
+    GetFsmBool(gameObject=Self, fsmName="ui_list_getinput", variableName="Repeating", storeValue=var "Repeating", everyFrame=false)
+    BoolTest(boolVariable=var "Repeating", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="MOVE PANE R", delay=0, everyFrame=false)
+    on CANCEL → R Arrow
+  }
+
+  state Move Pane L {
+    GetFsmBool(gameObject=Self, fsmName="ui_list_getinput", variableName="Repeating", storeValue=var "Repeating", everyFrame=false)
+    BoolTest(boolVariable=var "Repeating", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="MOVE PANE L", delay=0, everyFrame=false)
+    on CANCEL → L Arrow
+  }
+
+  state Other Panes? L {
+    BoolTest(boolVariable=var "Has No Panes", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    GetInventoryPaneCount(paneListChild=Self, UnlockedPaneCount=(unset), SinglePaneEvent=→"CANCEL", ManyPaneEvent=(none))
+    on CANCEL → Return Previous Selection
+    on FINISHED → L Arrow
+  }
+
+  state Other Panes? R {
+    BoolTest(boolVariable=var "Has No Panes", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    GetInventoryPaneCount(paneListChild=Self, UnlockedPaneCount=(unset), SinglePaneEvent=→"CANCEL", ManyPaneEvent=(none))
+    on FINISHED → R Arrow
+    on CANCEL → Return Previous Selection
+  }
+
+  state Accept Input {
+    on UI UP → Select UP
+    on UI DOWN → Select DOWN
+    on UI LEFT → Select LEFT
+    on UI RIGHT → Select RIGHT
+    on UI CONFIRM → CONFIRM
+    on UI CANCEL → CANCEL
+    on UI RS UP → RS UP
+    on UI RS DOWN → RS DOWN
+    on UI EXTRA → EXTRA
+    on UI SUPER → SUPER
+    on UI RS LEFT → RS LEFT
+    on UI RS RIGHT → RS RIGHT
+  }
+
+  state Select UP {
+    MoveInventoryItemSelection(Direction=Up, CancelEvent=(none), Target=Self)
+    on FINISHED → Accept Input
+  }
+
+  state Select DOWN {
+    MoveInventoryItemSelection(Direction=Down, CancelEvent=(none), Target=Self)
+    on FINISHED → Accept Input
+  }
+
+  state Select LEFT {
+    MoveInventoryItemSelection(Direction=Left, CancelEvent=→"CANCEL", Target=Self)
+    on FINISHED → Accept Input
+    on CANCEL → Other Panes? L
+  }
+
+  state Select RIGHT {
+    MoveInventoryItemSelection(Direction=Right, CancelEvent=→"CANCEL", Target=Self)
+    on FINISHED → Accept Input
+    on CANCEL → Other Panes? R
+  }
+
+  state Return Previous Selection {
+    SetInventoryItemSelected(SelectedAction=Previous, CustomObject=<null>, JustDisplay=false, Target=Self)
+    SetSpriteRendererOrder(gameObject=var "Cursor Glow", order=0, delay=0)
+    on FINISHED → Accept Input
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindChild(gameObject=var "Parent", childName="Border", storeResult=var "Border")
+    FindChild(gameObject=var "Border", childName="Arrows", storeResult=var "Arrows")
+    FindChild(gameObject=var "Arrows", childName="Arrow Right", storeResult=var "Arrow R")
+    FindChild(gameObject=var "Arrows", childName="Arrow Left", storeResult=var "Arrow L")
+    ActivateGameObject(gameObject=var "Dream Nail", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Find Cursor
+  }
+
+  state Wait for active {
+    SendEventByName(eventTarget=GameObject(var "Cursor"), sendEvent="DOWN", delay=0, everyFrame=false)
+    on SETUP → Setup
+    on ACTIVATE → Cursor
+  }
+
+  state Wait For Setup {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Select Start
+  }
+
+  state Cursor {
+    SendEventByName(eventTarget=GameObject(var "Cursor"), sendEvent="CURSOR ACTIVATE", delay=0, everyFrame=false)
+    on FINISHED → Wait For Setup
+  }
+
+  state CONFIRM {
+    InventoryItemSelectedAction(Action=Submit, SuccessEvent=(none), FailureEvent=→"CANCEL", Target=Self)
+    on FINISHED → Confirm Held
+    on CANCEL → Confirm Cancel
+  }
+
+  state Select Start {
+    SetSpriteRendererOrder(gameObject=var "Cursor Glow", order=0, delay=0)
+    BoolTest(boolVariable=var "Do Select Start", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetInventoryItemSelected(SelectedAction=var "Start Selection", CustomObject=<null>, JustDisplay=false, Target=Self)
+    SetEnumValue(enumVariable=var "Start Selection", enumValue=Previous, everyFrame=false)
+    on FINISHED → Accept Input
+  }
+
+  state CANCEL {
+    InventoryItemSelectedAction(Action=Cancel, SuccessEvent=(none), FailureEvent=→"CANCEL", Target=Self)
+    on FINISHED → Accept Input
+    on CANCEL → Cancel Cancel
+  }
+
+  state Select Rightmost {
+    TrySetInventoryItemSelected(SelectedAction=RightMost, CustomObject=<null>, JustDisplay=false, successEvent=(none), failedEvent=→"CANCEL", Target=Self)
+    CallMethodProper(gameObject=Self, behaviour="InventoryItemManager", methodName="PlayMoveSound", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetSpriteRendererOrder(gameObject=var "Cursor Glow", order=0, delay=0)
+    on FINISHED → Accept Input
+    on CANCEL → L Arrow
+  }
+
+  state Select Leftmost {
+    TrySetInventoryItemSelected(SelectedAction=LeftMost, CustomObject=<null>, JustDisplay=false, successEvent=(none), failedEvent=→"CANCEL", Target=Self)
+    CallMethodProper(gameObject=Self, behaviour="InventoryItemManager", methodName="PlayMoveSound", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetSpriteRendererOrder(gameObject=var "Cursor Glow", order=0, delay=0)
+    on FINISHED → Accept Input
+    on CANCEL → R Arrow
+  }
+
+  state RS UP {
+    MoveInventorySelectionPage(Direction=Up, Target=Self)  // disabled
+    TryMoveInventorySelectionPage(Direction=Up, StoreValue=(unset), trueEvent=→"CANCEL", falseEvent=(none), Target=Self)
+    on FINISHED → Select UP
+    on CANCEL → Accept Input
+  }
+
+  state RS DOWN {
+    MoveInventorySelectionPage(Direction=Down, Target=Self)  // disabled
+    TryMoveInventorySelectionPage(Direction=Down, StoreValue=(unset), trueEvent=→"CANCEL", falseEvent=(none), Target=Self)
+    on FINISHED → Select DOWN
+    on CANCEL → Accept Input
+  }
+
+  state Find Cursor {
+    FindChildRecursive(gameObject=Self, childName="Cursor", storeResult=var "Cursor")
+    FindChild(gameObject=var "Cursor", childName="Back", storeResult=var "Cursor Back")
+    FindChild(gameObject=var "Cursor Back", childName="Glow", storeResult=var "Cursor Glow")
+    on FINISHED → Check Single Pane?
+  }
+
+  state Confirm Cancel {
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="ui_list_getinput"), sendEvent="CONFIRM CANCEL", delay=0, everyFrame=false)
+    on FINISHED → Accept Input
+  }
+
+  state Cancel Cancel {
+    SendEventByNameV2(eventTarget=GameObjectFSM(Self, fsm="ui_list_getinput"), sendEvent="CANCEL CANCEL", delay=0, everyFrame=false)
+    on FINISHED → Accept Input
+  }
+
+  state Confirm Held {
+    on UI CONFIRM RELEASED → Confirm Released
+  }
+
+  state Confirm Released {
+    InventoryItemSelectedAction(Action=SubmitRelease, SuccessEvent=(none), FailureEvent=(none), Target=Self)
+    on FINISHED → Accept Input
+  }
+
+  state Setup {
+    SetInventoryItemSelected(SelectedAction=var "Start Selection", CustomObject=<null>, JustDisplay=false, Target=Self)
+    SetEnumValue(enumVariable=var "Start Selection", enumValue=Previous, everyFrame=false)
+    on ACTIVATE → Cursor
+  }
+
+  state EXTRA {
+    InventoryItemSelectedAction(Action=Extra, SuccessEvent=(none), FailureEvent=→"CANCEL", Target=Self)
+    on CANCEL → Accept Input
+    on FINISHED → Extra Held
+  }
+
+  state Extra Released {
+    InventoryItemSelectedAction(Action=ExtraRelease, SuccessEvent=(none), FailureEvent=(none), Target=Self)
+    on FINISHED → Accept Input
+  }
+
+  state Extra Held {
+    on UI EXTRA RELEASED → Extra Released
+  }
+
+  state SUPER {
+    InventoryItemSelectedAction(Action=Super, SuccessEvent=(none), FailureEvent=(none), Target=Self)
+    on FINISHED → Accept Input
+  }
+
+  state RS LEFT {
+    TryMoveInventorySelectionPage(Direction=Left, StoreValue=(unset), trueEvent=→"CANCEL", falseEvent=(none), Target=Self)
+    BoolTest(boolVariable=var "Single Pane", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    Comment(comment="Wait a frame when successfully moving page selection to prevent UI Right / Left events from firing immeidately after.")
+    NextFrameEvent(sendEvent=(none))
+    on FINISHED → L Arrow
+    on CANCEL → Accept Input
+  }
+
+  state RS RIGHT {
+    TryMoveInventorySelectionPage(Direction=Right, StoreValue=(unset), trueEvent=→"CANCEL", falseEvent=(none), Target=Self)
+    BoolTest(boolVariable=var "Single Pane", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    Comment(comment="Wait a frame when successfully moving page selection to prevent UI Right / Left events from firing immeidately after.")
+    NextFrameEvent(sendEvent=(none))
+    on FINISHED → R Arrow
+    on CANCEL → Accept Input
+  }
+
+  state Check Single Pane? {
+    SetBoolValue(boolVariable=var "Single Pane", boolValue=false, everyFrame=false)
+    GetParent(gameObject=Self, storeResult=var "Pane Parent")
+    GameObjectIsNull(gameObject=var "Pane Parent", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    GetInventoryPaneCount(paneListChild=Self, UnlockedPaneCount=(unset), SinglePaneEvent=(none), ManyPaneEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Single Pane", boolValue=true, everyFrame=false)
+    on FINISHED → Wait for active
+  }
+
+  var Has No Panes: bool = true
+  var Do Select Start: bool = true
+
+  var Repeating: bool = false
+  var Single Pane: bool = false
+  var Arrow L: gameObject = <null>
+  var Arrow R: gameObject = <null>
+  var Arrows: gameObject = <null>
+  var Border: gameObject = <null>
+  var Cursor: gameObject = <null>
+  var Cursor Back: gameObject = <null>
+  var Cursor Glow: gameObject = <null>
+  var Dream Nail: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Self: gameObject = <null>
+  var Pane Parent: gameObject = <null>
+  var Start Selection: enum = InventoryItemManager+SelectedActionType(0)
+}

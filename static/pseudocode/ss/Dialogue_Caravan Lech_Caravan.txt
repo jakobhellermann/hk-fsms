@@ -1,0 +1,179 @@
+# Dialogue
+# 1 location(s):
+#   Greymoor_08_caravan / Caravan/Caravan Lech
+
+fsm Dialogue {
+  start Pause
+
+  state Pause {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Wounded?
+  }
+
+  state Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.6, MaxReactDelay=1.9, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Door Opened?
+    on SING → Sing
+    on STARTLE → Startle
+  }
+
+  state End Dialogue {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Intro {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="CaravanLechMet", value=true)
+    GetQuestState(IsAccepted=(unset), IsCompleted=var "Test", Quest=Save the Fleas (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="CARAVAN_LECH_INTRO_MARROW", trueString="CARAVAN_LECH_INTRO", everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Enter Spa?
+  }
+
+  state Talk {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Convo Key", falseString="CARAVAN_LECH_TALK", trueString="CARAVAN_LECH_TALK_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Enter Spa?
+  }
+
+  sequence state Enter Spa? {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    DialogueYesNo(Text="", TranslationSheet="Caravan", TranslationKey="CARAVAN_LECH_SPA_PROMPT", UseCurrency=true, CurrencyCost=10, CurrencyType=Money, YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on NO → Declined
+    on YES → Open Spa
+  }
+
+  state Declined {
+    RunDialogue(Sheet="Caravan", Key="CARAVAN_LECH_SPA_DECLINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Accepted {
+    PlayerDataVariableTest(VariableName="CaravanLechSpaAttacked", ExpectedValue=true, IsExpectedEvent=→"VIP", IsNotExpectedEvent=(none))
+    GetPlayerDataBool(boolName="CaravanLechSpaAcceptState", storeValue=var "Talked Spa Accept")
+    ConvertBoolToString(boolVariable=var "Talked Spa Accept", stringVariable=var "Dlg", falseString="CARAVAN_LECH_SPA_ACCEPT", trueString="CARAVAN_LECH_SPA_ACCEPT_2", everyFrame=false)
+    BoolFlip(boolVariable=var "Talked Spa Accept")
+    SetPlayerDataBool(boolName="CaravanLechSpaAcceptState", value=var "Talked Spa Accept")
+    RunDialogue(Sheet="Caravan", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+    on VIP → Accepted VIP
+  }
+
+  state Init {
+    ActivateGameObject(gameObject=var "Wounded State", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Opened Spa Door", boolValue=false, everyFrame=false)
+    ActivateInteractible(Target=var "Spa Door", Activate=false, AllowQueueing=false, UseChildren=false)
+    AnimatorPlay(gameObject=var "Spa Door Anim", stateName="Closed", layer=0, normalizedTime=1, everyFrame=false)  // disabled
+    on FINISHED → Idle
+  }
+
+  state Door Opened? {
+    BoolTest(boolVariable=var "Opened Spa Door", isTrue=→"YES", isFalse=→"NO", everyFrame=false)
+    on NO → State
+    on YES → Accepted
+  }
+
+  state Wounded? {
+    GetStaticVariable(variableName="LECH_WOUNDED", storeValue=var "Wounded")
+    BoolTest(boolVariable=var "Wounded", isTrue=→"YES", isFalse=(none), everyFrame=false)
+    PlayerDataVariableTest(VariableName="CaravanLechSpaAttacked", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    PlayerDataVariableTest(VariableName="CaravanLechWoundedSpoken", ExpectedValue=true, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=(none))
+    GetEntryGateName(StoreValue=var "Entry Gate Name")
+    GetName(gameObject=var "Spa Door", storeName=var "Spa Door Name", everyFrame=false)
+    StringCompare(stringVariable=var "Entry Gate Name", compareTo=var "Spa Door Name", equalEvent=→"YES", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetPlayerDataVariable(VariableName="CaravanLechWoundedSpoken", SetValue=true)
+    on YES → Wounded State
+    on FINISHED → Init
+  }
+
+  state Wounded State {
+    SetStaticVariable(variableName="LECH_WOUNDED", setValue=true, sceneTransitionsLimit=3)
+    SendEventToRegister(eventName="CARAVAN LECH WOUNDED")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    SetParent(gameObject=var "Wounded State", parent=var "Parent", resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Wounded State", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state State {
+    PlayerDataVariableTest(VariableName="CaravanLechSpaAttacked", ExpectedValue=true, IsExpectedEvent=→"VIP", IsNotExpectedEvent=(none))
+    BoolTest(boolVariable=var "Activated", isTrue=(none), isFalse=→"MEET", everyFrame=false)  // disabled
+    PlayerDataBoolTrueAndFalse(trueBool="blackThreadWorld", falseBool="CaravanLechAct3Convo", isTrue=→"ACT 3 MEET", isFalse=(none))
+    PlayerDataBoolTest(boolName="CaravanLechMet", isTrue=(none), isFalse=→"MEET")
+    on MEET → Intro
+    on FINISHED → Talk
+    on VIP → Talk VIP
+    on ACT 3 MEET → Act 3 Meet
+  }
+
+  state Talk VIP {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Convo Key", falseString="CARAVAN_LECH_SPA_INTIMIDATED", trueString="CARAVAN_LECH_SPA_INTIMIDATED_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Open Spa
+  }
+
+  state Open Spa {
+    ActivateInteractible(Target=var "Spa Door", Activate=true, AllowQueueing=false, UseChildren=false)
+    SetBoolValue(boolVariable=var "Opened Spa Door", boolValue=true, everyFrame=false)
+    AnimatorPlay(gameObject=var "Spa Door Anim", stateName="Open", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    PlayerDataVariableTest(VariableName="CaravanLechSpaAttacked", ExpectedValue=true, IsExpectedEvent=→"VIP", IsNotExpectedEvent=(none))
+    on VIP → End Dialogue
+    on FINISHED → Accepted
+  }
+
+  state Accepted VIP {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Convo Key", falseString="CARAVAN_LECH_SPA_INTIMIDATED", trueString="CARAVAN_LECH_SPA_INTIMIDATED_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Caravan", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Act 3 Meet {
+    SetPlayerDataBool(boolName="CaravanLechAct3Convo", value=true)
+    SetPlayerDataBool(boolName="CaravanLechMet", value=true)
+    RunDialogue(Sheet="Caravan", Key="CARAVAN_LECH_ACT3_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Sing {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=kratt_sing (sfxdynamic_assets_fleacaravan.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  sequence state Sing End {
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Sing End", AnimationCompleteEvent=(none))
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Idle
+  }
+
+  state Startle {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    Wait(time=0.5, finishEvent=→"CANCEL", realTime=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=kratt_alert (sfxdynamic_assets_fleacaravan.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on CANCEL → Sing End
+  }
+
+  var Spa Door: gameObject = Caravan/door2
+  var Spa Door Anim: gameObject = Caravan/Caravan_Spa/caravan_spa_door
+
+  var Activated: bool = false
+  var Opened Spa Door: bool = false
+  var Test: bool = false
+  var Talked Spa Accept: bool = false
+  var Wounded: bool = false
+  var Is Act 3: bool = false
+  var Entry Gate Name: string = ""
+  var Spa Door Name: string = ""
+  var Dlg: string = ""
+  var Convo Key: string = ""
+  var Wounded State: gameObject = Caravan/Caravan Lech/Caravan Lech Wounded
+  var Parent: gameObject = <null>
+  var Audio Loop Voice: gameObject = Caravan/Caravan Lech/Audio Loop Voice
+}

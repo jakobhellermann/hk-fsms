@@ -1,0 +1,97 @@
+# Orb Control
+# 1 location(s):
+#   sharedassets407.assets / Radiant Orb
+
+fsm Orb Control {
+  start Init
+  on DESTROY → Dissipate  // from any state
+
+  state Init {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetScale(gameObject=Self, vector=(unset), x=1.4, y=1.4, z=1, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Particle System", emit=0)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetDamageHeroAmount(target=var "Hero Hurter", damageDealt=2)
+    FindChild(gameObject=Self, childName="Fader", storeResult=var "Fader")
+    ActivateGameObject(gameObject=var "Fader", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=Self, childName="Appear Glow", storeResult=var "Appear Glow")
+    ActivateGameObject(gameObject=var "Appear Glow", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Orbiting
+    on FIRE → Chase Hero
+  }
+
+  state Orbiting {
+    on FIRE → Chase Hero
+    on DISSIPATE → Dissipate
+  }
+
+  state Chase Hero {
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Hero Box(20), sendEvent=→"END", storeCollider=var "")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Wait(time=2.25, finishEvent=→"DISSIPATE", realTime=false)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=20, accelerationForce=50, offsetX=0, offsetY=0)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on DISSIPATE → Dissipate
+    on FINISHED → Chase Hero 2
+    on ORBIT SHIELD → Impact
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Impact {
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_projectile_impact (resources.assets))
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetDamageHeroAmount(target=var "Hero Hurter", damageDealt=0)
+    ActivateGameObject(gameObject=var "Impact", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRandomRotation(gameObject=var "Impact", x=false, y=false, z=true)
+    PlayParticleEmitter(gameObject=var "Impact Particles", emit=0)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Particle System")
+    ActivateGameObject(gameObject=var "Fader", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Recycle
+  }
+
+  state Dissipate {
+    AudioStop(gameObject=Self)
+    iTweenScaleTo(gameObject=Self, id="", transformScale=var "", vectorScale=(0.1, 0.1, 0.1), time=0.2, delay=0, speed=(unset), easeType=linear, loopType=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    DecelerateV2(gameObject=Self, deceleration=0.9)
+    SetDamageHeroAmount(target=var "Hero Hurter", damageDealt=0)
+    ActivateGameObject(gameObject=var "Fader", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Stop Particles
+  }
+
+  state Stop Particles {
+    StopParticleEmitter(gameObject=var "Particle System")
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on FINISHED → Recycle
+  }
+
+  state Impact pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Impact
+  }
+
+  state Chase Hero 2 {
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Hero Box(20), sendEvent=→"END", storeCollider=var "")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Trigger2dEventLayer(trigger=OnTriggerStay2D, collideTag="", collideLayer=Terrain(8), sendEvent=→"END", storeCollider=var "")
+    Wait(time=2.25, finishEvent=→"DISSIPATE", realTime=false)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=20, accelerationForce=50, offsetX=0, offsetY=0)
+    on END → Impact pause
+    on DISSIPATE → Dissipate
+  }
+
+  var Appear Glow: gameObject = <null>
+  var Fader: gameObject = <null>
+  var Hero Hurter: gameObject = Radiant Orb/Hero Hurter
+  var Impact: gameObject = Radiant Orb/Impact
+  var Impact Particles: gameObject = Radiant Orb/Impact Particles
+  var Particle System: gameObject = Radiant Orb/Particle System
+}

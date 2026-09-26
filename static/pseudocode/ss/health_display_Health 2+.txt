@@ -1,0 +1,522 @@
+# health_display
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Health/Health 2+
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Health/Health 2+
+
+// uses template: health_display
+fsm health_display {
+  start Init
+  on CHARM INDICATOR CHECK → Charm Pause  // from any state
+  on TOOL EQUIPS CHANGED → Charm Pause  // from any state
+  on HUD APPEAR RESET → Init  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetBoolValue(boolVariable=var "Initialised", boolValue=false, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Max Up", storeResult=var "Max Up")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Idle Bound", storeResult=var "Bound Sprite")
+    FindChild(gameObject=var "Self", childName="Fractured Mask", storeResult=var "Fractured Mask")
+    SetMeshRenderer(gameObject=var "Fractured Mask", active=false)
+    FindChild(gameObject=var "Self", childName="Curse Break Effect", storeResult=var "Curse Break Effect")
+    ActivateGameObject(gameObject=var "Curse Break Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Frost Idle Effect", storeResult=var "Frost Idle Effect")
+    ActivateGameObject(gameObject=var "Frost Idle Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Frost Antic Effect", storeResult=var "Frost Antic Effect")
+    FindChild(gameObject=var "Self", childName="Frost Break Effect", storeResult=var "Frost Break Effect")
+    ActivateGameObject(gameObject=var "Frost Break Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "blue_health_revert")
+    ActivateGameObject(gameObject=var "blue_health_revert", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Set Appear Pause
+  }
+
+  state Check Max HP {
+    GetPlayerDataVariable(VariableName="CurrentMaxHealth", StoreValue=var "Current Max HP")
+    GetPlayerDataVariable(VariableName="maxHealthBase", StoreValue=var "Max Health Base")
+    IntCompare(integer1=var "Current Max HP", integer2=var "Health Number", equal=(none), lessThan=→"OVER MAX", greaterThan=(none), everyFrame=false)
+    on OVER MAX → Cursed Shrink?
+    on FINISHED → Started Hive?
+  }
+
+  state Inactive {
+    SetMeshRenderer(gameObject=var "Self", active=false)
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Was Over Max", boolValue=true, everyFrame=false)
+    SendEventEnableFsm(Target=Self, SendToChildren=true, EventName="HEALTH INACTIVE")
+    ActivateGameObject(gameObject=var "Frost Idle Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on MAX HP UP → Appear?
+  }
+
+  state Check if Full {
+    BoolTest(boolVariable=var "Was Over Max", isTrue=→"WAS OVER MAX", isFalse=(none), everyFrame=false)
+    SendEventEnableFsm(Target=Self, SendToChildren=true, EventName="HEALTH ACTIVE")
+    GetPlayerDataInt(intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"FULL", lessThan=→"EMPTY", greaterThan=→"FULL", everyFrame=false)
+    on WAS OVER MAX → Wait HUD Change
+    on FULL → Set Fractured
+    on EMPTY → Was Full?
+  }
+
+  state Is Frosted? {
+    SetBoolValue(boolVariable=var "Queue Frost Break", boolValue=false, everyFrame=false)
+    GetHeroCState(VariableName="isFrosted", StoreValue=var "Is Hero Frosted", EveryFrame=false)
+    BoolTest(boolVariable=var "Is Hero Frosted", isTrue=→"TRUE", isFalse=(none), everyFrame=false)
+    GetHeroCState(VariableName="inFrostRegion", StoreValue=var "Is Hero In Frost", EveryFrame=false)
+    BoolTest(boolVariable=var "Is Hero In Frost", isTrue=→"REGION", isFalse=(none), everyFrame=false)
+    on TRUE → Frosted
+    on REGION → Frosted Idle
+    on FINISHED → Idle
+  }
+
+  state Empty {
+    SetBoolValue(boolVariable=var "Was Full", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName=var "Anim Empty")
+    EnableFsmSelf(SetEnabled=false)
+    on HERO HEALED → Heal?
+    on LEAVING SCENE → Heal?
+    on HERO HEALED FULL → Pause
+  }
+
+  state Break? {
+    GetPlayerDataInt(intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"FULL", lessThan=(none), greaterThan=→"FULL", everyFrame=false)
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Frost Idle Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Frost Antic Effect", behaviour="PlayParticleEffects", methodName="StopParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Frost Break Effect", activate=var "Queue Frost Break", recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Queue Frost Break", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Was Full", boolValue=false, everyFrame=false)
+    PlayAudioEvent(audioClip=var "Break Audio Clip", pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName=var "Anim Break", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="DAMAGE TAKEN", delay=0, everyFrame=false)
+    on FULL → Idle Enter
+    on FINISHED → Empty
+    on HERO HEALED → Heal?
+    on LEAVING SCENE → Heal?
+    on HERO HEALED FULL → Pause
+  }
+
+  state Heal? {
+    GetPlayerDataInt(intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=(none), lessThan=→"EMPTY", greaterThan=(none), everyFrame=false)
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckHudVisible(trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset), everyFrame=false)
+    CreateObject(gameObject=var "Heal Particles", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")  // disabled
+    SpawnObjectFromGlobalPool(gameObject=var "Heal Particles", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SetBoolValue(boolVariable=var "Was Full", boolValue=true, everyFrame=false)
+    IsRefillSoundSuppressed(trueEvent=(none), falseEvent=(none), storeValue=var "Block Refill Audio", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Block Refill Audio", floatVariable=var "Refill Volume", falseValue=1, trueValue=0, everyFrame=false)
+    PlayAudioEvent(audioClip=var "Heal Audio Clip", pitchMin=0.9, pitchMax=1.1, volume=var "Refill Volume", audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName=var "Anim Refill", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on EMPTY → Empty
+    on FINISHED → Idle Enter
+    on HEALTH UPDATE → Set Fractured 2
+  }
+
+  state Appear? {
+    GetPlayerDataVariable(VariableName="CurrentMaxHealth", StoreValue=var "Current Max HP")
+    IntCompare(integer1=var "Current Max HP", integer2=var "Health Number", equal=(none), lessThan=→"OVER MAX", greaterThan=(none), everyFrame=false)
+    on OVER MAX → Inactive
+    on FINISHED → Max Up Appear
+  }
+
+  state Max Up Appear {
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName="Health Max Up", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Max Up Flash
+  }
+
+  state Max Up Flash {
+    SendEventEnableFsm(Target=Self, SendToChildren=true, EventName="HEALTH ACTIVE")
+    ActivateGameObject(gameObject=var "Max Up", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Enter
+  }
+
+  state Pause {
+    GetPlayerDataInt(intName="health", storeValue=var "Current HP")
+    SetIntValue(intVariable=var "Max Heal Int", intValue=var "Health Number", everyFrame=false)
+    IntOperator(integer1=var "Max Heal Int", integer2=var "Current HP", operation=Subtract, storeResult=var "Max Heal Int", everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Max Heal Int", floatVariable=var "Max Heal Pause", everyFrame=false)
+    FloatMultiply(floatVariable=var "Max Heal Pause", multiplyBy=0.07, everyFrame=false)
+    TimeLimitSet(timeDelay=var "Max Heal Pause", storeValue=var "Max Heal Timer")
+    TimeLimitCheck(storedValue=var "Max Heal Timer", aboveEvent=→"FINISHED", belowEvent=(none), EveryFrame=true)
+    on FINISHED → Max Heal Anim
+    on HERO HEALED → Idle Enter
+    on LEAVING SCENE → Set Fractured
+    on HEALTH UPDATE → Set Fractured 2
+  }
+
+  state Max Heal Anim {
+    SetFloatValue(floatVariable=var "Max Heal Pause", floatValue=0, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=var "Heal Particles", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName=var "Anim Refill", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle Enter
+    on HERO HEALED → Idle Enter
+    on LEAVING SCENE → Idle Enter
+    on HEALTH UPDATE → Set Fractured 2
+  }
+
+  state Load Animation? {
+    BoolTest(boolVariable=var "Initialised", isTrue=→"FULL", isFalse=(none), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    GetRespawningHero(variable=var "Respawning Hero")
+    BoolTest(boolVariable=var "Respawning Hero", isTrue=→"RESPAWNING", isFalse=(none), everyFrame=false)
+    on FINISHED → First Pause
+    on FULL → Check if Full
+    on RESPAWNING → Waiting
+  }
+
+  state Load Anim {
+    SetBoolValue(boolVariable=var "Was Over Max", boolValue=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetFsmBool(gameObject=var "HUD Canvas", fsmName="Slide Out", variableName="Is Visible", storeValue=var "Is Hud Visible", everyFrame=false)
+    BoolTest(boolVariable=var "Is Hud Visible", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    PlayAudioEvent(audioClip=heartpiece_appear_option_3 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Last HP?
+    on INVENTORY OPEN COMPLETE → Last HP?
+  }
+
+  state Charm Pause {
+    SetBoolValue(boolVariable=var "Skip HUD Frame Wait", boolValue=false, everyFrame=false)
+    TimeLimitSet(timeDelay=0.2, storeValue=var "Wait Timer")
+    TimeLimitCheckV2(StoredValue=var "Wait Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Wait Time Finished", EveryFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Max Heal Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Max Heal Time Finished", EveryFrame=true)
+    BoolAllTrue(boolVariables=[var "Wait Time Finished", var "Max Heal Time Finished"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    on FINISHED → Max Healed?
+    on HUD FRAME CHANGED → HUD Changed
+  }
+
+  state Check Type {
+    SetMeshRenderer(gameObject=var "Bound Sprite", active=false)
+    SetBoolValue(boolVariable=var "Had Regen", boolValue=var "Has Regen", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="get_IsInLifebloodState", parameters=[], storeResult=var "Has Regen", EveryFrame=false)
+    BoolTest(boolVariable=var "Has Regen", isTrue=→"HIVE", isFalse=→"NORMAL", everyFrame=false)
+    on NORMAL → Normal
+    on HIVE → Hive
+    on FINISHED → Normal
+  }
+
+  state Normal {
+    FindChild(gameObject=var "Self", childName="Idle", storeResult=var "Idle Sprite")
+    FindChild(gameObject=var "Self", childName="Idle Hive", storeResult=var "Idle Sprite Other")
+    SetStringValue(stringVariable=var "Anim Appear", stringValue="Health Appear", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Appear Blank", stringValue="Health Appear Blank", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Break", stringValue="Health Break", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Empty", stringValue="Health Empty", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Refill", stringValue="Health Refill", everyFrame=false)
+    ActivateGameObject(gameObject=var "Idle Sprite Other", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGameObject(variable=var "Heal Particles", gameObject=HP Up Particles (localpoolprefabs_assets_shared.bundle), everyFrame=false)
+    SetAudioClipVariable(audioClipVariable=var "Heal Audio Clip", audioClip=ui_hud_heartpiece_gain_option (sfxstatic_assets_shared.bundle))
+    SetAudioClipVariable(audioClipVariable=var "Break Audio Clip", audioClip=<null>)
+    on FINISHED → Check Max HP
+  }
+
+  state Hive {
+    FindChild(gameObject=var "Self", childName="Idle Hive", storeResult=var "Idle Sprite")
+    FindChild(gameObject=var "Self", childName="Idle", storeResult=var "Idle Sprite Other")
+    SetStringValue(stringVariable=var "Anim Appear", stringValue="Hive Health Appear B", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Break", stringValue="Hive Health Break B", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Empty", stringValue="Hive Health Empty", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Refill", stringValue="Hive Health Refill B", everyFrame=false)
+    ActivateGameObject(gameObject=var "Idle Sprite Other", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetGameObject(variable=var "Heal Particles", gameObject=HP Up Particles HiveB (localpoolprefabs_assets_shared.bundle), everyFrame=false)
+    SetAudioClipVariable(audioClipVariable=var "Heal Audio Clip", audioClip=ui_lifeblood_regen (sfxstatic_assets_shared.bundle))
+    SetAudioClipVariable(audioClipVariable=var "Break Audio Clip", audioClip=ui_lifeblood_break (sfxstatic_assets_shared.bundle))
+    on FINISHED → Check Max HP
+  }
+
+  state First Pause {
+    PlayerDataBoolTest(boolName="bindCutscenePlayed", isTrue=→"SHOW HP", isFalse=(none))
+    FloatAdd(floatVariable=var "Appear Pause", add=-2.5, everyFrame=false, perSecond=false)
+    on SHOW HP → Appear Pause
+  }
+
+  state Last HP? {
+    SetBoolValue(boolVariable=var "Initialised", boolValue=true, everyFrame=false)
+    IntCompare(integer1=var "Current Max HP", integer2=var "Health Number", equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="LAST HP ADDED", delay=0, everyFrame=false)  // disabled
+    SendEventToRegister(eventName="LAST HP ADDED")
+    on FINISHED → Check if Full
+  }
+
+  state Waiting {
+    Wait(time=1, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Charm Pause
+  }
+
+  state Appear Pause {
+    Wait(time=var "Appear Pause", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Full Anim
+    on INVENTORY OPEN COMPLETE → Load Anim Instant
+  }
+
+  sequence state Set Fractured 2 {
+    NextFrameEvent(sendEvent=(none))
+    CheckIfToolEquipped(Tool=Fractured Mask (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=(none), storeValue=var "Fractured Mask Equipped")
+    CheckIfToolEquipped(Tool=Fractured Mask (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=var "Health Number", trueEvent=(none), falseEvent=(none), storeValue=var "Has Fractured Mask")
+    SetFsmBool(gameObject=var "Fractured Mask", fsmName="Animation", variableName="Is Active", setValue=var "Fractured Mask Equipped", everyFrame=false)
+    SetFsmBool(gameObject=var "Fractured Mask", fsmName="Animation", variableName="Is Whole", setValue=var "Has Fractured Mask", everyFrame=false)
+    on FINISHED → Break?
+  }
+
+  state Set Fractured {
+    CheckIfToolEquipped(Tool=Fractured Mask (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=(none), storeValue=var "Fractured Mask Equipped")
+    CheckIfToolEquipped(Tool=Fractured Mask (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=var "Health Number", trueEvent=(none), falseEvent=(none), storeValue=var "Has Fractured Mask")
+    SetFsmBool(gameObject=var "Fractured Mask", fsmName="Animation", variableName="Is Active", setValue=var "Fractured Mask Equipped", everyFrame=false)
+    SetFsmBool(gameObject=var "Fractured Mask", fsmName="Animation", variableName="Is Whole", setValue=var "Has Fractured Mask", everyFrame=false)
+    on FINISHED → Idle Enter
+  }
+
+  state Cursed Shrink? {
+    BoolTest(boolVariable=var "Initialised", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Was Over Max", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on CANCEL → Curse Bound? 2
+    on FINISHED → Wait HUD Change 2
+  }
+
+  state Wait HUD Change {
+    BoolTest(boolVariable=var "Skip HUD Frame Wait", isTrue=→"HUD FRAME CHANGED", isFalse=(none), everyFrame=false)
+    on HUD FRAME CHANGED → Check Full Anim
+  }
+
+  state Wait HUD Change 2 {
+    BoolTest(boolVariable=var "Skip HUD Frame Wait", isTrue=→"HUD FRAME CHANGED", isFalse=(none), everyFrame=false)
+    on HUD FRAME CHANGED → Curse Bound?
+  }
+
+  state Cursed Shrink. {
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName="Health Cursed Shrink", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Inactive
+  }
+
+  state Curse Bound? {
+    CheckIfCrestEquipped(Crest=<null>, trueEvent=(none), falseEvent=→"FALSE", storeValue=(unset))
+    IntCompare(integer1=var "Health Number", integer2=var "Max Health Base", equal=→"TRUE", lessThan=→"TRUE", greaterThan=→"FALSE", everyFrame=false)
+    on TRUE → Curse Antic
+    on FALSE → Cursed Shrink.
+  }
+
+  state Curse Bound {
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPlayerDataInt(intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"FULL", lessThan=→"EMPTY", greaterThan=→"FULL", everyFrame=false)
+    on EMPTY → Curse Bound Empty
+    on FULL → Cursed Bound Full
+  }
+
+  state Cursed Bound Full {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Health Cursed Full Bind", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Curse Bind Burst
+  }
+
+  state Curse Bound Empty {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Health Cursed Empty Bind", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Curse Bound Idle
+  }
+
+  state Curse Bound Idle {
+    SendEventToRegister(eventName="HEALTH CURSE HEALTH BROKEN")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Health Cursed Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    WaitRandom(timeMin=1.5, timeMax=3, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Curse Bound Idle
+    on HERO HEALED → Curse Bound Idle
+    on HERO HEALED FULL → Curse Bound Idle
+    on LEAVING SCENE → Curse Bound Idle
+  }
+
+  state HUD Changed {
+    SetBoolValue(boolVariable=var "Skip HUD Frame Wait", boolValue=true, everyFrame=false)
+    TimeLimitCheckV2(StoredValue=var "Wait Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Wait Time Finished", EveryFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Max Heal Timer", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Max Heal Time Finished", EveryFrame=true)
+    BoolAllTrue(boolVariables=[var "Wait Time Finished", var "Max Heal Time Finished"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    on FINISHED → Max Healed?
+  }
+
+  state Curse Bound? 2 {
+    CheckIfCrestEquipped(Crest=<null>, trueEvent=(none), falseEvent=→"FALSE", storeValue=(unset))
+    IntCompare(integer1=var "Health Number", integer2=var "Max Health Base", equal=→"TRUE", lessThan=→"TRUE", greaterThan=→"FALSE", everyFrame=false)
+    on TRUE → Curse Load In
+    on FALSE → Inactive
+  }
+
+  state Set Appear Pause {
+    SetFloatValue(floatVariable=var "Appear Pause", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Max Heal Pause", floatValue=0, everyFrame=false)
+    BoolTest(boolVariable=var "Initialised", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Appear Pause", floatValue=2.5, everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Health Number", floatVariable=var "Health Num Float", everyFrame=false)
+    FloatMultiply(floatVariable=var "Health Num Float", multiplyBy=0.2, everyFrame=false)
+    FloatAdd(floatVariable=var "Appear Pause", add=var "Health Num Float", everyFrame=false, perSecond=false)
+    on FINISHED → Check Type
+  }
+
+  sequence state Curse Load In {
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=var "Appear Pause", finishEvent=(none), realTime=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Cursed Bound Full
+  }
+
+  state Curse Antic {
+    ObjectJitterLocal(gameObject=Self, x=0.03, y=0.03, z=(unset), resetPosOnStateExit=true, limitFps=0)
+    on HEALTH CURSE APPLY → Curse Bound
+  }
+
+  state Curse Bind Burst {
+    ActivateGameObject(gameObject=var "Curse Break Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Curse Break Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=HUD (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Curse Bound Idle
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Was Full", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Frost Antic Effect", behaviour="PlayParticleEffects", methodName="StopParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on FROST UPDATE HEALTH → Idle Enter
+    on HEALTH UPDATE → Set Fractured 2
+    on HERO HEALED → Idle Enter
+  }
+
+  state Frosted {
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Current Blue HP")
+    IntCompare(integer1=var "Current Blue HP", integer2=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    GetPlayerDataInt(intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"LAST", lessThan=(none), greaterThan=(none), everyFrame=false)
+    on FINISHED → Frosted Idle
+    on LAST → Frosted Antic Idle
+  }
+
+  state Frosted Antic Idle {
+    CallMethodProper(gameObject=var "Frost Antic Effect", behaviour="PlayParticleEffects", methodName="PlayParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Queue Frost Break", boolValue=true, everyFrame=false)
+    ObjectJitterLocal(gameObject=Self, x=0.05, y=0.05, z=(unset), resetPosOnStateExit=true, limitFps=30)
+    DoSpriteFlash(Target=var "Idle Sprite", FlashMethod="FlashingFrostAntic", IsRepeating=true, CancelOnExit=true)
+    on FROST UPDATE HEALTH → Idle Enter
+    on HEALTH UPDATE → Set Fractured 2
+    on HERO HEALED → Idle Enter
+  }
+
+  state Idle Enter {
+    SetFloatValue(floatVariable=var "Max Heal Pause", floatValue=0, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Self", active=false)
+    ActivateGameObject(gameObject=var "Idle Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Idle Sprite Other", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Was Over Max", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Frost Idle Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Is Frosted?
+  }
+
+  state Load Anim Instant {
+    SetBoolValue(boolVariable=var "Was Over Max", boolValue=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Last HP?
+  }
+
+  state Frosted Idle {
+    CallMethodProper(gameObject=var "Frost Antic Effect", behaviour="PlayParticleEffects", methodName="StopParticleSystems", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ObjectJitterLocal(gameObject=Self, x=0.02, y=0.02, z=(unset), resetPosOnStateExit=true, limitFps=30)
+    on FROST UPDATE HEALTH → Idle Enter
+    on HEALTH UPDATE → Set Fractured 2
+    on HERO HEALED → Idle Enter
+  }
+
+  state Check Full Anim {
+    SetStringValue(stringVariable=var "Anim", stringValue=var "Anim Appear", everyFrame=false)
+    GetPlayerDataInt(intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim", stringValue=var "Anim Appear Blank", everyFrame=false)
+    on FINISHED → Load Anim
+  }
+
+  state Was Full? {
+    BoolTest(boolVariable=var "Was Full", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Break?
+    on FALSE → Empty
+  }
+
+  state Max Healed? {
+    FloatCompare(float1=var "Max Heal Pause", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=var "Heal Particles", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    on FINISHED → Set Appear Pause
+  }
+
+  state Ended Hive? {
+    BoolTestMulti(boolVariables=[var "Has Regen", var "Had Regen"], boolStates=[false, true], trueEvent=(none), falseEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "blue_health_revert", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "blue_health_revert", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Load Animation?
+  }
+
+  state Started Hive? {
+    BoolTestMulti(boolVariables=[var "Has Regen", var "Had Regen"], boolStates=[true, false], trueEvent=(none), falseEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SendMessageV2(gameObject=var "Idle Sprite", delivery=SendMessage, options=1, functionCall=StartTimedJitter(), everyFrame=false)
+    on FINISHED → Ended Hive?
+  }
+
+  var Health Number: int = 2
+
+  var Appear Pause: float = 0
+  var Health Num Float: float = 0
+  var Max Heal Pause: float = 0
+  var Wait Timer: float = 0
+  var Max Heal Timer: float = 0
+  var Refill Volume: float = 0
+  var Current HP: int = 0
+  var Current Max HP: int = 0
+  var Max Heal Int: int = 0
+  var Max Health Base: int = 0
+  var Current Blue HP: int = 0
+  var Fractured Mask Equipped: bool = false
+  var Has Fractured Mask: bool = false
+  var Initialised: bool = false
+  var Respawning Hero: bool = false
+  var Was Over Max: bool = false
+  var Skip HUD Frame Wait: bool = false
+  var Is Hero Frosted: bool = false
+  var Queue Frost Break: bool = false
+  var Is Hero In Frost: bool = false
+  var Has Regen: bool = false
+  var Is Hud Visible: bool = false
+  var Was Full: bool = false
+  var Wait Time Finished: bool = false
+  var Max Heal Time Finished: bool = false
+  var Had Regen: bool = false
+  var Block Refill Audio: bool = false
+  var Anim Appear: string = "Health Appear"
+  var Anim Break: string = "Health Break"
+  var Anim Empty: string = "Health Empty"
+  var Anim Refill: string = "Health Refill"
+  var Anim Appear Blank: string = ""
+  var Anim: string = ""
+  var Bound Sprite: gameObject = <null>
+  var Fractured Mask: gameObject = <null>
+  var Heal Particles: gameObject = <null>
+  var Idle Sprite: gameObject = <null>
+  var Idle Sprite Other: gameObject = <null>
+  var Max Up: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Self: gameObject = <null>
+  var Curse Break Effect: gameObject = <null>
+  var Frost Antic Effect: gameObject = <null>
+  var Frost Break Effect: gameObject = <null>
+  var Frost Idle Effect: gameObject = <null>
+  var blue_health_revert: gameObject = <null>
+  var Heal Audio Clip: object = <null>
+  var Break Audio Clip: object = <null>
+}

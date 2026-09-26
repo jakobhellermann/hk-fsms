@@ -1,0 +1,142 @@
+# Dialogue
+# 1 location(s):
+#   Belltown / Mapper Control/Black Thread World/Mapper Rest NPC
+
+fsm Dialogue {
+  start Pause
+  on CLOSE SHOP WINDOW → Reset  // from any state
+
+  state Shop Up {
+    GetProperty(targetProperty=ShopOwner.ShopObject on Mapper Control/Black Thread World/Mapper Rest NPC@ShopOwner, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Shop Object"), sendEvent="SHOP UP", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on SHOP CLOSED → Reset
+    on SHOP NO STOCK → Reset
+  }
+
+  state Pause {
+    ActivateGameObject(gameObject=var "Shop Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  sequence state Reset {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    PlayRandomAudioClipTableV3(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Speak End")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on INTERACT → Speak Start
+    on DID TAUNT POSHANKA → Ring Greet Pause
+  }
+
+  sequence state End Dialogue {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    PlayRandomAudioClipTableV3(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Speak End")
+    on FINISHED → Idle
+  }
+
+  state Shop Has stock? {
+    ShopHasStock(Target=Self, trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → End Dialogue
+    on TRUE → To Shop
+  }
+
+  state No Stock Convo {
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_NOSTOCK_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataBool(boolName="mapperConvo_Act3NoStock", value=true)
+    on CONVO_END → End Dialogue
+  }
+
+  state Stock Depleted {
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="MAPPER")
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_STOCKDEPLETED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Reset
+  }
+
+  state Convo Check {
+    PlayerDataBoolTest(boolName="mapperConvo_Act3Intro", isTrue=(none), isFalse=→"MEET")
+    GetPlayerDataBool(boolName="mapperConvo_Act3IntroTimePassed", storeValue=var "Time Passed Since Intro")
+    GetPlayerDataBool(boolName="HasWhiteFlower", storeValue=var "Has White Flower")
+    GetPlayerDataBool(boolName="mapperConvo_WhiteFlower", storeValue=var "Talked White Flower")
+    BoolTestMulti(boolVariables=[var "Time Passed Since Intro", var "Has White Flower", var "Talked White Flower"], boolStates=[true, true, false], trueEvent=→"WHITE FLOWER", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    ShopHasStock(Target=Self, trueEvent=(none), falseEvent=(none), storeValue=var "Has Stock")
+    GetPlayerDataBool(boolName="mapperConvo_Act3NoStock", storeValue=var "Did No Stock Convo")
+    BoolTestMulti(boolVariables=[var "Has Stock", var "Did No Stock Convo"], boolStates=[false, false], trueEvent=→"SHOP NO STOCK", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on MEET → Act 3 Intro
+    on WHITE FLOWER → White Flower Dlg
+    on FINISHED → Repeat
+    on SHOP NO STOCK → No Stock Convo
+  }
+
+  state Act 3 Intro {
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_MEET_BELLHART_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetPlayerDataBool(boolName="mapperConvo_Act3Intro", value=true)
+    on CONVO_END → Shop Has stock?
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_BELLHART_REPEAT_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Shop Has stock?
+  }
+
+  sequence state To Shop {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Shop Up
+  }
+
+  state Speak Start {
+    PlayRandomAudioClipTableV3(Table=small_movement_shell (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false, StoreSpawned=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Speak", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Convo Check
+  }
+
+  state White Flower Dlg {
+    SetPlayerDataBool(boolName="mapperConvo_WhiteFlower", value=true)
+    RunDialogue(Sheet="Wanderers", Key="MAPPER_WHITE_FLOWER_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Shop Has stock?
+  }
+
+  state Ring Greet Pause {
+    GetDistanceV2(gameObject=Self, target=var "Hero", targetOffsetX=0, targetOffsetY=0, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=15, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    Wait(time=0.4, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Mapper Control/Black Thread World/Mapper Rest NPC@HeroPerformanceSingReaction, everyFrame=false)
+    on FINISHED → Ring Greet
+    on CANCEL → Idle
+  }
+
+  state Ring Greet {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    PlayRandomAudioClipTable(Table=Shakra_battle_poshanka (sfxdynamic_assets_mapper.bundle), AudioPlayerPrefab=var "Audio Loop Voice", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Ring Greet End
+  }
+
+  state Ring Greet Finish {
+    SetProperty(targetProperty=HeroPerformanceSingReaction.enabled on Mapper Control/Black Thread World/Mapper Rest NPC@HeroPerformanceSingReaction, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Ring Greet End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Ring Greet Finish
+  }
+
+  var Shop Camlock: gameObject = Mapper Control/Black Thread World/Mapper Rest NPC/CameraLockArea Shop
+
+  var Distance: float = 0
+  var Did No Stock Convo: bool = false
+  var Has Stock: bool = false
+  var Has White Flower: bool = false
+  var Talked White Flower: bool = false
+  var Time Passed Since Intro: bool = false
+  var Shop Object: gameObject = <null>
+  var Audio Loop Voice: object = Mapper Control/Black Thread World/Mapper Rest NPC/Audio Loop Voice@AudioSource
+}

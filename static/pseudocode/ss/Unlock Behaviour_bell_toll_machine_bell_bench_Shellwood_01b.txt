@@ -1,0 +1,82 @@
+# Unlock Behaviour
+# 2 location(s):
+#   Shellwood_01b / bell_bench/bell_toll_machine
+#   Shellwood_08c / bell_bench/bell_toll_machine
+
+fsm Unlock Behaviour {
+  start Init
+
+  state Inert {
+    BoolTest(boolVariable=var "Activated", isTrue=→"ACTIVATED", isFalse=(none), everyFrame=false)
+    on INTERACT → Prompt
+    on ACTIVATED → Disabled
+  }
+
+  state End Interaction {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Inert
+  }
+
+  state Init {
+    SetAnimator(target=Self, active=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Inert
+  }
+
+  state Retract Animation {
+    PlayAudioEvent(audioClip=bell_bench_pay_dish_retract_start_on_rise (sfxstatic_assets_bench.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetPlayerDataVariable(VariableName="hasActivatedBellBench", SetValue=true)
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="PersistentBoolItem", methodName="SaveState", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessageV2(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl(), everyFrame=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    SetAnimator(target=Self, active=true)
+    AnimatorPlayStateWait(target=Self, stateName="Retract", finishEvent=→"FINISHED")
+    on FINISHED → After Retract Pause
+  }
+
+  state After Retract Pause {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stop
+  }
+
+  state Disabled {
+    CallMethod(behaviour=var "Unlockable", methodName="Opened", parameters=[], storeResult=(unused), everyFrame=false, manualUI=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Stop {
+    CallMethod(behaviour=var "Unlockable", methodName="Open", parameters=[], storeResult=(unused), everyFrame=false, manualUI=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  sequence state Prompt {
+    EndDialogue(ReturnControl=false, ReturnHUD=true, Target=Self, UseChildren=false)
+    RunFSM(fsmTemplateControl=template=-8990696591063553075 in[Prompt Text Override<-var "Prompt Text Override", Dish<-var "Dish", Cost Reference<-var "Cost Reference"], finishEvent=→"FINISHED", everyFrame=false)
+    on CANCEL → End Interaction
+    on FINISHED → Set Extra PD Bool
+  }
+
+  state Desc {
+    RunDialogue(Sheet="Prompts", Key="TOLL_BENCH", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=Top, OffsetY=0, Target=Self)
+    on CONVO_END → Prompt
+  }
+
+  state Set Extra PD Bool {
+    StringCompare(stringVariable=var "PD Bool Set When Unlocked", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetPlayerDataBool(boolName=var "PD Bool Set When Unlocked", value=true)
+    on FINISHED → Retract Animation
+  }
+
+  var PD Bool Set When Unlocked: string = ""
+  var Cost Reference: object = Bell Bench Toll Midlands (dataassets_assets_assets/dataassets/costs.bundle)
+  var Unlockable: object = bell_bench@BellBench
+
+  var Cost: int = 100
+  var Activated: bool = false
+  var Dish Start Position: vector3 = (0, 0, 0)
+  var Dish: gameObject = bell_bench/bell_toll_machine/toll_machine/toll_machine_dish
+  var Currency Type: enum = CurrencyType(0)
+}

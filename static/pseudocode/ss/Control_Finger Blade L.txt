@@ -1,0 +1,570 @@
+# Control
+# 14 location(s):
+#   Cradle_03 / Boss Scene/Silk Boss/Hand R/Finger Blade L
+#   Cradle_03 / Boss Scene/Silk Boss/Hand R/Finger Blade R
+#   Cradle_03 / Boss Scene/Silk Boss/Hand L/Finger Blade R
+#   Cradle_03 / Boss Scene/Silk Boss/Hand R/Finger Blade M
+#   Cradle_03 / Boss Scene/Silk Boss/Hand L/Finger Blade M
+#   Cradle_03 / Boss Scene/Silk Boss/Hand L/Finger Blade L
+#   Cradle_Destroyed_Challenge_01 / Boss Scene/Silk Finger Blade
+#   Cradle_Destroyed_Challenge_01 / Boss Scene/Hand R old/Silk Finger Blade (2)
+#   Cradle_Destroyed_Challenge_01 / Boss Scene/Hand L old/Silk Finger Blade (1)
+#   Cradle_Destroyed_Challenge_01 / Boss Scene/Hand R old/Silk Finger Blade
+#   Cradle_Destroyed_Challenge_01 / Boss Scene/Silk Finger Blade (1)
+#   Cradle_Destroyed_Challenge_01 / Boss Scene/Silk Finger Blade (2)
+#   Cradle_Destroyed_Challenge_01 / Boss Scene/Hand L old/Silk Finger Blade (2)
+#   Cradle_Destroyed_Challenge_01 / Boss Scene/Hand R old/Silk Finger Blade (1)
+
+// uses template: silk_boss_blade
+fsm Control {
+  start Pause
+  on SILK STAGGERED → Stagger Pause  // from any state
+  on SWIPE R → Set Swipe R  // from any state
+  on SWIPE L → Set Swipe L  // from any state
+  on STOMP → Set Stomp  // from any state
+  on ATTACK → Set Attack  // from any state
+  on BLADES AWAY → Blades Away  // from any state
+  on SILK STUNNED → Stun Anim Pause  // from any state
+  on SWIPE L QUICK → Set Swipe L Q  // from any state
+  on SWIPE R QUICK → Set Swipe R Q  // from any state
+  on STOMP → Set Stomp Q  // from any state
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    RandomFloat(min=0.005, max=0.0055, storeResult=var "Z Pos")
+    on FINISHED → Init
+  }
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent Hand")
+    GetGrandparent(gameObject=Self, storeResult=var "Silk Boss")
+    GetPosition(gameObject=Self, vector=(unset), x=var "Offset X", y=var "Offset Y", z=(unset), space=1, everyFrame=false)
+    FindChild(gameObject=Self, childName="Terrain Detector", storeResult=var "Terrain Detector")
+    FindNamedChild(gameObject=Self, storeResult=var "Thunk Effect")
+    FindNamedChild(gameObject=Self, storeResult=var "Damager")
+    FindNamedChild(gameObject=Self, storeResult=var "Phys Collider")
+    FindNamedChild(gameObject=Self, storeResult=var "Antic Thread")
+    FindChild(gameObject=Self, childName="silk_boss_finger_antic", storeResult=var "Antic Gleam")
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Pos Idle")
+    RandomFloat(min=0.002, max=0.003, storeResult=var "Z Pos Attack")
+    Tk2dSpriteSetColor(gameObject=Self, color=var "Tint Idle", everyframe=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos Idle", space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Idle")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopBounce())
+    on FINISHED → Dormant
+  }
+
+  state Idle L {
+    RandomFloat(min=1.5, max=2, storeResult=var "Y Speed")
+    GetPosition(gameObject=var "Parent Hand", vector=(unset), x=(unset), y=var "Idle Y", z=(unset), space=0, everyFrame=true)
+    FloatAdd(floatVariable=var "Idle Y", add=var "Offset Y", everyFrame=true, perSecond=false)
+    SilkBossIdleBuzz(gameObject=Self, targetY=var "Idle Y", targetRange=0.2, acceleration=5, speedMax=var "Y Speed", fuzzTargetRange=true)
+    GetDistanceV2(gameObject=Self, target=var "Parent Hand", targetOffsetX=var "Offset X", targetOffsetY=(unset), storeResult=var "Distance", everyFrame=true)
+    FloatOperator(float1=var "Distance", float2=2, operation=Multiply, storeResult=var "Speed Max", everyFrame=true)
+    ChaseObjectGround(gameObject=Self, target=var "Parent Hand", xOffset=var "Offset X", speedMax=var "Speed Max", acceleration=0.25, animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0.1, snapTo=true, snapSpeedOnly=true, onlyOnStateEntry=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Aim Angle", pause=0, everyFrame=true)
+    FloatAdd(floatVariable=var "Aim Angle", add=180, everyFrame=true, perSecond=false)
+    FloatClamp(floatVariable=var "Aim Angle", minValue=420, maxValue=446, everyFrame=true)
+    RotateTo(gameObject=Self, targetAngle=var "Aim Angle", speed=360)
+    GetScale(gameObject=var "Parent Hand", vector=(unset), xScale=var "Hand X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hand X Scale", float2=0, tolerance=0, equal=(none), lessThan=→"TURN R", greaterThan=(none), everyFrame=true)
+    on TURN R → Turn R Pause
+    on TINKED → Tink Idle L
+  }
+
+  state Turn R {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Turn")
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=-1, z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=true, everyFrame=false)
+    on FINISHED → Idle R
+  }
+
+  state Idle R {
+    RandomFloat(min=1.5, max=2, storeResult=var "Y Speed")
+    GetPosition(gameObject=var "Parent Hand", vector=(unset), x=(unset), y=var "Idle Y", z=(unset), space=0, everyFrame=true)
+    FloatAdd(floatVariable=var "Idle Y", add=var "Offset Y", everyFrame=true, perSecond=false)
+    SilkBossIdleBuzz(gameObject=Self, targetY=var "Idle Y", targetRange=0.2, acceleration=5, speedMax=var "Y Speed", fuzzTargetRange=true)
+    GetDistanceV2(gameObject=Self, target=var "Parent Hand", targetOffsetX=var "Offset X", targetOffsetY=(unset), storeResult=var "Distance", everyFrame=true)
+    FloatOperator(float1=var "Distance", float2=2, operation=Multiply, storeResult=var "Speed Max", everyFrame=true)
+    ChaseObjectGround(gameObject=Self, target=var "Parent Hand", xOffset=var "Offset X", speedMax=var "Speed Max", acceleration=0.25, animateTurnAndRun=false, runAnimation="", turnAnimation="", turnRange=0.1, snapTo=true, snapSpeedOnly=true, onlyOnStateEntry=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Aim Angle", pause=0, everyFrame=true)
+    FloatAdd(floatVariable=var "Aim Angle", add=180, everyFrame=true, perSecond=false)
+    FloatClamp(floatVariable=var "Aim Angle", minValue=454, maxValue=480, everyFrame=true)
+    RotateTo(gameObject=Self, targetAngle=var "Aim Angle", speed=360)
+    GetScale(gameObject=var "Parent Hand", vector=(unset), xScale=var "Hand X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hand X Scale", float2=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TURN L", everyFrame=true)
+    on TURN L → Turn L Pause
+    on TINKED → Tink Idle R
+  }
+
+  state Turn L {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Turn")
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Facing Right", boolValue=false, everyFrame=false)
+    on FINISHED → Idle L
+  }
+
+  state Turn R Pause {
+    WaitRandom(timeMin=0.1, timeMax=0.35, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Turn R
+    on TINKED → Tink Turn R
+  }
+
+  state Turn L Pause {
+    WaitRandom(timeMin=0.1, timeMax=0.35, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Turn L
+    on TINKED → Tink Turn L
+  }
+
+  state Set Stomp {
+    RandomFloat(min=90, max=90, storeResult=var "Attack Rotation")
+    SetFloatValue(floatVariable=var "Attack Y", floatValue=var "Ground Y", everyFrame=false)
+    FloatAddRandom(floatVariable=var "Attack Y", addMin=11, addMax=12)
+    GetScale(gameObject=Self, vector=(unset), xScale=(unset), yScale=var "Attack Y Scale", zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Max", floatValue=0.2, everyFrame=false)
+    SetBoolValue(boolVariable=var "Quick Recover", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Min", floatValue=20, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Max", floatValue=57, everyFrame=false)
+    on FINISHED → Attack Start Pause
+  }
+
+  state Attack Start Pause {
+    RandomFloat(min=0.75, max=0.9, storeResult=var "Thunk Time")
+    SetBoolValue(boolVariable=var "Ready", boolValue=false, everyFrame=false)
+    WaitRandom(timeMin=var "Wait Min", timeMax=var "Wait Max", finishEvent=→"FINISHED", realTime=false)
+    SetFloatValue(floatVariable=var "Travel Time Multiplier", floatValue=0.02, everyFrame=false)
+    on FINISHED → Tele To
+  }
+
+  state Antic Pause {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Idle")
+    SetPosition(gameObject=Self, vector=var "Travel Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Attack Rotation", space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Antic Pull
+  }
+
+  state Antic Pull {
+    ActivateGameObject(gameObject=var "Antic Gleam", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayRandomAudioClipTable(Table=silk_boss_needle_antic (sfxdynamic_assets_areacradle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    GetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Attack Angle", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Attack Angle", add=180, everyFrame=false, perSecond=false)
+    SetVelocityAsAngle(gameObject=Self, angle=var "Attack Angle", speed=-12, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.92, brakeOnExit=false)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    WaitBool(boolTest=var "Quick Recover", time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Antic Thread", activate=true, recursive=false, resetOnExit=true, everyFrame=false)  // disabled
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=var "X Pos", y=(unset), space=0, everyFrame=true)
+    FloatClamp(floatVariable=var "X Pos", minValue=22, maxValue=55, everyFrame=true)  // disabled
+    SetPosition2d(gameObject=Self, vector=(unset), x=var "X Pos", y=(unset), space=0, everyFrame=true, lateUpdate=false)
+    on FINISHED → Shoot
+  }
+
+  state Shoot {
+    SetVelocityAsAngle(gameObject=Self, angle=var "Attack Angle", speed=70, everyFrame=false)
+    PlayRandomAudioClipTable(Table=silk_boss_needle_throw (sfxdynamic_assets_areacradle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Damager", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Collision2dEvent(gameObject=Self, collision=0, collideTag="", sendEvent=→"THUNK", storeCollider=var "", storeForce=(unset))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="RECOIL STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Attack")
+    Wait(time=1, finishEvent=→"THUNK", realTime=false)
+    RandomFloat(min=0.85, max=1.15, storeResult=var "Pitch")
+    SetAudioPitch(gameObject=Self, pitch=var "Pitch", everyFrame=false)
+    AudioPlayInState(gameObject=Self, volume=0.5)
+    on THUNK → Thunk
+  }
+
+  state Thunk {
+    Tk2dSpriteSetColor(gameObject=Self, color=var "Tint Idle", everyframe=false)
+    PlayRandomAudioClipTable(Table=silk_boss_needle_impact (sfxdynamic_assets_areacradle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos Idle", space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Thunk")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    FloatAdd(floatVariable=var "Thunk Time", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Thunk Time", float2=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    ActivateGameObject(gameObject=var "Thunk Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Pull Out
+    on TINKED → Thunk Tink
+  }
+
+  state Return End {
+    SetBoolValue(boolVariable=var "Ready", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="RECOIL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Settle")
+    BoolTest(boolVariable=var "Facing Right", isTrue=→"TURN R", isFalse=→"TURN L", everyFrame=false)
+    on TURN R → Flip For R
+    on TURN L → Flip For L
+  }
+
+  state Return {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Travel")
+    GetPosition(gameObject=Self, vector=var "Current Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Parent Hand", vector=var "Travel Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Travel Pos", vector3Value=(unset), x=(unset), y=(unset), z=var "Z Pos Idle", everyFrame=false)
+    Vector3AddXYZ(vector3Variable=var "Travel Pos", addX=var "Offset X", addY=(unset), addZ=(unset), everyFrame=false, perSecond=false)
+    DistanceBetweenPoints(distanceResult=var "Travel Time", point1=var "Current Pos", point2=var "Travel Pos", ignoreX=false, ignoreY=false, ignoreZ=true, everyFrame=false)
+    FloatMultiply(floatVariable=var "Travel Time", multiplyBy=var "Travel Time Multiplier", everyFrame=false)
+    AnimatePositionTo(gameObject=Self, toValue=var "Travel Pos", localSpace=false, time=var "Travel Time", speed=(unset), delay=(unset), easeType=2, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    AnimateRotationTo(gameObject=Self, fromValue=(unset), toValue=var "Attack Rotation", worldSpace=false, negativeSpace=false, time=var "Travel Time", speed=(unset), delay=(unset), easeType=2, reverse=false, finishEvent=(none), realTime=false)
+    SetPolygonCollider(gameObject=Self, active=false, resetOnExit=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Return End
+  }
+
+  state Tele To {
+    FloatClamp(floatVariable=var "Attack X", minValue=var "X Target Min", maxValue=var "X Target Max", everyFrame=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos Attack", space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=var "Attack Y Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Travel")
+    GetPosition(gameObject=Self, vector=var "Current Pos", x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Travel Pos", vector3Value=(unset), x=var "Attack X", y=var "Attack Y", z=var "Z Pos", everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Travel Time", point1=var "Current Pos", point2=var "Travel Pos", ignoreX=false, ignoreY=false, ignoreZ=true, everyFrame=false)
+    FloatMultiply(floatVariable=var "Travel Time", multiplyBy=0.02, everyFrame=false)
+    AnimatePositionTo(gameObject=Self, toValue=var "Travel Pos", localSpace=false, time=var "Travel Time", speed=(unset), delay=(unset), easeType=2, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    AnimateRotationTo(gameObject=Self, fromValue=(unset), toValue=var "Attack Rotation", worldSpace=false, negativeSpace=false, time=var "Travel Time", speed=(unset), delay=(unset), easeType=2, reverse=false, finishEvent=(none), realTime=false)
+    SetPolygonCollider(gameObject=Self, active=false, resetOnExit=true)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on FINISHED → Antic Pause
+  }
+
+  state Pull Out {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Pull Out")
+    RandomFloat(min=-22, max=-25, storeResult=var "Speed")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Attack Angle", speed=var "Speed", everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    Wait(time=0.15, finishEvent=→"FINISHED", realTime=false)
+    WaitBool(boolTest=var "Quick Recover", time=0.1, finishEvent=→"FINISHED", realTime=false)
+    PlayRandomAudioClipTable(Table=silk_boss_needle_pullout_dash (sfxdynamic_assets_areacradle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayRandomAudioClipTable(Table=silk_boss_needle_pullout_rock (sfxdynamic_assets_areacradle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Return
+  }
+
+  state Set Swipe L {
+    RandomFloat(min=-1, max=1, storeResult=var "Attack Rotation")
+    SetFloatValue(floatVariable=var "Attack Y Scale", floatValue=1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Max", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Quick Recover", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Min", floatValue=23, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Max", floatValue=54, everyFrame=false)
+    on FINISHED → Attack Start Pause
+  }
+
+  state Set Swipe R {
+    RandomFloat(min=179, max=181, storeResult=var "Attack Rotation")
+    SetFloatValue(floatVariable=var "Attack Y Scale", floatValue=-1, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Max", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Quick Recover", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Min", floatValue=23, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Max", floatValue=55, everyFrame=false)
+    on FINISHED → Attack Start Pause
+  }
+
+  state Flip For R {
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=-1, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle R
+  }
+
+  state Flip For L {
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle L
+  }
+
+  state Set Attack {
+    SetFloatValue(floatVariable=var "Wait Min", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wait Max", floatValue=0.2, everyFrame=false)
+    SetBoolValue(boolVariable=var "Quick Recover", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Min", floatValue=23, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Max", floatValue=55, everyFrame=false)
+    on FINISHED → Attack Start Pause
+  }
+
+  state Tink Idle R {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Settle")
+    on FINISHED → Idle R
+  }
+
+  state Tink Idle L {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Settle")
+    on FINISHED → Idle L
+  }
+
+  state Tink Turn L {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Settle")
+    on FINISHED → Turn L
+  }
+
+  state Tink Turn R {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Settle")
+    on FINISHED → Turn R
+  }
+
+  state Thunk Tink {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Thunk")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FloatAdd(floatVariable=var "Thunk Time", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Thunk Time", float2=0, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Pull Out
+  }
+
+  state Blades Away {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetPolygonCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Idle")
+    Tk2dSpriteSetColor(gameObject=Self, color=var "Tint Idle", everyframe=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos Idle", space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    on BLADES RETURN → Beast Return
+  }
+
+  state Beast Return {
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetPolygonCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Parent Hand", xOffset=var "Offset X", yOffset=var "Offset Y", everyFrame=false)
+    on FINISHED → Idle L
+  }
+
+  state Stun Anim Pause {
+    ClampSpeed(gameObject=Self, speedMin=(unset), speedMax=8, everyFrame=false)
+    SetBoolValue(boolVariable=var "Ready", boolValue=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Stun Anim
+    on BLADES RETURN → Stun Return
+  }
+
+  state Stun Anim {
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Settle")
+    WaitRandom(timeMin=0.4, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Drop
+    on BLADES RETURN → Stun Return
+  }
+
+  state Drop {
+    ActivateGameObject(gameObject=var "Phys Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    RandomFloat(min=1, max=1.5, storeResult=var "Gravity")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    SetRigidbody2DConstraints(gameObject=Self, freezePositionX=(unset), freezePositionY=(unset), freezeRotation=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartBounce())
+    on BLADES RETURN → Stun Return
+  }
+
+  state Stun Return {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetRigidbody2DConstraints(gameObject=Self, freezePositionX=(unset), freezePositionY=(unset), freezeRotation=true)
+    WaitRandom(timeMin=0, timeMax=0.25, finishEvent=→"FINISHED", realTime=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopBounce())
+    SetRigidbody2DConstraints(gameObject=Self, freezePositionX=(unset), freezePositionY=(unset), freezeRotation=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    on FINISHED → Return
+  }
+
+  state Dormant {
+    SetPolygonCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on RISE → Rise Side
+  }
+
+  state Begin {
+    SetParent(gameObject=Self, parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPolygonCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Idle L
+  }
+
+  state Rise Side {
+    SetMeshRenderer(gameObject=Self, active=true)
+    GetPosition(gameObject=Self, vector=(unset), x=var "X Target", y=var "Y Target", z=(unset), space=1, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Silk Boss", aboveEvent=(none), belowEvent=(none), rightEvent=→"L", leftEvent=→"R", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    on L → Rise L
+    on R → Rise R
+  }
+
+  state Rise L {
+    SetFloatValue(floatVariable=var "Rise Scale", floatValue=-1, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=var "Rise Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Aim Angle", pause=0, everyFrame=true)  // disabled
+    FloatAdd(floatVariable=var "Aim Angle", add=180, everyFrame=true, perSecond=false)  // disabled
+    FloatClamp(floatVariable=var "Aim Angle", minValue=454, maxValue=480, everyFrame=true)  // disabled
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=480, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → First Rise
+  }
+
+  state Rise R {
+    SetFloatValue(floatVariable=var "Rise Scale", floatValue=1, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=var "Rise Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Aim Angle", pause=0, everyFrame=true)  // disabled
+    FloatAdd(floatVariable=var "Aim Angle", add=180, everyFrame=true, perSecond=false)  // disabled
+    FloatClamp(floatVariable=var "Aim Angle", minValue=420, maxValue=446, everyFrame=true)  // disabled
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=420, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → First Rise
+  }
+
+  state Rise {
+    RandomFloat(min=0.5, max=1.25, storeResult=var "Travel Time")
+    EaseFloat(fromValue=-12, toValue=var "Y Target", floatVariable=var "Y Animate", time=var "Travel Time", speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Y Animate", z=(unset), space=1, everyFrame=true, lateUpdate=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Aim Angle", pause=0, everyFrame=true)
+    FloatAdd(floatVariable=var "Aim Angle", add=180, everyFrame=true, perSecond=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Aim Angle", space=0, everyFrame=true, lateUpdate=false)
+    on BLADES RETURN → Begin
+  }
+
+  state Stagger Pause {
+    ClampSpeed(gameObject=Self, speedMin=(unset), speedMax=8, everyFrame=false)
+    SetBoolValue(boolVariable=var "Ready", boolValue=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Damager", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Terrain Detector", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Stagger Anim
+  }
+
+  state Stagger Anim {
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Settle")
+    WaitRandom(timeMin=0.4, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stagger Drop
+  }
+
+  state Stagger Drop {
+    RandomBool(storeResult=var "Physical")
+    ActivateGameObject(gameObject=var "Phys Collider", activate=var "Physical", recursive=false, resetOnExit=false, everyFrame=false)
+    RandomFloat(min=1, max=1.5, storeResult=var "Gravity")
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    SetRigidbody2DConstraints(gameObject=Self, freezePositionX=(unset), freezePositionY=(unset), freezeRotation=false)
+    Collision2dEvent(gameObject=var "Phys Collider", collision=0, collideTag="", sendEvent=→"LAND", storeCollider=var "", storeForce=(unset))
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stagger Finish
+    on LAND → Stagger Bounce
+  }
+
+  state Stagger Finish {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetRigidbody2DConstraints(gameObject=Self, freezePositionX=(unset), freezePositionY=(unset), freezeRotation=true)
+    SetPolygonCollider(gameObject=Self, active=false, resetOnExit=false)
+    on BLADES RETURN → Rerise Follow
+  }
+
+  state Stagger Bounce {
+    PlayRandomAudioClipTable(Table=metal_bounce_resonant (sfxdynamic_assets_areasong.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    ActivateGameObject(gameObject=var "Phys Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FlingObject(flungObject=Self, speedMin=10, speedMax=15, angleMin=60, angleMax=120)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    RandomFloatEither(value1=-0.1, value2=-0.3, storeResult=var "Z Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Stagger Finish
+  }
+
+  state Rerise Follow {
+    SetParent(gameObject=Self, parent=var "Parent Hand", resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=Self, vector=(unset), x=var "X Target", y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Blade Idle")
+    SetScale(gameObject=Self, vector=(unset), x=(unset), y=var "Rise Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    SetRigidbody2DConstraints(gameObject=Self, freezePositionX=(unset), freezePositionY=(unset), freezeRotation=true)
+    SetAngularVelocity2d(gameObject=Self, angularVelocity=0, everyFrame=false)
+    Translate(gameObject=Self, vector=(unset), x=var "Offset X", y=var "Offset Y", z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)  // disabled
+    on FINISHED → Rise
+  }
+
+  state First Rise {
+    RandomFloat(min=0.5, max=1.25, storeResult=var "Travel Time")
+    EaseFloat(fromValue=-12, toValue=var "Y Target", floatVariable=var "Y Animate", time=var "Travel Time", speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Y Animate", z=(unset), space=1, everyFrame=true, lateUpdate=false)
+    on BLADES RETURN → Begin
+  }
+
+  state Set Swipe L Q {
+    RandomFloat(min=-1, max=1, storeResult=var "Attack Rotation")
+    SetFloatValue(floatVariable=var "Attack Y Scale", floatValue=1, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Min", floatValue=23, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Max", floatValue=55, everyFrame=false)
+    on FINISHED → Set Quick
+  }
+
+  state Set Swipe R Q {
+    RandomFloat(min=179, max=181, storeResult=var "Attack Rotation")
+    SetFloatValue(floatVariable=var "Attack Y Scale", floatValue=-1, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Min", floatValue=23, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Max", floatValue=55, everyFrame=false)
+    on FINISHED → Set Quick
+  }
+
+  state Set Quick {
+    SetBoolValue(boolVariable=var "Quick Recover", boolValue=true, everyFrame=false)
+    RandomFloat(min=0.2, max=0.2, storeResult=var "Thunk Time")
+    SetBoolValue(boolVariable=var "Ready", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Travel Time Multiplier", floatValue=0.015, everyFrame=false)
+    on FINISHED → Tele To
+  }
+
+  state Set Stomp Q {
+    RandomFloat(min=90, max=90, storeResult=var "Attack Rotation")
+    SetFloatValue(floatVariable=var "Attack Y", floatValue=var "Ground Y", everyFrame=false)
+    FloatAddRandom(floatVariable=var "Attack Y", addMin=11, addMax=12)
+    GetScale(gameObject=Self, vector=(unset), xScale=(unset), yScale=var "Attack Y Scale", zScale=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Min", floatValue=20, everyFrame=false)
+    SetFloatValue(floatVariable=var "X Target Max", floatValue=57, everyFrame=false)
+    on FINISHED → Set Quick
+  }
+
+  var Offset X: float = 0
+  var Aim Angle: float = 0
+  var Speed Max: float = 0
+  var Distance: float = 0
+  var Idle Y: float = 0
+  var Y Speed: float = 0
+  var Hand X Scale: float = 0
+  var Attack X: float = 0
+  var Attack Rotation: float = 0
+  var Ground Y: float = 132
+  var Attack Y: float = 0
+  var Z Pos: float = 0
+  var Travel Time: float = 0
+  var Attack Speed: float = 40
+  var Attack Angle: float = 0
+  var Speed: float = 0
+  var Attack Y Scale: float = 0
+  var Z Pos Attack: float = 0
+  var Z Pos Idle: float = 0
+  var Thunk Time: float = 0
+  var Offset Y: float = 0
+  var Wait Min: float = 0
+  var Wait Max: float = 0
+  var Gravity: float = 0
+  var Y Animate: float = 0
+  var Y Target: float = 0
+  var Rise Scale: float = 0
+  var X Target: float = 0
+  var Pitch: float = 0
+  var Travel Time Multiplier: float = 0.02
+  var X Target Min: float = 0
+  var X Target Max: float = 0
+  var X Pos: float = 0
+  var Facing Right: bool = false
+  var Ready: bool = true
+  var Physical: bool = false
+  var Quick Recover: bool = false
+  var Attack Event: string = ""
+  var Travel Pos: vector3 = (0, 0, 0)
+  var Current Pos: vector3 = (0, 0, 0)
+  var Tint Idle: color = (0.6911765, 0.6911765, 0.6911765, 1)
+  var Damager: gameObject = <null>
+  var Parent Hand: gameObject = <null>
+  var Phys Collider: gameObject = <null>
+  var Terrain Detector: gameObject = <null>
+  var Thunk Effect: gameObject = <null>
+  var Antic Thread: gameObject = <null>
+  var Antic Gleam: gameObject = <null>
+  var Silk Boss: gameObject = <null>
+}

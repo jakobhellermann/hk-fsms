@@ -1,0 +1,191 @@
+# Conversation Control
+# 1 location(s):
+#   Ruins1_24_boss_defeated / Ghost Mage Lord NPC
+
+fsm Conversation Control {
+  start Pause
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+  on HERO DAMAGED → Hero Damaged  // from any state
+
+  state Idle {
+    on CONVO START → Hero Look
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="mageLordDreamDefeated", isTrue=(none), isFalse=→"INERT")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="mageLordOrbsCollected", isTrue=→"INERT", isFalse=(none))
+    on FINISHED → Wounded?
+    on INERT → Inert
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Hero Look {
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP DREAM", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Defeated
+  }
+
+  state Anim End {
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Inert {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Hero Damaged {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    on FINISHED → Wounded?
+  }
+
+  state Defeated {
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MAGE_LORD", "Ghosts"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 4
+  }
+
+  state Box Down 4 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN DREAM", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Vanish Glow
+  }
+
+  state Vanish Glow {
+    ActivateGameObject(gameObject=var "Vanish Glow", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Vanish Start Pt", emit=0)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    StopParticleEmitter(gameObject=var "Idle Pt")
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Wounded"), sendEvent="DOWN", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_dialogue_death_explode (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    on FINISHED → Anim End 3
+  }
+
+  state Vanish Burst {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOWN", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_dialogue_death_explode (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    ActivateGameObject(gameObject=var "Wounded", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Vanish Burst Pt", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Warp", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Vanish Burst Pt", emit=0)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    DestroyObject(gameObject=var "Vanish Start Pt", delay=0, detachChildren=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM NAIL HUD", delay=0, everyFrame=false)
+    on FINISHED → Vanish Get Start
+  }
+
+  state Vanish Get Start {
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_absorb (sharedassets46.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    Vector3AddXYZ(vector3Variable=var "Hero Pos", addX=(unset), addY=-0.5, addZ=(unset), everyFrame=false, perSecond=false)
+    SetPosition(gameObject=var "Vanish Get Pt", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Vanish Get Pt", emit=0)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Vanish Get
+  }
+
+  state Anim End 3 {
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Vanish Burst
+  }
+
+  state Vanish Get {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FlashingSuperDash())
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Vanisher Stop
+  }
+
+  state Vanisher Stop {
+    StopParticleEmitter(gameObject=var "Vanish Get Pt")
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get
+  }
+
+  state Get {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    AudioStop(gameObject=var "Sound Player")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_absorb_final_impact (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    SetPosition(gameObject=var "White Flash", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "White Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Attack Pt", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Attack Pt", emit=0)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="dreamOrbs", amount=var "Dream Orbs")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAM ORB COLLECT", delay=0, everyFrame=false)
+    on FINISHED → Collected
+  }
+
+  state Collected {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    SetPlayerDataBool(boolName="mageLordOrbsCollected", value=true)
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FIGHT START", delay=0, everyFrame=false)
+    on FINISHED → Allow Inspect
+  }
+
+  state Wounded? {
+    ActivateGameObject(gameObject=var "Wounded", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Sprite", delivery=SendMessage, options=1, functionCall=FlashingGhostWounded())
+    on FINISHED → Idle
+  }
+
+  state Allow Inspect {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+  }
+
+  var Dream Orbs: int = 300
+  var Hero Looks Up: bool = true
+  var PD Int Name: string = ""
+
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Attack Pt: gameObject = Ghost Mage Lord NPC/Attack Pt
+  var Idle Pt: gameObject = Ghost Mage Lord NPC/Idle Pt
+  var Inspect Region: gameObject = <null>
+  var Self: gameObject = <null>
+  var Sound Player: gameObject = <null>
+  var Sprite: gameObject = Ghost Mage Lord NPC/Character Sprite
+  var Vanish Burst Pt: gameObject = Ghost Mage Lord NPC/Vanish Burst Pt
+  var Vanish Get Pt: gameObject = Ghost Mage Lord NPC/Vanish Get Pt
+  var Vanish Glow: gameObject = Ghost Mage Lord NPC/Vanish Glow
+  var Vanish Start Pt: gameObject = Ghost Mage Lord NPC/Vanish Start Pt
+  var Warp: gameObject = Ghost Mage Lord NPC/Warp
+  var White Flash: gameObject = Ghost Mage Lord NPC/White Flash
+  var Wounded: gameObject = Ghost Mage Lord NPC/Wounded
+}

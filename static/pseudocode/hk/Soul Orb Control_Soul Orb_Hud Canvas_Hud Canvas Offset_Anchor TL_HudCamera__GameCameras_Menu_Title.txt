@@ -1,0 +1,292 @@
+# Soul Orb Control
+# 1 location(s):
+#   Menu_Title / _GameCameras/HudCamera/Anchor TL/Hud Canvas Offset/Hud Canvas/Soul Orb
+
+fsm Soul Orb Control {
+  start Pause
+
+  state Init {
+    GetHero(storeResult=var "Hero")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ClearMP", parameters=[], storeResult=(unset var))
+    ActivateGameObject(gameObject=var "Binding Cap", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Binding Cap Full", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindChild(gameObject=var "Hero", childName="Effects", storeResult=var "Hero Effects")
+    FindChild(gameObject=var "Hero Effects", childName="Soul Burst", storeResult=var "Soul Burst")
+    FindChild(gameObject=Self, childName="Vessels", storeResult=var "Vessel Folder")
+    FindChild(gameObject=Self, childName="SoulOrb_fill", storeResult=var "Fill")
+    FindChild(gameObject=Self, childName="White Flash", storeResult=var "Get Flash")
+    FindChild(gameObject=Self, childName="Can Heal Particles", storeResult=var "Can Heal Particles")
+    FindChild(gameObject=Self, childName="Eyes", storeResult=var "Eyes")
+    FindChild(gameObject=var "Fill", childName="Liquid", storeResult=var "Liquid")
+    FindChild(gameObject=Self, childName="Orb Anim", storeResult=var "Orb Anim")
+    FindChild(gameObject=Self, childName="Orb Full", storeResult=var "Orb Full")
+    FindChild(gameObject=Self, childName="Burst Anim", storeResult=var "Burst Anim")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    IntCompare(integer1=var "MP", integer2=0, equal=→"MP IS ZERO", lessThan=→"MP IS ZERO", greaterThan=(none), everyFrame=false)
+    ConvertIntToFloat(intVariable=var "MP", floatVariable=var "Liquid Y", everyFrame=false)
+    FloatMultiply(floatVariable=var "Liquid Y", multiplyBy=var "Liquid Y Per MP", everyFrame=false)
+    FloatAdd(floatVariable=var "Liquid Y", add=var "Liquid Bottom Y", everyFrame=false, perSecond=false)
+    SetPosition(gameObject=var "Liquid", vector=(unset), x=(unset), y=var "Liquid Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    IntCompare(integer1=var "MP", integer2=100, equal=→"FULL", lessThan=(none), greaterThan=→"FULL", everyFrame=false)
+    on FINISHED → Already Can Heal?
+    on MP IS ZERO → MP <= 1
+    on FULL → Start Full
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Setting", boolValue=false, everyFrame=false)
+    on MP DRAIN → MP Drain
+    on MP GAIN → Orb Flash?
+    on MP LOSE → Binding?
+    on MP GAIN SPA → MP Gain
+    on MP SET → Set
+  }
+
+  state MP Drain {
+    SendEventByName(eventTarget=GameObject(var "Vessel Folder"), sendEvent="MP DRAIN", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Orb Full", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Binding Cap Full"), sendEvent="NOT FULL", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Orb Filled", boolValue=false, everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    IntCompare(integer1=var "MP", integer2=1, equal=→"MP IS ZERO", lessThan=→"MP IS ZERO", greaterThan=(none), everyFrame=false)
+    ConvertIntToFloat(intVariable=var "MP", floatVariable=var "Liquid Y", everyFrame=false)
+    FloatMultiply(floatVariable=var "Liquid Y", multiplyBy=var "Liquid Y Per MP", everyFrame=false)
+    FloatAdd(floatVariable=var "Liquid Y", add=var "Liquid Bottom Y", everyFrame=false, perSecond=false)
+    SetPosition(gameObject=var "Liquid", vector=(unset), x=(unset), y=var "Liquid Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Check Can Heal
+    on MP IS ZERO → MP <= 1
+  }
+
+  state MP <= 1 {
+    SetMeshRenderer(gameObject=var "Liquid", active=false)  // disabled
+    SetPosition(gameObject=var "Liquid", vector=(unset), x=(unset), y=-10, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Check Can Heal
+  }
+
+  state MP Gain {
+    SetMeshRenderer(gameObject=var "Liquid", active=true)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="maxMP", storeValue=var "Max MP")
+    ConvertIntToFloat(intVariable=var "MP", floatVariable=var "Liquid Y", everyFrame=false)
+    FloatMultiply(floatVariable=var "Liquid Y", multiplyBy=var "Liquid Y Per MP", everyFrame=false)
+    FloatAdd(floatVariable=var "Liquid Y", add=var "Liquid Bottom Y", everyFrame=false, perSecond=false)
+    SetPosition(gameObject=var "Liquid", vector=(unset), x=(unset), y=var "Liquid Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    IntCompare(integer1=var "MP", integer2=var "Max MP", equal=→"FULL", lessThan=(none), greaterThan=→"FULL", everyFrame=false)
+    IntCompare(integer1=var "MP", integer2=50, equal=→"HALF FULL", lessThan=(none), greaterThan=→"HALF FULL", everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Half Burst", boolValue=false, everyFrame=false)  // disabled
+    on FINISHED → Check Can Heal
+    on FULL → MP Full
+    on HALF FULL → 
+  }
+
+  state MP Full {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="soulLimited", isTrue=→"FINISHED", isFalse=(none))
+    GGCheckBoundSoul(boundEvent=→"GG BINDING", unboundEvent=(none))
+    BoolTest(boolVariable=var "Orb Filled", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    ActivateGameObject(gameObject=var "Orb Full", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Orb Filled", boolValue=true, everyFrame=false)
+    GetPlayerDataBool(boolName="hasSpell", storeValue=var "Has Spell")
+    BoolTest(boolVariable=var "Setting", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    ActivateGameObject(gameObject=var "Burst Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Check Can Heal
+    on GG BINDING → Bound Full
+  }
+
+  state Check Can Heal {
+    GetFsmBool(gameObject=var "Hero", fsmName="Spell Control", variableName="Focusing", storeValue=var "Hero Focusing", everyFrame=false)
+    BoolTest(boolVariable=var "Hero Focusing", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)  // disabled
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="focusMP_amount", storeValue=var "Focus MP amount")
+    IntCompare(integer1=var "MP", integer2=var "Focus MP amount", equal=→"CAN HEAL", lessThan=→"CANT HEAL", greaterThan=→"CAN HEAL", everyFrame=false)
+    on CANCEL → Idle
+    on CAN HEAL → Can Heal 2
+    on CANT HEAL → Can't Heal
+  }
+
+  state Can't Heal {
+    SetBoolValue(boolVariable=var "Can Focus Anim", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Liquid"), sendEvent="CANT HEAL", delay=0, everyFrame=false)
+    on FINISHED → Check Eyes
+  }
+
+  state MP Lose {
+    Tk2dPlayAnimation(gameObject=var "Liquid", animLibName="", clipName="Shrink")
+    ActivateGameObject(gameObject=var "Orb Full", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Binding Cap Full"), sendEvent="NOT FULL", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Orb Filled", boolValue=false, everyFrame=false)
+    Tk2dPlayFrame(gameObject=var "Liquid", frame=0)
+    ConvertIntToFloat(intVariable=var "MP", floatVariable=var "Liquid Y", everyFrame=false)
+    FloatMultiply(floatVariable=var "Liquid Y", multiplyBy=var "Liquid Y Per MP", everyFrame=false)
+    FloatAdd(floatVariable=var "Liquid Y", add=var "Liquid Bottom Y", everyFrame=false, perSecond=false)
+    GetPosition(gameObject=var "Liquid", vector=var "Tween Vector", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Tween Vector", vector3Value=(unset), x=(unset), y=var "Liquid Y", z=(unset), everyFrame=false)
+    iTweenMoveTo(gameObject=var "Liquid", id="", transformPosition=var "", vectorPosition=var "Tween Vector", time=0.5, delay=0, speed=(unset), space=1, easeType=easeOutSine, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=true, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    on FINISHED → Check MP
+    on MP LOSE → Check Eyes 2
+  }
+
+  state Check MP {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    IntCompare(integer1=var "MP", integer2=1, equal=→"MP IS ZERO", lessThan=→"MP IS ZERO", greaterThan=(none), everyFrame=false)
+    on MP IS ZERO → MP <= 1
+    on FINISHED → Check Can Heal
+  }
+
+  state Check Eyes {
+    IntCompare(integer1=var "MP", integer2=50, equal=→"OVER", lessThan=→"UNDER", greaterThan=→"OVER", everyFrame=false)
+    on OVER → Over
+    on UNDER → Under
+  }
+
+  state Over {
+    SendEventByName(eventTarget=GameObject(var "Eyes"), sendEvent="OVER", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Under {
+    SendEventByName(eventTarget=GameObject(var "Eyes"), sendEvent="UNDER", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Under 2 {
+    SendEventByName(eventTarget=GameObject(var "Eyes"), sendEvent="UNDER", delay=0, everyFrame=false)
+    on FINISHED → MP Lose
+  }
+
+  state Check Eyes 2 {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    SendEventByName(eventTarget=GameObject(var "Vessel Folder"), sendEvent="MP DRAIN", delay=0, everyFrame=false)
+    IntCompare(integer1=var "MP", integer2=50, equal=→"OVER", lessThan=→"UNDER", greaterThan=→"OVER", everyFrame=false)
+    on OVER → Over 2
+    on UNDER → Under 2
+  }
+
+  state Over 2 {
+    SendEventByName(eventTarget=GameObject(var "Eyes"), sendEvent="OVER", delay=0, everyFrame=false)
+    on FINISHED → MP Lose
+  }
+
+  state Start Full {
+    GGCheckBoundSoul(boundEvent=→"FINISHED", unboundEvent=(none))
+    ActivateGameObject(gameObject=var "Orb Full", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Already Can Heal?
+  }
+
+  state Check Focus Prompt {
+    GetPlayerDataBool(boolName="promptFocus", storeValue=var "Focus Prompted")
+    BoolTest(boolVariable=var "Focus Prompted", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="seenFocusTablet", isTrue=(none), isFalse=→"FINISHED")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="health", storeValue=var "HP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="maxHealth", storeValue=var "Max HP")
+    IntCompare(integer1=var "HP", integer2=var "Max HP", equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    IntCompare(integer1=var "HP", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    IntCompare(integer1=var "MP", integer2=33, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetPlayerDataBool(boolName="promptFocus", value=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="REMINDER FOCUS", delay=0, everyFrame=false)
+    on FINISHED → MP Gain
+  }
+
+  state Already Can Heal? {
+    IntCompare(integer1=var "MP", integer2=var "Focus MP amount", equal=(none), lessThan=→"CANT HEAL", greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Can Focus Anim", boolValue=true, everyFrame=false)
+    on CANT HEAL → Check Can Heal
+    on FINISHED → Check Can Heal
+  }
+
+  state Orb Flash? {
+    BoolTest(boolVariable=var "Setting", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="maxMP", storeValue=var "Max MP")
+    IntCompare(integer1=var "MP", integer2=var "Max MP", equal=→"FULL", lessThan=(none), greaterThan=→"FULL", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Get Flash"), sendEvent="FLASH", delay=0, everyFrame=false)
+    on FULL → Check Focus Prompt
+    on FINISHED → Check Focus Prompt
+  }
+
+  state Set {
+    SetBoolValue(boolVariable=var "Setting", boolValue=true, everyFrame=false)
+    on FINISHED → Binding?
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Can Heal 2 {
+    SendEventByName(eventTarget=GameObject(var "Liquid"), sendEvent="CAN HEAL", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Can Focus Anim", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Setting", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Can Heal Particles", emit=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=focus_ready (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Soul Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetScale(gameObject=var "Effect", vector=(unset), x=2, y=2, z=(unset), everyFrame=false, lateUpdate=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=flashFocusGet())
+    SetParent(gameObject=var "Effect", parent=var "Hero", resetLocalPosition=false, resetLocalRotation=false)
+    SendEventToRegister(eventName="CAN HEAL EFFECT")
+    SetBoolValue(boolVariable=var "Can Focus Anim", boolValue=true, everyFrame=false)
+    on FINISHED → Check Eyes
+  }
+
+  state Binding? {
+    GGCheckBoundSoul(boundEvent=→"GG BINDING", unboundEvent=→"FINISHED")
+    on FINISHED → Not Bound
+    on GG BINDING → Bound
+  }
+
+  state Bound {
+    ActivateGameObject(gameObject=var "Binding Cap", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Orb Full", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Set?
+  }
+
+  state Not Bound {
+    ActivateGameObject(gameObject=var "Binding Cap", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Binding Cap Full", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Set?
+  }
+
+  state Bound Full {
+    ActivateGameObject(gameObject=var "Binding Cap Full", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Check Can Heal
+  }
+
+  state Set? {
+    BoolTest(boolVariable=var "Setting", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Orb Flash?
+    on FALSE → Check Eyes 2
+  }
+
+  var Liquid Bottom Y: float = -0.59
+  var Liquid Y: float = 0
+  var Liquid Y Per MP: float = 0.0171
+  var Focus MP amount: int = 0
+  var HP: int = 0
+  var MP: int = 0
+  var Max HP: int = 0
+  var Max MP: int = 0
+  var Can Focus Anim: bool = false
+  var Focus Prompted: bool = false
+  var Half Burst: bool = false
+  var Has Spell: bool = false
+  var Hero Focusing: bool = false
+  var Orb Filled: bool = false
+  var Setting: bool = false
+  var Tween Vector: vector3 = (0, 0, 0)
+  var Binding Cap: gameObject = _GameCameras/HudCamera/Anchor TL/Hud Canvas Offset/Hud Canvas/Soul Orb/Binding Cap
+  var Binding Cap Full: gameObject = _GameCameras/HudCamera/Anchor TL/Hud Canvas Offset/Hud Canvas/Soul Orb/Binding Cap Full
+  var Burst Anim: gameObject = <null>
+  var Can Heal Particles: gameObject = <null>
+  var Effect: gameObject = <null>
+  var Eyes: gameObject = <null>
+  var Fill: gameObject = <null>
+  var Get Flash: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Hero Effects: gameObject = <null>
+  var Liquid: gameObject = <null>
+  var Orb Anim: gameObject = <null>
+  var Orb Full: gameObject = <null>
+  var Soul Burst: gameObject = <null>
+  var Vessel Folder: gameObject = <null>
+}

@@ -1,0 +1,243 @@
+# Travel Control
+# 1 location(s):
+#   Song_Tower_01 / door_cutsceneEndLaceTower
+
+fsm Travel Control {
+  start Pause
+  on TEST ARRIVE → Set Hero Pos  // from any state
+
+  state Pause {
+    ActivateGameObject(gameObject=var "Cage Hornet", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Door Interact", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Lift Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Lift Animator", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Door Entry
+  }
+
+  state Door Entry {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    GetName(gameObject=var "Self", storeName=var "Door Entry", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetEntryGateName", parameters=[], storeResult=var "Door Entered", EveryFrame=false)
+    StringCompare(stringVariable=var "Door Entry", compareTo=var "Door Entered", equalEvent=(none), notEqualEvent=→"INACTIVE", storeResult=(unset), everyFrame=false)
+    on INACTIVE → Not Returning
+    on FINISHED → Lift Arrive?
+  }
+
+  sequence state Not Returning {
+    ActivateGameObject(gameObject=var "Lift Animator", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AnimatorPlay(gameObject=var "Lift Animator", stateName="Arrive", layer=0, normalizedTime=1, everyFrame=false)
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Close", layer=0, normalizedTime=1, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    StopParticleEmittersInChildrenV2(Target=var "Lift Animator", StopBehaviour=0)
+    PlayerDataBoolTest(boolName="MelodyLiftCanReturn", isTrue=→"ACTIVE", isFalse=(none))
+    SendEventToRegister(eventName="BATTLE START REFIGHT")
+    on ACTIVE → Start Active
+  }
+
+  sequence state Here Wait {
+    AudioPlaySimple(gameObject=var "Audio Loop LiftMove", volume=1, oneShotClip=<null>)  // disabled
+    ActivateGameObject(gameObject=var "Lift Animator", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AnimatorPlay(gameObject=var "Lift Animator", stateName="Depart Silently", layer=0, normalizedTime=1, everyFrame=false)
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Close", layer=0, normalizedTime=1, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    StopParticleEmittersInChildrenV2(Target=var "Lift Animator", StopBehaviour=0)
+    CameraRepositionToHero()
+    Wait(time=1, finishEvent=(none), realTime=false)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=2)
+    AnimatorPlayStateWait(target=var "Lift Animator", stateName="Arrive", finishEvent=(none))
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Door Open
+  }
+
+  state Hero Control {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    ToolsCutsceneControl(SetInCutscene=false)
+    SetPlayerDataVariable(VariableName="encounteredLaceTower", SetValue=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    PlayerDataVariableTest(VariableName="defeatedLaceTower", ExpectedValue=true, IsExpectedEvent=→"LACE DEFEATED", IsNotExpectedEvent=(none))  // disabled
+    BoolTest(boolVariable=var "Do Door Close", isTrue=→"CLOSE DOOR", isFalse=(none), everyFrame=false)
+    on LACE DEFEATED → Start Active
+    on CLOSE DOOR → Close Door
+    on FINISHED → Wait
+  }
+
+  sequence state Lift Arrive? {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    WaitForFinishedEnteringScene(sendEvent=(none))
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    PlayerDataBoolTest(boolName="encounteredLaceTower", isTrue=→"TRUE", isFalse=→"FALSE")
+    on FALSE → Start Cinematic
+    on TRUE → Set Hero Pos
+  }
+
+  sequence state Lift Already Here {
+    SetBoolValue(boolVariable=var "Do Door Close", boolValue=false, everyFrame=false)
+    ScreenFader(startColour=(unset), endColour=(0, 0, 0, 1), duration=0)
+    ActivateGameObject(gameObject=var "Lift Animator", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AnimatorPlay(gameObject=var "Lift Animator", stateName="Arrive", layer=0, normalizedTime=1, everyFrame=false)
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Close", layer=0, normalizedTime=1, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    StopParticleEmittersInChildrenV2(Target=var "Lift Animator", StopBehaviour=0)
+    SendEventToRegister(eventName="BATTLE START FIRST")
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=0.2)
+    Wait(time=0.2, finishEvent=(none), realTime=false)
+    on FINISHED → Hero Control
+  }
+
+  state Door Open {
+    PlayVibrationV4(vibrationDataAsset=silk_lift_door_open (vibrationstatic_assets_vibrationdataasset.bundle), strength=1, motors=None, loop=false, tag="", stopOnStateExit=false, waitUntilFinished=false)
+    PlayAudioEvent(audioClip=silk_lift_door_open (sfxstatic_assets_silkshared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Open", layer=0, normalizedTime=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Hero Walk Out
+  }
+
+  sequence state Finish Walk Out {
+    AudioStop(gameObject=var "Audio Loop WalkOutFlower", fadeTime=0)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    PlayAudioEvent(audioClip=hornet_land_grass_1 (sfxstatic_assets_areacoral.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=var "Cage Hornet", ClipName="Exit To Idle", AnimationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Cage Hornet", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Cage Hornet", vector=var "Cage Hornet Pos Local", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Do Door Close", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="BATTLE START REFIGHT")
+    ActivateGameObject(gameObject=var "Lift Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Hero Control
+  }
+
+  state Hero Walk Out {
+    AudioPlaySimple(gameObject=var "Audio Loop WalkOutFlower", volume=1, oneShotClip=<null>)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Cage Hornet", clipName="Exit", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    iTweenMoveTo(gameObject=var "Cage Hornet", id="", transformPosition=var "", vectorPosition=var "Hero Position", time=(unset), delay=0, speed=5, space=0, easeType=21, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=false)
+    on FINISHED → Finish Walk Out
+  }
+
+  state Set Hero Pos {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=1)
+    GetPlayerDataBool(boolName="defeatedLaceTower", storeValue=var "Do Lift CamLock")
+    BoolFlip(boolVariable=var "Do Lift CamLock")
+    ActivateGameObject(gameObject=var "Lift Camlock", activate=var "Do Lift CamLock", recursive=false, resetOnExit=false, everyFrame=false)
+    CameraRepositionToHero()
+    ToolsCutsceneControl(SetInCutscene=true)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    ActivateGameObject(gameObject=var "Cage Hornet", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPosition(gameObject=var "Cage Hornet", vector=var "Cage Hornet Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Cage Hornet", vector=var "Cage Hornet Pos Local", x=(unset), y=(unset), z=(unset), space=1, everyFrame=false)
+    GetVector3XYZ(vector3Variable=var "Cage Hornet Pos", storeX=var "Cage Hornet X", storeY=(unset), storeZ=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Hero Position", vector3Value=(unset), x=var "Cage Hornet X", y=(unset), z=(unset), everyFrame=false)
+    SetPosition(gameObject=var "Hero", vector=var "Hero Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Here Wait
+  }
+
+  sequence state Close Door {
+    Wait(time=2, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=silk_lift_door_close (sfxstatic_assets_silkshared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Close", layer=0, normalizedTime=0, everyFrame=false)
+    on FINISHED → Wait
+  }
+
+  state Lift Active {
+    ActivateGameObject(gameObject=var "Door Interact", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on INTERACT → Start Preloading
+  }
+
+  state Start Preloading {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    StartPreloadingScene(SceneName="Cog_Dancers", LoadMode=LoadSceneMode(1))
+    on FINISHED → Start Enter
+  }
+
+  state Start Enter {
+    ToolsCutsceneControl(SetInCutscene=true)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    ActivateGameObject(gameObject=var "Cage Hornet", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    GetPosition(gameObject=var "Cage Hornet", vector=var "Cage Hornet Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetVector3XYZ(vector3Variable=var "Hero Position", storeX=var "Hero X", storeY=(unset), storeZ=(unset), everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Cage Hornet Pos", vector3Value=(unset), x=var "Hero X", y=(unset), z=(unset), everyFrame=false)
+    SetPosition(gameObject=var "Cage Hornet", vector=var "Hero Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Cage Hornet", clipName="Enter", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Enter
+  }
+
+  state Enter {
+    iTweenMoveTo(gameObject=var "Cage Hornet", id="", transformPosition=var "", vectorPosition=var "Cage Hornet Pos", time=(unset), delay=0, speed=5, space=0, easeType=21, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=false)
+    AudioPlaySimple(gameObject=var "Audio Loop WalkOut", volume=1, oneShotClip=<null>)
+    on FINISHED → In Lift
+  }
+
+  sequence state In Lift {
+    AudioStop(gameObject=var "Audio Loop WalkOut", fadeTime=0)
+    PlayAudioEvent(audioClip=hornet_land_metal (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=var "Cage Hornet", ClipName="TurnFromBG", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Cage Hornet", clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    PlayVibrationV4(vibrationDataAsset=silk_lift_door_close (vibrationstatic_assets_vibrationdataasset.bundle), strength=1, motors=None, loop=false, tag="", stopOnStateExit=false, waitUntilFinished=false)
+    PlayAudioEvent(audioClip=silk_lift_door_close (sfxstatic_assets_silkshared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Close", layer=0, normalizedTime=0, everyFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    AnimatorPlay(gameObject=var "Lift Animator", stateName="Depart", layer=0, normalizedTime=0, everyFrame=false)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=1.5)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    on FINISHED → Transition
+  }
+
+  state Transition {
+    BeginSceneTransition(sceneName="Cog_Dancers", entryGateName="door_arriveFromTower", entryDelay=0, visualization=Default, preventCameraFadeOut=true)
+  }
+
+  state Wait {
+    on LACE DEFEATED → Lace Defeated
+  }
+
+  state Start Active {
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Open", layer=0, normalizedTime=1, everyFrame=false)
+    on FINISHED → Lift Active
+  }
+
+  sequence state Lace Defeated {
+    Wait(time=2, finishEvent=(none), realTime=false)
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Open", layer=0, normalizedTime=0, everyFrame=false)
+    PlayAudioEvent(audioClip=silk_lift_door_open (sfxstatic_assets_silkshared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Lift Active
+  }
+
+  sequence state Start Cinematic {
+    CallMethodProper(gameObject=var "Cinematic Player", behaviour="CinematicPlayer", methodName="TriggerStartVideo", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 0), duration=0)
+    Translate(gameObject=var "Hero", vector=(unset), x=2, y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on CINEMATIC END → Lift Already Here
+  }
+
+  var Cinematic Player: gameObject = Cinematic Player
+
+  var Cage Hornet X: float = 0
+  var Hero X: float = 0
+  var Do Door Close: bool = false
+  var Do Lift CamLock: bool = false
+  var Door Entered: string = ""
+  var Door Entry: string = ""
+  var Cage Hornet Pos: vector3 = (0, 0, 0)
+  var Hero Position: vector3 = (0, 0, 0)
+  var Cage Hornet Pos Local: vector3 = (0, 0, 0)
+  var Self: gameObject = <null>
+  var Lift Animator: gameObject = door_cutsceneEndLaceTower/Lift Parent
+  var Door Animator: gameObject = door_cutsceneEndLaceTower/Lift Parent/Lift Offset/door
+  var Cage Hornet: gameObject = door_cutsceneEndLaceTower/Lift Parent/Lift Offset/Hornet
+  var Door Interact: gameObject = door_cutsceneEndLaceTower/Door Interact
+  var Lift Camlock: gameObject = door_cutsceneEndLaceTower/CameraLockArea - Lift Enter
+  var Audio Loop LiftMove: gameObject = door_cutsceneEndLaceTower/Lift Parent/Audio Loop LiftMove
+  var Audio Loop WalkOut: gameObject = door_cutsceneEndLaceTower/Audio Loop WalkOut
+  var Audio Loop WalkOutFlower: gameObject = door_cutsceneEndLaceTower/Audio Loop WalkOutFlower
+}

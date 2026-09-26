@@ -1,0 +1,284 @@
+# Map Control
+# 1 location(s):
+#   heroloading_assets_all.bundle / Hero_Hornet
+
+fsm Map Control {
+  start Pause
+  on NO INV → No Inv  // from any state
+  on HERO DAMAGED → Cancel All  // from any state
+  on LEAVING SCENE → Cancel All  // from any state
+  on FSM CANCEL → Cancel All  // from any state
+
+  state Inactive {
+    BoolTest(boolVariable=var "Photo Mode", isTrue=→"PHOTO", isFalse=(none), everyFrame=false)
+    ListenForQuickMap(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"BUTTON DOWN", isNotPressed=(none))
+    on BUTTON DOWN → Can QuickMap?
+    on PHOTO → Photo Ready
+  }
+
+  state Open Map {
+    SetBoolValue(boolVariable=var "Quick Cancel", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetFloatValue(floatVariable=var "Open Time", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Can Close Quick Map", boolValue=false, everyFrame=false)
+    FloatAdd(floatVariable=var "Open Time", add=1, everyFrame=true, perSecond=true)  // disabled
+    FloatClamp(floatVariable=var "Open Time", minValue=0, maxValue=3, everyFrame=true)  // disabled
+    SendEventToRegister(eventName="MAP OPENED")
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    SendEventToRegister(eventName="OPEN QUICK MAP")
+    SendEventToRegister(eventName="STOP HERO EXIT")
+    SetBoolValue(boolVariable=var "Quick Map Open", boolValue=true, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    PlayAudioEvent(audioClip=hornet_map_open_2d (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio Player")
+    GetPlayerDataBool(boolName="disableInventory", storeValue=var "Can Open Inventory")
+    BoolFlip(boolVariable=var "Can Open Inventory")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Map Open", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ListenForQuickMapV2(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=var "Can Open Inventory")
+    on LEFT GROUND → Fall Cancel
+    on INVENTORY OPENED → Quick Map Check Delay
+    on FINISHED → Map Idle
+    on BUTTON DOWN → Inventory Map Shortcut
+  }
+
+  state Regain Control {
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    PlayerDataBoolTest(boolName="atBench", isTrue=→"FINISHED", isFalse=(none))
+    SetBoolValue(boolVariable=var "Quick Map Open", boolValue=false, everyFrame=false)
+    on FINISHED → Quick Map?
+  }
+
+  state Quick Map Check Delay {
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    FloatTestToBool(float1=var "Open Time", float2=0.1, tolerance=0, equalBool=(unset), lessThanBool=var "Can Do Shortcut", greaterThanBool=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Can Do Shortcut", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Map Idle")
+    AudioStopV2(gameObject=var "Spawned Audio Player", fadeTime=0, cancelOnEarlyExit=false)  // disabled
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))  // disabled
+    BoolAllTrue(boolVariables=[var "Can Do Shortcut", var "Can Open Inventory"], sendEvent=(none), storeResult=var "Can Do Shortcut", everyFrame=false)
+    ListenForQuickMapV2(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=var "Can Do Shortcut")
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on BUTTON DOWN → Inventory Map Shortcut
+    on FINISHED → Regain Control
+    on LEFT GROUND → Fall Cancel
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindGameObject(objectName="", withTag="Inventory Top", store=var "Inventory")
+    SetFloatValue(floatVariable=var "Walk Speed Neg", floatValue=var "Walk Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Walk Speed Neg", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Reset Timer
+  }
+
+  state Cancel All {
+    AudioStopV2(gameObject=var "Spawned Audio Player", fadeTime=0, cancelOnEarlyExit=false)
+    BoolTest(boolVariable=var "Quick Map Open", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Reset Timer
+    on CANCEL → Quick Cancel
+  }
+
+  state Can QuickMap? {
+    CallMethodProper(gameObject=var "Self", behaviour="HeroController", methodName="CanQuickMap", parameters=[], storeResult=var "Return Bool", EveryFrame=false)
+    BoolTest(boolVariable=var "Return Bool", isTrue=→"FINISHED", isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Open Map
+  }
+
+  state Inventory Map Shortcut {
+    SendEventToRegister(eventName="CLOSE QUICK MAP INSTANT")
+    GameObjectIsNull(gameObject=var "Inventory", isNull=→"GET INVENTORY", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Queued Quick Map", boolValue=true, everyFrame=false)
+    on FINISHED → Regain Control
+    on GET INVENTORY → Get Inventory
+  }
+
+  state Reset Timer {
+    SetFloatValue(floatVariable=var "Open Time", floatValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Inactive
+  }
+
+  state Map Idle {
+    SetBoolValue(boolVariable=var "Walking", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SendEventToRegister(eventName="MAPWALK END")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Map Idle")
+    FloatAdd(floatVariable=var "Open Time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Open Time", minValue=0, maxValue=3, everyFrame=true)
+    FloatTestToBool(float1=var "Open Time", float2=0.15, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Can Close Quick Map", everyFrame=true)
+    ListenForQuickMapV2(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"BUTTON UP", queueBool=(unset), DelayBeforeActive=0, IsActive=true)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"WALK RIGHT", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"WALK LEFT", isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    on INVENTORY OPENED → Quick Map Check Delay
+    on LEFT GROUND → Fall Cancel
+    on BUTTON UP → Quick Map Check Delay
+    on WALK LEFT → Turn L?
+    on WALK RIGHT → Turn R?
+  }
+
+  state Walk Left {
+    SetBoolValue(boolVariable=var "Walking", boolValue=true, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceLeft())
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Map Walk")
+    SendEventToRegister(eventName="MAPWALK START")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed Neg", y=(unset), everyFrame=true)
+    HeroCheckForBump(Direction=-1, StoreHitBump=(unset), StoreHitWall=(unset), BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    FloatAdd(floatVariable=var "Open Time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Open Time", minValue=0, maxValue=3, everyFrame=true)
+    FloatTestToBool(float1=var "Open Time", float2=0.15, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Can Close Quick Map", everyFrame=true)
+    ListenForQuickMapV2(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"BUTTON UP", queueBool=(unset), DelayBeforeActive=0, IsActive=true)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"STOP WALK", isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    SetPropertyV2(TargetProperty=HeroController.ForceWalkingSound on Hero_Hornet@HeroController, EveryFrame=false, ResetOnExit=true)
+    on INVENTORY OPENED → Quick Map Check Delay
+    on BUTTON UP → Quick Map Check Delay
+    on LEFT GROUND → Fall Cancel
+    on STOP WALK → Map Idle
+  }
+
+  state Walk Right {
+    SetBoolValue(boolVariable=var "Walking", boolValue=true, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceRight())
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Map Walk")
+    SendEventToRegister(eventName="MAPWALK START")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed", y=(unset), everyFrame=true)
+    HeroCheckForBump(Direction=1, StoreHitBump=(unset), StoreHitWall=(unset), BumpEvent=(none), NoBumpEvent=(none), WallEvent=(none), EveryFrame=true)
+    FloatAdd(floatVariable=var "Open Time", add=1, everyFrame=true, perSecond=true)
+    FloatClamp(floatVariable=var "Open Time", minValue=0, maxValue=3, everyFrame=true)
+    FloatTestToBool(float1=var "Open Time", float2=0.15, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Can Close Quick Map", everyFrame=true)
+    ListenForQuickMapV2(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"BUTTON UP", queueBool=(unset), DelayBeforeActive=0, IsActive=true)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"STOP WALK", isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    SetPropertyV2(TargetProperty=HeroController.ForceWalkingSound on Hero_Hornet@HeroController, EveryFrame=false, ResetOnExit=true)
+    on INVENTORY OPENED → Quick Map Check Delay
+    on BUTTON UP → Quick Map Check Delay
+    on LEFT GROUND → Fall Cancel
+    on STOP WALK → Map Idle
+  }
+
+  state Quick Cancel {
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    AudioStopV2(gameObject=var "Spawned Audio Player", fadeTime=0, cancelOnEarlyExit=false)
+    SetBoolValue(boolVariable=var "Quick Cancel", boolValue=true, everyFrame=false)
+    on FINISHED → Regain Control
+  }
+
+  state Turn L? {
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Map Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayRandomAudioClipTable(Table=hornet_run_start (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed Neg", y=(unset), everyFrame=false)
+    FloatTestToBool(float1=var "Open Time", float2=0.1, tolerance=0, equalBool=(unset), lessThanBool=var "Can Do Shortcut", greaterThanBool=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Can Do Shortcut", var "Can Open Inventory"], sendEvent=(none), storeResult=var "Can Do Shortcut", everyFrame=false)
+    ListenForQuickMapV2(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=var "Can Do Shortcut")
+    on FINISHED → Walk Left
+    on BUTTON DOWN → Inventory Map Shortcut
+  }
+
+  state Turn R? {
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=(none), negativeEvent=→"FINISHED", space=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Map Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayRandomAudioClipTable(Table=hornet_run_start (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Walk Speed", y=(unset), everyFrame=false)
+    FloatTestToBool(float1=var "Open Time", float2=0.1, tolerance=0, equalBool=(unset), lessThanBool=var "Can Do Shortcut", greaterThanBool=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Can Do Shortcut", var "Can Open Inventory"], sendEvent=(none), storeResult=var "Can Do Shortcut", everyFrame=false)
+    ListenForQuickMapV2(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none), queueBool=(unset), DelayBeforeActive=0, IsActive=var "Can Do Shortcut")
+    on FINISHED → Walk Right
+    on BUTTON DOWN → Inventory Map Shortcut
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Get Inventory {
+    FindGameObject(objectName="", withTag="Inventory Top", store=var "Inventory")
+    on FINISHED → Inventory Map Shortcut
+  }
+
+  state No Inv {
+    on LEVEL LOADED → Reset Timer
+  }
+
+  state Photo Ready {
+    BoolTest(boolVariable=var "Photo Mode", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on BUTTON DOWN → Game Freeze
+    on CANCEL → Inactive
+  }
+
+  state Game Freeze {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SetTimeScale", parameters=[0], storeResult=(unset var), EveryFrame=false)
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"BUTTON DOWN", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on BUTTON DOWN → Unfreeze
+  }
+
+  state Unfreeze {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="SetTimeScale", parameters=[1], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Photo Ready
+  }
+
+  state Quick Map? {
+    BoolTest(boolVariable=var "Queued Quick Map", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Queued Quick Map", boolValue=false, everyFrame=false)
+    SendEventToRegister(eventName="OPEN INVENTORY MAP")
+    on FINISHED → Close Map
+  }
+
+  sequence state Close Map {
+    BoolTest(boolVariable=var "Quick Cancel", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=(unset), space=0, everyFrame=false)  // disabled
+    FloatInRange(floatVariable=var "Velocity X", lowerValue=-0.5, upperValue=0.5, boolVariable=(unset), trueEvent=(none), falseEvent=→"RUN START", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Walking", isTrue=→"RUN START", isFalse=(none), everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_map_close_2d (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio Player")
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Map Away", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Reset Timer
+    on RUN START → Running Start
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Reset Timer
+  }
+
+  state Running Start {
+    PlayAudioEvent(audioClip=hornet_map_close_2d (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio Player")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Reset Timer
+  }
+
+  state Fall Cancel {
+    SendEventToRegister(eventName="CLOSE QUICK MAP")
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    SetBoolValue(boolVariable=var "Quick Map Open", boolValue=false, everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_map_close_2d (herosfxstatic_assets_all.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player Actor 2D@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio Player")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Reset Timer
+  }
+
+  var Button Down Time: float = 0.1
+  var Open Time: float = 0
+  var Walk Speed: float = 4
+  var Walk Speed Neg: float = 0
+  var Velocity X: float = 0
+  var Quick Map Open: bool = false
+  var Return Bool: bool = false
+  var Photo Mode: bool = false
+  var Queued Quick Map: bool = false
+  var Can Close Quick Map: bool = false
+  var Can Do Shortcut: bool = false
+  var Walking: bool = false
+  var Quick Cancel: bool = false
+  var Can Open Inventory: bool = false
+  var Inventory: gameObject = <null>
+  var Self: gameObject = <null>
+  var Spawned Audio Player: gameObject = <null>
+}

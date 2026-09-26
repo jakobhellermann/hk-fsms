@@ -1,0 +1,117 @@
+# Animation
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Extender Tool
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Extender Tool
+
+fsm Animation {
+  start Pause
+  on TOOL EQUIPS CHANGED → Was Equipped?  // from any state
+  on SILK DEATH BIND SETUP → Add Event Registers  // from any state
+
+  state Inert {
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="SPOOL CAP FIX")
+    EnableFsmSelf(SetEnabled=false)
+  }
+
+  state Appear {
+    SetBoolValue(boolVariable=var "Was Equipped", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStop(gameObject=var "Spawned Audio", fadeTime=0)
+    CheckHudVisible(trueEvent=(none), falseEvent=(none), storeValue=var "Is Visible", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Is Visible", floatVariable=var "Volume", falseValue=0, trueValue=0.4, everyFrame=false)
+    PlayAudioEvent(audioClip=ui_hud_spool_extender_equip (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=var "Volume", audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Sprite", clipName="Spool Extender Appear", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Shatter Cap
+  }
+
+  state Idle {
+    EnableFsmSelf(SetEnabled=false)
+    on SPOOL EXTENDER HIDE → Hidden
+    on SPOOL UNBROKEN → Equipped? 3
+  }
+
+  state Pause {
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Equipped?
+  }
+
+  sequence state Disappear {
+    SetBoolValue(boolVariable=var "Was Equipped", boolValue=false, everyFrame=false)
+    AudioStop(gameObject=var "Spawned Audio", fadeTime=0)
+    CheckHudVisible(trueEvent=(none), falseEvent=(none), storeValue=var "Is Visible", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Is Visible", floatVariable=var "Volume", falseValue=0, trueValue=0.4, everyFrame=false)
+    PlayAudioEvent(audioClip=ui_hud_spool_extender_unequip (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=var "Volume", audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Spawned Audio")
+    Tk2dPlayAnimationWait(Target=var "Sprite", ClipName="Spool Extender Disappear", AnimationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Inert
+  }
+
+  state Equipped? {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Inert
+    on TRUE → Appear
+  }
+
+  state Was Equipped? {
+    BoolTest(boolVariable=var "Silk Death Active", isTrue=→"SILK DEATH HUD ADVANCE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Was Equipped", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Equipped?
+    on TRUE → Equipped? 2
+    on SILK DEATH HUD ADVANCE → Add Event Registers
+  }
+
+  state Equipped? 2 {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Disappear
+    on TRUE → Idle
+  }
+
+  state Shatter Cap {
+    SendEventToRegister(eventName="SPOOL CAP SHATTER")
+    Tk2dWatchAnimationEvents(gameObject=var "Sprite", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  sequence state Hidden {
+    SetBoolValue(boolVariable=var "Was Equipped", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimationWait(Target=var "Sprite", ClipName="Spool Extender Disappear", AnimationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SendEventToRegister(eventName="SPOOL CAP FIX")
+    EnableFsmSelf(SetEnabled=false)
+    on SPOOL EXTENDER SHOW → Appear
+  }
+
+  state Equipped? 3 {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Disappear
+    on TRUE → Appear
+  }
+
+  state Add Event Registers {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=→"FALSE", storeValue=(unset))
+    AddEventRegister(target=Self, eventName="SILK DEATH HUD ADVANCE")
+    AddEventRegister(target=Self, eventName="SILK DEATH HUD FINAL")
+    SetBoolValue(boolVariable=var "Silk Death Active", boolValue=true, everyFrame=false)
+    on SILK DEATH HUD ADVANCE → Hide Instant
+    on FALSE → Inert
+  }
+
+  state Hide Instant {
+    SetBoolValue(boolVariable=var "Was Equipped", boolValue=false, everyFrame=false)
+    AudioStop(gameObject=var "Spawned Audio", fadeTime=0)
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Inert
+  }
+
+  var Volume: float = 0
+  var Was Equipped: bool = false
+  var Is Visible: bool = false
+  var Silk Death Active: bool = false
+  var Sprite: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Extender Tool/Extender Sprite
+  var Spawned Audio: gameObject = <null>
+  var Tool: object = Spool Extender (dataassets_assets_assets/dataassets/tools/toolitems.bundle)
+}

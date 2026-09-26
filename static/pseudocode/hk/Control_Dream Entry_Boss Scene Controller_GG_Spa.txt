@@ -1,0 +1,117 @@
+# Control
+# 1 location(s):
+#   GG_Spa / Boss Scene Controller/Dream Entry
+
+fsm Control {
+  start Pause
+
+  state Take Control {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=MaxHealth())  // disabled
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="UPDATE BLUE HEALTH", delay=0, everyFrame=false)  // disabled
+    on FINISHED → First Boss? 1
+  }
+
+  state Start Fade {
+    SetFsmFloat(gameObject=var "HUD Blanker White", fsmName="Blanker Control", variableName="Fade Time", setValue=0.5, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → First Boss?
+  }
+
+  state Return Control {
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    ActivateGameObject(gameObject=var "Cutscene", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AcceptInput())
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ResetQuakeDamage", parameters=[], storeResult=(unset var))
+  }
+
+  state Pause {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=false)
+    on FINISHED → Door Entry
+  }
+
+  state Door Entry {
+    StringCompare(stringVariable=var "Door Entry", compareTo="", equalEvent=→"ACTIVATE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetEntryGateName", parameters=[], storeResult=var "Door Entered")
+    StringCompare(stringVariable=var "Door Entry", compareTo=var "Door Entered", equalEvent=→"ACTIVATE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on ACTIVATE → Take Control
+  }
+
+  state Wait for Anim {
+    Tk2dWatchAnimationEvents(gameObject=var "Cutscene", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Return Control
+  }
+
+  state Arrive Anim {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    FindChild(gameObject=Self, childName="Knight Dream Arrival", storeResult=var "Cutscene")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=var "Cutscene", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    GetScale(gameObject=var "Hero", vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    SetScale(gameObject=var "Cutscene", vector=(unset), x=var "X Scale", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Cutscene", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Wait for Anim
+  }
+
+  state First Boss? {
+    GGCheckIfBossSequence(trueEvent=(none), falseEvent=→"FALSE")
+    GGCheckIfFirstBossScene(trueEvent=→"TRUE", falseEvent=→"FALSE")
+    on TRUE → Arrive Anim
+    on FALSE → Return from Kneeling
+  }
+
+  state First Boss? 1 {
+    GGCheckIfBossSequence(trueEvent=(none), falseEvent=→"STATUE")
+    GGCheckIfFirstBossScene(trueEvent=→"FIRST", falseEvent=→"FINISHED")
+    on FINISHED → Start Kneeling
+    on FIRST → Hide Player
+    on STATUE → Statue
+  }
+
+  state Start Kneeling {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 3")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Pause Kneeling
+  }
+
+  state Hide Player {
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    SendEventToRegister(eventName="K HATCHLING END")
+    on FINISHED → Start Fade
+  }
+
+  state Return from Kneeling {
+    Tk2dPauseAnimation(gameObject=var "Hero", pause=false, everyframe=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Return Control
+    on KNIGHT EXITED ROAR → Return Control
+  }
+
+  state Pause Kneeling {
+    Tk2dPauseAnimation(gameObject=var "Hero", pause=true, everyframe=false)
+    on FINISHED → Wait for Transition
+  }
+
+  state Wait for Transition {
+    GGWaitForBossSceneTransitionIn(finishEvent=→"FINISHED")
+    on FINISHED → Start Fade
+  }
+
+  state Statue {
+    SendEventToRegister(eventName="K HATCHLING END")
+    on FINISHED → Start Kneeling
+  }
+
+  var Door Entry: string = "door_dreamEnter"
+
+  var X Scale: float = 0
+  var Door Entered: string = ""
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Cutscene: gameObject = <null>
+}

@@ -1,0 +1,140 @@
+# Surface Water
+# 2 location(s):
+#   Knight_Pickup / Knight
+#   resources.assets / Knight:1
+
+fsm Surface Water {
+  start Init
+  on HERO DAMAGED → Cancel All  // from any state
+  on LEAVING SCENE → Cancel All  // from any state
+  on  → Cancel All  // from any state
+
+  state Inactive {
+    on SURFACE ENTER → Take Control
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetFloatValue(floatVariable=var "Swim Speed neg", floatValue=var "Swim Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Swim Speed neg", multiplyBy=-1, everyFrame=false)
+    FindChild(gameObject=Self, childName="Sounds", storeResult=var "Sounds")
+    FindChild(gameObject=var "Sounds", childName="Swim", storeResult=var "Swim Audio")
+    FindChild(gameObject=Self, childName="RC 1", storeResult=var "RC 1")
+    FindChild(gameObject=Self, childName="RC 2", storeResult=var "RC 2")
+    on FINISHED → Inactive
+  }
+
+  state Cancel All {
+    AudioStop(gameObject=var "Swim Audio")
+    on FINISHED → Inactive
+  }
+
+  state Take Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=ResetAirMoves())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=IsSwimming())
+    on FINISHED → Enter
+  }
+
+  state Enter {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Surface In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    AudioPlay(gameObject=var "Swim Audio", volume=0, oneShotClip=<null>, finishedEvent=(none))
+    SetStringValue(stringVariable=var "Idle Anim", stringValue="Surface InToIdle", everyFrame=false)
+    SetStringValue(stringVariable=var "Swim Anim", stringValue="Surface InToSwim", everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Start Swimming?
+  }
+
+  state Idle {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Idle Anim", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=true)
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"RIGHT", isNotPressed=(none))
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"LEFT", isNotPressed=(none))
+    FadeAudio(gameObject=var "Swim Audio", startVolume=0.7, endVolume=0.25, time=0.5)
+    SetStringValue(stringVariable=var "Swim Anim", stringValue="Surface Swim", everyFrame=false)
+    on LEFT → Swim Left
+    on RIGHT → Swim Right
+    on JUMP → Jump Out
+  }
+
+  state Swim Left {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceLeft())
+    SetStringValue(stringVariable=var "Idle Anim", stringValue="Surface Idle", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Swim Anim", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Swim Speed neg", y=0, everyFrame=true)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"CANCEL")
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    AudioPlayInState(gameObject=var "Swim Audio", volume=1)  // disabled
+    FadeAudio(gameObject=var "Swim Audio", startVolume=0.25, endVolume=1, time=0.5)
+    SetStringValue(stringVariable=var "Swim Anim", stringValue="Surface Swim", everyFrame=false)  // disabled
+    on CANCEL → Idle
+    on JUMP → Jump Out
+  }
+
+  state Swim Right {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FaceRight())
+    SetStringValue(stringVariable=var "Idle Anim", stringValue="Surface Idle", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Swim Anim", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Swim Speed", y=0, everyFrame=true)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"CANCEL")
+    ListenForJump(eventTarget=Self, wasPressed=→"JUMP", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    AudioPlayInState(gameObject=var "Swim Audio", volume=1)  // disabled
+    FadeAudio(gameObject=var "Swim Audio", startVolume=0.25, endVolume=1, time=0.5)
+    SetStringValue(stringVariable=var "Swim Anim", stringValue="Surface Swim", everyFrame=false)  // disabled
+    on CANCEL → Idle
+    on JUMP → Jump Out
+  }
+
+  state Jump Out {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Airborne")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=10, everyFrame=false)
+    AudioStop(gameObject=var "Swim Audio")
+    on FINISHED → Translate?
+  }
+
+  state Regain Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithJump())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="HERO SURFACE EXIT", delay=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=NotSwimming())
+    on FINISHED → Inactive
+  }
+
+  state Translate? {
+    RayCast2dV2(fromGameObject=var "RC 1", fromPosition=(unset), direction=(0, 1), space=0, distance=1.1, minDepth=(unset), maxDepth=(unset), hitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "RC 2", fromPosition=(unset), direction=(0, 1), space=0, distance=1.1, minDepth=(unset), maxDepth=(unset), hitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Frame
+  }
+
+  state Start Swimming? {
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"RIGHT", isNotPressed=(none))
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=→"LEFT", isNotPressed=→"FINISHED")
+    on LEFT → Swim Left
+    on RIGHT → Swim Right
+    on FINISHED → Idle
+  }
+
+  state Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Regain Control
+  }
+
+  var Swim Speed: float = 5
+
+  var Swim Speed neg: float = 0
+  var Idle Anim: string = ""
+  var Swim Anim: string = "Surface Swim"
+  var RC 1: gameObject = <null>
+  var RC 2: gameObject = <null>
+  var Self: gameObject = <null>
+  var Sounds: gameObject = <null>
+  var Swim Audio: gameObject = <null>
+}

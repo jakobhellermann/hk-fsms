@@ -1,0 +1,125 @@
+# Confirm Control
+# 1 location(s):
+#   shopui_assets_all.bundle / Shop Menu/Item Confirm Group/Confirm/UI List
+
+fsm Confirm Control {
+  start Init
+
+  state Init {
+    on FINISHED → Listen
+  }
+
+  state Listen {
+    on UI SELECTION MADE → Check Selection
+  }
+
+  state Check Selection {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="UI INACTIVE", delay=0, everyFrame=false)
+    GetFsmInt(gameObject=Self, fsmName="ui_list", variableName="Current Item", storeValue=var "Current Item", everyFrame=false)
+    IntSwitch(intVariable=var "Current Item", compareTo=[1, 2], sendEvent=[→"YES", →"NO"], everyFrame=false)
+    on YES → Yes
+    on NO → No
+  }
+
+  state No {
+    FadeNestedFadeGroup(Target=var "Parent", ToAlpha=0, FadeTime=var "Fade Time")
+    Wait(time=var "Fade Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Cancel
+  }
+
+  state Cancel {
+    SendEventByName(eventTarget=GameObjectFSM(Shop Menu/Item List Group/Item List, fsm="Item List Control"), sendEvent="CANCEL", delay=0, everyFrame=false)
+  }
+
+  state Yes {
+    FadeNestedFadeGroup(Target=var "Parent", ToAlpha=0, FadeTime=var "Fade Time")
+    Wait(time=var "Fade Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Deduct Geo and set PD
+  }
+
+  state Bob {
+    IntAdd(intVariable=var "Current Item", add=-1, everyFrame=false)
+    SetFsmInt(gameObject=var "Shop Window", fsmName="shop_control", variableName="Current Item", setValue=var "Current Item", everyFrame=false)
+    CallMethodProper(gameObject=var "Figurehead", behaviour="InvAnimateUpAndDown", methodName="ReplayUpAnim", parameters=[], storeResult=(unset var), EveryFrame=false)  // disabled
+    iTweenMoveBy(gameObject=var "Shop Window", id="", vector=(0, 0.2, 0), time=0.2, delay=0, speed=(unset), easeType=21, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=false)
+    iTweenMoveBy(gameObject=var "Shop Window", id="", vector=(0, -0.2, 0), time=0.2, delay=0.2, speed=(unset), easeType=13, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Thankyou
+  }
+
+  state Thankyou {
+    ActivateGameObject(gameObject=var "Thankyou", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Thankyou", ToAlpha=1, FadeTime=var "Fade Time")
+    Wait(time=var "Fade Time", finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor 2D (audioobjects_assets_all.bundle), spawnPoint=var "Hero", audioClip=shiny_item_pickup (sfxstatic_assets_currency.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Particles
+  }
+
+  sequence state Thank Fade {
+    FadeNestedFadeGroup(Target=var "Thankyou", ToAlpha=0, FadeTime=var "Fade Time")
+    Wait(time=var "Fade Time", finishEvent=(none), realTime=false)
+    FadeNestedFadeGroup(Target=Shop Menu/Item Confirm Group, ToAlpha=0, FadeTime=0.2)
+    on FINISHED → Waiting For UI Control
+  }
+
+  state Deduct Geo and set PD {
+    SetPlayerDataBool(boolName=var "PD Bool Name", value=true)
+    SetShopItemPurchasedV2(Target=var "Item GameObject", SubItemIndex=var "Current Item Sub", IsWaitingBool=var "Is Waiting")
+    CallMethodProper(gameObject=var "Shop Window", behaviour="ShopMenuStock", methodName="SetWasItemPurchased", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Bob
+  }
+
+  state Particles {
+    PlayParticleEmitter(gameObject=var "Prt 1", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Prt 2", emit=0, resetIfPlaying=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Thank Fade
+  }
+
+  state Send Event? {
+    StringCompare(stringVariable=var "Event After Purchase", compareTo="", equalEvent=→"CANCEL", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetFsmString(gameObject=var "Shop Window", fsmName="shop_control", variableName="Send Event After Close", setValue=var "Event After Purchase", everyFrame=false)
+    SendEventToRegister(eventName="CLOSE SHOP WINDOW INACTIVE")
+    on CANCEL → No Stock?
+  }
+
+  state No Stock? {
+    CallMethodProper(gameObject=var "Shop Window", behaviour="ShopMenuStock", methodName="StockLeft", parameters=[], storeResult=var "Stock Left", EveryFrame=false)
+    BoolTest(boolVariable=var "Stock Left", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    SendEventToRegister(eventName="CLOSE SHOP WINDOW")
+    on CANCEL → End
+  }
+
+  state Waiting?... {
+    BoolTest(boolVariable=var "Is Waiting", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Send Event?
+  }
+
+  state Waiting For UI Control {
+    CheckStaticBool(variableName="IsUIListInputBlocked", trueEvent=(none), falseEvent=→"FINISHED", EveryFrame=true)
+    on FINISHED → Waiting?...
+  }
+
+  state End {
+    ActivateGameObject(gameObject=var "Thankyou", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="RESET SHOP WINDOW")
+  }
+
+  var Fade Time: float = 0.1
+  var Cost: int = 0
+  var Current Item: int = 0
+  var Current Item Sub: int = 0
+  var Stock Left: bool = false
+  var Is Waiting: bool = false
+  var Event After Purchase: string = ""
+  var PD Bool Name: string = ""
+  var Str Cancel: string = ""
+  var Str Confirm: string = ""
+  var Figurehead: gameObject = <null>
+  var Item GameObject: gameObject = <null>
+  var Parent: gameObject = Shop Menu/Item Confirm Group/Confirm
+  var Prt 1: gameObject = Shop Menu/Item Confirm Group/Purchase Prt 1
+  var Prt 2: gameObject = Shop Menu/Item Confirm Group/Purchase Prt 2
+  var Shop Window: gameObject = Shop Menu
+  var Thankyou: gameObject = Shop Menu/Item Confirm Group/Thankyou
+}

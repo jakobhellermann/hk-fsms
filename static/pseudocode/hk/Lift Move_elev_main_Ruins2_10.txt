@@ -1,0 +1,172 @@
+# Lift Move
+# 1 location(s):
+#   Ruins2_10 / elev_main
+
+fsm Lift Move {
+  start Init
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindGameObject(objectName="CameraLockArea Lift", withTag="Untagged", store=var "Cam Lock")
+    ActivateGameObject(gameObject=var "Cam Lock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Pause
+  }
+
+  state Idle {
+    on MOVE → Close
+  }
+
+  state Close {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=ruins_big_lift_gate_door_thingy_close (sharedassets79.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    ActivateGameObject(gameObject=var "Closed Block", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Open Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cam Lock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOORS CLOSE", delay=0, everyFrame=false)
+    SetParent(gameObject=var "Hero", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetInterpolateNone(gameObject=var "Hero")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rumble
+  }
+
+  state Move Out {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    iTweenMoveBy(gameObject=Self, id="", vector=var "Move Vector", time=1, delay=0, speed=7, easeType=easeInCubic, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=false, loopDontFinish=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fade
+  }
+
+  state Fade {
+    SetFsmFloat(gameObject=var "HUD Blanker", fsmName="Blanker Control", variableName="Fade Time", setValue=0.6, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → New Scene
+  }
+
+  state New Scene {
+    SendEventByName(eventTarget=GameObject(var "MainCamera"), sendEvent="FADE INSTANT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+    SetParent(gameObject=var "Hero", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPlayerDataBool(boolName="liftArrival", value=true)
+    BeginSceneTransition(sceneName=var "New Scene", entryGateName="elev_entrance", entryDelay=0, visualization=0, preventCameraFadeOut=false)
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Check Arrival
+  }
+
+  state Check Arrival {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="liftArrival", isTrue=→"ARRIVAL", isFalse=→"FINISHED")
+    on ARRIVAL → Parent Hero
+    on FINISHED → Check Lowered
+  }
+
+  state Set Hero pos {
+    SetPlayerDataBool(boolName="liftArrival", value=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Bottom Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Cam Lock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    GetPosition(gameObject=Self, vector=var "Self Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    Vector3Add(vector3Variable=var "Hero Set Vector", addVector=var "Self Pos", everyFrame=false, perSecond=false)
+    SetPosition(gameObject=var "Hero", vector=var "Hero Set Vector", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)  // disabled
+    ActivateGameObject(gameObject=var "Inactive Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Closed Block", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Open Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Arrives Up", isTrue=→"ARRIVE UP", isFalse=→"ARRIVE DOWN", everyFrame=false)
+    on ARRIVE UP → Set Down
+    on ARRIVE DOWN → Set Up
+  }
+
+  state Check Lowered {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "PlayerData Bool", isTrue=→"LOWER", isFalse=→"FINISHED")
+    on LOWER → Lower
+    on FINISHED → Idle
+  }
+
+  state Lower {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Bottom Y", z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOORS OPEN", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Inactive Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Closed Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Open Block", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Set Down {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-18, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Arrival Tween
+  }
+
+  state Set Up {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=18, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Arrival Tween
+  }
+
+  state Arrival Tween {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=var "Self Z", space=0, everyFrame=false)
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=ruins_big_lift_activate (sharedassets79.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetVector3XYZ(vector3Variable=var "Tween Vector", vector3Value=(unset), x=var "Self X", y=var "Bottom Y", z=var "Self Z", everyFrame=false)
+    iTweenMoveTo(gameObject=Self, id="", transformPosition=var "", vectorPosition=var "Tween Vector", time=(unset), delay=0, speed=7, space=0, easeType=easeOutCubic, loopType=none, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=true, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    on FINISHED → Arrive
+  }
+
+  state Arrive {
+    AudioStop(gameObject=Self)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=ruins_big_lift_arrive (sharedassets79.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetParent(gameObject=var "Hero", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Roof Dust", emit=0)
+    PlayParticleEmitter(gameObject=var "Whole Dust", emit=0)
+    on FINISHED → Open
+  }
+
+  state Open {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DOORS OPEN", delay=0, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=ruins_big_lift_gate_door_thingy_open (sharedassets7.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    ActivateGameObject(gameObject=var "Cam Lock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Inactive Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Closed Block", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Open Block", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Rumble {
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Hero", audioClip=ruins_big_lift_activate (sharedassets79.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    PlayParticleEmitter(gameObject=var "Roof Dust", emit=0)
+    PlayParticleEmitter(gameObject=var "Whole Dust", emit=0)
+    on FINISHED → Move Out
+  }
+
+  state Parent Hero {
+    SetParent(gameObject=var "Hero", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    on FINISHED → Set Hero pos
+  }
+
+  var Bottom Y: float = 162.59
+  var Arrives Up: bool = true
+  var New Scene: string = "Ruins2_10b"
+  var PlayerData Bool: string = "cityLift2"
+  var Move Vector: vector3 = (0, -30, 0)
+
+  var Self X: float = 0
+  var Self Z: float = 0
+  var Hero Set Vector: vector3 = (-0.21, -3.65, 0.524)
+  var Self Pos: vector3 = (0, 0, 0)
+  var Tween Vector: vector3 = (0, 0, 0)
+  var Cam Lock: gameObject = <null>
+  var Closed Block: gameObject = elev_main/Closed Block
+  var Inactive Block: gameObject = elev_main/Inactive Block
+  var Open Block: gameObject = elev_main/Open Block
+  var Roof Dust: gameObject = elev_main/Roof Dust
+  var Self: gameObject = <null>
+  var Whole Dust: gameObject = elev_main/Whole Dust
+}

@@ -1,0 +1,238 @@
+# Dialogue
+# 1 location(s):
+#   Bone_18 / Quest Scene/Pilgrim Stomper NPC
+
+fsm Dialogue {
+  start Init
+
+  state Init {
+    ActivateGameObject(gameObject=var "Quest Can Complete Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Quest Complete Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pre Quest Complete Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Quest Complete?
+  }
+
+  sequence state Startle {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Turn Left", AnimationCompleteEvent=(none))  // disabled
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Startle", AnimationCompleteEvent=(none))  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle Left", animationTriggerEvent=(none), animationCompleteEvent=(none))  // disabled
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=(none), realTime=false)  // disabled
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Turn Right", AnimationCompleteEvent=(none))  // disabled
+    on FINISHED → Activate
+  }
+
+  state Wait For Hero {
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Startle
+  }
+
+  state Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=(none), ActiveOuter=→"SING", IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Quest Status?
+    on SING → Sing
+  }
+
+  sequence state Sing {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Turn Left", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Sing End
+  }
+
+  sequence state Sing End {
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Sing End", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Turn Right", AnimationCompleteEvent=(none))
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle Right")
+    on INTERACT → Quest Status?
+    on FINISHED → Idle
+  }
+
+  state End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdleRight")
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    on FINISHED → Start Quest?
+  }
+
+  state Quest Status? {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdleLeft")
+    PlayerDataBoolTest(boolName="metLearnedPilgrim", isTrue=(none), isFalse=→"MEET")
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=true, npcTitle="LEARNEDPILGRIM")
+    PlayerDataBoolTrueAndFalse(trueBool="blackThreadWorld", falseBool="metLearnedPilgrimAct3", isTrue=→"REMEET ACT 3", isFalse=(none))
+    CheckQuestState(NotTrackedEvent=→"NOT TRACKED", TrackedEvent=→"TRACKED", CompletedEvent=(none), Quest=var "Quest")
+    on NOT TRACKED → Reoffer Quest
+    on TRACKED → Convo Check
+    on MEET → Meet 1
+    on REMEET ACT 3 → Act3 Remeet 1
+  }
+
+  sequence state Quest Prompt {
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=→"TRACKED", CompletedEvent=(none), Quest=<null>)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    QuestYesNo(Quest=var "Quest", YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Quest Decline
+    on TRUE → Quest Accept
+    on TRACKED → Accepted Already
+  }
+
+  state Quest Decline {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Convo Key", falseString="PILGRIM_STOMPER_QUEST_DECLINE", trueString="PILGRIM_STOMPER_QUEST_DECLINE_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Quest Accept {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Convo Key", falseString="PILGRIM_STOMPER_QUEST_ACCEPT", trueString="PILGRIM_STOMPER_QUEST_ACCEPT_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Reoffer Quest {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Convo Key", falseString="PILGRIM_STOMPER_QUEST_REOFFER", trueString="PILGRIM_STOMPER_QUEST_REOFFER_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Prompt
+  }
+
+  state Convo Check {
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"CONVO 3", isFalse=(none))
+    IntSwitch(intVariable=var "Value", compareTo=[0, 1, 2], sendEvent=[→"CONVO 1", →"CONVO 2", →"CONVO 3"], everyFrame=false)
+    on FINISHED → Convo 3
+    on CONVO 1 → Convo 1
+    on CONVO 2 → Convo 2
+    on CONVO 3 → Convo 3
+  }
+
+  state Quest Complete? {
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=→"CAN COMPLETE", CompletedEvent=→"COMPLETE", Quest=<null>)
+    CheckQuestState(NotTrackedEvent=(none), TrackedEvent=(none), CompletedEvent=→"CAN COMPLETE", Quest=var "Quest")
+    CanEndQuest(CannotEndEvent=(none), CanEndEvent=→"CAN COMPLETE", StoreValue=(unset), Quest=var "Quest")
+    ActivateGameObject(gameObject=var "Pre Quest Complete Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on CAN COMPLETE → Do Battle
+    on COMPLETE → Everyone Dead
+    on FINISHED → Wait For Hero
+  }
+
+  state Do Battle {
+    ActivateGameObject(gameObject=var "Quest Can Complete Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pre Quest Complete Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Everyone Dead {
+    ActivateGameObject(gameObject=var "Quest Complete Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pre Quest Complete Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Meet 1 {
+    SetPlayerDataVariable(VariableName="metLearnedPilgrim", SetValue=true)
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"ACT 3", isFalse=(none))
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_MEET_1", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=true, npcTitle="LEARNEDPILGRIM")
+    on CONVO_END → Meet 2
+    on ACT 3 → Act3 Meet 1
+  }
+
+  state First Offer {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdleLeft")
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_OFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Prompt
+  }
+
+  state Meet 2 {
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_MEET_2", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdleRight")
+    on CONVO_END → First Offer
+  }
+
+  state Convo 1 {
+    IntAdd(intVariable=var "Value", add=1, everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_CONVO_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Convo 2 {
+    IntAdd(intVariable=var "Value", add=1, everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_CONVO_2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Convo 3 {
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_CONVO_3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End
+  }
+
+  state Start Quest? {
+    BoolTest(boolVariable=var "Do Start Quest", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BeginQuestV2(ShowPrompt=true, Quest=<null>)
+    SetBoolValue(boolVariable=var "Do Start Quest", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Accepted Already {
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    ConvertBoolToString(boolVariable=var "Is Act 3", stringVariable=var "Convo Key", falseString="PILGRIM_STOMPER_QUEST_ACCEPTED_WISHWALL", trueString="PILGRIM_STOMPER_QUEST_ACCEPTED_WISHWALL_ACT3", everyFrame=false)
+    RunDialogue(Sheet="Bonebottom", Key=var "Convo Key", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    SetBoolValue(boolVariable=var "Do Start Quest", boolValue=true, everyFrame=false)
+    on CONVO_END → Quest Accept
+  }
+
+  state Act3 Meet 1 {
+    SetPlayerDataVariable(VariableName="metLearnedPilgrimAct3", SetValue=true)
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_MEET_1_ACT3", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=true, npcTitle="LEARNEDPILGRIM")
+    on CONVO_END → Act3 Meet 2
+  }
+
+  state Act3 Meet 2 {
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_MEET_2_ACT3", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdleRight")
+    on CONVO_END → Act3 First Offer
+  }
+
+  state Act3 First Offer {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdleLeft")
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_OFFER_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Prompt
+  }
+
+  state Act3 Remeet 1 {
+    SetPlayerDataVariable(VariableName="metLearnedPilgrimAct3", SetValue=true)
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_REMEET_ACT3_1", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Act3 Remeet 2
+  }
+
+  state Act3 Remeet 2 {
+    RunDialogue(Sheet="Bonebottom", Key="PILGRIM_STOMPER_QUEST_REMEET_ACT3_2", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToIdleRight")
+    on CONVO_END → End Without Turn
+  }
+
+  state End Without Turn {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    on FINISHED → Start Quest?
+  }
+
+  var Quest Can Complete Folder: gameObject = Quest Scene/Final Encounter
+  var Quest Complete Folder: gameObject = Quest Scene/Quest Complete
+  var Pre Quest Complete Folder: gameObject = Quest Scene/Pre Completion
+
+  var Value: int = 0
+  var Do Start Quest: bool = false
+  var Is Act 3: bool = false
+  var Convo Key: string = ""
+  var Quest: object = <null>
+}

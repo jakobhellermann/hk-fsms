@@ -1,0 +1,599 @@
+# Dialogue
+# 1 location(s):
+#   Belltown_Room_doctor / Doctor Fly Scene/Doctor Fly
+
+fsm Dialogue {
+  start Init
+  on RESPAWNING → Respawning  // from any state
+
+  state Init {
+    FadeNestedFadeGroup(Target=var "Fader", ToAlpha=0, FadeTime=0)
+    GetPosition(gameObject=Self, vector=var "Start Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=var "Start Pos 2D", x=(unset), y=(unset), space=0, everyFrame=false)
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    CreateObject(gameObject=Scene Fader (localpoolprefabs_assets_areabell.bundle), spawnPoint=<null>, position=(0, 0, 0), rotation=(0, 0, 0), storeObject=var "Scene Fader")
+    FadeNestedFadeGroup(Target=var "Scene Fader", ToAlpha=0, FadeTime=0)
+    SetProperty(targetProperty=Rigidbody2D.bodyType on Doctor Fly Scene/Doctor Fly@Rigidbody2D, everyFrame=false)
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Wait Frame
+  }
+
+  state Hidden {
+    ActivateInteractible(Target=var "NPC Controller", Activate=false, AllowQueueing=false, UseChildren=false)
+    GetPosition(gameObject=var "Hide Marker", vector=var "Hide Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Sprite", active=false)
+    SetPosition(gameObject=Self, vector=var "Hide Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    TriggerEnterEventSubscribe(trigger=var "Force Talk Trigger", triggerEnteredEvent=→"ENTER", triggerExitedEvent=(none), triggerStayedEvent=(none))
+    on ENTER → Capture Hero
+  }
+
+  state Appear {
+    SetPlayerDataVariable(VariableName="MetBelltownDoctor", SetValue=true)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    PlayRandomAudioClipTable(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Yarnaby_talk (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetMeshRenderer(gameObject=var "Sprite", active=true)
+    EaseColor(fromValue=(0, 0, 0, 1), toValue=(1, 1, 1, 1), colorVariable=var "Color", time=0.3, speed=(unset), delay=(unset), easeType=3, reverse=false, finishEvent=(none), realTime=false)
+    Tk2dSpriteSetColor(gameObject=var "Sprite", color=var "Color", everyframe=true)
+    iTweenMoveTo(gameObject=Self, id="", transformPosition=var "", vectorPosition=var "Start Pos", time=0.3, delay=0, speed=(unset), space=0, easeType=27, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Flutter", volume=0, oneShotClip=<null>)
+    FadeAudio(gameObject=var "Audio Loop Flutter", startVolume=(unset), endVolume=1, time=0.3)
+    on FINISHED → Exclaim
+  }
+
+  state Idle {
+    NPCFlyToPoint(Target=Self, FlyToPos=var "Start Pos 2D", ArrivedEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=1.5, MaxReactDelay=1.7, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Cursed? 3
+    on SING → Sing
+    on STARTLE → Startle
+  }
+
+  sequence state Dialogue End {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=var "NPC Controller", UseChildren=false)
+    GameObjectCompare(gameObjectVariable=var "Queued Spawn", compareTo=<null>, equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    CreateObject(gameObject=var "Queued Spawn", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SetGameObject(variable=var "Queued Spawn", gameObject=<null>, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Met? {
+    PlayerDataVariableTest(VariableName="MetBelltownDoctor", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Hidden
+    on TRUE → Idle
+  }
+
+  state Repeat {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Interacted End
+  }
+
+  state Cursed Offer {
+    SetPlayerDataVariable(VariableName="BelltownDoctorQuestOffered", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_OFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on LINE_END → Cursed Offer 2
+  }
+
+  state Quest Offered? {
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    PlayerDataVariableTest(VariableName="BelltownDoctorQuestOffered", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Cursed Offer
+    on TRUE → Cursed Reoffer
+  }
+
+  state Cursed Reoffer {
+    ShowNpcDialogueTitle(Target=var "NPC Controller")
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_REOFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Take Quest?
+  }
+
+  state Cursed? 2 {
+    ActivateInteractible(Target=var "NPC Controller", Activate=true, AllowQueueing=false, UseChildren=false)
+    PlayerDataVariableTest(VariableName="IsAnyCursed", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=(none))
+    on FINISHED → Convo Choice
+    on TRUE → Quest Active?
+  }
+
+  state Dialogue End 2 {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=false)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    SetHeroTalkWatchTarget(Target=<null>, EndedFacingForwardEvent=(none))
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=var "NPC Controller", UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  sequence state Exclaim {
+    Tk2dSpriteSetColor(gameObject=var "Sprite", color=(1, 1, 1, 1), everyframe=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Wait(time=1, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Sing End", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Cursed? 2
+  }
+
+  state Sing {
+    ActivateInteractible(Target=var "NPC Controller", Activate=false, AllowQueueing=false, UseChildren=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on CANCEL → Activate NPC
+    on FINISHED → Sing 2
+  }
+
+  sequence state Sing End {
+    Tk2dPlayAnimationWaitV2(Target=Self, ClipName="Sing End", AnimationCompleteEvent=(none))
+    on FINISHED → Activate NPC
+  }
+
+  state Interacted {
+    ShowNpcDialogueTitle(Target=var "NPC Controller")
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    on FINISHED → Repeat Convo Choice
+  }
+
+  state Interacted End {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=false)
+    SetHeroTalkWatchTarget(Target=<null>, EndedFacingForwardEvent=→"FINISHED")
+    on FINISHED → Dialogue End
+  }
+
+  sequence state Crest Get Antic {
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 0), duration=1.5)
+    Wait(time=2, finishEvent=(none), realTime=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="CREST CHANGE ANTIC", delay=0, everyFrame=false)
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    Wait(time=1.75, finishEvent=(none), realTime=false)
+    on FINISHED → Un-maggot?
+  }
+
+  state Crest Change {
+    UnlockCrest(Crest=var "Crest Object")
+    AutoEquipCrestV2(Crest=var "Crest Object", SkipToAppear=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetSilkRegenBlocked", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="UpdateSilkCursed", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    QueueSaveGameV2(createAutoSave=true, nameEnum=GAINED_WITCH)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Kneeling", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → Curse Fix Fade Up
+  }
+
+  state Curse Fix Fade Down Left {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Yarnaby_approach (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FaceDirectionV2(ObjectA=Self, Direction=1, SpriteFacesRight=true, NewAnimationClip="Turn To Fly", ResetFrame=true, PauseBetweenTurns=0, StoreDuration=(unset), EveryFrame=true)
+    Translate(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), space=1, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=2)
+    TransitionToAudioSnapshot(snapshot=Cinematic (audioobjects_assets_all.bundle), transitionTime=2)
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Setup Audio
+  }
+
+  sequence state Fix Curse? {
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=var "NPC Controller", UseChildren=false)
+    QuestCompleteYesNo(Quest=Doctor Curse Cure (dataassets_assets_assets/dataassets/questsystem/quests.bundle), ConsumeCurrency=false, YesEvent=(none), NoEvent=→"FALSE", ReturnHUDAfter=false)
+    EndQuest(ConsumeCurrency=true, Quest=Doctor Curse Cure (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on FALSE → Decline Fix
+    on FINISHED → Accept Fix
+  }
+
+  state Cursed? 3 {
+    PlayerDataVariableTest(VariableName="IsAnyCursed", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=(none))
+    on TRUE → Quest Active?
+    on FINISHED → Interacted
+  }
+
+  sequence state Curse Fix Fade Up {
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=3)
+    FadeNestedFadeGroup(Target=var "Fader", ToAlpha=0, FadeTime=3)
+    Wait(time=5, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=weak_hornet_exert_standard_02 (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Normal 3", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Cursed Fixed 2
+  }
+
+  state Cursed Fixed 2 {
+    SetPlayerDataBool(boolName="BelltownDoctorCuredCurse", value=true)
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetDeathRespawnMarker(Target=Doctor Fly Scene/Death Respawn Marker)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_ENDED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → End Watch Target
+  }
+
+  state Cinematic {
+    ScreenFader(startColour=(0.029411793, 0.029411793, 0.029411793, 0), endColour=(0, 0, 0, 0), duration=0)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    StartCinematic(CinematicPlayer=var "Cinematic Player")
+    on CINEMATIC END → Combo Bar Prompt
+  }
+
+  state Set After Scene Pos's {
+    SetHeroTalkWatchTarget(Target=<null>, EndedFacingForwardEvent=(none))
+    ClearHeroEffects()
+    GetPosition2D(gameObject=Doctor Fly Scene/After Scene Doctor Pos, vector=var "Set Pos 2D", x=(unset), y=(unset), space=0, everyFrame=false)
+    NPCFlyToPoint(Target=Self, FlyToPos=var "Set Pos 2D", ArrivedEvent=(none))
+    GetPosition2D(gameObject=Doctor Fly Scene/After Scene Hero Pos, vector=var "Set Pos 2D", x=(unset), y=(unset), space=0, everyFrame=false)
+    PositionColliderOnGroundV2(Target=var "Hero", GroundPos=var "Set Pos 2D")
+    HeroFaceInstant(Target=var "Room Centre")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetSilkRegenBlocked", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Doctor Fly Scene/Machine States, behaviour="TestGameObjectActivator", methodName="DoEvaluate", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Cinematic
+  }
+
+  state Accept Fix {
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_FIX_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Check Side 2
+  }
+
+  state Cursed Offer 2 {
+    ShowNpcDialogueTitle(Target=var "NPC Controller")
+    on CONVO_END → Take Quest?
+  }
+
+  state Un-maggot? {
+    GetHeroCState(VariableName="isMaggoted", StoreValue=var "Test", EveryFrame=false)
+    BoolTest(boolVariable=var "Test", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetHeroMaggoted(Value=false)
+    on FINISHED → Crest Change
+  }
+
+  state Decline Fix {
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_FIX_DECLINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Dialogue End 2
+  }
+
+  state Repeat Convo Choice {
+    SendEvent(eventTarget=Self, sendEvent=→"CONVO 3", delay=0, everyFrame=false)  // disabled
+    GetPlayerDataInt(intName="BelltownDoctorConvo", storeValue=var "Convo State")
+    IntSwitch(intVariable=var "Convo State", compareTo=[0, 1, 2], sendEvent=[→"CONVO 1", →"CONVO 2", →"CONVO 3"], everyFrame=false)
+    on CONVO 1 → Convo 1
+    on CONVO 2 → Convo 2
+    on CONVO 3 → Turn Hero
+    on FINISHED → Repeat
+  }
+
+  state Convo 1 {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    SetPlayerDataInt(intName="BelltownDoctorConvo", value=1)
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CONVO_1", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Interacted End
+  }
+
+  state Convo 2 {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    SetPlayerDataInt(intName="BelltownDoctorConvo", value=2)
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CONVO_2", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Interacted End
+  }
+
+  state Slap Convo 1 {
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_SLAP_INTRO", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Check Side
+  }
+
+  state Pre Slap 2 {
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_SLAP_PRE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Dialogue End 4
+  }
+
+  state Move In + Slap 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Grab", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CallStaticMethod(className="HeroTalkAnimation", methodName="SetBlocked", parameters=[true], storeResult=(unset var), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Idle Slap", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Slap Impact 2
+  }
+
+  state Post Slap 2 {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetProperty(targetProperty=Rigidbody2D.bodyType on Doctor Fly Scene/Doctor Fly@Rigidbody2D, everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_SLAP_POST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    SetPlayerDataInt(intName="BelltownDoctorConvo", value=3)
+    on CONVO_END → Dialogue End
+  }
+
+  state Move To Grab Start 2 {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=false)
+    NPCFlyToPoint(Target=Self, FlyToPos=var "Hero Grab Start Pos", ArrivedEvent=→"FINISHED")
+    on FINISHED → Pre Slap 2
+  }
+
+  sequence state Dialogue End 4 {
+    SetPosition2D(GameObject=Self, Vector=var "Hero Grab Start Pos", X=0, Y=0, Space=0, EveryFrame=false)
+    SetHeroTalkWatchTarget(Target=<null>, EndedFacingForwardEvent=(none))
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=var "NPC Controller", UseChildren=false)
+    on FINISHED → Move In + Wait 2
+  }
+
+  state Move In + Wait 2 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Yarnaby_approach (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    tk2dPlayAnimAfterPreviousComplete(Target=Self, AnimName="Grab", StoreDidPlay=(unset))
+    SetProperty(targetProperty=Rigidbody2D.bodyType on Doctor Fly Scene/Doctor Fly@Rigidbody2D, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=var "Move In Velocity", x=(unset), y=(unset), everyFrame=false)
+    Wait(time=1.7, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Move In + Slap 2
+  }
+
+  state Slap Impact 2 {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Yarnaby_hit (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayParticleEmitter(gameObject=var "Pt Slap", emit=0, resetIfPlaying=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Slap (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=hornet_slap_B_2 (sfxstatic_assets_areabellareacoralareagreymoorareashellwoodareasong.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Slap X Velocity", y=10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.65, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Hit Recoil", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    tk2dPlayAnimAfterPreviousComplete(Target=Self, AnimName="Fly", StoreDidPlay=(unset))
+    CallMethodProper(gameObject=var "Sprite", behaviour="SpriteFlash", methodName="FlashEnemyHit", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Slap End 2
+  }
+
+  state Slap End 2 {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallStaticMethod(className="HeroTalkAnimation", methodName="SetBlocked", parameters=[false], storeResult=(unset var), everyFrame=false)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Post Slap 2
+  }
+
+  state Decelerate 2 {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)  // disabled
+    DecelerateV2(gameObject=Self, deceleration=0.7, brakeOnExit=true)  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))  // disabled
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)  // disabled
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    on FINISHED → Post Slap 2
+  }
+
+  sequence state Combo Bar Prompt {
+    FadeNestedFadeGroup(Target=var "Fader", ToAlpha=1, FadeTime=0)
+    PlayAudioEvent(audioClip=ui_crest_get_witch_pt_1_start_on_cut_to_black (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=1, finishEvent=(none), realTime=false)
+    CreateObject(gameObject=UI Msg Crest Evolve (prompts_assets_all.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "UI Msg")
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Cursed", everyFrame=false)
+    on GET ITEM MSG END → Crest Get Antic
+  }
+
+  state Capture Hero {
+    RunFSM(fsmTemplateControl=template=-5127244416333177452, finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → Appear
+  }
+
+  state Quest Active? {
+    CheckQuestState(NotTrackedEvent=→"FALSE", TrackedEvent=(none), CompletedEvent=(none), Quest=Doctor Curse Cure (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    CanEndQuest(CannotEndEvent=(none), CanEndEvent=→"CANCEL", StoreValue=(unset), Quest=Doctor Curse Cure (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    on FALSE → Quest Offered?
+    on FINISHED → Quest Repeat
+    on CANCEL → Fix Offered?
+  }
+
+  state Fix Offered? {
+    ShowNpcDialogueTitle(Target=var "NPC Controller")
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    PlayerDataVariableTest(VariableName="BelltownDoctorFixOffered", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Fix Offer
+    on TRUE → Fix Reoffer
+  }
+
+  sequence state Take Quest? {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=var "NPC Controller", UseChildren=false)
+    QuestYesNo(Quest=Doctor Curse Cure (dataassets_assets_assets/dataassets/questsystem/quests.bundle), YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on TRUE → Accept Quest
+    on FALSE → Decline Quest
+  }
+
+  state Accept Quest {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=false)  // disabled
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → End Watch Target
+  }
+
+  state Decline Quest {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=false)  // disabled
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_DECLINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → End Watch Target
+  }
+
+  state Quest Repeat {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    ShowNpcDialogueTitle(Target=var "NPC Controller")
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Dialogue End 2
+  }
+
+  state Fix Reoffer {
+    ShowNpcDialogueTitle(Target=var "NPC Controller")
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_FIX_REOFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on CONVO_END → Fix Curse?
+  }
+
+  state Fix Offer {
+    SetPlayerDataVariable(VariableName="BelltownDoctorFixOffered", SetValue=true)
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CURSE_FIX_OFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=var "NPC Controller")
+    on LINE_END → Fix Curse?
+  }
+
+  state Setup Audio {
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    AudioPlaySimpleV2(gameObject=var "Cinematic Player", volume=1, startTime=0, oneShotClip=extractor_assembly (sfxstatic_assets_areabell.bundle))
+    Wait(time=4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Set After Scene Pos's
+  }
+
+  sequence state End Watch Target {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=var "NPC Controller", UseChildren=false)
+    SetHeroTalkWatchTarget(Target=<null>, EndedFacingForwardEvent=(none))
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    on FINISHED → Idle
+  }
+
+  state Sing 2 {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.5, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Yarnaby_sing (sfxdynamic_assets_areabell.bundle), noThreadEffects=true, noPuppetString=true, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+  }
+
+  state Activate NPC {
+    ActivateInteractible(Target=var "NPC Controller", Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    on FINISHED → Idle
+  }
+
+  state Check Side {
+    GetPosition2D(gameObject=var "Hero", vector=var "Hero Grab Start Pos", x=var "Hero X Position", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Room Centre", vector=(unset), x=var "Room X Position", y=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X Position", float2=var "Room X Position", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TRUE", everyFrame=false)
+    on FINISHED → Left
+    on TRUE → Right
+  }
+
+  state Left {
+    Vector2Add(vector2Variable=var "Hero Grab Start Pos", addVector=(3, 1.7), everyFrame=false, perSecond=false)
+    SetVector2Value(vector2Variable=var "Move In Velocity", vector2Value=(-0.8, -0.35), everyFrame=false)
+    SetVector2Value(vector2Variable=var "Slapped Velocity", vector2Value=(5, 3), everyFrame=false)
+    SetFloatValue(floatVariable=var "Slap X Velocity", floatValue=40, everyFrame=false)
+    on FINISHED → Move To Grab Start 2
+  }
+
+  state Right {
+    Vector2Add(vector2Variable=var "Hero Grab Start Pos", addVector=(-3, 1.7), everyFrame=false, perSecond=false)
+    SetVector2Value(vector2Variable=var "Move In Velocity", vector2Value=(0.8, -0.35), everyFrame=false)
+    SetVector2Value(vector2Variable=var "Slapped Velocity", vector2Value=(-5, 3), everyFrame=false)
+    SetFloatValue(floatVariable=var "Slap X Velocity", floatValue=-40, everyFrame=false)
+    on FINISHED → Move To Grab Start 2
+  }
+
+  state Turn Hero {
+    HeroTurnToFace(Target=Self)
+    ShowNpcDialogueTitle(Target=var "NPC Controller")
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=true)
+    on FINISHED → Slap Convo 1
+  }
+
+  state Convo Choice {
+    GetPlayerDataInt(intName="BelltownDoctorConvo", storeValue=var "Convo State")
+    IntCompare(integer1=var "Convo State", integer2=2, equal=→"CONVO 3", lessThan=(none), greaterThan=(none), everyFrame=false)
+    on CONVO 3 → Turn Hero
+    on FINISHED → Interacted
+  }
+
+  state Check Side 2 {
+    ActivateNPCFlyAroundTalking(Target=Self, SetActive=false)
+    ActivateLookAnimNPC(Activate=false, IsFacingLeft=(unset), Target=Self)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Doctor Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)  // disabled
+    FloatSignTest(floatValue=var "Doctor Scale", isPositive=→"TRUE", isNegative=(none), everyFrame=false)  // disabled
+    GetPosition2D(gameObject=var "Hero", vector=var "Hero Grab Start Pos", x=var "Hero X Position", y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=var "Self", vector=(unset), x=var "Room X Position", y=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Hero X Position", float2=var "Room X Position", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"TRUE", everyFrame=false)
+    on FINISHED → Accept End Dlg 2
+    on TRUE → Accept End Dlg
+  }
+
+  state Curse Fix Fade Down Right {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Yarnaby_approach (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    Translate(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), space=1, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=2)
+    TransitionToAudioSnapshot(snapshot=Cinematic (audioobjects_assets_all.bundle), transitionTime=2)
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Setup Audio
+  }
+
+  state Respawning {
+    Tk2dSpriteSetColor(gameObject=var "Sprite", color=(1, 1, 1, 1), everyframe=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Flutter", volume=0, oneShotClip=<null>)
+    FadeAudio(gameObject=var "Audio Loop Flutter", startVolume=(unset), endVolume=1, time=0.3)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SetPosition2D(GameObject=Self, Vector=var "Start Pos 2D", X=0, Y=0, Space=0, EveryFrame=false)
+    ActivateInteractible(Target=var "NPC Controller", Activate=true, AllowQueueing=false, UseChildren=false)
+    ActivateLookAnimNPC(Activate=true, IsFacingLeft=(unset), Target=Self)
+    Wait(time=0, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Wait Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Hidden
+  }
+
+  state Startle {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Yarnaby_startle (sfxdynamic_assets_areabell.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateInteractible(Target=var "NPC Controller", Activate=false, AllowQueueing=false, UseChildren=false)
+    Wait(time=0.5, finishEvent=→"CANCEL", realTime=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on CANCEL → Sing End
+  }
+
+  state Accept End Dlg {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=var "NPC Controller", UseChildren=false)
+    Wait(time=0.4, finishEvent=(none), realTime=false)
+    on FINISHED → Curse Fix Fade Down Right
+  }
+
+  state Accept End Dlg 2 {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=var "NPC Controller", UseChildren=false)
+    Wait(time=0.4, finishEvent=(none), realTime=false)
+    on FINISHED → Curse Fix Fade Down Left
+  }
+
+  var Cinematic Player: gameObject = Cinematic Player
+
+  var Hero X Position: float = 0
+  var Room X Position: float = 0
+  var Doctor Scale: float = 0
+  var Slap X Velocity: float = 0
+  var Convo State: int = 0
+  var Test: bool = false
+  var Hero Grab Start Pos: vector2 = (0, 0)
+  var Start Pos 2D: vector2 = (0, 0)
+  var Set Pos 2D: vector2 = (0, 0)
+  var Move In Velocity: vector2 = (0, 0)
+  var Slapped Velocity: vector2 = (0, 0)
+  var Start Pos: vector3 = (0, 0, 0)
+  var Hide Pos: vector3 = (0, 0, 0)
+  var Color: color = (0, 0, 0, 1)
+  var NPC Controller: gameObject = Doctor Fly Scene
+  var Hide Marker: gameObject = Doctor Fly Scene/Doctor Hidden Marker
+  var Self: gameObject = <null>
+  var Scene Fader: gameObject = <null>
+  var Sprite: gameObject = Doctor Fly Scene/Doctor Fly/Sprite
+  var Queued Spawn: gameObject = <null>
+  var Fader: gameObject = Doctor Fly Scene/Fader
+  var Audio Loop Flutter: gameObject = Doctor Fly Scene/Doctor Fly/Audio Loop Flutter
+  var Pt Slap: gameObject = Doctor Fly Scene/Doctor Fly/Pt Slap
+  var UI Msg: gameObject = <null>
+  var Room Centre: gameObject = Doctor Fly Scene/Room Centre Marker
+  var Audio Loop Voice: gameObject = Doctor Fly Scene/Doctor Fly/Audio Loop Voice
+  var Force Talk Trigger: object = Doctor Fly Scene/Force Talk Range@TriggerEnterEvent
+  var Crest Object: object = Witch (dataassets_assets_assets/dataassets/tools/crestitems.bundle)
+}

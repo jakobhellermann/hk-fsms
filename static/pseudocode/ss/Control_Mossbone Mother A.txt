@@ -1,0 +1,789 @@
+# Control
+# 1 location(s):
+#   Weave_03 / Boss Scene/Bosses/Mossbone Mother A
+
+fsm Control {
+  start Init
+  on EXTRACT → Get Dir  // from any state
+  on STUN → Stun Start  // from any state
+  on ZERO HP → End  // from any state
+
+  sequence state Init {
+    NextFrameEvent(sendEvent=(none))
+    GetOwner(storeGameObject=var "Self")
+    GetHero(storeResult=var "Hero")
+    GetHP(target=Self, storeValue=var "HP")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    MultiplyIntByFloat(integer=var "HP", multiplyFloat=0.95, storeResult=var "HP P2", everyFrame=false, forceRoundUp=false)
+    MultiplyIntByFloat(integer=var "HP", multiplyFloat=0.9, storeResult=var "HP Call Buddy", everyFrame=false, forceRoundUp=false)
+    MultiplyIntByFloat(integer=var "HP", multiplyFloat=0.7, storeResult=var "HP Half", everyFrame=false, forceRoundUp=false)
+    FindChild(gameObject=Self, childName="Cocoon", storeResult=var "Cocoon")
+    FindChild(gameObject=Self, childName="Cocoon Break", storeResult=var "Cocoon Break")
+    FindChild(gameObject=Self, childName="Strike", storeResult=var "Strike")
+    FindChild(gameObject=Self, childName="Pt Drip", storeResult=var "Pt Drip")
+    FindChild(gameObject=Self, childName="Pt Dust", storeResult=var "Pt Dust")
+    FindChild(gameObject=Self, childName="Pt SwoopDust", storeResult=var "Pt SwoopDust")
+    FindChild(gameObject=Self, childName="Pt SwoopRock", storeResult=var "Pt SwoopRock")
+    FindChild(gameObject=Self, childName="Terrain Block", storeResult=var "Terrain Block")
+    FindChild(gameObject=Self, childName="Pt Idle", storeResult=var "Pt Idle")
+    FindChild(gameObject=Self, childName="Pt Roar", storeResult=var "Pt Roar")
+    FindChild(gameObject=Self, childName="DazedEffect Marker", storeResult=var "DazedEffect Marker")  // disabled
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetAudioSource(gameObject=Self, active=false)
+    BoolTest(boolVariable=var "Double Fight Buddy", isTrue=→"BUDDY", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Double Fight", isTrue=→"DOUBLE", isFalse=(none), everyFrame=false)
+    PlayerDataBoolTest(boolName="encounteredMossMother", isTrue=→"RETURN", isFalse=(none))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.3, None=(none), ActiveInner=→"NOISE", ActiveOuter=→"NOISE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on BLOCKED HIT → Check Hero in Room
+    on RETURN → Return Ready
+    on COCOON KILL → Check Hero in Room
+    on DOUBLE → Return Ready 2
+    on BUDDY → Buddy
+    on WAKE → Start Battle
+    on NOISE → Check Hero in Room
+  }
+
+  state Idle {
+    BoolTest(boolVariable=var "Double Fight", isTrue=→"DOUBLE", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Hero X", float2=var "Centre X", tolerance=0, equalBool=(unset), lessThanBool=var "Hero Left", greaterThanBool=var "Hero Right", everyFrame=true)
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=12, speedMax=6, acceleration=0.375, targetsHeight=true, height=6, maxHeight=var "Max Height", stayLeft=false, stayRight=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=10, MinReactDelay=0.3, MaxReactDelay=0.4, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Idle Time", tolerance=0, equal=→"WAIT", lessThan=(none), greaterThan=→"WAIT", everyFrame=true)
+    on NEEDOLIN → Sing Antic
+    on TOOK DAMAGE → Dmg Response
+    on WAIT → Check First Idle
+    on DOUBLE → Idle D
+  }
+
+  state Move Choice {
+    SetFloatValue(floatVariable=var "Timer", floatValue=0, everyFrame=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=10, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    BoolTest(boolVariable=var "Double Fight", isTrue=→"DOUBLE", isFalse=(none), everyFrame=false)
+    GetHP(target=Self, storeValue=var "HP")
+    IntCompare(integer1=var "HP", integer2=var "HP P2", equal=(none), lessThan=(none), greaterThan=→"SWOOP", everyFrame=false)
+    SendRandomEventV2(events=[→"SLAM", →"SWOOP"], weights=[1, 1], trackingInts=[var "Ct Slam", var "Ct Swoop"], eventMax=[1, 2])
+    on SWOOP → Swoop Antic
+    on SLAM → Reduce Idle Time 2
+    on DOUBLE → Move Choice D
+    on NEEDOLIN → Sing Antic
+  }
+
+  state Swoop Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.75, brakeOnExit=false)
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=false, limitFps=0)
+    FadeAudio(gameObject=Self, startVolume=1, endVolume=0, time=0.3)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=moss_mother_attack (sfxdynamic_assets_areamoss.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Swoop
+  }
+
+  state Swoop {
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=false, IsRightBlocked=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=20, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=var "Ground Ray Point", storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    GetVector2XY(vector2Variable=var "Ground Ray Point", storeX=(unset), storeY=var "Swoop Height", everyFrame=false)
+    FloatAdd(floatVariable=var "Swoop Height", add=2.2, everyFrame=false, perSecond=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Swoop X Speed", float2=var "X Scale", operation=Multiply, storeResult=var "Speed Crt", everyFrame=false)
+    FloatOperator(float1=var "Speed Crt", float2=-1.3, operation=Multiply, storeResult=var "Antic Speed", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Antic Speed", y=(unset), everyFrame=false)
+    FloatOperator(float1=var "Speed Crt", float2=0.1, operation=Multiply, storeResult=var "Accel", everyFrame=false)
+    KeepFloatPositive(floatVariable=var "Accel", everyFrame=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=var "Accel", targetSpeed=var "Speed Crt")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Swoop Target", floatValue=var "Swoop Height", everyFrame=false)
+    FloatSubtract(floatVariable=var "Swoop Target", subtract=var "Self Y", everyFrame=false, perSecond=false)
+    SetVector3XYZ(vector3Variable=var "Swoop Vector", vector3Value=(unset), x=0, y=var "Swoop Target", z=0, everyFrame=false)
+    iTweenMoveBy(gameObject=Self, id="", vector=var "Swoop Vector", time=0.5, delay=0, speed=(unset), easeType=14, loopType=0, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    Wait(time=0.9, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt SwoopDust", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Pt SwoopRock", emit=0, resetIfPlaying=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=moss_mother_charge (sfxstatic_assets_areatutorial.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Swoop Extend
+  }
+
+  state Swoop Return {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge Recover")
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=(unset), brakeOnExit=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    FadeAudio(gameObject=Self, startVolume=0, endVolume=1, time=0.4)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    on FINISHED → Swoop Recover
+  }
+
+  state Swoop Recover {
+    BoolTest(boolVariable=var "Spawned", isTrue=→"SPAWNED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    Wait(time=0.65, finishEvent=→"FINISHED", realTime=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.1, targetSpeed=6)
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=(unset), brakeOnExit=false)
+    on FINISHED → Idle
+    on TOOK DAMAGE → Idle
+    on SPAWNED → Crawler Idle
+  }
+
+  state Slam Antic {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    FadeAudio(gameObject=Self, startVolume=1, endVolume=0, time=0.3)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=2.25, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=moss_mother_attack (sfxdynamic_assets_areamoss.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Set Antic Dir
+  }
+
+  state Fly Up {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="FlyUp")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=25, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"SLAM", rightHitEvent=→"SLAM", bottomHitEvent=(none), leftHitEvent=→"SLAM", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"SLAM", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=moss_mother_ceiling_dash_towards (sfxstatic_assets_areatutorial.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Velocity Y", space=0, everyFrame=true)
+    FloatCompare(float1=var "Velocity Y", float2=0, tolerance=0.1, equal=→"SLAM", lessThan=(none), greaterThan=(none), everyFrame=true)
+    Wait(time=1, finishEvent=→"SLAM", realTime=false)
+    on SLAM → Slam
+  }
+
+  state Slam {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Smash", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Slam", emit=0, resetIfPlaying=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=moss_mother_ceiling_hit (sfxstatic_assets_areamoss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Drop Type
+  }
+
+  state Swoop Extend {
+    SetBoolValue(boolVariable=var "Under Hero", boolValue=true, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Left X", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    FloatCompare(float1=var "Self X", float2=var "Right X", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    FloatTestToBool(float1=var "Hero X", float2=var "Self X", tolerance=2, equalBool=var "Under Hero", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    BoolTest(boolVariable=var "Under Hero", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Swoop Return
+  }
+
+  state Slam Antic 2 {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    SetVelocity2d(gameObject=Self, vector=var "Slam Antic Vector", x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="RoofAntic")
+    on FINISHED → Fly Up
+  }
+
+  state Drop Type {
+    SendEventByName(eventTarget=Self, sendEvent="CRAWLER", delay=0, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Double Fight", isTrue=→"DOUBLE", isFalse=(none), everyFrame=false)
+    GetHP(target=Self, storeValue=var "HP")
+    IntCompare(integer1=var "HP", integer2=var "HP Half", equal=(none), lessThan=(none), greaterThan=→"ROCK", everyFrame=false)
+    SendRandomEventV2(events=[→"ROCK", →"CRAWLER"], weights=[1, 1], trackingInts=[var "Ct Rock", var "Ct Crawler"], eventMax=[1, 1])
+    on CRAWLER → 2nd Crawler
+    on ROCK → Rock
+    on DOUBLE → Drop Type 2
+  }
+
+  state Rock {
+    BoolTest(boolVariable=var "Double Fight", isTrue=→"DOUBLE", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Stals"), sendEvent="FALL", delay=0, everyFrame=false)
+    on FINISHED → Anim End
+    on DOUBLE → Rock - DB
+  }
+
+  state Slam Recover {
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    Wait(time=var "Recover Time", finishEvent=→"FINISHED", realTime=false)
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=10, speedMax=6, acceleration=0.375, targetsHeight=true, height=7, maxHeight=(unset), stayLeft=false, stayRight=false)
+    on FINISHED → Idle
+    on TOOK DAMAGE → Idle
+  }
+
+  state Slam RePos {
+    BoolTest(boolVariable=var "Double Fight", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, -10), x=(unset), y=(unset), everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Self Y", z=(unset), space=1, everyFrame=true)
+    FloatCompare(float1=var "Self Y", float2=1, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Slam Recover
+  }
+
+  state Slam Wait {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FadeAudio(gameObject=Self, startVolume=0, endVolume=1, time=0.4)
+    on FINISHED → Slam RePos
+  }
+
+  state Rumble {
+    PlayAudioEvent(audioClip=moss_mother_small_egg_break (sfxstatic_assets_areatutorial.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=misc_rumble_loop (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    ObjectJitter(gameObject=Self, x=0.15, y=0.15, z=(unset), allowMovement=false, limitFps=0)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=true, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt Drip", emit=0, resetIfPlaying=false)
+    PlayParticleEmitterInState(gameObject=var "Shake Drip")
+    PlayParticleEmitterInState(gameObject=var "Shake Rubble")
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    on FINISHED → Burst Out
+  }
+
+  state Burst Out {
+    PlayAudioEvent(audioClip=moss_mother_main_egg_break (sfxstatic_assets_areatutorial.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    ActivateGameObject(gameObject=var "Cocoon Break", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    ActivateGameObject(gameObject=var "Cocoon Mound", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cocoon", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-30, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.85, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Strike", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Idle", emit=0, resetIfPlaying=false)
+    on FINISHED → Roar
+  }
+
+  state Roar End {
+    StopRoarEmitter(delay=0)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    ApplyMusicCue(musicCue=Boss Strive (audiocuesdynamic_assets_boss.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.1)
+    SetPlayerDataBool(boolName="encounteredMossMother", value=true)
+    ActivateGameObject(gameObject=var "Terrain Block", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Crawler {
+    SetBoolValue(boolVariable=var "Done First Spawn", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Spawn Crawler"), sendEvent="SPAWN", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Spawned", boolValue=true, everyFrame=false)
+    on FINISHED → Reduce Idle Time
+  }
+
+  state Crawler Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=10, speedMax=6, acceleration=0.5, targetsHeight=true, height=8, maxHeight=var "Max Height", stayLeft=false, stayRight=false)
+    BoolTest(boolVariable=var "Spawned", isTrue=(none), isFalse=→"KILLED", everyFrame=true)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on KILLED → Slam Recover
+    on TOOK DAMAGE → Swoop Antic
+    on FINISHED → Slam Recover
+  }
+
+  state Anim End {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Slam Wait
+  }
+
+  state Anim End 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    BoolTest(boolVariable=var "Spawned", isTrue=(none), isFalse=→"KILLED", everyFrame=true)
+    on FINISHED → Crawler Idle
+    on KILLED → Slam Recover
+  }
+
+  state Start Battle {
+    CallMethodProper(gameObject=var "Battle Scene", behaviour="BattleScene", methodName="StartBattle", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Short Pause
+  }
+
+  state Short Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Rumble
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(var "Spawn Crawler"), sendEvent="BOSS KILL", delay=0, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Double Fight", isTrue=→"DOUBLE", isFalse=(none), everyFrame=false)
+    SendEventToRegister(eventName="BOSS KILL")
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=1)
+    SetPlayerDataBool(boolName="defeatedMossMother", value=true)
+    StopParticleEmitter(gameObject=var "Battle Motes")
+    Tk2dPlayAnimation(gameObject=var "DazedEffect", animLibName="", clipName="Dazed End")
+    SendEventToRegister(eventName="MOSS SONG END")
+    on DOUBLE → Double End
+  }
+
+  state Roar {
+    SetAudioSource(gameObject=Self, active=true)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="MOSSBONE_MOTHER")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=moss_mother_cry_v2 (sfxstatic_assets_areatutorial.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=enemy_death_sword_old (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    PlayParticleEmitter(gameObject=var "Pt Roar", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Battle Motes", emit=0, resetIfPlaying=false)
+    SendEventToRegister(eventName="COCOON DESTROY")
+    on FINISHED → Reset Bind Prompt?
+  }
+
+  state Return Ready {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=99, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Cocoon Mound", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Trap Cocoons", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on BATTLE START → Return Pause
+  }
+
+  state Return In {
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    SetPosition(gameObject=Self, vector=(unset), x=7.87, y=5, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=moss_mother_ceiling_hit (sfxstatic_assets_areamoss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayParticleEmitter(gameObject=var "Pt Idle", emit=0, resetIfPlaying=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    PlayParticleEmitter(gameObject=var "Appear Rubble", emit=0, resetIfPlaying=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Cocoon", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-30, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Dust")
+    on FINISHED → Roar
+  }
+
+  state Return Pause {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Return Antic
+  }
+
+  state Return Antic {
+    Wait(time=1.8, finishEvent=→"FINISHED", realTime=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Shake Drip")
+    PlayParticleEmitterInState(gameObject=var "Shake Rubble")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", audioClip=misc_rumble_loop (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", audioClip=moss_crumble_plat_crumbling_loop (sfxstatic_assets_areamoss.bundle), pitchMin=0.8, pitchMax=0.8, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Return In
+  }
+
+  state Reduce Idle Time {
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=0.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recover Time", floatValue=0.25, everyFrame=false)
+    on FINISHED → Anim End 2
+  }
+
+  state Reduce Idle Time 2 {
+    FloatCompare(float1=var "Idle Time", float2=1, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=1, everyFrame=false)
+    on FINISHED → Slam Antic
+  }
+
+  state Check Hero in Room {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "X Pos", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatInRange(floatVariable=var "X Pos", lowerValue=45.08, upperValue=69.05, boolVariable=(unset), trueEvent=→"FINISHED", falseEvent=(none), everyFrame=true)
+    on FINISHED → Start Battle
+  }
+
+  state Sing Antic {
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    FadeAudio(gameObject=Self, startVolume=1, endVolume=0, time=0.3)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Sing
+  }
+
+  state Sing {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=moss_mother_sing (sfxdynamic_assets_areamoss.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=10, MinReactDelay=0.3, MaxReactDelay=0.4, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SendEventToRegister(eventName="MOSS SONG START")
+    ShoveFromWall(gameObject=Self, shoveForce=10, rayLength=2, checkUp=true, checkDown=true, checkLeft=true, checkRight=true, everyFrame=true)
+    on END → Recover
+    on SING DURATION END → Recover
+  }
+
+  state Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegister(eventName="MOSS SONG END")
+    on FINISHED → Idle
+  }
+
+  state Damage Timer {
+    FloatAdd(floatVariable=var "Timer", add=0.75, everyFrame=false, perSecond=false)
+    on FINISHED → Idle
+  }
+
+  state Stun Start {
+    StopParticleEmitter(gameObject=var "Pt Slam")
+    StopParticleEmitter(gameObject=var "Pt SwoopDust")
+    StopParticleEmitter(gameObject=var "Pt SwoopRock")
+    SetRecoilSpeed(target=Self, newRecoilSpeed=2)
+    SetFloatValue(floatVariable=var "Stun Timer", floatValue=2, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun")
+    SendEventToRegister(eventName="MOSS SONG END")
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=moss_mother_stunhit (sfxdynamic_assets_areamoss.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Stunned
+  }
+
+  state Stunned {
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    FloatAdd(floatVariable=var "Stun Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    IdleBuzzV3(gameObject=Self, waitMin=0.5, waitMax=0.75, speedMax=2, accelerationMin=30, accelerationMax=30, roamingRangeX=0.25, roamingRangeY=0.25, manualStartPos=(unset))
+    on END → Stun Recover
+    on TOOK DAMAGE → Stun Damage
+  }
+
+  state Stun Damage {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=moss_mother_stunhit (sfxdynamic_assets_areamoss.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Hit")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FloatAdd(floatVariable=var "Stun Timer", add=-0.1, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Stunned
+    on END → Damage Recover
+  }
+
+  state Damage Recover {
+    SendEventByName(eventTarget=Self, sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    on FINISHED → Stun Recover
+  }
+
+  state Stun Recover {
+    SetRecoilSpeed(target=Self, newRecoilSpeed=5)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state 2nd Crawler {
+    BoolTest(boolVariable=var "Done First Spawn", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Spawn Crawler 2"), sendEvent="SPAWN", delay=0, everyFrame=false)
+    on FINISHED → Crawler
+  }
+
+  state Extract {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    FindChild(gameObject=var "Hero", childName="Tool Effects/Extract Point", storeResult=var "Extract Point")
+    GetPosition2D(gameObject=var "Extract Point", vector=var "Extract pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    Vector2AddXY(vector2Variable=var "Extract pos", addX=var "Offset", addY=0.5, everyFrame=false, perSecond=false)
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=FlashingMossExtract())
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.003, space=0, everyFrame=false, lateUpdate=false)
+    AnimateRigidBody2DPositionTo(GameObject=Self, ToValue=var "Extract pos", time=0.2, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    on EXTRACT FINISH → Extract Hit
+  }
+
+  state Extract Hit {
+    SubtractHP(target=Self, amount=20)
+    SetDamageHero(Target=Self, Enabled=true)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelFlash())
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Recoil Speed", y=(unset), everyFrame=false)
+    on FINISHED → Recover
+  }
+
+  state Get Dir {
+    SetFloatValue(floatVariable=var "Offset", floatValue=-0.25, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recoil Dir", floatValue=180, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recoil Speed", floatValue=-10, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"FINISHED", leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Offset", floatValue=0.25, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recoil Dir", floatValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recoil Speed", floatValue=10, everyFrame=false)
+    on FINISHED → Extract
+  }
+
+  state Check First Idle {
+    FloatCompare(float1=var "Idle Time", float2=1.5, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=1.5, everyFrame=false)
+    on FINISHED → Move Choice
+  }
+
+  state Return Ready 2 {
+    GetPosition2D(gameObject=Self, vector=var "Entry Pos Double", x=(unset), y=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=99, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Cocoon Mound", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Trap Cocoons", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=0.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recover Time", floatValue=0.25, everyFrame=false)
+    SetFloatValue(floatVariable=var "Max Height", floatValue=25, everyFrame=false)
+    on BATTLE START → Return Pause 2
+  }
+
+  state Return In 2 {
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    SetPosition2D(GameObject=Self, Vector=var "Entry Pos Double", X=0, Y=0, Space=0, EveryFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=moss_mother_ceiling_hit (sfxstatic_assets_areamoss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayParticleEmitter(gameObject=var "Pt Idle", emit=0, resetIfPlaying=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    PlayParticleEmitter(gameObject=var "Appear Rubble", emit=0, resetIfPlaying=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cocoon", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-30, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Dust")
+    on FINISHED → Roar
+  }
+
+  state Return Pause 2 {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Return Antic 2
+  }
+
+  state Return Antic 2 {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=true, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Shake Drip")
+    PlayParticleEmitterInState(gameObject=var "Shake Rubble")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", audioClip=misc_rumble_loop (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    on FINISHED → Return In 2
+  }
+
+  state Move Choice D {
+    SendRandomEventV2(events=[→"SLAM", →"SWOOP"], weights=[1, 1], trackingInts=[var "Ct Slam", var "Ct Swoop"], eventMax=[2, 2])
+    on SWOOP → Swoop Antic
+    on SLAM → Slam Antic
+  }
+
+  state Drop Type 2 {
+    GetHP(target=Self, storeValue=var "HP")
+    IntTestToBool(int1=var "HP", int2=var "HP Call Buddy", equalBool=(unset), lessThanBool=var "Ready To Call", greaterThanBool=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Called Buddy", var "Ready To Call", var "Double Fight Buddy"], boolStates=[false, true, false], trueEvent=→"BUDDY", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    SendRandomEventV2(events=[→"ROCK", →"CRAWLER"], weights=[1, 1], trackingInts=[var "Ct Rock", var "Ct Crawler"], eventMax=[1, 1])
+    on CRAWLER → 2nd Crawler
+    on ROCK → Rock
+    on BUDDY → Do Call Buddy
+  }
+
+  state Buddy {
+    GetPosition2D(gameObject=Self, vector=var "Entry Pos Double", x=(unset), y=(unset), space=0, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=99, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ActivateGameObject(gameObject=var "Cocoon Mound", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Trap Cocoons", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Idle Time", floatValue=0.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Recover Time", floatValue=0.25, everyFrame=false)
+    SetBoolValue(boolVariable=var "Double Fight", boolValue=true, everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    ActivateGameObject(gameObject=var "Cocoon", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetFloatValue(floatVariable=var "Max Height", floatValue=25, everyFrame=false)
+    on CALL BUDDY → Entry Antic
+  }
+
+  state Entry Antic {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetPosition2D(GameObject=Self, Vector=var "Entry Pos Double", X=0, Y=0, Space=0, EveryFrame=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt BuddyEntryAntic", resetTimeIfPlaying=false, stopOnStateExit=true)
+    PlayParticleEmitterInState(gameObject=var "Shake Drip")
+    PlayParticleEmitterInState(gameObject=var "Shake Rubble")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", audioClip=misc_rumble_loop (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Sound Player")
+    on FINISHED → Return In 3
+  }
+
+  state Return In 3 {
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=moss_mother_ceiling_hit (sfxstatic_assets_areamoss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayParticleEmitter(gameObject=var "Pt Idle", emit=0, resetIfPlaying=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    PlayParticleEmitter(gameObject=var "Appear Rubble", emit=0, resetIfPlaying=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingMed", setValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cocoon", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-30, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Dust")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Roar 2
+  }
+
+  state Do Call Buddy {
+    SetBoolValue(boolVariable=var "Called Buddy", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="CALL BUDDY", delay=0, everyFrame=false)
+    on FINISHED → Reduce Idle Time
+  }
+
+  state Roar End 2 {
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    ActivateGameObject(gameObject=var "Terrain Block", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Idle
+  }
+
+  state Roar 2 {
+    SetAudioSource(gameObject=Self, active=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=moss_mother_cry_v2 (sfxstatic_assets_areatutorial.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=enemy_death_sword_old (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    PlayParticleEmitter(gameObject=var "Pt Roar", emit=0, resetIfPlaying=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Roar End 2
+  }
+
+  state Double End {
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="CALL BUDDY", delay=0, everyFrame=false)
+  }
+
+  state Set Antic Dir {
+    SetVector2Value(vector2Variable=var "Slam Antic Vector", vector2Value=(0, -8), everyFrame=false)
+    BoolTest(boolVariable=var "Double Fight", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    CheckXPosition(gameObject=Self, compareTo=24, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"FINISHED", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    SetVector2Value(vector2Variable=var "Slam Antic Vector", vector2Value=(-15, -8), everyFrame=false)
+    on FINISHED → Slam Antic 2
+  }
+
+  state Dmg Response {
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=12, speedMax=6, acceleration=0.375, targetsHeight=true, height=6, maxHeight=var "Max Height", stayLeft=(unset), stayRight=(unset))
+    WaitRandom(timeMin=0.25, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check First Idle
+  }
+
+  state Idle D {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Hero X", float2=var "Centre X", tolerance=0, equalBool=(unset), lessThanBool=var "Hero Left", greaterThanBool=var "Hero Right", everyFrame=true)
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=12, speedMax=6, acceleration=0.375, targetsHeight=true, height=6, maxHeight=var "Max Height", stayLeft=var "z Always Stay Left", stayRight=var "z Always Stay Right")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.25, None=(none), ActiveInner=→"NEEDOLIN", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    FloatAdd(floatVariable=var "Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Timer", float2=var "Idle Time", tolerance=0, equal=→"WAIT", lessThan=(none), greaterThan=→"WAIT", everyFrame=true)
+    on NEEDOLIN → Sing Antic
+    on TOOK DAMAGE → Dmg Response
+    on WAIT → Check First Idle
+  }
+
+  state Rock - DB {
+    SendEventByName(eventTarget=GameObject(var "Stals"), sendEvent="FALL", delay=0, everyFrame=false)
+    on FINISHED → Anim End
+  }
+
+  state Reset Bind Prompt? {
+    PlayerDataBoolTest(boolName="completedTutorial", isTrue=→"FINISHED", isFalse=(none))
+    SetPlayerDataBool(boolName="SeenBindPrompt", value=false)
+    on FINISHED → Roar End
+  }
+
+  var Centre X: float = 20
+  var Double Fight: bool = true
+  var Double Fight Buddy: bool = false
+  var z Always Stay Left: bool = true
+  var z Always Stay Right: bool = false
+  var Appear Rubble: gameObject = Boss Scene/Appear Rubble
+  var Battle Motes: gameObject = <null>
+  var Battle Scene: gameObject = Boss Scene
+  var Cocoon Mound: gameObject = <null>
+  var Pt Slam: gameObject = Boss Scene/Stals/Pt Slam
+  var Shake Drip: gameObject = Boss Scene/Shake Drip
+  var Shake Rubble: gameObject = Boss Scene/Shake Rubble
+  var Spawn Crawler: gameObject = Boss Scene/MossBone Crawler Summon
+  var Spawn Crawler 2: gameObject = Boss Scene/MossBone Crawler Summon (1)
+  var Stals: gameObject = Boss Scene/Stals
+  var Trap Cocoons: gameObject = <null>
+
+  var Accel: float = 0
+  var Antic Speed: float = 0
+  var Hero X: float = 0
+  var Idle Time: float = 2
+  var Left X: float = 46.43
+  var Max Height: float = 23.8
+  var Recover Time: float = 0.75
+  var Right X: float = 67.92
+  var Self X: float = 0
+  var Self Y: float = 0
+  var Speed Crt: float = 0
+  var Stun Timer: float = 0
+  var Swoop Height: float = 18.19
+  var Swoop Target: float = 0
+  var Swoop X Speed: float = 18
+  var Timer: float = 0
+  var X Pos: float = 0
+  var X Scale: float = 0
+  var Offset: float = 0
+  var Recoil Dir: float = 0
+  var Recoil Speed: float = 0
+  var Z Pos: float = 0
+  var Velocity Y: float = 0
+  var Ct Crawler: int = 0
+  var Ct Rock: int = 1
+  var Ct Slam: int = 0
+  var Ct Swoop: int = 2
+  var HP: int = 0
+  var HP Half: int = 0
+  var HP P2: int = 0
+  var HP Call Buddy: int = 0
+  var Called Buddy: bool = false
+  var Done First Spawn: bool = false
+  var Hero Left: bool = false
+  var Hero Right: bool = true
+  var Ready To Call: bool = false
+  var Spawned: bool = false
+  var Under Hero: bool = false
+  var Extract pos: vector2 = (0, 0)
+  var Entry Pos Double: vector2 = (0, 0)
+  var Ground Ray Point: vector2 = (0, 0)
+  var Slam Antic Vector: vector2 = (0, 0)
+  var Swoop Vector: vector3 = (0, 0, 0)
+  var Cocoon: gameObject = <null>
+  var Cocoon Break: gameObject = <null>
+  var DazedEffect: gameObject = <null>
+  var DazedEffect Marker: gameObject = <null>
+  var Pt Drip: gameObject = <null>
+  var Pt Dust: gameObject = <null>
+  var Pt Idle: gameObject = <null>
+  var Pt Roar: gameObject = <null>
+  var Pt SwoopDust: gameObject = <null>
+  var Pt SwoopRock: gameObject = <null>
+  var Self: gameObject = <null>
+  var Sound Player: gameObject = <null>
+  var Strike: gameObject = <null>
+  var Terrain Block: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Extract Point: gameObject = <null>
+  var Pt BuddyEntryAntic: gameObject = Boss Scene/Bosses/Mossbone Mother A/Pt BuddyEntryAntic
+  var Parent: gameObject = <null>
+  var Audio Loop Voice: gameObject = Boss Scene/Bosses/Mossbone Mother A/Audio Loop Voice
+}

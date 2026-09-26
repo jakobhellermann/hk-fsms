@@ -1,0 +1,201 @@
+# Control
+# 1 location(s):
+#   Ant_19 / Harpoon Ring Ant String (1)/Pin Point/Harpoon Ring
+
+// uses template: harpoon_ring
+fsm Control {
+  start Init
+  on CONNECT L → Connect L  // from any state
+  on CONNECT R → Connect R  // from any state
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Hit Effect")
+    ActivateGameObject(gameObject=var "Hit Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Hit Effect Snowy")
+    ActivateGameObject(gameObject=var "Hit Effect Snowy", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Ring Parent")
+    FindNamedChild(gameObject=var "Ring Parent", storeResult=var "Ring")
+    FindNamedChild(gameObject=var "Ring Parent", storeResult=var "Connect Effect")
+    FindNamedChild(gameObject=var "Ring Parent", storeResult=var "Harpoon Connect L")
+    FindNamedChild(gameObject=var "Ring Parent", storeResult=var "Hornet Grab Point")
+    ActivateGameObject(gameObject=var "Harpoon Connect L", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hornet Grab Point", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Check Type
+  }
+
+  state Idle {
+    SetCircleCollider(gameObject=Self, active=var "Collider Start Enabled")
+    ReceivedDamage(Target=Self, collideTag="", sendEvent=→"STRIKE", sendEventHeavy=(none), sendEventSpikes=(none), sendEventLava=(none), sendEventLightning=(none), storeGameObject=var "", ignoreAcid=false, ignoreLava=false, ignoreWater=false, ignoreHunterWeapon=false, ignoreTraps=true, ignoreNail=false, ignoreSpikes=false, storeDamageDealt=(unset), storeDirection=(unset), storeMagnitudeMultiplier=(unset), firstHitOnly=false)
+    Trigger2dEvent(gameObject=Self, trigger=0, collideTag="Nail Attack", sendEvent=→"STRIKE", storeCollider=var "")  // disabled
+    on CONNECT L → Connect L
+    on CONNECT R → Connect R
+    on STRIKE → Snow Effect?
+    on IMPACT → Snow Effect? 2
+    on GRAB → Quick Grab
+  }
+
+  state Connect L {
+    SetScale(gameObject=var "Ring Parent", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Grab Notify"), sendEvent="CONNECT L", delay=0, everyFrame=false)
+    on FINISHED → Snow Effect? 3
+  }
+
+  state Connect R {
+    SetScale(gameObject=var "Ring Parent", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "Grab Notify"), sendEvent="CONNECT R", delay=0, everyFrame=false)
+    on FINISHED → Snow Effect? 3
+  }
+
+  state Connect {
+    PlayRandomAudioClipTable(Table=var "Connect Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventByNameUpwards(Target=Self, EventName="CONNECT")
+    SendMessageV2(gameObject=Self, delivery=SendMessageUpwards, options=1, functionCall=HeroNeedleConnect(), everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Connected", boolValue=true, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Connect Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Harpoon Connect L", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Connect")
+    on GRAB → Grab Start
+    on HERO DAMAGED → Eject
+  }
+
+  state Grab Idle {
+    on DROP → Drop
+    on EJECT → Eject
+    on HERO DAMAGED → Eject
+    on TURN → Turn
+  }
+
+  state Drop {
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Drop")
+    PlayRandomAudioClipTable(Table=var "Shake Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Cooldown
+  }
+
+  state Cooldown {
+    SendMessageV2(gameObject=Self, delivery=SendMessageUpwards, options=1, functionCall=HeroOffRing(), everyFrame=false)
+    SetCircleCollider(gameObject=Self, active=false)
+    SetBoolValue(boolVariable=var "Collider Start Enabled", boolValue=true, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Detach Notify"), sendEvent="RING DETACH", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SELF RING DETACH", delay=0, everyFrame=false)
+    SendEventByNameUpwards(Target=Self, EventName="DISCONNECT")
+    SetBoolValue(boolVariable=var "Is Connected", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Eject {
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Eject")
+    ActivateGameObject(gameObject=var "Harpoon Connect L", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayRandomAudioClipTable(Table=var "Shake Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Cooldown
+  }
+
+  state Strike {
+    SetBoolValue(boolVariable=var "Collider Start Enabled", boolValue=true, everyFrame=false)
+    FaceObjectV2(objectA=var "Ring Parent", objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Hit")
+    Tk2dPlayFrame(gameObject=var "Ring", frame=0)
+    ActivateGameObject(gameObject=var "Hit Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=var "Strike Audio", pitchMin=1.25, pitchMax=1.3, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=var "Shake Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendMessageV2(gameObject=Self, delivery=SendMessageUpwards, options=1, functionCall=DamageHit(var "Hit Direction"), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Impact {
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Eject")
+    PlayRandomAudioClipTable(Table=var "Shake Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Idle
+  }
+
+  state Grab Start {
+    PlayRandomAudioClipTable(Table=var "Shake Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventByName(eventTarget=GameObject(var "Grab Notify"), sendEvent="RING GRAB", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="SELF RING GRAB", delay=0, everyFrame=false)
+    SendMessageV2(gameObject=Self, delivery=SendMessageUpwards, options=1, functionCall=HeroOnRing(), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Grab")
+    ActivateGameObject(gameObject=var "Harpoon Connect L", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Grab Idle
+  }
+
+  state Turn {
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Wobble")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    PlayRandomAudioClipTable(Table=var "Shake Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Grab Idle
+  }
+
+  state Snow Effect? {
+    GetDefaultTk2dClipName(gameObject=var "Ring", storeName=var "Current Clip Name")
+    StringCompare(stringVariable=var "Current Clip Name", compareTo="Idle Snowy", equalEvent=(none), notEqualEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Hit Effect Snowy", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Strike
+  }
+
+  state Snow Effect? 2 {
+    GetDefaultTk2dClipName(gameObject=var "Ring", storeName=var "Current Clip Name")
+    StringCompare(stringVariable=var "Current Clip Name", compareTo="Idle Snowy", equalEvent=(none), notEqualEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Hit Effect Snowy", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Impact
+  }
+
+  state Snow Effect? 3 {
+    GetDefaultTk2dClipName(gameObject=var "Ring", storeName=var "Current Clip Name")
+    StringCompare(stringVariable=var "Current Clip Name", compareTo="Idle Snowy", equalEvent=(none), notEqualEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Hit Effect Snowy", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Connect
+  }
+
+  state Quick Grab {
+    PlayRandomAudioClipTable(Table=var "Connect Audio Table", AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendMessageV2(gameObject=Self, delivery=SendMessageUpwards, options=1, functionCall=HeroNeedleConnect(), everyFrame=false)
+    ActivateGameObject(gameObject=var "Connect Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByNameUpwards(Target=Self, EventName="CONNECT")
+    SetBoolValue(boolVariable=var "Is Connected", boolValue=true, everyFrame=false)
+    on FINISHED → Grab Start
+  }
+
+  state Check Type {
+    EnumSwitch(enumVariable=var "Type", compareTo=[HarpoonRingTypes(0), HarpoonRingTypes(1)], sendEvent=[→"METAL", →"BONE"], everyFrame=false)
+    on METAL → Metal
+    on BONE → Bone
+  }
+
+  state Metal {
+    SetObjectValue(objectVariable=var "Connect Audio Table", objectValue=harpoon_ring_connect_metal (sfxdynamic_assets_shared.bundle), everyFrame=false)
+    SetObjectValue(objectVariable=var "Shake Audio Table", objectValue=harpoon_ring_shake_metal (sfxdynamic_assets_shared.bundle), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Bone {
+    SetObjectValue(objectVariable=var "Connect Audio Table", objectValue=harpoon_ring_connect_bone (sfxdynamic_assets_shared.bundle), everyFrame=false)
+    SetObjectValue(objectVariable=var "Shake Audio Table", objectValue=harpoon_ring_shake_bone (sfxdynamic_assets_shared.bundle), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Rail Slider: bool = false
+  var Grab Notify: gameObject = Harpoon Ring Ant String (1)/string
+  var Detach Notify: gameObject = <null>
+  var Strike Audio: object = sword_hit_reject (sfxstatic_assets_shared.bundle)
+  var Type: enum = HarpoonRingTypes(0)
+
+  var Hit Direction: float = 0
+  var Is Connected: bool = false
+  var Collider Start Enabled: bool = true
+  var Is Snowy: bool = false
+  var Default Clip Name: string = ""
+  var Current Clip Name: string = ""
+  var Harpoon Connect L: gameObject = <null>
+  var Ring: gameObject = <null>
+  var Ring Parent: gameObject = <null>
+  var Connect Effect: gameObject = <null>
+  var Hornet Grab Point: gameObject = <null>
+  var Hit Effect: gameObject = <null>
+  var Hit Effect Snowy: gameObject = <null>
+  var Connect Audio Table: object = <null>
+  var Shake Audio Table: object = <null>
+}

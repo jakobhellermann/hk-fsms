@@ -1,0 +1,408 @@
+# Control
+# 1 location(s):
+#   Dust_03 / Battle Control/Return Scene/Roachfeeder Tall
+
+fsm Control {
+  start Pause
+  on ZERO HP → Death  // from any state
+  on TO PATROL → Return To Unalert  // from any state
+
+  state Init {
+    SetGameObject(variable=var "Next Point", gameObject=var "Patrol Point", everyFrame=false)
+    SetParent(gameObject=var "Patrol Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Start Point", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GameObjectIsNull(gameObject=var "Enemy Target", isNull=(none), isNotNull=→"ENEMY TARGET", storeResult=(unset), everyFrame=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Start Anim")
+    StringCompare(stringVariable=var "Start Anim", compareTo="Find Spawn Point", equalEvent=→"SPAWN POINT", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Patrol
+    on SPAWN POINT → Fly In Ready
+    on ENEMY TARGET → Enemy Target Buzz
+  }
+
+  state Patrol {
+    ChaseObjectVertical(gameObject=Self, target=var "Next Point", offset=0, speedMax=4, acceleration=0.3)
+    GetDistance(gameObject=Self, target=var "Next Point", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=1, tolerance=0, equal=→"NEXT", lessThan=→"NEXT", greaterThan=(none), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=(unset), sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on NEXT → Decel
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+    on SING → Sing
+    on BATTLE START → Startle
+  }
+
+  state Next Point {
+    RandomBool(storeResult=var "Will Turn")
+    GameObjectCompare(gameObjectVariable=var "Next Point", compareTo=var "Patrol Point", equalEvent=→"START", notEqualEvent=→"PATROL", storeResult=(unset), everyFrame=false)
+    on PATROL → To Patrol
+    on START → To Start
+  }
+
+  state To Patrol {
+    SetGameObject(variable=var "Next Point", gameObject=var "Patrol Point", everyFrame=false)
+    on FINISHED → Turn?
+  }
+
+  state To Start {
+    SetGameObject(variable=var "Next Point", gameObject=var "Start Point", everyFrame=false)
+    on FINISHED → Turn?
+  }
+
+  state Decel {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Next Point
+    on TOOK DAMAGE → Startle
+    on ALERT → Startle
+    on SING → Sing
+    on BATTLE START → Startle
+  }
+
+  state Turn? {
+    SendRandomEventV4(events=[→"NO TURN", →"TURN"], weights=[1, 1], eventMax=[2, 2], missedMax=[4, 4], activeBool=(unset))
+    on TURN → Turn
+    on NO TURN → Patrol
+  }
+
+  state Startle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Startle")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToStartle", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    Wait(time=0.16, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SendEventByName(eventTarget=GameObject(var "Buddy"), sendEvent="WAKE", delay=0.1, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Roachtender_alert (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Cry
+  }
+
+  state Cry {
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=8)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SendEventToRegister(eventName="RAISE ALARM")  // disabled
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Choice
+  }
+
+  state Chase {
+    FloatTestToBool(float1=var "Attack Cooldown", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Can Attack", greaterThanBool=(unset), everyFrame=true)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=7, acceleration=0.3, targetsHeight=true, height=3, minAboveHero=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Chase")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToChase", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Attack", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckAlertRange(alertRange=Battle Control/Return Scene/Roachfeeder Tall/Unalert Range@AlertRange, storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"UNALERT", OutOfRangeDelay=5, everyFrame=true)
+    FloatAdd(floatVariable=var "Attack Cooldown", add=-1, everyFrame=true, perSecond=true)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=var "Hero Is Below", rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Velocity X", float2=0, tolerance=0.1, equalBool=var "Not Moving On X", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Hero Is Below", var "Not Moving On X"], sendEvent=(none), storeResult=var "Shift Down", everyFrame=true)
+    SetVelocity2dBool(gameObject=Self, activeBool=var "Shift Down", vector=(unset), x=(unset), y=-5, everyFrame=true)
+    on ATTACK → Attack Choice
+    on SING → Sing
+    on UNALERT → Unalert Check
+  }
+
+  state MultiSlash Antic {
+    PlayAudioEvent(audioClip=roach_feeder_tall_antic (sfxstatic_assets_areadust.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=small_movement_metal (sfxdynamic_assets_areadocksareadustareagreymoorareawisp.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="MultiSlash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFloatValue(floatVariable=var "Multihit Timer", floatValue=0.85, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Roachtender_alert (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Multislashing
+  }
+
+  state Multi Slash 1 {
+    PlayAudioEvent(audioClip=zombie_shield_sword_1 (sfxstatic_assets_areacoralareadustareashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Multi", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-30, ySpeed=-15, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Multi Slash 2
+  }
+
+  state Multi Slash End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Slash To Evade
+  }
+
+  state Evade {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Evade")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=25, ySpeed=14, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Evade Recover
+  }
+
+  state Evade Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Choice
+  }
+
+  state Turn {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="TurnToFly")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Patrol
+    on TOOK DAMAGE → Startle
+    on BATTLE START → Startle
+  }
+
+  state Choice {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    SendRandomEventV4(events=[→"CHASE", →"WATCH"], weights=[1, 1], eventMax=[2, 1], missedMax=[5, 4], activeBool=(unset))
+    on SING → Sing
+    on CHASE → Chase
+    on WATCH → Watch
+  }
+
+  state Watch {
+    FloatTestToBool(float1=var "Attack Cooldown", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Can Attack", greaterThanBool=(unset), everyFrame=true)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=9, speedMax=7, acceleration=0.3, targetsHeight=true, height=4.5, minAboveHero=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Chase")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToChase", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Attack", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    WaitRandom(timeMin=1, timeMax=3, finishEvent=→"FINISHED", realTime=false)
+    FloatAdd(floatVariable=var "Attack Cooldown", add=-1, everyFrame=true, perSecond=true)
+    on FINISHED → Chase
+    on TOOK DAMAGE → Chase
+    on ATTACK → Attack Choice
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Roachtender_sing (sfxdynamic_assets_areadust.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Choice
+  }
+
+  state Idle Fly {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=(unset), sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    IdleBuzzV3(gameObject=Self, waitMin=1, waitMax=3, speedMax=5, accelerationMin=5, accelerationMax=8, roamingRangeX=3, roamingRangeY=2, manualStartPos=(unset))
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+  }
+
+  state Unalert Check {
+    BoolTest(boolVariable=var "Stay Alert", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle Fly
+    on CANCEL → Chase
+  }
+
+  state Fly In Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Ambush Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    SetBoolValue(boolVariable=var "Stay Alert", boolValue=true, everyFrame=false)
+    on BATTLE START → Find Pos
+    on WAKE → Find Pos
+  }
+
+  state Fly In {
+    PlayParticleEmitter(gameObject=var "Pt Idle", emit=0, resetIfPlaying=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=10, z=-15, space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetMeshRenderer(gameObject=Self, active=true)
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, -10, 15), time=0.75, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.55)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    on FINISHED → Cry
+  }
+
+  state Find Pos {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Hero", xOffset=0, yOffset=0, zOffset=0, overrideZ=var "Z Pos", everyFrame=false)
+    FindClosest(gameObject=Self, withTag="Teleplane", ignoreOwner=true, mustBeVisible=false, storeObject=var "Spawn Point", storeDistance=(unset), everyFrame=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Spawn Point", xOffset=0, yOffset=0, zOffset=0, overrideZ=var "Z Pos", everyFrame=false)
+    on FINISHED → Fly In
+  }
+
+  state Death {
+    SendEventToRegister(eventName="RAISE ALARM")
+  }
+
+  state Pause {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=false)
+    on FINISHED → Init
+  }
+
+  state Multi Slash 2 {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Multi Slash 3
+  }
+
+  state Multi Slash 3 {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=zombie_shield_sword_3 (sfxstatic_assets_areadustareashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Multi Slash 4
+  }
+
+  state Multi Slash 4 {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=zombie_shield_sword_2 (sfxstatic_assets_areadustareashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Multi Slash End
+  }
+
+  state Return To Unalert {
+    SetGameObject(variable=var "Next Point", gameObject=var "Patrol Point", everyFrame=false)
+    DistanceFly(gameObject=Self, target=var "Next Point", distance=0, speedMax=7, acceleration=0.3, targetsHeight=false, height=(unset), minAboveHero=(unset))
+    GetDistanceV2(gameObject=Self, target=var "Next Point", targetOffsetX=0, targetOffsetY=0, storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=3, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    on FINISHED → Idle Fly
+  }
+
+  state Enemy Target Buzz {
+    RandomFloat(min=0, max=360, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=5, everyFrame=false)
+    DistanceFly(gameObject=Self, target=var "Enemy Target", distance=4, speedMax=7, acceleration=0.3, targetsHeight=true, height=2, minAboveHero=(unset))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Chase")
+    FaceObjectV2(objectA=Self, objectB=var "Enemy Target", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToChase", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    WaitRandom(timeMin=1.5, timeMax=2.5, finishEvent=→"ATTACK", realTime=false)
+    on TOOK DAMAGE → Startle
+    on ALERT → Startle
+    on ATTACK → NPC Shout
+  }
+
+  state NPC Shout {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Startle")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Roachtender_alert (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Enemy Target Buzz
+    on TOOK DAMAGE → Startle
+  }
+
+  state Evade Antic {
+    RayCast2dV2(fromGameObject=var "Ray Pt Centre", fromPosition=(unset), direction=(1, 0), space=1, distance=2.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTableV2(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    on FINISHED → Evade
+    on CANCEL → Attack Choice
+  }
+
+  state Attack Choice {
+    RandomFloat(min=0.5, max=0.75, storeResult=var "Attack Cooldown")
+    SendRandomEventV4(events=[→"SINGLE", →"MULTI", →"EVADE"], weights=[0.5, 0.25, 0.25], eventMax=[2, 1, 1], missedMax=[3, 4, 4], activeBool=(unset))
+    on SINGLE → Slash Antic
+    on MULTI → MultiSlash Antic
+    on EVADE → Evade Antic
+  }
+
+  state Slash Antic {
+    PlayAudioEvent(audioClip=roach_feeder_tall_antic (sfxstatic_assets_areadust.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=small_movement_metal (sfxdynamic_assets_areadocksareadustareagreymoorareawisp.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Roachtender_attack (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Slash 1
+  }
+
+  state Slash 1 {
+    PlayAudioEvent(audioClip=zombie_shield_sword_3 (sfxstatic_assets_areadustareashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-35, ySpeed=-15, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.925, brakeOnExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Roachtender_attack (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Slash 2
+  }
+
+  state Slash End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    on FINISHED → Choice
+  }
+
+  state Slash 2 {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Slash 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash End
+  }
+
+  state Multislashing {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Multi", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Roachtender_attack_flurry (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateGameObject(gameObject=var "Slash Multi", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-30, ySpeed=-10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    PlayAudioEvent(audioClip=song_reed_fast_counter_attack (sfxstatic_assets_areasong.bundle), pitchMin=1.15, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FloatAdd(floatVariable=var "Multihit Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Multihit Timer", float2=0, tolerance=0, equal=→"NEXT", lessThan=→"NEXT", greaterThan=(none), everyFrame=true)
+    on NEXT → Multi Slash End
+    on MULTI HIT CONNECT → Multislashing End
+  }
+
+  state Multislashing End {
+    Wait(time=0.35, finishEvent=→"NEXT", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on NEXT → Multi Slash End
+  }
+
+  state Slash To Evade {
+    PlayRandomAudioClipTableV2(Table=enemy_fly_in (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=false)
+    on FINISHED → Evade
+  }
+
+  var Stay Alert: bool = true
+  var Buddy: gameObject = <null>
+  var Enemy Target: gameObject = <null>
+
+  var Distance: float = 0
+  var Z Pos: float = 0
+  var Angle: float = 0
+  var Attack Cooldown: float = 0
+  var Multihit Timer: float = 0
+  var Velocity X: float = 0
+  var Will Turn: bool = false
+  var Can Attack: bool = false
+  var In Attack Range: bool = false
+  var Hero Is Below: bool = false
+  var Not Moving On X: bool = false
+  var Shift Down: bool = false
+  var Start Anim: string = ""
+  var Next Point: gameObject = <null>
+  var Patrol Point: gameObject = Battle Control/Return Scene/Roachfeeder Tall/Patrol Point
+  var Slash 1: gameObject = Battle Control/Return Scene/Roachfeeder Tall/Slash 1
+  var Slash 2: gameObject = Battle Control/Return Scene/Roachfeeder Tall/Slash 2
+  var Start Point: gameObject = Battle Control/Return Scene/Roachfeeder Tall/Start Point
+  var Pt Idle: gameObject = Grove Pilgrim Fly/Pt Idle (localpoolprefabs_assets_areadust.bundle)
+  var Spawn Point: gameObject = <null>
+  var Slash Multi: gameObject = Battle Control/Return Scene/Roachfeeder Tall/Slash Multi
+  var Audio Loop Voice: gameObject = Battle Control/Return Scene/Roachfeeder Tall/Audio Loop Voice
+  var Ray Pt Centre: gameObject = Battle Control/Return Scene/Roachfeeder Tall/Ray Pt Centre
+}

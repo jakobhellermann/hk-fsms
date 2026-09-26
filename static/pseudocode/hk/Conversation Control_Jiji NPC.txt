@@ -1,0 +1,442 @@
+# Conversation Control
+# 1 location(s):
+#   Room_Ouiji / Jiji NPC
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Black Wave", storeResult=var "Black Wave")
+    FindChild(gameObject=Self, childName="Shade Form", storeResult=var "Shade Form")
+    FindChild(gameObject=Self, childName="Pt Land", storeResult=var "Pt Land")
+    FindChild(gameObject=Self, childName="Particle Wave", storeResult=var "Particle Wave")
+    FindChild(gameObject=Self, childName="Pt Floor", storeResult=var "Pt Floor")
+    FindChild(gameObject=Self, childName="Pt Trail", storeResult=var "Pt Trail")
+    FindChild(gameObject=Self, childName="Spawn Point", storeResult=var "Spawn Point")
+    FindChild(gameObject=Self, childName="Approach Range", storeResult=var "Approach Range")
+    FindChild(gameObject=Self, childName="Dream Dialogue", storeResult=var "Dream Dialogue")
+    FindGameObject(objectName="GradeMarker", withTag="Untagged", store=var "GradeMarker")
+    FindGameObject(objectName="Smoke Activator", withTag="Untagged", store=var "Smoke Activator")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Shade Present?
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    AudioStop(gameObject=var "Voice Player")
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="jijiMet", isTrue=(none), isFalse=→"FINISHED")
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="JIJI", everyFrame=false)
+    on FINISHED → Convo Choice
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Meet 1 {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    SetPlayerDataBool(boolName="jijiMet", value=true)
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MEET1", "Jiji"], storeResult=(unset var))
+    on CONVO_FINISH → Meet 2
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Convo Choice {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="rancidEggs", storeValue=var "Eggs Held")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_talk_01 (sharedassets28.assets), Jiji_talk_03 (sharedassets28.assets), Jiji_talk_04 (sharedassets28.assets)], weights=[1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="jijiMet", isTrue=(none), isFalse=→"MEET")
+    PlayerDataBoolTrueAndFalse(gameObject=var "GameManager", trueBool="troupeInTown", falseBool="jijiGrimmConvo", isTrue=→"GRIMM", isFalse=(none))
+    BoolTest(boolVariable=var "Spoken Shade Killed", isTrue=→"SPOKEN KILLED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Shade Killed", isTrue=→"SHADE KILLED", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "No Shade Spoken", isTrue=→"NO SHADE REPEAT", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "No Eggs Spoken", isTrue=→"NO EGGS", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REPEAT", isFalse=(none), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"GREET", delay=0, everyFrame=false)
+    on MEET → Meet 1
+    on NO SHADE REPEAT → No Shade Repeat
+    on GREET → Greet
+    on NO EGGS → No Eggs Repeat
+    on REPEAT → Has Shade?
+    on SHADE KILLED → Shade Killed
+    on SPOKEN KILLED → Spoken Killed
+    on GRIMM → Grimm
+  }
+
+  state Has Shade? {
+    GetPlayerDataString(gameObject=var "GameManager", stringName="shadeScene", storeValue=var "Shade Scene")
+    StringCompare(stringVariable=var "Shade Scene", compareTo="None", equalEvent=→"NO", notEqualEvent=→"YES", storeResult=(unset), everyFrame=false)
+    on YES → Check Location
+    on NO → No Shade
+  }
+
+  state No Shade {
+    SetBoolValue(boolVariable=var "No Shade Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NOSHADE", "Jiji"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state No Shade Repeat {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NOSHADE_REPEAT", "Jiji"], storeResult=(unset var))
+    AudioStop(gameObject=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_Greet (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Greet {
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["GREET", "Jiji"], storeResult=(unset var))
+    on CONVO_FINISH → Has Shade?
+  }
+
+  state Shade Offered? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="jijiShadeOffered", isTrue=→"YES", isFalse=→"NO")
+    on YES → Offer
+    on NO → First Offer
+  }
+
+  state First Offer {
+    SetPlayerDataBool(boolName="jijiShadeOffered", value=true)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["SHADE_OFFER_INTRO", "Jiji"], storeResult=(unset var))
+    on CONVO_FINISH → Have Eggs?
+  }
+
+  state Check Location {
+    GetPlayerDataString(gameObject=var "GameManager", stringName="shadeMapZone", storeValue=var "Shade Map Zone")
+    SendEventByName(eventTarget=Self, sendEvent=var "Shade Map Zone", delay=0, everyFrame=false)
+    on ABYSS → Found shade
+    on CITY → Found shade
+    on CLIFFS → Found shade
+    on COLOSSEUM → Found shade
+    on CROSSROADS → Found shade
+    on DEEPNEST → Found shade
+    on FOG_CANYON → Found shade
+    on GREEN_PATH → Found shade
+    on HIVE → Found shade
+    on KINGS_PASS → 
+    on MINES → Found shade
+    on QUEENS_STATION → Found shade
+    on FINISHED → Not Found
+    on OUTSKIRTS → Found shade
+  }
+
+  state Found shade {
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Shade Map Zone", "Jiji"], storeResult=(unset var))
+    on CONVO_FINISH → Shade Offered?
+  }
+
+  state Not Found {
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["LOST_SHADE", "Jiji"], storeResult=(unset var))
+    on CONVO_FINISH → Shade Offered?
+  }
+
+  state Offer {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["SHADE_OFFER", "Jiji"], storeResult=(unset var))
+    on CONVO_FINISH → Have Eggs?
+  }
+
+  state Have Eggs? {
+    IntCompare(integer1=var "Eggs Held", integer2=0, equal=→"NO", lessThan=→"NO", greaterThan=→"YES", everyFrame=false)
+    on YES → Box Down 2
+    on NO → No Eggs
+  }
+
+  state No Eggs {
+    SetBoolValue(boolVariable=var "No Eggs Spoken", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NO_EGGS", "Jiji"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state No Eggs Repeat {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["NO_EGGS_REPEAT", "Jiji"], storeResult=(unset var))
+    AudioStop(gameObject=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_Greet (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Box Down 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up YN
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=0, everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["JIJI_OFFER", "Prompts"], storeResult=(unset var))
+    on NO → Decline
+    on YES → Yes
+  }
+
+  state Yes {
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionX", value=25.10169)
+    SetPlayerDataInt(intName="shadeSpecialType", value=0)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_jiji())
+    SetPlayerDataFloat(gameObject=var "GameManager", floatName="shadePositionY", value=10.59)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayerDataIntAdd(gameObject=var "GameManager", intName="rancidEggs", amount=var "Decrement")
+    SetPlayerDataString(gameObject=var "GameManager", stringName="shadeScene", value="Room_Ouiji")
+    ActivateGameObject(gameObject=var "Dream Dialogue", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="ANIM END", delay=0, everyFrame=false)
+    on FINISHED → Turn Hero
+  }
+
+  state Decline {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    on FINISHED → Box Up 2
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Decline Msg
+  }
+
+  state Decline Msg {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["DECLINE", "Jiji"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_Greet (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Box Up 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    on FINISHED → Ritual Msg
+  }
+
+  state Ritual Msg {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["RITUAL_BEGIN", "Jiji"], storeResult=(unset var))
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_Greet (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Box Down 3
+  }
+
+  state Turn Hero {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on FINISHED → Move Hero
+  }
+
+  state Move Hero {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=-6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=21.64, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Turn Back
+  }
+
+  state Turn Back {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=0, everyFrame=false)
+    SetPosition(gameObject=var "Hero", vector=(unset), x=21.64, y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Box Up 3
+  }
+
+  state Start Summon {
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Summon Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Summoning 1
+  }
+
+  state Summoning 1 {
+    PlayParticleEmitter(gameObject=var "Pt Floor", emit=0)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_Summon (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Summon")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[dark_spell_absorb (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Summoning 2
+  }
+
+  state Summoning 2 {
+    PlayParticleEmitter(gameObject=var "Pt Trail", emit=0)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=true, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Shade Form", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Spawn
+  }
+
+  state Spawn {
+    AudioStop(gameObject=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[dark_spell_get (resources.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    Translate(gameObject=var "GradeMarker", vector=(unset), x=(unset), y=100, z=(unset), space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    ActivateGameObject(gameObject=var "Smoke Activator", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Summon End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BREAKABLE DEACTIVE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SUMMON BLAST", delay=0, everyFrame=false)
+    SetFsmBool(gameObject=var "CameraParent", fsmName="CameraShake", variableName="RumblingSmall", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Black Wave", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Particle Wave", emit=0)
+    StopParticleEmitter(gameObject=var "Pt Floor")
+    StopParticleEmitter(gameObject=var "Pt Trail")
+    CreateObject(gameObject=Hollow Shade:0 (resources.assets), spawnPoint=var "Spawn Point", position=(unset), rotation=(unset), storeObject=var "Shade", networkInstantiate=false, networkGroup=0)
+    on FINISHED → Retreat
+  }
+
+  state Retreat {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Retreat", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_retreat_01 (sharedassets28.assets), Jiji_retreat_02 (sharedassets28.assets)], weights=[1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on FINISHED → Retreated
+  }
+
+  state Retreated {
+    SendEventByName(eventTarget=GameObject(var "Shade"), sendEvent="ALERT", delay=0, everyFrame=false)
+    on HOLLOW SHADE KILLED → Return Pause
+  }
+
+  state Shade Present? {
+    GetPlayerDataString(gameObject=var "GameManager", stringName="shadeScene", storeValue=var "Shade Scene")
+    StringCompare(stringVariable=var "Shade Scene", compareTo="Room_Ouiji", equalEvent=→"YES", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Idle
+    on YES → Insta Retreat
+  }
+
+  state Insta Retreat {
+    SetCollider(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Approach Range", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BREAKABLE DEACTIVE", delay=0, everyFrame=false)
+    on FINISHED → Retreated
+  }
+
+  state Box Down 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Start Summon
+  }
+
+  state Return Pause {
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Shade Killed", boolValue=true, everyFrame=false)
+    on FINISHED → Return
+  }
+
+  state Return {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Approach", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Pt Land", emit=0)
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_retreat_01 (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[hornet_jump (resources.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[hornet_ground_land (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0.65, storePlayer=var "Voice Player")
+    on FINISHED → Return End
+  }
+
+  state Return End {
+    ActivateGameObject(gameObject=var "Dream Dialogue", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="ANIM START", delay=0, everyFrame=false)
+    SetCollider(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Shade Killed {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="royalCharmState", storeValue=var "Royal Charm State")
+    IntCompare(integer1=var "Royal Charm State", integer2=4, equal=→"SHADE CHARM", lessThan=(none), greaterThan=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["RITUAL_COMPLETED", "Jiji"], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Spoken Shade Killed", boolValue=true, everyFrame=false)
+    on CONVO_FINISH → Talk Finish
+    on SHADE CHARM → Shade Charm
+  }
+
+  state Spoken Killed {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["RITUAL_REPEAT", "Jiji"], storeResult=(unset var))
+    AudioStop(gameObject=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_Greet (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Meet 2 {
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MEET2", "Jiji"], storeResult=(unset var))
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="JIJI", everyFrame=false)
+    on CONVO_FINISH → Has Shade?
+  }
+
+  state Shade Charm {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["SHADE_CHARM", "Jiji"], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Spoken Shade Killed", boolValue=true, everyFrame=false)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Grimm {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["JIJI_GRIMM", "CP2"], storeResult=(unset var))
+    AudioStop(gameObject=var "Voice Player")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Jiji_Greet (sharedassets28.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    SetPlayerDataBool(boolName="jijiGrimmConvo", value=true)
+    on CONVO_FINISH → Talk Finish
+  }
+
+  var Hero X: float = 0
+  var Decrement: int = -1
+  var Eggs Held: int = 0
+  var Royal Charm State: int = 0
+  var No Eggs Spoken: bool = false
+  var No Shade Spoken: bool = false
+  var Shade Killed: bool = false
+  var Spoken: bool = false
+  var Spoken Shade Killed: bool = false
+  var Shade Map Zone: string = ""
+  var Shade Scene: string = ""
+  var Approach Range: gameObject = <null>
+  var Area Title: gameObject = <null>
+  var Black Wave: gameObject = <null>
+  var Dream Dialogue: gameObject = <null>
+  var GradeMarker: gameObject = <null>
+  var Particle Wave: gameObject = <null>
+  var Pt Floor: gameObject = <null>
+  var Pt Land: gameObject = <null>
+  var Pt Trail: gameObject = <null>
+  var Self: gameObject = <null>
+  var Shade: gameObject = <null>
+  var Shade Form: gameObject = <null>
+  var Smoke Activator: gameObject = <null>
+  var Spawn Point: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

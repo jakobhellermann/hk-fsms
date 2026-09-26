@@ -1,0 +1,135 @@
+# Wake Up
+# 1 location(s):
+#   Memory_Needolin / Memory Control/door_wakeOnGround
+
+// uses template: wake_on_ground_silkheart
+fsm Wake Up {
+  start Pause
+  on TEST → Take Control  // from any state
+
+  state Pause {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    ActivateGameObject(gameObject=var "Activate On First Enter", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Death Respawn Marker")
+    on START ENTRY → Set Respawn?
+    on HERO RESPAWNING HERE → Wait For Scene Enter
+  }
+
+  state Door Entry {
+    ActivateGameObject(gameObject=var "Activate On First Enter", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISH ENTRY → Take Control
+  }
+
+  state Regain Control {
+    RemoveHeroInputBlocker(Blocker=Self)
+    SetIsKinematic2d(gameObject=var "Hero", isKinematic=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Return HUD", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    on FINISHED → Save?
+  }
+
+  state Take Control {
+    AddHeroInputBlocker(Blocker=Self)
+    TransitionToAudioSnapshot(snapshot=Off (audioobjects_assets_all.bundle), transitionTime=0)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="WAKE ON GROUND START")
+    on FINISHED → Fade Screen
+  }
+
+  state Fade Screen {
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    ScreenFaderAlpha(EndAlpha=1, Duration=0)
+    on FINISHED → Wait for hero in position
+  }
+
+  state Fade Up {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Prostrate", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    TransitionToAudioSnapshot(snapshot=On (audioobjects_assets_all.bundle), transitionTime=6)
+    ScreenFaderAlpha(EndAlpha=0, Duration=9)
+    Wait(time=8, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Up
+  }
+
+  state Get Up {
+    RunFSM(fsmTemplateControl=template=-4922903412483150305 in[Slow<-true], finishEvent=→"FINISHED", everyFrame=false)
+    SendEventToRegister(eventName="WAKE ON GROUND GETUP")
+    SendEventToRegister(eventName="VIGNETTE OPEN SLOW")
+    SetDarknessLevel(SetLevel=0, StoreCurrentLevel=(unset))  // disabled
+    on FINISHED → Regain Control
+  }
+
+  state Save? {
+    BoolTest(boolVariable=var "Save Game", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SaveGame()
+    on FINISHED → Silkheart Music?
+  }
+
+  state End {
+    SendEventByNameUpwards(Target=Self, EventName="DOOR GET UP FINISHED")
+    SendEventToRegister(eventName="WAKE ON GROUND END")
+    RemoveMemoryMsg(Source=Self, DisappearDelay=1)
+  }
+
+  state Set Respawn? {
+    AddHeroInputBlocker(Blocker=Self)
+    SetSceneManagerActorSnapshot(snapshot=Off (audioobjects_assets_all.bundle))
+    TransitionToAudioSnapshot(snapshot=Off (audioobjects_assets_all.bundle), transitionTime=0)
+    BoolTest(boolVariable=var "Set Death Respawn", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetDeathRespawnMarker(Target=var "Death Respawn Marker")
+    on FINISHED → Door Entry
+  }
+
+  state Wait For Scene Enter {
+    AddHeroInputBlocker(Blocker=Self)
+    TransitionToAudioSnapshot(snapshot=Off (audioobjects_assets_all.bundle), transitionTime=0)
+    SetSceneManagerActorSnapshot(snapshot=Off (audioobjects_assets_all.bundle))
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Take Control
+  }
+
+  state Get Up Wait {
+    Wait(time=var "Get Up Wait Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Up
+  }
+
+  state Voice Line {
+    AddMemoryMsg(Source=Self, Text={Sheet="Lore", Key=var "Voice Line Convo Key"})
+    Wait(time=2, finishEvent=(none), realTime=false)
+    on FINISHED → Get Up
+  }
+
+  state Wait for hero in position {
+    WaitForSceneAudioSnapshotsApplied(SendEvent=(none))
+    on FINISHED → Wait
+  }
+
+  sequence state Wait {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    NextFixedFrameEvent(SendEvent=(none))
+    on FINISHED → Fade Up
+  }
+
+  state Silkheart Music? {
+    BoolTest(boolVariable=var "z No Silkheat Music", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    ApplyMusicCue(musicCue=Cradle (audiocuesdynamic_assets_areacradle.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Main Only (audioobjects_assets_all.bundle), transitionTime=6)
+    on FINISHED → End
+  }
+
+  var Get Up Wait Time: float = 0
+  var Save Game: bool = false
+  var Return HUD: bool = false
+  var Set Death Respawn: bool = true
+  var z No Silkheat Music: bool = true
+  var Voice Line Convo Key: string = "MEMORY_NEEDOLIN_1"
+  var Activate On First Enter: gameObject = <null>
+
+  var Idle Scale: vector3 = (5, 5, 5)
+  var Self: gameObject = <null>
+  var Death Respawn Marker: gameObject = <null>
+}

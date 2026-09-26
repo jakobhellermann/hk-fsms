@@ -1,0 +1,488 @@
+# Umbrella Float
+# 1 location(s):
+#   heroloading_assets_all.bundle / Hero_Hornet
+
+// uses template: hornet_umbrella_float
+fsm Umbrella Float {
+  start Init
+  on TOOLTHROW CANCEL → Toolthrow Cancel  // from any state
+  on HERO SURFACE EXIT → Cooldown 2  // from any state
+  on DASH CANCEL → Dash Cancel  // from any state
+  on ATTACK CANCEL → Attack Cancel  // from any state
+  on START MANTLE → Mantle Cancel  // from any state
+  on FORCE UPDRAFT ENTER → Start Updraft Control  // from any state
+  on LEAVING SCENE → Leaving Scene  // from any state
+  on HERO DAMAGED → Force Cancel  // from any state
+  on FSM CANCEL → Force Cancel  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Effects", storeResult=var "Effects Folder")
+    FindChild(gameObject=var "Effects Folder", childName="umbrella_inflate_effect", storeResult=var "Inflate Effect")
+    FindChild(gameObject=var "Effects Folder", childName="umbrella_updraftJump_fx", storeResult=var "UpdraftJump Effect")
+    SetFloatValue(floatVariable=var "Float Speed Crt", floatValue=var "Float Speed", everyFrame=false)
+    FindGameObject(objectName="", withTag="CameraTarget", store=var "Camera Target")
+    FindChild(gameObject=Self, childName="Sounds", storeResult=var "Sounds Folder")
+    FindChild(gameObject=var "Sounds Folder", childName="Umbrella Float", storeResult=var "Float Loop Source")
+    SetAudioSource(gameObject=var "Float Loop Source", active=false)
+    FindChild(gameObject=var "Sounds Folder", childName="Updraft Fly Loop", storeResult=var "Fly Loop Source")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Is Active", boolValue=false, everyFrame=false)
+    on FLOAT → Take Control
+  }
+
+  state Cancel All {
+    SetAudioSource(gameObject=var "Float Loop Source", active=false)
+    SetBoolValue(boolVariable=var "Was Active", boolValue=var "Is Active", everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Active", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Has Control", boolValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUmbrellaFloating", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Was Active", isTrue=→"END", isFalse=(none), everyFrame=false)
+    SendEventToRegister(eventName="BROLLY END")
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    on FINISHED → Idle
+    on END → Relinquish Control
+  }
+
+  state Antic {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=ResetPlays())
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Umbrella Inflate Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dIsPlaying(gameObject=Self, clipName="Umbrella Inflate Antic", isPlaying=(unset), isPlayingEvent=(none), isNotPlayingEvent=→"CANCEL", everyframe=true)
+    UmbrellaMotionX(gameObject=Self, accelerationFactor=8.5, decelerationFactor=0.25, maxSpeed=8.5)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanHarpoonDash", parameters=[], storeResult=var "Can Harpoon Dash", EveryFrame=true)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=var "Can Harpoon Dash")
+    on FINISHED → Damager?
+    on CANCEL → Anim Canceled
+    on LAND → Land
+    on HARPOON CANCEL → Harpoon Cancel
+  }
+
+  state Take Control {
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=CancelAttack, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=RelinquishControlNotVelocity, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetBoolValue(boolVariable=var "Has Control", boolValue=true, everyFrame=false)
+    GetPlayerDataBool(boolName="hasDash", storeValue=var "Has Dash")
+    HeroClampFallVelocityV2(everyFrame=false)
+    on FINISHED → Antic
+  }
+
+  state Inflate {
+    SetBoolValue(boolVariable=var "Is Active", boolValue=true, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanHarpoonDash", parameters=[], storeResult=var "Can Harpoon Dash", EveryFrame=true)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=var "Can Harpoon Dash")
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)  // disabled
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake Inert (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetCState", parameters=["inUpdraft"], storeResult=var "In Updraft", EveryFrame=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUmbrellaFloating", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "In Updraft", isTrue=→"UPDRAFT ENTER", isFalse=(none), everyFrame=false)
+    PlayAudioEvent(audioClip=hornet_umbrella_open (herosfxstatic_assets_all.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hornet_umbrella_open (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    SetAudioSource(gameObject=var "Float Loop Source", active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Umbrella Inflate", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Inflate Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2dConditional(gameObject=Self, vector=(0, 0), x=(unset), y=0.5, xCondition={value=0, comparisonType=0}, yCondition={value=0.05, comparisonType=2}, bothConditionsMustBeTrue=false, everyFrame=true)
+    UmbrellaMotionX(gameObject=Self, accelerationFactor=1, decelerationFactor=0.25, maxSpeed=8.5)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0.075)
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=(unset))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetCanAirDashCancel", parameters=[], storeResult=var "Can Dash", EveryFrame=false)
+    ListenForDashV2(EventTarget=Self, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), DelayBeforeActive=0.075, IsActive=var "Can Dash")
+    AllowMantle()
+    GetHeroCState(VariableName="isTouchingSlopeLeft", StoreValue=var "Condition", EveryFrame=true)
+    BoolTest(boolVariable=var "Condition", isTrue=→"BUMP L", isFalse=(none), everyFrame=true)
+    GetHeroCState(VariableName="isTouchingSlopeRight", StoreValue=var "Condition", EveryFrame=true)
+    BoolTest(boolVariable=var "Condition", isTrue=→"BUMP R", isFalse=(none), everyFrame=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(-1, 0), space=0, distance=var "Wall Bump Distance", minDepth=(unset), maxDepth=(unset), hitEvent=→"BUMP L", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=0, distance=var "Wall Bump Distance", minDepth=(unset), maxDepth=(unset), hitEvent=→"BUMP R", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SendEventToRegister(eventName="BROLLY START")
+    on FINISHED → Start
+    on LAND → Land
+    on UPDRAFT ENTER → Updraft Antic
+    on BUMP L → Inflate Bump L
+    on BUMP R → Inflate Bump R
+    on HARPOON CANCEL → Harpoon Cancel
+  }
+
+  state Float Idle {
+    GetHeroCState(VariableName="isTouchingSlopeLeft", StoreValue=var "Condition", EveryFrame=true)
+    BoolTest(boolVariable=var "Condition", isTrue=→"BUMP L", isFalse=(none), everyFrame=true)
+    GetHeroCState(VariableName="isTouchingSlopeRight", StoreValue=var "Condition", EveryFrame=true)
+    BoolTest(boolVariable=var "Condition", isTrue=→"BUMP R", isFalse=(none), everyFrame=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(-1, 0), space=0, distance=var "Wall Bump Distance", minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Bumping L", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(1, 0), space=0, distance=var "Wall Bump Distance", minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Bumping R", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=true, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Bumping L", var "Bumping R"], boolStates=[true, false], trueEvent=→"BUMP L", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Bumping L", var "Bumping R"], boolStates=[false, true], trueEvent=→"BUMP R", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.13, targetSpeed=-6)
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"END", queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    UmbrellaMotionX(gameObject=Self, accelerationFactor=1, decelerationFactor=0.25, maxSpeed=8.5)
+    FaceDirectionUmbrella(gameObject=var "Self", playNewAnimation=true, newAnimationClip="Umbrella Turn", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=(unset))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetCanAirDashCancel", parameters=[], storeResult=var "Can Dash", EveryFrame=false)
+    ListenForDashV2(EventTarget=Self, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), DelayBeforeActive=0, IsActive=var "Can Dash")
+    AllowMantle()
+    on LAND → Land
+    on END → Deflate
+    on BUMP L → Start Wall Slide L?
+    on BUMP R → Start Wall Slide R?
+    on UPDRAFT ENTER → Updraft Antic
+  }
+
+  state Start {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0.5, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Umbrella Float")
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    on FINISHED → Float Idle
+  }
+
+  state Relinquish Control {
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ResetHardLandingTimer", parameters=[], storeResult=(unset var), EveryFrame=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUmbrellaFloating", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Has Control", boolValue=false, everyFrame=false)
+    SendEventToRegister(eventName="BROLLY END")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())
+    on FINISHED → Cooldown
+  }
+
+  state Deflate {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Umbrella Deflate", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=(unset))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetCanAirDashCancel", parameters=[], storeResult=var "Can Dash", EveryFrame=false)
+    ListenForDashV2(EventTarget=Self, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), DelayBeforeActive=0, IsActive=var "Can Dash")
+    AllowMantle()
+    on FINISHED → Relinquish Control
+    on LAND → Land
+  }
+
+  state Cooldown {
+    SetBoolValue(boolVariable=var "Has Control", boolValue=false, everyFrame=false)
+    SetAudioSource(gameObject=var "Float Loop Source", active=false)
+    BoolTest(boolVariable=var "Is Active", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Bump L {
+    PlayVibrationV4(vibrationDataAsset=hero_land_soft (vibrationstatic_assets_vibrationdataasset.bundle), strength=0.5, motors=None, loop=false, tag="", stopOnStateExit=false, waitUntilFinished=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Y Velocity", minValue=-9999, maxValue=-0.5, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=6, y=var "Y Velocity", everyFrame=false)
+    Wait(time=0.01, finishEvent=→"FINISHED", realTime=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"END", queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    on FINISHED → Float Idle
+    on END → Deflate
+    on LAND → Land
+    on UPDRAFT ENTER → Updraft Antic
+  }
+
+  state Bump R {
+    PlayVibrationV4(vibrationDataAsset=hero_land_soft (vibrationstatic_assets_vibrationdataasset.bundle), strength=0.5, motors=None, loop=false, tag="", stopOnStateExit=false, waitUntilFinished=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-6, y=(unset), everyFrame=false)
+    Wait(time=0.01, finishEvent=→"FINISHED", realTime=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"END", queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    on FINISHED → Float Idle
+    on END → Deflate
+    on LAND → Land
+    on UPDRAFT ENTER → Updraft Antic
+  }
+
+  state Land {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=ForceSoftLanding())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=ResetAirMoves())
+    PlayVibrationV4(vibrationDataAsset=hero_land_soft (vibrationstatic_assets_vibrationdataasset.bundle), strength=0.5, motors=None, loop=false, tag="", stopOnStateExit=false, waitUntilFinished=false)
+    on FINISHED → Relinquish Control
+  }
+
+  state Attack Cancel {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithAttack())
+    CheckIfCrestEquipped(Crest=Warrior (dataassets_assets_assets/dataassets/tools/crestitems.bundle), trueEvent=(none), falseEvent=(none), storeValue=(unset))  // disabled
+    on FINISHED → Relinquish Control
+    on KEEP ANIM → Relinquish Control Not Anim
+  }
+
+  state Dash Cancel {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetCanAirDashCancel", parameters=[], storeResult=var "Can Dash", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Dash", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithDash())
+    on FINISHED → Relinquish Control
+    on CANCEL → Cancel Frame
+  }
+
+  state Updraft Antic {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=ResetAirMoves())
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Updraft Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUmbrellaFloating", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=updraft_hornet_takeoff (sfxstatic_assets_shared.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=updraft_hornet_takeoff (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Y Velocity", minValue=0, maxValue=9999, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", everyFrame=false)
+    DoCameraShakeV4(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=true, Delay=0, CancelOnExit=false, vibrate=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Updraft Start
+    on UPDRAFT EXIT → Bounce Out Effect
+  }
+
+  state Updraft Rise {
+    AudioPlayInState(gameObject=var "Fly Loop Source", volume=1)
+    VibrationPlayerPlayV2(target=var "Fly Loop Source", stopOnStateExit=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Y Velocity", minValue=4, maxValue=9999, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=var "Y Velocity", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Updraft Rise")
+    FaceDirectionUmbrella(gameObject=Self, playNewAnimation=true, newAnimationClip="Updraft Rise Turn", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.2)
+    AccelerateToY(gameObject=Self, accelerationFactor=0.3, targetSpeed=var "Target Updraft Speed")
+    ListenForAttack(eventTarget=Self, wasPressed=→"ATTACK CANCEL", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    ListenForToolThrow(EventTarget=Self, WasPressed=→"TOOLTHROW CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), RequireToolToThrow=true, IsActive=(unset))
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetCanAirDashCancel", parameters=[], storeResult=var "Can Dash", EveryFrame=false)
+    ListenForDashV2(EventTarget=Self, WasPressed=→"DASH CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), DelayBeforeActive=0, IsActive=var "Can Dash")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanHarpoonDash", parameters=[], storeResult=var "Can Harpoon Dash", EveryFrame=true)
+    ListenForSuperdashV2(Target=Self, WasPressed=→"HARPOON CANCEL", WasReleased=(none), IsPressed=(none), IsNotPressed=(none), ActiveBool=var "Can Harpoon Dash")
+    ListenForJump(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"END", queueBool=(unset), activeBool=(unset), stateEntryOnly=false)
+    UmbrellaMotionX(gameObject=Self, accelerationFactor=1, decelerationFactor=2, maxSpeed=4)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Updraft Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=true, Delay=0)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUpdraft", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUmbrellaFloating", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodOnExit(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUpdraft", parameters=[false], storeResult=(unset var))
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"BONK", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=true)
+    GetHeroCState(VariableName="inUpdraft", StoreValue=var "In Updraft", EveryFrame=true)
+    BoolTest(boolVariable=var "In Updraft", isTrue=(none), isFalse=→"UPDRAFT EXIT", everyFrame=true)
+    on UPDRAFT EXIT → Bounce Out Effect
+    on END → Updraft End
+    on BONK → Hit Roof
+    on HARPOON CANCEL → Harpoon Cancel
+  }
+
+  state Bounce Out {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ResetHardLandingTimer", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithUpdraftExit())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())
+    on FINISHED → Cooldown
+  }
+
+  state Cooldown 2 {
+    SetAudioSource(gameObject=var "Float Loop Source", active=false)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Mantle Cancel {
+    SetAudioSource(gameObject=var "Float Loop Source", active=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUmbrellaFloating", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="BROLLY END")
+    SetBoolValue(boolVariable=var "Has Control", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Active", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Start Updraft Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=ResetAirMoves())
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=RelinquishControlNotVelocity, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    HeroControllerMethods(method=StopAnimationControl, parameters=[], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    HeroControllerMethods(method=AffectedByGravity, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUmbrellaFloating", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Updraft Antic DJ
+  }
+
+  state Updraft Antic DJ {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Updraft Antic DJ", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=updraft_hornet_takeoff (sfxstatic_assets_shared.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=updraft_hornet_takeoff (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Y Velocity", minValue=0, maxValue=9999, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Velocity", everyFrame=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    on FINISHED → Updraft Start
+  }
+
+  state Anim Canceled {
+    DebugLogConsole(logLevel=2, text="Umbrella Inflate Antic was canceled!", sendToUnityLog=true)  // disabled
+    on FINISHED → Inflate
+  }
+
+  state Start Wall Slide L? {
+    GetHeroCState(VariableName="isTouchingSlopeLeft", StoreValue=var "Condition", EveryFrame=false)
+    BoolTest(boolVariable=var "Condition", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayerDataVariableTest(VariableName="hasWalljump", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    ListenForLeft(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"FINISHED", isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfRightPressed=false)
+    HeroWallJumpBrollyCheck(Target=Self, IsFacingRight=false, TrueEvent=(none), FalseEvent=→"FINISHED")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithWallslide", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"WALLSLIDE", delay=0, everyFrame=false)
+    on FINISHED → Bump L
+    on WALLSLIDE → Relinquish Control
+  }
+
+  state Start Wall Slide R? {
+    GetHeroCState(VariableName="isTouchingSlopeRight", StoreValue=var "Condition", EveryFrame=false)
+    BoolTest(boolVariable=var "Condition", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    PlayerDataVariableTest(VariableName="hasWalljump", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    ListenForRight(eventTarget=Self, wasPressed=(none), wasReleased=(none), isPressed=(none), isNotPressed=→"FINISHED", isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false, ignoreIfLeftPressed=false)
+    HeroWallJumpBrollyCheck(Target=Self, IsFacingRight=true, TrueEvent=(none), FalseEvent=→"FINISHED")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetStartWithWallslide", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"WALLSLIDE", delay=0, everyFrame=false)
+    on FINISHED → Bump R
+    on WALLSLIDE → Relinquish Control
+  }
+
+  state Cancel Frame {
+    HeroClampFallVelocityV2(everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Float Idle
+  }
+
+  state Toolthrow Cancel {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetStartWithToolThrow())
+    on FINISHED → Relinquish Control
+  }
+
+  state Damager? {
+    CheckIfToolEquipped(Tool=Brolly Spike (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    SetGameObject(variable=var "Spawned Brolly Spike", gameObject=<null>, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Tool_brolly_spike (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Spawned Brolly Spike")
+    SetParent(gameObject=var "Spawned Brolly Spike", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=var "Spawned Brolly Spike", vector=(unset), x=(unset), y=(unset), z=0.002, space=0, everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Spawned Brolly Spike", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Inflate
+  }
+
+  sequence state Leaving Scene {
+    BoolTest(boolVariable=var "Has Control", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Has Control", boolValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "In Updraft", isTrue=→"UPDRAFT EXIT", isFalse=(none), everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SetBoolValue(boolVariable=var "Is Active", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Umbrella Deflate", AnimationCompleteEvent=(none))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Restore Nail Charge
+    on LEVEL LOADED → Restore Nail Charge
+    on UPDRAFT EXIT → Cooldown 2
+  }
+
+  state Force Cancel {
+    SetBoolValue(boolVariable=var "Is Active", boolValue=false, everyFrame=false)
+    on FINISHED → Restore Nail Charge
+  }
+
+  state Updraft Start {
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake Inert (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Inflate Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Inflate Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Updraft Rise
+  }
+
+  state Hit Roof {
+    PlayAudioEvent(audioClip=hornet_land_hard new (herosfxstatic_assets_all.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayVibrationV2(vibrationData={lowFidelityVibration=LowFidelityVibrations(0), highFidelityVibration=<null>, gamepadVibration=<null>, ps5Vibration=<null>}, vibrationDataAsset=hornet_land_hard (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    AllowMantle()
+    SetBoolValue(boolVariable=var "Is Active", boolValue=false, everyFrame=false)
+    SendEventToRegister(eventName="BROLLY END")
+    SendEventByNameV2(eventTarget=GameObject(Self), sendEvent="SUPERJUMP HIT ROOF", delay=0, everyFrame=false)
+    on FINISHED → Restore Nail Charge
+  }
+
+  state Inflate Bump L {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Umbrella Float")
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    on FINISHED → Start Wall Slide L?
+  }
+
+  state Inflate Bump R {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Umbrella Float")
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    on FINISHED → Start Wall Slide R?
+  }
+
+  state Harpoon Cancel {
+    SendEventByName(eventTarget=GameObjectFSM(Self, fsm="Harpoon Dash"), sendEvent="DO MOVE", delay=0, everyFrame=false)
+  }
+
+  state Bounce Out Effect {
+    PlayAudioEvent(audioClip=hornet_sprint_jump_2nd_spin (herosfxstatic_assets_all.bundle), pitchMin=0.8, pitchMax=0.8, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hornet_umbrella_open (herosfxstatic_assets_all.bundle), pitchMin=1.25, pitchMax=1.25, volume=0.4, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "UpdraftJump Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayVibrationV3(vibrationDataAsset=hornet_sprint_jump (vibrationstatic_assets_vibrationdataasset.bundle), motors=None, loopTime=(unset), loopAuto=false, tag="", stopOnStateExit=false)
+    on FINISHED → Bounce Out
+  }
+
+  state Relinquish Control Not Anim {
+    SetHeroCState(VariableName="isInCancelableFSMMove", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ResetHardLandingTimer", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetAllowNailChargingWhileRelinquished", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Camera Target", behaviour="CameraTarget", methodName="SetUmbrellaFloating", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Has Control", boolValue=false, everyFrame=false)
+    SendEventToRegister(eventName="BROLLY END")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())  // disabled
+    on FINISHED → Cooldown
+  }
+
+  state Updraft End {
+    PlayAudioEvent(audioClip=updraft_hornet_exit (sfxstatic_assets_shared.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Relinquish Control
+  }
+
+  state Restore Nail Charge {
+    BoolTest(boolVariable=var "Has Control", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    HeroControllerMethods(method=SetAllowNailChargingWhileRelinquished, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Cancel All
+  }
+
+  var Float Speed: float = -6
+  var Float Speed Crt: float = 0
+  var Wall Bump Distance: float = 0.7
+  var Y Velocity: float = 0
+  var Target Updraft Speed: float = 0
+  var Bumping L: bool = false
+  var Bumping R: bool = false
+  var Can Dash: bool = false
+  var Can Harpoon Dash: bool = false
+  var Condition: bool = false
+  var Has Control: bool = false
+  var Has Dash: bool = false
+  var Has Harpoon Dash: bool = false
+  var In Updraft: bool = false
+  var Is Active: bool = false
+  var Was Active: bool = false
+  var Umbrella Wind: vector2 = (-5, 0)
+  var Camera Target: gameObject = <null>
+  var Effects Folder: gameObject = <null>
+  var Float Loop Source: gameObject = <null>
+  var Inflate Effect: gameObject = <null>
+  var Self: gameObject = <null>
+  var Sounds Folder: gameObject = <null>
+  var Spawned Brolly Spike: gameObject = <null>
+  var UpdraftJump Effect: gameObject = <null>
+  var Fly Loop Source: gameObject = <null>
+}

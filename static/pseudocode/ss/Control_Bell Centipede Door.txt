@@ -1,0 +1,94 @@
+# Control
+# 1 location(s):
+#   Bellway_Centipede_additive / Bell Centipede Bellway Scene/Bell Centipede Door
+
+fsm Control {
+  start Pause
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Enter")
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Target Y Pos", space=0, everyFrame=false)
+    FloatOperator(float1=var "Target Y Pos", float2=-2, operation=Add, storeResult=var "End Y Pos", everyFrame=false)
+    FloatAdd(floatVariable=var "Target Y Pos", add=-4, everyFrame=false, perSecond=false)  // disabled
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on INTERACT → Save Corpse Pos
+  }
+
+  state Hop Antic {
+    StartFreeCameraMode(StoreObject=var "")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Hop To Somersault", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetPlayerDataVariable(VariableName="disablePause", SetValue=true)
+    SetHeroCState(VariableName="invulnerable", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Hornet Jump
+  }
+
+  state Hornet Jump {
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 20), x=(unset), y=(unset), everyFrame=false)
+    GetVelocity2d(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Velocity Y", space=0, everyFrame=true)
+    FloatCompare(float1=var "Velocity Y", float2=0, tolerance=0, equal=(none), lessThan=→"END", greaterThan=(none), everyFrame=true)
+    Wait(time=3, finishEvent=→"END", realTime=false)
+    PlayAudioEvent(audioClip=hornet_jump_ss (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTableV2(Table=Grunt Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0), ForcePlay=true)
+    on END → Start Fall
+  }
+
+  state Hornet Fall {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Somersault Pin Drop", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventToRegister(eventName="REMASKER FREEZE")
+    SetCollider(gameObject=var "Hero", active=false, resetOnExit=false)
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Current Y Pos", space=0, everyFrame=true)
+    FloatCompare(float1=var "Current Y Pos", float2=var "Target Y Pos", tolerance=0, equal=(none), lessThan=→"END", greaterThan=(none), everyFrame=true)
+    AddForce2d(gameObject=var "Hero", forceMode=0, atPosition=(unset), vector=(unset), x=(unset), y=-20, vector3=(unset), everyFrame=true)
+    on END → Enter
+  }
+
+  state Start Fall {
+    Wait(time=0.2, finishEvent=(none), realTime=false)
+    on FINISHED → Hornet Fall
+  }
+
+  state Enter {
+    PlayParticleEmitter(gameObject=var "Pt Enter", emit=0, resetIfPlaying=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    GetPosition2D(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Current Y Pos", space=0, everyFrame=true)
+    FloatCompare(float1=var "Current Y Pos", float2=var "End Y Pos", tolerance=0, equal=(none), lessThan=→"END", greaterThan=(none), everyFrame=true)
+    PlayAudioEvent(audioClip=bell_goomba_emerge_from_under (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on END → End
+  }
+
+  sequence state End {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    TransitionToAudioSnapshot(snapshot=at None (audioobjects_assets_all.bundle), transitionTime=0.5)
+    TransitionToAudioSnapshot(snapshot=Off (audioobjects_assets_all.bundle), transitionTime=0.5)
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=0.5)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SetCollider(gameObject=var "Hero", active=true, resetOnExit=false)
+    BeginSceneTransition(sceneName="Bellway_Centipede_Arena", entryGateName="top1", entryDelay=0, visualization=Default, preventCameraFadeOut=false)
+  }
+
+  state Pause {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Init
+  }
+
+  state Save Corpse Pos {
+    CallMethodProper(gameObject=Bell Centipede Bellway Scene/Hero Corpse Marker, behaviour="HeroCorpseMarker", methodName="get_Position", parameters=[], storeResult=var "Corpse Marker Pos", EveryFrame=false)
+    SetStaticVariable(variableName="LastCentipedeCorpseMarkerPos", setValue=var "Corpse Marker Pos", sceneTransitionsLimit=2)
+    on FINISHED → Hop Antic
+  }
+
+  var Velocity Y: float = 0
+  var Current Y Pos: float = 0
+  var Target Y Pos: float = 0
+  var End Y Pos: float = 0
+  var Corpse Marker Pos: vector2 = (0, 0)
+  var Pt Enter: gameObject = <null>
+}

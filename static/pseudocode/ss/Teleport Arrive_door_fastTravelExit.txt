@@ -1,0 +1,173 @@
+# Teleport Arrive
+# 7 location(s):
+#   Belltown_basement / door_fastTravelExit
+#   Bellway_03 / door_fastTravelExit
+#   Bellway_04 / door_fastTravelExit
+#   Bellway_08 / door_fastTravelExit
+#   Bellway_City / door_fastTravelExit
+#   Bone_05 / door_fastTravelExit
+#   Shellwood_19 / door_fastTravelExit
+
+fsm Teleport Arrive {
+  start Init
+  on DISABLE → Disable  // from any state
+
+  state Hero Fling Out {
+    CallStaticMethod(className="DeliveryQuestItem", methodName="BreakAll", parameters=[], storeResult=(unset var), everyFrame=false)
+    SendEventToRegister(eventName="HERO ARRIVED")
+    CreateNoise(From=var "Hero", LocalOrigin=(0, 0), Radius=20)
+    PlayAudioEvent(audioClip=bell_beast_underground_emerge (sfxstatic_assets_areabellway.bundle), pitchMin=1.25, pitchMax=1.25, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=Attack Normal Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=var "Hero", SpawnPosition=(0, 0, 0))
+    ActivateGameObject(gameObject=var "Teleport Arrive Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    SetHeroAffectedByGravity(SetTime=0, CanSet=true, SetAffectedByGravity=true)
+    SetPosition2D(GameObject=var "Hero", Vector=var "Fling Start Pos", X=0, Y=0, Space=0, EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="ReattachHeroLight", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CalculateProjectileVelocity(Target=var "Hero", TargetPosition=var "Hero Pos", FireAngle=80, ImpulseVelocity=var "Fling Velocity", EveryFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=var "Fling Velocity", x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Fling Anim Up
+  }
+
+  state Land {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControlToIdle", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → End
+  }
+
+  state End {
+    RemoveHeroInputBlocker(Blocker=Self)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    CameraStopFreeze(freezeTargetAlso=true)  // disabled
+  }
+
+  state Fling Anim Up {
+    SelectRandomString(strings=["DownSpikeBounce 1", "DownSpikeBounce 2"], weights=[1, 1], storeString=var "Bounce Anim")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName=var "Bounce Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ListenForDash(eventTarget=Self, wasPressed=→"DASH", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    GetVelocity2d(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Vel Y", space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Hero Vel Y", float2=0, tolerance=0, equalBool=var "Hero Y 0", lessThanBool=var "Hero Moving Down", greaterThanBool=(unset), everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Hero Y 0", var "Hero Moving Down"], sendEvent=→"FALL", storeResult=var "Hero Moving Down", everyFrame=true)
+    on FINISHED → Fling Anim Loop
+    on DASH → Dash Queued
+    on FALL → Fling Anim Down
+  }
+
+  state Fling Anim Loop {
+    SetColliderV2(Target=var "Hero", SetActive=true, EveryFrame=false, ResetOnExit=false)
+    SetHeroCState(VariableName="isTriggerEventsPaused", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    CheckIsCharacterGrounded(Target=var "Hero", RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Airborne")
+    Tk2dPlayFrame(gameObject=var "Hero", frame=9)
+    ListenForDash(eventTarget=Self, wasPressed=→"DASH", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    on DASH → Dash Cancel
+    on LAND → Land
+  }
+
+  state Position {
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    GetPosition2D(gameObject=door_fastTravelExit, vector=var "Hero Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    GetPosition2D(gameObject=door_fastTravelExit/Teleport Hero Start, vector=var "Fling Start Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    PositionColliderOnGroundV2(Target=var "Hero", GroundPos=var "Fling Start Pos")
+    GetPosition2D(gameObject=var "Hero", vector=var "Hero Ground Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    CallMethodProper(gameObject=var "MainCamera", behaviour="CameraController", methodName="PositionToHero", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Fling Wait
+  }
+
+  state Dash Queued {
+    GetVelocity2d(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Vel Y", space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Vel Y", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dash Cancel
+  }
+
+  state Dash Cancel {
+    SetColliderV2(Target=var "Hero", SetActive=true, EveryFrame=false, ResetOnExit=false)
+    SetHeroCState(VariableName="isTriggerEventsPaused", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetStartWithDashKeepFacing", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → End
+  }
+
+  state Teleport Arrive? {
+    GetEntryGateName(StoreValue=var "Entry Gate")
+    GetName(gameObject=var "Self", storeName=var "Name", everyFrame=false)
+    StringCompare(stringVariable=var "Entry Gate", compareTo=var "Name", equalEvent=(none), notEqualEvent=→"FALSE", storeResult=(unset), everyFrame=false)
+    PlayerDataVariableTest(VariableName="IsTeleporting", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Inert
+    on TRUE → Position
+  }
+
+  state Wait For Boss Load {
+    WaitForBossLoad(sendEvent=→"FINISHED")
+    on FINISHED → Wait For Position
+  }
+
+  state Wait For Position {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Teleport Arrive?
+  }
+
+  state Init {
+    AddHeroInputBlocker(Blocker=Self)
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    GetHero(storeResult=var "Hero")
+    ActivateGameObject(gameObject=var "Teleport Arrive Effects", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Wait For Boss Load
+  }
+
+  state Inert {
+    RemoveHeroInputBlocker(Blocker=Self)
+  }
+
+  state Clear Teleport {
+    SetPlayerDataVariable(VariableName="IsTeleporting", SetValue=false)
+    on FINISHED → Hero Fling Out
+  }
+
+  sequence state Fling Wait {
+    WaitForFinishedEnteringScene(sendEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="DetachHeroLight", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetHeroCState(VariableName="isTriggerEventsPaused", Value=true, EveryFrame=false, SetOppositeOnExit=false)
+    CameraFreezeInPlace(freezeTargetAlso=true)  // disabled
+    SetHeroAffectedByGravity(SetTime=0, CanSet=true, SetAffectedByGravity=false)
+    SetColliderV2(Target=var "Hero", SetActive=false, EveryFrame=false, ResetOnExit=false)
+    Translate(gameObject=var "Hero", vector=(unset), x=(unset), y=-2, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    GetPosition2D(gameObject=var "Hero", vector=var "Fling Start Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=(none), realTime=false)
+    on FINISHED → Clear Teleport
+  }
+
+  state Fling Anim Down {
+    SetColliderV2(Target=var "Hero", SetActive=true, EveryFrame=false, ResetOnExit=false)
+    SetHeroCState(VariableName="isTriggerEventsPaused", Value=false, EveryFrame=false, SetOppositeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ListenForDash(eventTarget=Self, wasPressed=→"DASH", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    CheckIsCharacterGrounded(Target=var "Hero", RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    on DASH → Dash Queued
+    on LAND → Land
+    on FINISHED → Fling Anim Loop
+  }
+
+  state Disable {
+    RemoveHeroInputBlocker(Blocker=Self)
+  }
+
+  var Hero Vel Y: float = 0
+  var Hero Moving Down: bool = false
+  var Hero Y 0: bool = false
+  var Bounce Anim: string = ""
+  var Entry Gate: string = ""
+  var Name: string = ""
+  var Fling Start Pos: vector2 = (0, 0)
+  var Fling Velocity: vector2 = (0, 0)
+  var Hero Pos: vector2 = (0, 0)
+  var Hero Ground Pos: vector2 = (0, 0)
+  var Hero: gameObject = <null>
+  var Self: gameObject = <null>
+  var Teleport Arrive Effects: gameObject = door_fastTravelExit/Teleport Hero Start/Burst Effects
+}

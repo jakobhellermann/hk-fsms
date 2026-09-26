@@ -1,0 +1,79 @@
+# Stand Control
+# 1 location(s):
+#   Fungus3_35 / Bank Stand
+
+fsm Stand Control {
+  start Pause
+  on BANKER LEFT → Banker Gone  // from any state
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Check Theft
+  }
+
+  state Check Theft {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="bankerTheft", storeValue=var "Theft State")
+    IntSwitch(intVariable=var "Theft State", compareTo=[0, 1, 2], sendEvent=[→"PRESENT", →"GONE", →"KNOCKED OVER"], everyFrame=false)
+    on PRESENT → Present
+    on GONE → Banker Gone
+    on KNOCKED OVER → Knocked Over
+  }
+
+  state Present {
+  }
+
+  state Banker Gone {
+    ReceivedDamage(collideTag="", sendEvent=→"NAIL HIT", fsmName="damages_enemy", storeGameObject=var "Damager", ignoreAcid=false, ignoreWater=false)
+    on NAIL HIT → Check Damage
+  }
+
+  state Knocked Over {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stand Fallen")
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BANK FALLEN", delay=0, everyFrame=false)
+  }
+
+  state Check Damage {
+    GetFsmInt(gameObject=var "Damager", fsmName="damages_enemy", variableName="damageDealt", storeValue=var "damageDealt", everyFrame=false)
+    IntCompare(integer1=var "damageDealt", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    on CANCEL → Banker Gone
+    on FINISHED → Knock
+  }
+
+  state Check Hits {
+    IntCompare(integer1=var "Hits", integer2=3, equal=→"KNOCK OVER", lessThan=→"FINISHED", greaterThan=→"KNOCK OVER", everyFrame=false)
+    on KNOCK OVER → Knock Over
+    on FINISHED → Banker Gone
+  }
+
+  state Knock {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[banker_house_damage (sharedassets218.assets)], weights=[1], pitchMin=0.85, pitchMax=1.15)
+    IntAdd(intVariable=var "Hits", add=1, everyFrame=false)
+    iTweenShakePosition(gameObject=Self, id="", vector=(0.1, 0.1, 0), time=0.25, delay=0, loopType=none, space=0, axis=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    CreateObject(gameObject=Strike Nail (sharedassets6.assets), spawnPoint=var "Damager", position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    on FINISHED → Check Hits
+  }
+
+  state Knock Over {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=banker_house_fall (sharedassets218.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="BANK FALL", delay=0, everyFrame=false)
+    CreateObject(gameObject=Strike Nail (sharedassets6.assets), spawnPoint=var "Damager", position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stand Fall", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetPlayerDataInt(intName="bankerTheft", value=2)
+    on FINISHED → Land
+  }
+
+  state Land {
+    PlayParticleEmitter(gameObject=var "Dust", emit=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=banker_house_impact (sharedassets218.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    iTweenMoveBy(gameObject=Self, id="", vector=(0, 0.8, 0), time=0.2, delay=0, speed=(unset), easeType=easeOutSine, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+    iTweenMoveBy(gameObject=Self, id="", vector=(0, -0.8, 0), time=0.2, delay=0.2, speed=(unset), easeType=easeInSine, loopType=none, space=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=0, axis=none, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=true)
+  }
+
+  var Hits: int = 0
+  var Theft State: int = 0
+  var damageDealt: int = 0
+  var Damager: gameObject = <null>
+  var Dust: gameObject = Bank Stand/Dust
+  var Self: gameObject = <null>
+}

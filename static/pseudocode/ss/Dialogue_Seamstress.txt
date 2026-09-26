@@ -1,0 +1,464 @@
+# Dialogue
+# 1 location(s):
+#   Bone_East_Umbrella / _NPCs/Seamstress
+
+fsm Dialogue {
+  start Init
+
+  sequence state Init {
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=Seamstress_idle_hum_loop (sfxstatic_assets_areawilds.bundle), autoPlay=true, stopOnExit=false)
+    GetHero(storeResult=var "Hero")
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Start Idle Anim
+  }
+
+  state Idle {
+    BoolTest(boolVariable=var "Lore Talk Entered", isTrue=→"LORE TALK", isFalse=(none), everyFrame=true)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    TriggerEnterEventSubscribe(trigger=_NPCs/Seamstress/Glance Range@TriggerEnterEvent, triggerEnteredEvent=→"GLANCE", triggerExitedEvent=→"CANCEL", triggerStayedEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=2, MaxReactDelay=2, None=(none), ActiveInner=(none), ActiveOuter=→"SING", IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on INTERACT → Start Talk
+    on CANCEL → Reset Glance
+    on GLANCE → Glance Pause
+    on SING → Sing
+    on LORE TALK → Is Facing Left? 2
+    on STARTLE → Idle To Startle Check
+  }
+
+  state Meet Talk {
+    SetPlayerDataVariable(VariableName=var "Met Bool", SetValue=true)
+    GetPlayerDataBool(boolName="citadelWoken", storeValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Convo Key", falseString="SEAMSTRESS_MEET", trueString="SEAMSTRESS_MEET_ALT", everyFrame=false)
+    RunDialogue(Sheet=var "Translation Sheet", Key=var "Convo Key", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest State?
+  }
+
+  state Talk End 2 {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Turn Back
+  }
+
+  state First Talk? {
+    CheckIsInEditor(trueEvent=→"TEST", falseEvent=(none), storeValue=(unset))  // disabled
+    PlayerDataVariableTest(VariableName=var "Met Bool", ExpectedValue=false, IsExpectedEvent=→"MEET", IsNotExpectedEvent=→"FINISHED")
+    on MEET → Meet Talk
+    on FINISHED → Quest State?
+  }
+
+  state Glance {
+    BoolTest(boolVariable=var "Lore Talk Entered", isTrue=→"LORE TALK", isFalse=(none), everyFrame=true)
+    GetDirection2D(From=Self, To=var "Hero", StoreVector=(unset), StoreX=var "Hero X Direction", StoreY=(unset), EveryFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Self Scale X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSign(Value=var "Self Scale X", StoreValue=var "Self Scale X", EveryFrame=false)
+    FloatOperator(float1=var "Hero X Direction", float2=var "Self Scale X", operation=Multiply, storeResult=var "Hero X Direction", everyFrame=false)
+    FloatCompare(float1=var "Hero X Direction", float2=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    TimeLimitCheckV2(StoredValue=var "Glance Cooldown", AboveEvent=(none), BelowEvent=→"CANCEL", StoreBool=(unset), EveryFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)  // disabled
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    SendEventToRegister(eventName="SEAMSTRESS LOOM STOP")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Glance", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Seamstress_turn (sfxdynamic_assets_areawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Activate Interaction
+    on LORE TALK → Activate Interaction
+    on CANCEL → Idle
+  }
+
+  state Reset Glance {
+    TimeLimitSetRandom(MinDelay=3, MaxDelay=7, StoreValue=var "Glance Cooldown")
+    on FINISHED → Idle
+  }
+
+  state Turn Back {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    PlayRandomAudioClipTable(Table=hornet_run_start (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    BoolTest(boolVariable=var "Force Facing Left", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk Left Exit", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Activate Interaction
+  }
+
+  sequence state Sing {
+    SendEventToRegister(eventName="SEAMSTRESS LOOM STOP")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    GetRandomAudioClipFromTable(Table=Seamstress_sing (sfxdynamic_assets_areawilds.bundle), ForcePlay=false, StoreClip=var "Clip")
+    SetAudioVolume(gameObject=var "Audio Loop Voice", volume=0.7, everyFrame=false)
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=var "Clip", autoPlay=true, stopOnExit=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=AddNeedolinText())
+    ConvertBoolToString(boolVariable=var "Force Facing Left", stringVariable=var "Anim", falseString="Sing", trueString="Sing From Left", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.75, MaxReactDelay=0.75, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on CANCEL → Sing End
+  }
+
+  state Activate Interaction {
+    SetAudioVolume(gameObject=var "Audio Loop Voice", volume=1, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=true, UseChildren=false)
+    PlayerDataVariableTest(VariableName=var "Met Bool", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    on FINISHED → Start Idle Anim
+  }
+
+  state Sing End {
+    ConvertBoolToString(boolVariable=var "Force Facing Left", stringVariable=var "Anim", falseString="Sing End Right", trueString="Sing End Left", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=small_movement_cloak (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=RemoveNeedolinText())
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.3, cancelOnEarlyExit=false)
+    on FINISHED → Activate Interaction
+  }
+
+  state DLG After Dress {
+    SetBoolValue(boolVariable=var "Queued Lore Talk", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Force Facing Left", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_AFTER_GET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    ActivateGameObject(gameObject=var "Exit Lore Wall", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on CONVO_END → Talk End 3
+  }
+
+  sequence state Fade Down {
+    ScreenFader(startColour=(0, 0, 0, 0), endColour=(0, 0, 0, 1), duration=1)
+    Tk2dPlayAnimationWait(Target=Self, ClipName="Talk Left Exit", AnimationCompleteEvent=(none))  // disabled
+    SendEventToRegister(eventName="SEAMSTRESS LOOM START")  // disabled
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))  // disabled
+    Wait(time=1, finishEvent=(none), realTime=false)
+    on FINISHED → Cinematic
+  }
+
+  state Cinematic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk Left", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventToRegister(eventName="SEAMSTRESS LOOM STOP")
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    ScreenFader(startColour=(0.029411793, 0.029411793, 0.029411793, 0), endColour=(0, 0, 0, 0), duration=0)
+    StartCinematic(CinematicPlayer=var "Cinematic Player")
+    GetPosition2D(gameObject=_NPCs/Seamstress/Hornet Dress Reposition, vector=var "Hornet Reposition", x=(unset), y=(unset), space=0, everyFrame=false)
+    PositionColliderOnGroundV2(Target=var "Hero", GroundPos=var "Hornet Reposition")
+    on CINEMATIC END → Citadel Dlg Skip?
+  }
+
+  sequence state Dress Flourish {
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=hornet_cloak_swish_for_umbrella_quest_fin (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Dress Flourish", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → To Idle
+  }
+
+  sequence state To Idle {
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Run To Idle", AnimationCompleteEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CallStaticMethod(className="HeroTalkAnimation", methodName="SetBlocked", parameters=[false], storeResult=(unset var), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → DLG After Dress
+  }
+
+  state Msg {
+    ScreenFader(startColour=(0.029411793, 0.029411793, 0.029411793, 0), endColour=(0, 0, 0, 1), duration=0)
+    CreateUIMsgGetItem(gameObject=UI Msg Get Item (prompts_assets_all.bundle), storeObject=var "UI Msg", sprite=prompt_hornet_umbrella (atlases_assets_assets/sprites/_atlases/prompts.spriteatlas.bundle))
+    SetFsmString(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Item", setValue="Brolly", everyFrame=false)
+    SetPlayerDataVariable(VariableName="hasBrolly", SetValue=true)
+    on GET ITEM MSG END → Fade Up
+  }
+
+  state Fade Up {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallStaticMethod(className="HeroTalkAnimation", methodName="SetBlocked", parameters=[true], storeResult=(unset var), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Give Dress Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ScreenFader(startColour=(0, 0, 0, 0.991), endColour=(0, 0, 0, 0), duration=1)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Dress Flourish
+  }
+
+  state Quest State? {
+    CheckQuestState(NotTrackedEvent=→"NOT TRACKED", TrackedEvent=→"TRACKED", CompletedEvent=→"COMPLETE", Quest=var "Quest")
+    on NOT TRACKED → Quest Offered?
+    on TRACKED → Can Complete?
+    on COMPLETE → Other States
+  }
+
+  state Quest Offered? {
+    PlayerDataVariableTest(VariableName="SeamstressOfferedQuest", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → Offer Quest
+    on TRUE → Reoffer Quest
+  }
+
+  state Offer Quest {
+    SetPlayerDataVariable(VariableName="SeamstressOfferedQuest", SetValue=true)
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_QUEST_OFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Prompt
+  }
+
+  sequence state Quest Prompt {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    QuestYesNo(Quest=var "Quest", YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → Quest Decline
+    on TRUE → Quest Accept
+  }
+
+  state Reoffer Quest {
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_QUEST_REOFFER", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Quest Prompt
+  }
+
+  state Quest Accept {
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_QUEST_ACCEPT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  state Quest Decline {
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_QUEST_DECLINE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  state Can Complete? {
+    CanEndQuest(CannotEndEvent=→"FALSE", CanEndEvent=→"TRUE", StoreValue=(unset), Quest=var "Quest")
+    on FALSE → Quest Repeat
+    on TRUE → Hand-In
+  }
+
+  state Quest Repeat {
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_QUEST_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  sequence state Quest Complete {
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_QUEST_COMPLETE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dlg
+  }
+
+  sequence state End Dlg {
+    HideNpcDialogueTitle(Target=Self)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    on FINISHED → Fade Down
+  }
+
+  state Repeat {
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  sequence state Lore Talk Intro {
+    ActivateGameObject(gameObject=var "Exit Lore Wall", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetHeroTalkWatchTarget(Target=Self, EndedFacingForwardEvent=(none))
+    RunDialogue(Sheet="Wilds", Key="SEAMSTRESS_EXTRA_LORE_1", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=true, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Idle
+    on CONVO_END → Walk To Pos?
+  }
+
+  sequence state Lore Talk End {
+    SetHeroTalkWatchTarget(Target=<null>, EndedFacingForwardEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetBoolValue(boolVariable=var "Force Facing Left", boolValue=false, everyFrame=false)
+    on FINISHED → Talk End 2
+  }
+
+  state Start Talk {
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    SendEventToRegister(eventName="SEAMSTRESS LOOM STOP")
+    PlayRandomAudioClipTable(Table=hornet_run_start (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    BoolTest(boolVariable=var "Force Facing Left", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk Left", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on FINISHED → First Talk?
+  }
+
+  state Is Facing Left? 2 {
+    SetBoolValue(boolVariable=var "Lore Talk Entered", boolValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Queued Lore Talk", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    SetBoolValue(boolVariable=var "Queued Lore Talk", boolValue=false, everyFrame=false)
+    BoolTest(boolVariable=var "Force Facing Left", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0, cancelOnEarlyExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Talk Left", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventToRegister(eventName="SEAMSTRESS LOOM STOP")
+    on CANCEL → Idle
+    on FINISHED → Take Control
+  }
+
+  state Start Idle Anim {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle Left", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    BoolTest(boolVariable=var "Force Facing Left", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    SendEventToRegister(eventName="SEAMSTRESS LOOM START")
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=Seamstress_idle_hum_loop (sfxstatic_assets_areawilds.bundle), autoPlay=true, stopOnExit=false)
+    on FINISHED → Started Inside?
+  }
+
+  state Take Control {
+    RunFSM(fsmTemplateControl=template=5120264638226263702, finishEvent=→"FINISHED", everyFrame=false)  // disabled
+    RunFSM(fsmTemplateControl=template=6159435039333135483 in[Clamp X<-12.3], finishEvent=→"FINISHED", everyFrame=false)
+    on FINISHED → Lore Talk Intro
+  }
+
+  sequence state Complete? {
+    QuestCompleteYesNo(Quest=var "Quest", ConsumeCurrency=false, YesEvent=(none), NoEvent=→"FALSE", ReturnHUDAfter=false)
+    EndQuest(ConsumeCurrency=true, Quest=var "Quest")
+    on FALSE → Refuse Hand-in
+    on FINISHED → Quest Complete
+  }
+
+  state Started Inside? {
+    CheckTrackTriggerCountV2(Target=var "Glance Detector", Count=0, Test=MoreThan, EveryFrame=false, SetBool=(unset), SuccessEvent=→"TRUE", FailEvent=→"FALSE")
+    on TRUE → Reset Glance
+    on FALSE → Idle
+  }
+
+  state Lore Talk Turned {
+    GetPlayerDataBool(boolName="citadelWoken", storeValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Convo Key", falseString="SEAMSTRESS_EXTRA_LORE_2", trueString="SEAMSTRESS_EXTRA_LORE_2_ALT", everyFrame=false)
+    RunDialogue(Sheet="Wilds", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=true, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Lore Talk End
+  }
+
+  state Walk To Pos? {
+    CheckXPosition(gameObject=var "Hero", compareTo=15.1, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"WALK", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    on WALK → Walk To
+    on FINISHED → Lore Talk Turned
+  }
+
+  sequence state Walk To {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    SetHeroTalkWatchTarget(Target=<null>, EndedFacingForwardEvent=(none))
+    MoveHeroToPosX(Hero=var "Hero", PositionTarget=var "", PositionX=17.5, FinishEvent=→"FINISHED")
+    on FINISHED → Lore Talk Walked
+  }
+
+  state Lore Talk Walked {
+    GetPlayerDataBool(boolName="citadelWoken", storeValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Convo Key", falseString="SEAMSTRESS_EXTRA_LORE_2", trueString="SEAMSTRESS_EXTRA_LORE_2_ALT", everyFrame=false)
+    RunDialogue(Sheet="Wilds", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Lore Talk End
+  }
+
+  state Talk End 3 {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Save Game
+  }
+
+  state Save Game {
+    SetDeathRespawnMarker(Target=var "Rest Bench")
+    SaveGameV2(createAutoSave=true, nameEnum=GAINED_BROLLY)
+    on FINISHED → Turn Back
+  }
+
+  state Refuse Hand-in {
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_HANDIN_REFUSE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  state Glance Pause {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    BoolTest(boolVariable=var "Lore Talk Entered", isTrue=→"LORE TALK", isFalse=(none), everyFrame=false)
+    on FINISHED → Glance
+    on LORE TALK → Is Facing Left? 2
+  }
+
+  state Hand-In {
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_BROLLY_HANDIN_ASK", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Complete?
+  }
+
+  state Other States {
+    CheckIfToolEquipped(Tool=Pinstress Tool (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=(none), storeValue=var "Badge Equipped")
+    GetPlayerDataBool(boolName="SeamstressAct3Convo", storeValue=var "Did Act 3 Meet")
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    BoolTestMulti(boolVariables=[var "Is Act 3", var "Did Act 3 Meet"], boolStates=[true, false], trueEvent=→"ACT3", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    GetPlayerDataBool(boolName="SeamstressBadgeConvo", storeValue=var "Test")
+    BoolTestMulti(boolVariables=[var "Badge Equipped", var "Test"], boolStates=[true, false], trueEvent=→"BADGE", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(boolName="blackThreadWorld", isTrue=→"ACT3", isFalse=(none))
+    GetPlayerDataBool(boolName="citadelWoken", storeValue=var "Citadel Woken")
+    GetPlayerDataBool(boolName="SeamstressCitadelConvo", storeValue=var "Test")
+    BoolTestMulti(boolVariables=[var "Citadel Woken", var "Test"], boolStates=[true, false], trueEvent=→"CITADEL", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    GetPlayerDataBool(boolName="hasChargeSlash", storeValue=var "Met Pinstress")
+    GetPlayerDataBool(boolName="SeamstressPinstressConvo", storeValue=var "Test")
+    BoolTestMulti(boolVariables=[var "Met Pinstress", var "Test"], boolStates=[true, false], trueEvent=→"PINSTRESS", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on CITADEL → Citadel
+    on PINSTRESS → Pinstress
+    on ACT3 → Act 3
+    on BADGE → Badge
+    on FINISHED → Repeat
+  }
+
+  state Citadel {
+    SetPlayerDataBool(boolName="SeamstressCitadelConvo", value=true)
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_VISITED_CITADEL", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  state Citadel Dlg Skip? {
+    GetPlayerDataBool(boolName="citadelWoken", storeValue=var "Citadel Woken")
+    BoolTest(boolVariable=var "Citadel Woken", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetPlayerDataBool(boolName="SeamstressCitadelConvo", value=true)
+    on FINISHED → Msg
+  }
+
+  state Pinstress {
+    SetPlayerDataBool(boolName="SeamstressPinstressConvo", value=true)
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_MET_PINSTRESS", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  state Act 3 {
+    GetPlayerDataBool(boolName="SeamstressAct3Convo", storeValue=var "Test")
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Convo Key", falseString="SEAMSTRESS_ACT_3_MEET", trueString="SEAMSTRESS_ACT_3_REPEAT", everyFrame=false)
+    SetPlayerDataBool(boolName="SeamstressAct3Convo", value=true)
+    RunDialogue(Sheet=var "Translation Sheet", Key=var "Convo Key", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  state Badge {
+    SetPlayerDataBool(boolName="SeamstressBadgeConvo", value=true)
+    RunDialogue(Sheet=var "Translation Sheet", Key="SEAMSTRESS_WEARING_ORDER_BADGE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Talk End 2
+  }
+
+  state Idle To Startle Check {
+    BoolTest(boolVariable=var "Force Facing Left", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"STARTLE RIGHT", leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Glance Cooldown", floatValue=0, everyFrame=false)
+    on FINISHED → Glance
+    on CANCEL → Idle
+    on STARTLE RIGHT → Startle Right
+  }
+
+  state Startle Left {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle Left", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Seamstress_startle (sfxdynamic_assets_areawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Start Idle Anim
+  }
+
+  state Startle Right {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle Right", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Seamstress_startle (sfxdynamic_assets_areawilds.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Start Idle Anim
+  }
+
+  var Cinematic Player: gameObject = Cinematic Player
+  var Rest Bench: gameObject = RestBench
+
+  var Glance Cooldown: float = 0
+  var Hero X Direction: float = 0
+  var Self Scale X: float = 0
+  var Badge Equipped: bool = false
+  var Citadel Woken: bool = false
+  var Did Act 3 Meet: bool = false
+  var Force Facing Left: bool = false
+  var Lore Talk Entered: bool = false
+  var Met Pinstress: bool = false
+  var Queued Lore Talk: bool = false
+  var Test: bool = false
+  var Is Act 3: bool = false
+  var Met Bool: string = "MetSeamstress"
+  var Translation Sheet: string = "Wilds"
+  var Convo Key: string = ""
+  var Anim: string = ""
+  var Hornet Reposition: vector2 = (0, 0)
+  var Hero: gameObject = <null>
+  var UI Msg: gameObject = <null>
+  var Glance Detector: gameObject = _NPCs/Seamstress/Glance Range
+  var Exit Lore Wall: gameObject = _NPCs/Seamstress/Exit Lore Wall
+  var Audio Loop Voice: gameObject = _NPCs/Seamstress/Audio Loop Voice
+  var Quest: object = Brolly Get (dataassets_assets_assets/dataassets/questsystem/quests.bundle)
+  var Clip: object = <null>
+}

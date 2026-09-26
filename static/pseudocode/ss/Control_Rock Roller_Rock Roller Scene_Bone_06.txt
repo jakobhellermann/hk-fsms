@@ -1,0 +1,431 @@
+# Control
+# 1 location(s):
+#   Bone_06 / Rock Roller Scene/Rock Roller
+
+fsm Control {
+  start Pause
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetParent(gameObject=var "Guide Trail", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Ambient Stuff", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindAlertRange(target=Self, storeResult=var "Alert Range", childName="Alert Range")
+    SetParent(gameObject=var "Alert Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Home Marker", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindNamedChild(gameObject=Self, storeResult=var "CamLock")
+    SetParent(gameObject=var "CamLock", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Set Coal height
+  }
+
+  state Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"UNALERT", OutOfRangeDelay=0, everyFrame=false)
+    SendRandomEvent(events=[(none), (none)], weights=[1, 1], delay=0)
+    on L → Walk L
+    on R → Walk R
+    on SING → Sing
+    on UNALERT → Marker Dir
+  }
+
+  state Attack Choice {
+    SendEvent(eventTarget=Self, sendEvent=→"BOMB", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"ROLL", →"JUMP", →"BOMB"], weights=[1, 1, 1], eventMax=[2, 2, 2], missedMax=[3, 3, 3], activeBool=(unset))
+    on ROLL → Roll Antic
+    on JUMP → Jump Antic
+    on BOMB → Bomb Shake
+  }
+
+  state Roll Antic {
+    RayCast2dV2(fromGameObject=var "Wall Check", fromPosition=(0, 0), direction=(-1, 0), space=1, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roll", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=rock_roller_jump_attack (sfxstatic_assets_areabone.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Roll Player")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=10, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Roll
+    on CANCEL → Try Jump
+  }
+
+  state Roll {
+    SetParticleEmission(gameObject=var "Pt Trail", emission=true, resetOnExit=true)
+    SetParticleEmission(gameObject=var "Pt Trail 2", emission=true, resetOnExit=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "X Scale", float2=-25, operation=Multiply, storeResult=var "Roll Speed", everyFrame=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=0.5, targetSpeed=var "Roll Speed")
+    Wait(time=1, finishEvent=→"WAIT", realTime=false)
+    SpawnObjectFromGlobalPoolOverTimeV2(gameObject=Delayed Pop Explosion (localpoolprefabs_assets_areabone.bundle), spawnPoint=var "Self", position=(unset), originVariationX=0.5, originVariationY=0.5, rotation=(unset), frequency=0.1, scaleMin=1, scaleMax=1)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"WALL", bottomHitEvent=(none), leftHitEvent=→"WALL", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    PlayParticleEmitterInState(gameObject=Self)
+    RayCast2dV2(fromGameObject=var "Ray Pt Roll", fromPosition=(unset), direction=(0, -1), space=1, distance=6.2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"WAIT", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on WAIT → Ground Check
+    on WALL → Ground Check
+  }
+
+  state Roll End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    SpawnObjectFromGlobalPool(gameObject=Delayed Pop Explosion (localpoolprefabs_assets_areabone.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    on FINISHED → Idle
+  }
+
+  state Jump Antic {
+    RayCast2dV2(fromGameObject=Self, fromPosition=(1, 0), direction=(0, 1), space=1, distance=3.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(-1, 0), direction=(0, 1), space=1, distance=3.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roll", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=rock_roller_jump_attack (sfxstatic_assets_areabone.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Roll Player")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=12, everyFrame=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Jump Aim
+    on ROLL → Roll Antic
+    on CANCEL → Roll Antic
+  }
+
+  state Jump {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=26, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → In Air
+  }
+
+  state Land {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Slam Effect R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(0, 0, -0.004), rotation=(unset), storeObject=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=rock_roller_land_after_wall (sfxstatic_assets_areabone.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle
+  }
+
+  state In Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=(unset), everyFrame=true)
+    SetParticleEmission(gameObject=var "Pt Trail", emission=true, resetOnExit=true)
+    SetParticleEmission(gameObject=var "Pt Trail 2", emission=true, resetOnExit=true)
+    PlayAudioEvent(audioClip=rock_roller_trail_appear (sfxstatic_assets_areabone.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SpawnObjectFromGlobalPoolOverTimeV2(gameObject=Delayed Pop Explosion (localpoolprefabs_assets_areabone.bundle), spawnPoint=var "Self", position=(unset), originVariationX=0.5, originVariationY=0.5, rotation=(unset), frequency=0.1, scaleMin=1, scaleMax=1)
+    on LAND → Land
+  }
+
+  state Wall {
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)
+    PlayParticleEmitterChildren(gameObject=var "Guide Trail", resetTimeIfPlaying=false, stopOnStateExit=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=2, MaxReactDelay=2, None=(none), ActiveInner=→"WAKE", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.4, None=(none), ActiveInner=(none), ActiveOuter=→"NOISE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on BLOCKED HIT → Distance Check
+    on WAKE → Emerge Antic
+    on NOISE → Distance Check Noise
+  }
+
+  state Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Attack Choice
+  }
+
+  state Distance Check {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="NoBattle Range", storeResult=false, sendEvent="CANCEL", outOfRangeEvent="", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="", outOfRangeEvent="CANCEL", everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)  // disabled
+    FloatCompare(float1=var "Distance", float2=10, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)  // disabled
+    on CANCEL → Wall
+    on FINISHED → Emerge Hit
+  }
+
+  state Emerge Hit {
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Butt Hit")
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Clash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ScreenFlash(flashColour=(1, 1, 1, 0.509))
+    PlayAudioEvent(audioClip=tool_metal_deposit_impact_1 (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Emerge Antic
+  }
+
+  state Emerge Antic {
+    SendEventToRegister(eventName="TRAILS OFF")
+    Wait(time=0.85, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterChildren(gameObject=var "Pt Emerge", resetTimeIfPlaying=false, stopOnStateExit=true)
+    PlayAudioEvent(audioClip=rock_roller_wall_disturbed (sfxstatic_assets_areabone.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ObjectJitterOnRender(Target=Self, X=0.1, Y=0.1, Z=(unset), LimitFps=30)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Butt Hit")
+    on FINISHED → Emerge
+  }
+
+  state Emerge {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=rock_roller_wall_exit (sfxstatic_assets_areabone.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    StopParticleEmittersInChildren(gameObject=var "Guide Trail")
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetParent(gameObject=var "Pt Burst", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    PlayParticleEmitter(gameObject=var "Pt Burst", emit=0, resetIfPlaying=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roll")
+    SetVelocityByScale(gameObject=Self, speed=var "Emerge X Velocity", ySpeed=var "Emerge Y Velocity", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    ApplyMusicCue(musicCue=Boneforest (audiocuesdynamic_assets_areabone.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Action and Sub (audioobjects_assets_all.bundle), transitionTime=0.25)
+    SetParent(gameObject=var "Burst Effects", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=var "Burst Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pt Ambient", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="ROCK ROLLER EMERGE")
+    on FINISHED → Emerge Air
+  }
+
+  state Emerge Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Emerge Land
+  }
+
+  state Death {
+    ActivateGameObject(gameObject=var "CamLock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    TransitionToAudioSnapshot(snapshot=var "Scene Snapshot", transitionTime=4)
+    AudioStop(gameObject=var "Roll Player", fadeTime=0)
+  }
+
+  state Walk L {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=-3, y=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Ground Ahead", boolValue=true, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(-1, 0), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=2, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(0, 0), direction=(-1, 0), space=1, distance=2.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Hero Is R", leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hero Is R", var "Wall Ahead"], boolStates=[false, true], trueEvent=→"JUMP", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=var "In Alert Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Ground Ahead", var "In Alert Range"], boolStates=[false, true], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    PlayAudioEvent(audioClip=rock_roller_move (sfxstatic_assets_areabone.bundle), pitchMin=0.9, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Alert Range?
+    on TOOK DAMAGE → Alert Range?
+    on SING → Sing
+    on JUMP → Jump Antic
+  }
+
+  state Walk R {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=3, y=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Ground Ahead", boolValue=true, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(1, 0), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=2, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(0, 0), direction=(1, 0), space=1, distance=2.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Hero Is R", leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Hero Is R", var "Wall Ahead"], boolStates=[true, true], trueEvent=→"JUMP", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=var "In Alert Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Ground Ahead", var "In Alert Range"], boolStates=[false, true], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    PlayAudioEvent(audioClip=rock_roller_move (sfxstatic_assets_areabone.bundle), pitchMin=0.9, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Alert Range?
+    on TOOK DAMAGE → Alert Range?
+    on SING → Sing
+    on JUMP → Jump Antic
+  }
+
+  state Try Jump {
+    RayCast2dV2(fromGameObject=Self, fromPosition=(2, 0), direction=(0, 1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(-2, 0), direction=(0, 1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    on FINISHED → Jump Antic
+    on CANCEL → Bomb Shake
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Sing {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=rock_roller_sing (sfxdynamic_assets_areabone.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    PlayAudioEvent(audioClip=rock_roller_move (sfxstatic_assets_areabone.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=rock_roller_move (sfxstatic_assets_areabone.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle
+  }
+
+  state Broadcast Presence {
+    SendEventToRegister(eventName="ROCK ROLLER PRESENT")
+    on FINISHED → Set Ranges
+  }
+
+  state Ground Check {
+    SetParticleEmission(gameObject=var "Pt Trail", emission=true, resetOnExit=true)
+    SetParticleEmission(gameObject=var "Pt Trail 2", emission=true, resetOnExit=true)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"FINISHED", NotGroundedEvent=(none), EveryFrame=true)
+    SpawnObjectFromGlobalPoolOverTimeV2(gameObject=Delayed Pop Explosion (localpoolprefabs_assets_areabone.bundle), spawnPoint=var "Self", position=(unset), originVariationX=0.5, originVariationY=0.5, rotation=(unset), frequency=0.1, scaleMin=1, scaleMax=1)
+    on FINISHED → Roll End
+  }
+
+  state Emerge Land {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartConstrainX())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetXMin(var "Range Min"))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=SetXMax(var "Range Max"))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartConstrainX())
+    on FINISHED → Land
+  }
+
+  state Alert Range? {
+    CheckAlertRange(alertRange=var "Coal Snipe RangeR", storeResult=var "In Snipe Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatTestToBool(float1=var "Distance", float2=12, tolerance=0, equalBool=(unset), lessThanBool=var "Close Range", greaterThanBool=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "In Snipe Range", var "Close Range"], sendEvent=→"BOMB", storeResult=(unset), everyFrame=false)
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=→"ALERT", InRangeDelay=0, OutOfRangeEvent=→"UNALERT", OutOfRangeDelay=0, everyFrame=false)
+    on ALERT → Antic
+    on UNALERT → Marker Dir
+    on BOMB → Bomb Shake
+  }
+
+  state Marker Dir {
+    CheckTargetDirection(gameObject=Self, target=var "Home Marker", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    on L → Walk L
+    on R → Walk R
+  }
+
+  state Jump Aim {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Target X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Target X", minValue=var "Range Min", maxValue=var "Range Max", everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Target X", float2=var "Self X", operation=Subtract, storeResult=var "Jump X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.35, everyFrame=false)
+    FloatClamp(floatVariable=var "Jump X", minValue=-13, maxValue=13, everyFrame=false)
+    on FINISHED → Jump
+  }
+
+  state Bomb Shake {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt BombAntic", emit=0, resetIfPlaying=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Bomb Shake")
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=explode_wall_charge_up (sfxstatic_assets_areawilds.bundle), pitchMin=1.15, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    on FINISHED → Shoot 1
+  }
+
+  state Shoot 1 {
+    AudioStop(gameObject=var "Audio Player", fadeTime=0)
+    PlayAudioEvent(audioClip=rock_roller_trail_explode (sfxstatic_assets_areabone.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Jump X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    RandomFloat(min=-4, max=-8, storeResult=var "Distance")
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=var "Distance", everyFrame=false)
+    RandomFloat(min=18, max=20, storeResult=var "Distance")
+    SpawnObjectFromGlobalPool(gameObject=Rock Roller Bomb (localpoolprefabs_assets_areabone.bundle), spawnPoint=var "Bomb Spawn Point", position=(0, 0, -0.001), rotation=(unset), storeObject=var "Bomb")
+    SetVelocity2d(gameObject=var "Bomb", vector=(unset), x=var "Jump X", y=var "Distance", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Jump X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    RandomFloat(min=10, max=14, storeResult=var "Distance")
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=var "Distance", everyFrame=false)
+    RandomFloat(min=var "Coal Shot Min", max=var "Coal Shot Max", storeResult=var "Distance")
+    SpawnObjectFromGlobalPool(gameObject=Rock Roller Bomb (localpoolprefabs_assets_areabone.bundle), spawnPoint=var "Bomb Spawn Point", position=(0, 0, -0.001), rotation=(unset), storeObject=var "Bomb")
+    SetVelocity2d(gameObject=var "Bomb", vector=(unset), x=var "Jump X", y=var "Distance", everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Shoot 2
+  }
+
+  state Shoot 2 {
+    PlayAudioEvent(audioClip=rock_roller_trail_explode (sfxstatic_assets_areabone.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Jump X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    RandomFloat(min=4, max=8, storeResult=var "Distance")
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=var "Distance", everyFrame=false)
+    RandomFloat(min=18, max=20, storeResult=var "Distance")
+    SpawnObjectFromGlobalPool(gameObject=Rock Roller Bomb (localpoolprefabs_assets_areabone.bundle), spawnPoint=var "Bomb Spawn Point", position=(0, 0, -0.001), rotation=(unset), storeObject=var "Bomb")
+    SetVelocity2d(gameObject=var "Bomb", vector=(unset), x=var "Jump X", y=var "Distance", everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Jump X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    RandomFloat(min=-10, max=-14, storeResult=var "Distance")
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=var "Distance", everyFrame=false)
+    RandomFloat(min=var "Coal Shot Min", max=var "Coal Shot Max", storeResult=var "Distance")
+    SpawnObjectFromGlobalPool(gameObject=Rock Roller Bomb (localpoolprefabs_assets_areabone.bundle), spawnPoint=var "Bomb Spawn Point", position=(0, 0, -0.001), rotation=(unset), storeObject=var "Bomb")
+    SetVelocity2d(gameObject=var "Bomb", vector=(unset), x=var "Jump X", y=var "Distance", everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    StopParticleEmitter(gameObject=var "Pt BombAntic")
+    ActivateGameObject(gameObject=var "Spit Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Set Ranges {
+    FindNamedChild(gameObject=Self, storeResult=var "Coal Snipe Range")
+    FindAlertRange(target=Self, storeResult=var "Coal Snipe RangeR", childName="Coal Snipe Range")
+    SetParent(gameObject=var "Coal Snipe Range", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Wall
+  }
+
+  state Distance Check Noise {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="NoBattle Range", storeResult=false, sendEvent="CANCEL", outOfRangeEvent="", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="", outOfRangeEvent="CANCEL", everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)  // disabled
+    FloatCompare(float1=var "Distance", float2=10, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)  // disabled
+    on CANCEL → Wall
+    on FINISHED → Emerge Antic
+  }
+
+  state Set Coal height {
+    SetFloatValue(floatVariable=var "Coal Shot Min", floatValue=22, everyFrame=false)
+    SetFloatValue(floatVariable=var "Coal Shot Max", floatValue=24, everyFrame=false)
+    BoolTest(boolVariable=var "Low Coal Shot Height", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Coal Shot Min", floatValue=18, everyFrame=false)
+    SetFloatValue(floatVariable=var "Coal Shot Max", floatValue=20, everyFrame=false)
+    on FINISHED → Broadcast Presence
+  }
+
+  var Emerge X Velocity: float = 12
+  var Emerge Y Velocity: float = 15
+  var Range Min: float = 61.08
+  var Range Max: float = 81.43
+  var Low Coal Shot Height: bool = false
+  var Scene Snapshot: object = Normal (audioobjects_assets_all.bundle)
+
+  var Distance: float = 0
+  var Roll Speed: float = -15
+  var X Scale: float = 0
+  var Jump X: float = 36.53
+  var Self X: float = 0
+  var Target X: float = 0
+  var Coal Shot Min: float = 0
+  var Coal Shot Max: float = 0
+  var Ground Ahead: bool = false
+  var Wall Ahead: bool = false
+  var Hero Is R: bool = false
+  var In Alert Range: bool = false
+  var In Snipe Range: bool = false
+  var Close Range: bool = false
+  var Alert Range Obj: gameObject = Rock Roller Scene/Rock Roller/Alert Range
+  var Ambient Stuff: gameObject = Rock Roller Scene/Rock Roller/Ambient Stuff
+  var Audio Player: gameObject = <null>
+  var Bomb: gameObject = <null>
+  var Bomb Spawn Point: gameObject = Rock Roller Scene/Rock Roller/Bomb Spawn Point
+  var Burst Effects: gameObject = Rock Roller Scene/Rock Roller/Burst Effects
+  var CamLock: gameObject = <null>
+  var Clash Effect: gameObject = Rock Roller Scene/Rock Roller/Clash Effect
+  var Coal Snipe Range: gameObject = <null>
+  var Guide Trail: gameObject = Rock Roller Scene/Rock Roller/Guide Trail
+  var Home Marker: gameObject = Rock Roller Scene/Rock Roller/Home Marker
+  var Pt Ambient: gameObject = Rock Roller Scene/Rock Roller/Pt Ambient
+  var Pt BombAntic: gameObject = Rock Roller Scene/Rock Roller/Pt BombAntic
+  var Pt Burst: gameObject = Rock Roller Scene/Rock Roller/Pt Burst
+  var Pt Emerge: gameObject = Rock Roller Scene/Rock Roller/Pt Emerge
+  var Pt Trail: gameObject = Rock Roller Scene/Rock Roller/Pt Trail
+  var Pt Trail 2: gameObject = Rock Roller Scene/Rock Roller/Pt Trail 2
+  var Ray Pt Roll: gameObject = Rock Roller Scene/Rock Roller/Ray Pt Roll
+  var Roll Player: gameObject = <null>
+  var Self: gameObject = <null>
+  var Spit Effect: gameObject = Rock Roller Scene/Rock Roller/Spit Effect
+  var Wall Check: gameObject = Rock Roller Scene/Rock Roller/Wall Check
+  var Audio Loop Voice: gameObject = Rock Roller Scene/Rock Roller/Audio Loop Voice
+  var Alert Range: object = <null>
+  var Coal Snipe RangeR: object = <null>
+}

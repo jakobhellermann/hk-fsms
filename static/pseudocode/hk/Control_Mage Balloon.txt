@@ -1,0 +1,134 @@
+# Control
+# 2 location(s):
+#   Ruins1_32 / Mage Balloon
+#   Ruins1_32 / Mage Balloon (1)
+
+fsm Control {
+  start Initiate
+
+  state Idle {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    ActivateGameObject(gameObject=var "Spawn Range Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Hero Saver Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Tk2dPlayFrame(gameObject=var "Self", frame=3)
+    IdleBuzz(gameObject=var "Self", waitMin=0.75, waitMax=1, speedMax=1.75, accelerationMax=15, roamingRange=1)
+    IdleBuzzV3(gameObject=Self, waitMin=0.75, waitMax=1, speedMax=2, accelerationMin=5, accelerationMax=15, roamingRangeX=2, roamingRangeY=2, manualStartPos=(unset))
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Alert Range"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    on ALERT → Startles?
+  }
+
+  state Startle {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[buzzer_startle_01 (sharedassets6.assets), buzzer_startle_02 (sharedassets6.assets), buzzer_startle_03 (sharedassets6.assets)], weights=[1, 1, 1], pitchMin=1.2, pitchMax=1.4, volume=1, delay=0, storePlayer=<null>)
+    SetVelocity2d(gameObject=var "Self", vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Startle")
+    FaceObject(objectA=var "Self", objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"ANIM END")
+    on ANIM END → Chase Start
+  }
+
+  state Startles? {
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")  // disabled
+    GetFsmGameObject(gameObject=var "Alerter", fsmName="alert_range", variableName="Hero", storeValue=var "Hero", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Startles", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Startle
+    on FALSE → Chase Start
+  }
+
+  state Chase - In Sight {
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToChase", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    ChaseObject(gameObject=var "Self", target=var "Hero", speedMax=8, acceleration=0.075, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)  // disabled
+    NextFrameEvent(sendEvent=→"WAIT")
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=5, accelerationForce=10, offsetX=0, offsetY=0)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on WAIT → Chase - Out of Sight
+  }
+
+  state Initiate {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Alert Range New", storeResult=var "Alerter")
+    FindChild(gameObject=Self, childName="Hero Saver", storeResult=var "Hero Saver Obj")
+    FindChild(gameObject=Self, childName="Spawn Range", storeResult=var "Spawn Range Obj")
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    BoolTest(boolVariable=var "Start Alert", isTrue=→"ALERT", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Spawns", isTrue=→"SPAWNS", isFalse=(none), everyFrame=false)
+    on FINISHED → Idle
+    on ALERT → Chase Start
+    on SPAWNS → Spawn Wait
+  }
+
+  state Chase - Out of Sight {
+    FaceDirection(gameObject=var "Self", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToChase", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    ChaseObject(gameObject=var "Self", target=var "Hero", speedMax=8, acceleration=0.075, targetSpread=0, spreadResetTimeMin=0, spreadResetTimeMax=0)  // disabled
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=5, accelerationForce=10, offsetX=0, offsetY=0)
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Alert Range", childName="Alert Range New", everyFrame=false)  // disabled
+    BoolAllTrue(boolVariables=[var "Can See Hero"], sendEvent=→"ALERT", storeResult=(unset), everyFrame=true)
+    Wait(time=var "Attention Span", finishEvent=→"WAIT", realTime=false)
+    on ALERT → Chase - In Sight
+    on WAIT → Stop
+  }
+
+  state Stop {
+    SetAudioPitch(gameObject=var "Self", pitch=1, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Tk2dPlayFrame(gameObject=var "Self", frame=3)
+    Decelerate(gameObject=var "Self", deceleration=0.12)
+    Wait(time=1, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Idle
+  }
+
+  state Chase Start {
+    SetAudioPitch(gameObject=var "Self", pitch=1.25, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Chase")
+    Wait(time=0, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Chase - In Sight
+  }
+
+  state Spawn Wait {
+    SetCollider(gameObject=Self, active=false)
+    SetCircleCollider(gameObject=Self, active=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on SPAWN → Spawn Pause
+  }
+
+  state Spawn Pause {
+    WaitRandom(timeMin=0, timeMax=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Saver
+  }
+
+  state Check Saver {
+    BoolTest(boolVariable=var "Hero Saver", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Spawn
+  }
+
+  state Spawn {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_balloon_appear (sharedassets34.assets))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Spawn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    SetCollider(gameObject=Self, active=true)
+    SetCircleCollider(gameObject=Self, active=true)
+    on FINISHED → Startles?
+  }
+
+  var Spawns: bool = false
+
+  var Attention Span: float = 6
+  var Can See Hero: bool = false
+  var Hero Saver: bool = false
+  var In Alert Range: bool = false
+  var Start Alert: bool = false
+  var Startles: bool = false
+  var Alerter: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Hero Saver Obj: gameObject = <null>
+  var Self: gameObject = <null>
+  var Spawn Range Obj: gameObject = <null>
+}

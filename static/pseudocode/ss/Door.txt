@@ -1,0 +1,165 @@
+# Door
+# 1 location(s):
+#   Room_CrowCourt / court_door
+
+fsm Door {
+  start Init Wait
+  on CONVO_END_FORCED → Continue open?  // from any state
+
+  state Init Wait {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Start State?
+  }
+
+  state Outside {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=true, UseChildren=false)
+    CheckAlertRange(alertRange=var "Enter Range", storeResult=(unset), InRangeEvent=→"ENTER", InRangeDelay=0.2, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    on ENTER → Open Up
+  }
+
+  state Inside {
+    CheckAlertRange(alertRange=var "Enter Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0.2, OutOfRangeEvent=→"EXIT", OutOfRangeDelay=0.5, everyFrame=true)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=true, UseChildren=false)
+    on EXIT → Back To Outside
+    on INTERACT → Offer
+    on TINKED → Tinked
+  }
+
+  state Start State? {
+    ActivateGameObject(gameObject=var "Camlock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayerDataVariableTest(VariableName="OpenedCrowSummonsDoor", ExpectedValue=true, IsExpectedEvent=→"OPENED", IsNotExpectedEvent=(none))
+    CollectableItemGetData(CollectedAmount=(unset), NeededAmount=1, IsCollected=→"FINISHED", NotCollected=→"INERT", ItemName="", Sprite=var "", Item=Craw Summons (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    on OPENED → Opened
+    on INERT → Inert
+    on FINISHED → Init Outside
+  }
+
+  state Opened {
+    AnimatorPlay(gameObject=Self, stateName="Open", layer=0, normalizedTime=1, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    ActivateGameObject(gameObject=var "Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Inert {
+    AnimatorPlay(gameObject=Self, stateName="Slot Close", layer=0, normalizedTime=1, everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+  }
+
+  state Init Outside {
+    AnimatorPlay(gameObject=Self, stateName="Slot Close", layer=0, normalizedTime=1, everyFrame=false)
+    on FINISHED → Outside
+  }
+
+  state Met? {
+    BoolTest(boolVariable=var "Has Talked", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on FALSE → Meet
+    on TRUE → Repeat
+  }
+
+  state Meet {
+    SetBoolValue(boolVariable=var "Has Talked", boolValue=true, everyFrame=false)
+    RunDialogue(Sheet="Greymoor", Key="CROW_DOOR_MEET", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Offer
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Greymoor", Key="CROW_DOOR_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Offer
+  }
+
+  state Offer {
+    DialogueYesNoItemV3(Prompt={Sheet="", Key=""}, RequiredItem=Craw Summons (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle), RequiredAmount=1, ShowCounter=false, ConsumeItem=false, WillGetItem=<null>, YesEvent=→"TRUE", NoEvent=→"FALSE", ReturnHUDAfter=false)
+    on FALSE → End Dialogue
+    on TRUE → Give Anim
+  }
+
+  state End Dialogue {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Inside
+  }
+
+  sequence state Give Anim {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_1 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Stand 1", AnimationCompleteEvent=(none))
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    SetPlayerDataVariable(VariableName="OpenedCrowSummonsDoor", SetValue=true)
+    PlayAudioEvent(audioClip=shiny_item_pickup (sfxstatic_assets_currency.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=crowman_actual_hop_1 (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CollectableItemTakeV2(Amount=1, ShowCounter=false, TakeDisplay=Given, Item=Craw Summons (dataassets_assets_assets/dataassets/collectables/collectableitems.bundle))
+    DebugLogConsole(logLevel=0, text="<b>TODO:</b> Give effect", sendToUnityLog=true)
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    Tk2dPlayAnimationWait(Target=var "Hero", ClipName="Collect Stand 3", AnimationCompleteEvent=(none))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Open
+  }
+
+  sequence state Open {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=crawman_yelp_04 (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=crowman_actual_hop_1 (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=ruins_big_lift_gate_door_thingy_close (sfxstatic_assets_areagreymoor.bundle), pitchMin=0.8, pitchMax=0.9, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatorPlayStateWait(target=Self, stateName="Slot Close", finishEvent=(none))
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=crowman_dagger_notice_hero (sfxstatic_assets_areadocks.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Audio Loop VoiceLeave", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop VoiceLeave", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)  // disabled
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=crowman_actual_flap_3 (sfxstatic_assets_areagreymoor.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Audio Loop VoiceLeave", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    PlayParticleEmitter(gameObject=var "Pt FlapAway", emit=0, resetIfPlaying=false)
+    AnimatorPlayStateWait(target=Self, stateName="Open", finishEvent=(none))
+    ActivateGameObject(gameObject=var "Camlock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Back To Outside {
+    PlayAudioEvent(audioClip=ruins_big_lift_gate_door_thingy_close (sfxstatic_assets_areagreymoor.bundle), pitchMin=0.8, pitchMax=0.9, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatorPlay(gameObject=Self, stateName="Slot Close", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    on FINISHED → Outside
+  }
+
+  state Continue open? {
+    PlayerDataVariableTest(VariableName="OpenedCrowSummonsDoor", ExpectedValue=true, IsExpectedEvent=→"TRUE", IsNotExpectedEvent=→"FALSE")
+    on FALSE → End Dialogue
+    on TRUE → Open
+  }
+
+  state Tinked {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    IntAdd(intVariable=var "Tinked Count", add=1, everyFrame=false)  // disabled
+    RandomInt(min=3, max=6, storeResult=var "Tink Target", inclusiveMax=true, noRepeat=false)  // disabled
+    IntCompare(integer1=var "Tinked Count", integer2=var "Tink Target", equal=→"THROW PIN", lessThan=(none), greaterThan=→"THROW PIN", everyFrame=false)  // disabled
+    on FINISHED → Inside
+    on THROW PIN → Throw Pin
+  }
+
+  sequence state Throw Pin {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    WaitRandom(timeMin=1, timeMax=2, finishEvent=(none), realTime=false)
+    SpawnProjectileV2(SpawnPoint=court_door/Pin Spawn Point, Prefab=PinSword Projectile Juror (localpoolprefabs_assets_areagreymoor.bundle), Position=(unset), Rotation=(unset), FlipScaleFireLeft=false, Speed=40, MinAngle=185, MaxAngle=190, Space=0, StoreSpawned=var "Spawned Projectile")
+    SetPosition(gameObject=var "Spawned Projectile", vector=(unset), x=(unset), y=(unset), z=0.025, space=0, everyFrame=false, lateUpdate=false)
+    IgnoreCollisions(Target=Self, Other=var "Spawned Projectile")
+    Wait(time=2, finishEvent=(none), realTime=false)
+    on FINISHED → Inside
+  }
+
+  state Open Up {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawman_med_yelp (sfxdynamic_assets_areagreymoor.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=ruins_big_lift_gate_door_thingy_open (sfxstatic_assets_areagreymoor.bundle), pitchMin=0.8, pitchMax=0.9, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatorPlay(gameObject=Self, stateName="Slot Open", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    on FINISHED → Inside
+  }
+
+  var Camlock: gameObject = CameraLockArea (10)
+
+  var Tinked Count: int = 0
+  var Tink Target: int = 0
+  var Has Talked: bool = false
+  var Spawned Projectile: gameObject = <null>
+  var Audio Loop Voice: gameObject = court_door/Audio Loop Voice
+  var Audio Loop VoiceLeave: gameObject = court_door/Audio Loop VoiceLeave
+  var Pt FlapAway: gameObject = court_door/Pt FlapAway
+  var Enter Range: object = court_door/Enter Range@AlertRange
+}

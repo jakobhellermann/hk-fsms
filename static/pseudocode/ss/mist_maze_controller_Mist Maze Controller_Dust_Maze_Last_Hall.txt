@@ -1,0 +1,188 @@
+# mist_maze_controller
+# 1 location(s):
+#   Dust_Maze_Last_Hall / Mist Maze Controller
+
+// uses template: mist_maze_controller
+fsm mist_maze_controller {
+  start Init
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindNamedChild(gameObject=Self, storeResult=var "Silkfly Nodes")
+    FindNamedChild(gameObject=Self, storeResult=var "Trap Sets")
+    FindNamedChild(gameObject=Self, storeResult=var "Wraith Nodes")
+    CreateEmptyObject(gameObject=<null>, spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Wraith Nodes Occupied")
+    SetName(gameObject=var "Wraith Nodes Occupied", name="Wraith Nodes Occupied")
+    SetParent(gameObject=var "Wraith Nodes Occupied", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Check Maze Level
+  }
+
+  state Check Maze Level {
+    SendEvent(eventTarget=Self, sendEvent=→"LV 4", delay=0, everyFrame=false)  // disabled
+    GetPlayerDataInt(intName="CorrectMazeDoorsEntered", storeValue=var "Maze Level")
+    IntSwitch(intVariable=var "Maze Level", compareTo=[0, 1, 2, 3, 4], sendEvent=[→"LV 0", →"LV 1", →"LV 2", →"LV 3", →"LV 4"], everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"LV 4", delay=0, everyFrame=false)
+    on LV 0 → Lv 0
+    on LV 1 → Lv 1
+    on LV 2 → Lv 2
+    on LV 3 → Lv 3
+    on LV 4 → Lv 4
+  }
+
+  state Lv 0 {
+    GetPlayerDataInt(intName="IncorrectMazeDoorsEntered", storeValue=var "Incorrect Doors")
+    IntCompare(integer1=var "Incorrect Doors", integer2=0, equal=(none), lessThan=(none), greaterThan=→"LV 1", everyFrame=false)
+    SetFloatValue(floatVariable=var "Trap Multiplier", floatValue=0.25, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wraith Multiplier", floatValue=0, everyFrame=false)
+    on FINISHED → Set Silkflies
+    on LV 1 → Lv 1
+  }
+
+  state Set Silkflies {
+    GameObjectIsNull(gameObject=var "Silkfly Nodes", isNull=→"NEXT", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    GetRandomChildSceneSeed(Parent=var "Silkfly Nodes", StoreResult=var "Next Node")
+    CreateObject(gameObject=Silkfly Mistmaze (localpoolprefabs_assets_areadustmaze.bundle), spawnPoint=var "Next Node", position=(unset), rotation=(unset), storeObject=var "")
+    DestroyObject(gameObject=var "Next Node", delay=0, detachChildren=false)
+    IntAdd(intVariable=var "Silkflies", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Silkflies", integer2=0, equal=→"NEXT", lessThan=→"NEXT", greaterThan=→"REPEAT", everyFrame=false)
+    on REPEAT → State 2
+    on NEXT → Get Trap Count
+  }
+
+  state Lv 1 {
+    SetFloatValue(floatVariable=var "Trap Multiplier", floatValue=0.25, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wraith Multiplier", floatValue=0.25, everyFrame=false)
+    on FINISHED → Set Silkflies
+  }
+
+  state Lv 2 {
+    SetFloatValue(floatVariable=var "Trap Multiplier", floatValue=0.35, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wraith Multiplier", floatValue=0.35, everyFrame=false)
+    on FINISHED → Set Silkflies
+  }
+
+  state Lv 3 {
+    SetFloatValue(floatVariable=var "Trap Multiplier", floatValue=0.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wraith Multiplier", floatValue=0.5, everyFrame=false)
+    on FINISHED → Set Silkflies
+  }
+
+  state Lv 4 {
+    SetFloatValue(floatVariable=var "Trap Multiplier", floatValue=0.7, everyFrame=false)
+    SetFloatValue(floatVariable=var "Wraith Multiplier", floatValue=0.7, everyFrame=false)
+    on FINISHED → Set Silkflies
+  }
+
+  state Set Traps {
+    GetRandomChildSceneSeed(Parent=var "Trap Sets", StoreResult=var "Next Node")
+    ActivateGameObject(gameObject=var "Next Node", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Next Node", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    IntAdd(intVariable=var "Items To Spawn", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Items To Spawn", integer2=0, equal=→"NEXT", lessThan=→"NEXT", greaterThan=→"REPEAT", everyFrame=false)
+    on REPEAT → Set Traps
+    on NEXT → Get Wraith Count
+  }
+
+  state Get Trap Count {
+    ActivateAllChildren(gameObject=var "Trap Sets", activate=false)
+    GameObjectIsNull(gameObject=var "Trap Sets", isNull=→"SKIP", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    FloatCompare(float1=var "Trap Multiplier", float2=0, tolerance=0, equal=→"SKIP", lessThan=→"SKIP", greaterThan=(none), everyFrame=false)
+    GetChildCount(gameObject=var "Trap Sets", storeResult=var "Items To Spawn")
+    MultiplyIntByFloat(integer=var "Items To Spawn", multiplyFloat=var "Trap Multiplier", storeResult=var "Items To Spawn", everyFrame=false, forceRoundUp=true)
+    on FINISHED → Set Traps
+    on SKIP → Get Wraith Count
+  }
+
+  state Get Wraith Count {
+    GameObjectIsNull(gameObject=var "Wraith Nodes", isNull=→"SKIP", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    FloatCompare(float1=var "Wraith Multiplier", float2=0, tolerance=0, equal=→"SKIP", lessThan=→"SKIP", greaterThan=(none), everyFrame=false)
+    GetChildCount(gameObject=var "Wraith Nodes", storeResult=var "Items To Spawn")
+    MultiplyIntByFloat(integer=var "Items To Spawn", multiplyFloat=var "Wraith Multiplier", storeResult=var "Items To Spawn", everyFrame=false, forceRoundUp=true)
+    on FINISHED → Set Wraiths
+    on SKIP → Check Music Level
+  }
+
+  state Set Wraiths {
+    GetRandomChildSceneSeed(Parent=var "Wraith Nodes", StoreResult=var "Next Node")
+    CreateObject(gameObject=Wraith (localpoolprefabs_assets_areadustmaze.bundle), spawnPoint=var "Next Node", position=(unset), rotation=(unset), storeObject=var "Wraith")
+    SetParent(gameObject=var "Wraith", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    DestroyObject(gameObject=var "Next Node", delay=0, detachChildren=false)
+    SetParent(gameObject=var "Next Node", parent=var "Wraith Nodes Occupied", resetLocalPosition=false, resetLocalRotation=false)
+    SetFsmGameObject(gameObject=var "Wraith", fsmName="Control", variableName="Current Node", setValue=var "Next Node", everyFrame=false)
+    IntAdd(intVariable=var "Items To Spawn", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Items To Spawn", integer2=0, equal=→"NEXT", lessThan=→"NEXT", greaterThan=→"REPEAT", everyFrame=false)
+    on REPEAT → State 1
+    on NEXT → Check Music Level
+  }
+
+  state Check Music Level {
+    ActivateAllChildren(gameObject=var "Silkfly Nodes", activate=false)
+    ActivateAllChildren(gameObject=var "Wraith Nodes", activate=false)
+    BoolTest(boolVariable=var "Quiet Zone", isTrue=→"LV 1", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Tension Zone", isTrue=→"TENSION", isFalse=(none), everyFrame=false)
+    GetPlayerDataInt(intName="CorrectMazeDoorsEntered", storeValue=var "Correct Doors")
+    IntSwitch(intVariable=var "Correct Doors", compareTo=[0, 1, 2, 3, 4], sendEvent=[→"LV 1", →"LV 2", →"LV 2", →"LV 3", →"LV 3"], everyFrame=false)
+    on LV 1 → Music Lv1
+    on LV 2 → Music Lv2
+    on LV 3 → Music Lv3
+    on TENSION → Tension
+    on FINISHED → Music Lv3
+  }
+
+  state State 1 {
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    on FINISHED → Set Wraiths
+  }
+
+  state State 2 {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Set Silkflies
+  }
+
+  state Music Lv1 {
+    GetPlayerDataInt(intName="IncorrectMazeDoorsEntered", storeValue=var "Incorrect Doors")  // disabled
+    IntCompare(integer1=var "Incorrect Doors", integer2=0, equal=→"ENTRY", lessThan=(none), greaterThan=(none), everyFrame=false)  // disabled
+    ApplyMusicCue(musicCue=MistMaze (audiocuesdynamic_assets_areadust.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Action Only (audioobjects_assets_all.bundle), transitionTime=4)  // disabled
+    on ENTRY → Music Area Entry
+  }
+
+  state Music Lv2 {
+    TransitionToAudioSnapshot(snapshot=Action and Sub (audioobjects_assets_all.bundle), transitionTime=4)
+  }
+
+  state Music Lv3 {
+    PlayerDataBoolTest(boolName="EnteredMazeRestScene", isTrue=(none), isFalse=→"LV 2")
+    TransitionToAudioSnapshot(snapshot=Action (audioobjects_assets_all.bundle), transitionTime=4)
+    on LV 2 → Music Lv2
+  }
+
+  sequence state Music Area Entry {
+    Wait(time=2, finishEvent=(none), realTime=false)
+    ApplyMusicCue(musicCue=MistMaze (audiocuesdynamic_assets_areadust.bundle), delayTime=0, transitionTime=0)  // disabled
+    TransitionToAudioSnapshot(snapshot=Action Only (audioobjects_assets_all.bundle), transitionTime=4)
+  }
+
+  state Tension {
+    TransitionToAudioSnapshot(snapshot=Tension Only (audioobjects_assets_all.bundle), transitionTime=3)
+  }
+
+  var Silkflies: int = 1
+  var Quiet Zone: bool = true
+  var Tension Zone: bool = false
+
+  var Trap Multiplier: float = 0
+  var Wraith Multiplier: float = 0
+  var Maze Level: int = 0
+  var Items To Spawn: int = 0
+  var Incorrect Doors: int = 0
+  var Correct Doors: int = 0
+  var Silkfly Nodes: gameObject = <null>
+  var Trap Sets: gameObject = <null>
+  var Wraith Nodes: gameObject = <null>
+  var Next Node: gameObject = <null>
+  var Wraith: gameObject = <null>
+  var Self: gameObject = <null>
+  var Wraith Nodes Occupied: gameObject = <null>
+}

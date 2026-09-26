@@ -1,0 +1,108 @@
+# Conversation Control
+# 1 location(s):
+#   RestingGrounds_04 / Dreamer Plaque Inspect
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="CamLock", storeResult=var "CamLock")
+    FindChild(gameObject=Self, childName="Map Update Msg", storeResult=var "Map Update Msg")
+    FindChild(gameObject=Self, childName="Msg", storeResult=var "Msg")
+    FindChild(gameObject=var "Msg", childName="Stop", storeResult=var "Stop")
+    on FINISHED → Idle
+  }
+
+  state End {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasDreamNail", isTrue=(none), isFalse=→"GET DREAM")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+    on GET DREAM → Dream Scene
+  }
+
+  state Anim End {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="TurnFromBG", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → End
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="TurnToBG")
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fade Up
+  }
+
+  state Fade Up {
+    Wait(time=8, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "Msg"), sendEvent="UP", delay=0, everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=Normal Soft (resources.assets), transitionTime=2)
+    on FINISHED → Wait For Input
+  }
+
+  state Wait For Input {
+    ActivateGameObject(gameObject=var "Stop", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ListenForMenuSubmit(eventTarget=Self, wasPressed=→"INPUT", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForCast(eventTarget=Self, wasPressed=→"INPUT", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)
+    ListenForMenuCancel(eventTarget=Self, wasPressed=→"INPUT", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForJump(eventTarget=Self, wasPressed=→"INPUT", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on INPUT → Msg Down
+  }
+
+  state Msg Down {
+    ActivateGameObject(gameObject=var "Stop", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player UI (resources.assets), spawnPoint=var "Self", audioClip=button (resources.assets), pitchMin=0.8, pitchMax=0.8, volume=0.3, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "Msg"), sendEvent="DOWN", delay=0, everyFrame=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Pan Back
+  }
+
+  state Update Map? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasPinGuardian", isTrue=→"FINISHED", isFalse=(none))
+    ActivateGameObject(gameObject=var "Map Update Msg", activate=true, recursive=false, resetOnExit=false, everyFrame=false)  // disabled
+    SetPlayerDataBool(boolName="hasPinGuardian", value=true)
+    SetPlayerDataBool(boolName="hasPin", value=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NEW MAP KEY ADDED", delay=0, everyFrame=false)
+    on FINISHED → Talk Finish
+  }
+
+  state Pan Back {
+    ActivateGameObject(gameObject=var "CamLock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    TransitionToAudioSnapshot(snapshot=Normal (resources.assets), transitionTime=2)
+    on FINISHED → Map Msg?
+  }
+
+  state Dream Scene {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="DREAMER INSPECT END", delay=0, everyFrame=false)
+  }
+
+  state Map Msg? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasPinGuardian", isTrue=→"GOT MAP", isFalse=(none))
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasMap", isTrue=(none), isFalse=→"FINISHED")
+    ActivateGameObject(gameObject=var "Map Update Msg", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Update Map?
+    on GOT MAP → Talk Finish
+  }
+
+  var Spoken: bool = false
+  var Area Title: gameObject = <null>
+  var CamLock: gameObject = <null>
+  var Map Update Msg: gameObject = <null>
+  var Msg: gameObject = <null>
+  var Self: gameObject = <null>
+  var Stop: gameObject = <null>
+}

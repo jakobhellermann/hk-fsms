@@ -1,0 +1,132 @@
+# Rail Control
+# 1 location(s):
+#   Cog_08 / Harpoon Ring Rail Slider (2)
+
+fsm Rail Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    GetPosition(gameObject=var "Pull Point", vector=(unset), x=var "Pull X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Pull Point", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Retract Point", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FloatOperator(float1=var "Pull Speed", float2=-2, operation=Multiply, storeResult=var "Return Speed", everyFrame=false)
+    FindChild(gameObject=Self, childName="Ring Parent/Ring", storeResult=var "Ring")
+    on FINISHED → Check Dir
+  }
+
+  state Idle {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Start X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Wobble")
+    Tk2dPlayFrame(gameObject=var "Ring", frame=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on CONNECT → Pull Pause
+  }
+
+  state Pull Pause {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    on DISCONNECT → End Cam Look
+    on FINISHED → Start Connection
+    on HAZARD RESPAWNED → Hazard Reset
+  }
+
+  state Pull To {
+    AudioPlayInState(gameObject=var "Loop Pull", volume=1)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AccelerateToX(gameObject=Self, accelerationFactor=var "Acceleration", targetSpeed=var "Pull Speed")
+    CheckXPosition(gameObject=Self, compareTo=var "Pull X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"END", greaterThanBool=(unset), everyFrame=true, space=0, activeBool=var "Travelling R")
+    CheckXPosition(gameObject=Self, compareTo=var "Pull X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"END", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=0, activeBool=var "Travelling L")
+    Rotate(gameObject=var "Turn Cog", vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=400, space=1, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    on END → End Point
+    on DISCONNECT → Keep Travelling?
+    on HAZARD RESPAWNED → Hazard Reset
+  }
+
+  state Return {
+    AudioPlayInState(gameObject=var "Loop Retract", volume=1)
+    AccelerateToX(gameObject=Self, accelerationFactor=var "Return Acceleration", targetSpeed=var "Return Speed")
+    Tk2dPlayAnimation(gameObject=var "Ring", animLibName="", clipName="Wobble")
+    Tk2dPlayFrame(gameObject=var "Ring", frame=0)
+    CheckXPosition(gameObject=Self, compareTo=var "Start X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"FINISHED", greaterThanBool=(unset), everyFrame=true, space=0, activeBool=var "Travelling L")
+    CheckXPosition(gameObject=Self, compareTo=var "Start X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"FINISHED", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=0, activeBool=var "Travelling R")
+    CheckXPosition(gameObject=Self, compareTo=var "Pull X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"END", greaterThanBool=(unset), everyFrame=true, space=0, activeBool=var "Travelling R")
+    CheckXPosition(gameObject=Self, compareTo=var "Pull X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"END", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=0, activeBool=var "Travelling L")
+    Rotate(gameObject=var "Turn Cog", vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=-400, space=1, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Return To Start
+    on CONNECT → Pull Pause
+    on END → End Point
+    on HAZARD RESPAWNED → Hazard Reset
+  }
+
+  state Return To Start {
+    PlayAudioEvent(audioClip=harpoon_pull_switch_return_to_init (sfxstatic_assets_areahang.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle
+  }
+
+  state Check Dir {
+    SetParent(gameObject=var "Turn Cog", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindGameObject(objectName="", withTag="CameraTarget", store=var "CamTarget")
+    CheckTargetDirection(gameObject=Self, target=var "Pull Point", aboveEvent=(none), belowEvent=(none), rightEvent=→"FINISHED", leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    FloatMultiply(floatVariable=var "Pull Speed", multiplyBy=-1, everyFrame=false)
+    SetBoolValue(boolVariable=var "Travelling R", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Travelling L", boolValue=true, everyFrame=false)
+    FloatOperator(float1=var "Pull Speed", float2=-2, operation=Multiply, storeResult=var "Return Speed", everyFrame=false)
+    SetStringValue(stringVariable=var "FacingMethod", stringValue="FaceLeft", everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state End Point {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Pull X", y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Return Speed", y=(unset), everyFrame=false)
+    on FINISHED → Return
+  }
+
+  state Keep Travelling? {
+    CallMethodProper(gameObject=var "CamTarget", behaviour="CameraTarget", methodName="SetSprint", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Travel Range", isTrue=(none), isFalse=→"RETURN", everyFrame=false)
+    CheckXPosition(gameObject=Self, compareTo=var "Travel Range Min", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"RETURN", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    CheckXPosition(gameObject=Self, compareTo=var "Travel Range Max", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"RETURN", greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    AccelerateToX(gameObject=Self, accelerationFactor=var "Acceleration", targetSpeed=var "Pull Speed")
+    on RETURN → Return
+    on CONNECT → Pull Pause
+    on HAZARD RESPAWNED → Hazard Reset
+  }
+
+  state Start Connection {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName=var "FacingMethod", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "CamTarget", behaviour="CameraTarget", methodName="SetSprint", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Pull To
+  }
+
+  state End Cam Look {
+    CallMethodProper(gameObject=var "CamTarget", behaviour="CameraTarget", methodName="SetSprint", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Hazard Reset {
+    on FINISHED → Idle
+  }
+
+  var Pull Speed: float = 12
+  var Return Acceleration: float = 0.12
+  var Travel Range Min: float = 30
+  var Travel Range Max: float = 50
+  var Travel Range: bool = true
+
+  var Return Speed: float = 0
+  var Acceleration: float = 1
+  var Pull X: float = 0
+  var Start X: float = 0
+  var Travelling R: bool = true
+  var Travelling L: bool = false
+  var FacingMethod: string = "FaceRight"
+  var Pull Point: gameObject = Harpoon Ring Rail Slider (2)/Pull Point
+  var Retract Point: gameObject = <null>
+  var Ring: gameObject = <null>
+  var Loop Pull: gameObject = Harpoon Ring Rail Slider (2)/Loop Pull
+  var Loop Retract: gameObject = Harpoon Ring Rail Slider (2)/Loop Retract
+  var CamTarget: gameObject = <null>
+  var Turn Cog: gameObject = Harpoon Ring Rail Slider (2)/Turn Cog
+}

@@ -1,0 +1,432 @@
+# Conversation Control
+# 1 location(s):
+#   Crossroads_33 / Cornifer
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on BOX DOWN → Box Down  // from any state
+  on TALK FINISH → Hero Look Back  // from any state
+  on TALK FINISH NO HERO ANIM → Check Direction 2  // from any state
+
+  state Idle {
+    on CONVO START → Check Direction
+  }
+
+  state Convo Choice {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="metCornifer", isTrue=(none), isFalse=→"MEET")
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "Got Map Bool", isTrue=→"BOUGHT", isFalse=(none))
+    BoolTest(boolVariable=var "Spoken", isTrue=→"AGAIN", isFalse=(none), everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="GREET", delay=0, everyFrame=false)
+    on MEET → Meet
+    on AGAIN → Again
+    on GREET → Greet
+    on BOUGHT → Bought Choice
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindChild(gameObject=Self, childName="Encounter Range", storeResult=var "Encounter Range")
+    FindChild(gameObject=Self, childName="Hum", storeResult=var "Hum")
+    SetFsmString(gameObject=var "Encounter Range", fsmName="Encounter", variableName="", setValue=var "Encountered Bool", everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetFsmFloat(gameObject=Self, fsmName="npc_control", variableName="Move To Offset", setValue=2, everyFrame=false)
+    on FINISHED → Not At Crossroads
+  }
+
+  state End {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=<null>, finishedEvent=(none))
+    AudioPlay(gameObject=var "Hum", volume=0.4, oneShotClip=<null>, finishedEvent=(none))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    on FINISHED → Hero Look Back
+  }
+
+  state Check Direction {
+    AudioStop(gameObject=Self)
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=(none), negativeEvent=→"FLIPPED", space=0)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"RIGHT", leftEvent=→"LEFT", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)
+    on RIGHT → Talk R
+    on LEFT → Talk L
+    on FLIPPED → Check Direction F
+  }
+
+  state Talk R {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk R")
+    SetBoolValue(boolVariable=var "Talking R", boolValue=true, everyFrame=false)
+    on FINISHED → Hero Look
+  }
+
+  state Talk L {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk L")
+    SetBoolValue(boolVariable=var "Talking R", boolValue=false, everyFrame=false)
+    on FINISHED → Hero Look
+  }
+
+  state Hero Look {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Box Up
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    AudioStop(gameObject=var "Hum")
+    on FINISHED → Open map Shop
+  }
+
+  state Meet {
+    SetPlayerDataBool(boolName="metCornifer", value=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Cornifer_01 (sharedassets64.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_MEET", "Cornifer"], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Check Direction 2 {
+    DestroyObject(gameObject=var "Voice Player", delay=0, detachChildren=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"RIGHT", leftEvent=→"LEFT", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Talking R", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on RIGHT → Face Right
+    on LEFT → Face Left
+  }
+
+  state Face Right {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk R End")
+    on FINISHED → End
+  }
+
+  state Face Left {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Talk L End")
+    on FINISHED → End
+  }
+
+  state Get F Map {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    SetPlayerDataBool(boolName="hasMap", value=true)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="FIRST MAP UP", delay=0, everyFrame=false)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Self", audioClip=spell_information_screen (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0.5, storePlayer=<null>)
+    on FINISHED → Map Input
+  }
+
+  state Map Input {
+    ListenForJump(eventTarget=Self, wasPressed=→"CONVO END", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForAttack(eventTarget=Self, wasPressed=→"CONVO END", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    ListenForCast(eventTarget=Self, wasPressed=→"CONVO END", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)
+    ListenForQuickMap(eventTarget=Self, wasPressed=→"CONVO END", wasReleased=(none), isPressed=(none), isNotPressed=(none))
+    on CONVO END → Prompt Down
+  }
+
+  state Map End {
+    SetPlayerDataBool(boolName="atMapPrompt", value=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="FIRST MAP DOWN", delay=0, everyFrame=false)
+    Wait(time=1, finishEvent=→"TALK FINISH", realTime=false)
+  }
+
+  state Hero Look Back {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpEnd")
+    on FINISHED → Check Direction 2
+  }
+
+  state Map End Opened {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="FIRST MAP DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH NO HERO ANIM", delay=0, everyFrame=false)
+  }
+
+  state Destroy {
+    DestroySelf(detachChildren=false)
+  }
+
+  state Open map Shop {
+    SetPlayerDataBool(boolName="openedMapperShop", value=true)
+    on FINISHED → Title Display
+  }
+
+  state Box Down 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up YN
+  }
+
+  state Box Up YN {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP YN", delay=0, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Send Text
+  }
+
+  state Send Text {
+    SetFsmInt(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Toll Cost", setValue=var "Map Cost", everyFrame=false)
+    SetFsmGameObject(gameObject=var "DialogueTextYN", fsmName="Dialogue Page Control", variableName="Requester", setValue=var "Self", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueTextYN", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_PROMPT", "Cornifer"], storeResult=(unset var))
+    on NO → YN Down
+    on YES → Geo Pause and GetMap
+  }
+
+  state Set Map Price {
+    BuildString(stringParts=["MAP_", var "Area"], separator="", addToEnd=true, storeResult=var "Price String", everyFrame=false)
+    GetLanguageString(sheetName="Prices", convName=var "Price String", storeValue=var "Map Cost String")
+    ConvertStringToInt(stringVariable=var "Map Cost String", intVariable=var "Map Cost", everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Map Cost", floatVariable=var "Map Cost Float", everyFrame=false)
+    FloatMultiply(floatVariable=var "Map Cost Float", multiplyBy=0.75, everyFrame=false)
+    ConvertFloatToInt(floatVariable=var "Map Cost Float", intVariable=var "Map Cost", rounding=Nearest, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Enough Geo? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="geo", storeValue=var "Geo")
+    IntCompare(integer1=var "Geo", integer2=var "Map Cost", equal=→"ENOUGH", lessThan=→"NOT ENOUGH", greaterThan=→"ENOUGH", everyFrame=false)
+    on ENOUGH → Refuse
+    on NOT ENOUGH → Not Enough
+  }
+
+  state Refuse {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Cornifer_05 (sharedassets64.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_REFUSE", "Cornifer"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down Event 2
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Enough Geo?
+  }
+
+  state Box Down Event 2 {
+    SendEventByName(eventTarget=Self, sendEvent="BOX DOWN", delay=0, everyFrame=false)
+  }
+
+  state Not Enough {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Cornifer_05 (sharedassets64.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_NOT_ENOUGH", "Cornifer"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down Event 2
+  }
+
+  state Geo Pause and GetMap {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    SetPlayerDataBool(boolName=var "Got Map Bool", value=true)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=StoryRecord_boughtCorniferMap(var "Got Map Bool"))
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=CheckAllMaps())
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="UpdateGameMap", parameters=[], storeResult=var "Map Updated")
+    CallMethodProper(gameObject=var "Game Map", behaviour="GameMap", methodName="SetupMap", parameters=[false], storeResult=(unset var))
+    on FINISHED → First Map?
+  }
+
+  state First Map? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="hasMap", isTrue=→"NO", isFalse=→"YES")
+    on YES → Get F Map
+    on NO → Get Map
+  }
+
+  state YN Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN YN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Box Up 2
+  }
+
+  state Again {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Cornifer_02 (sharedassets64.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_AGAIN", "Cornifer"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Get Map {
+    CreateObject(gameObject=Map Get Msg (sharedassets64.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Map Get Msg", networkInstantiate=false, networkGroup=0)
+    CreateObject(gameObject=Item Get Effect (sharedassets7.assets), spawnPoint=var "Hero", position=(0, -0.76, -1), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    BuildString(stringParts=["MAP_NAME_", var "Area"], separator="", addToEnd=true, storeResult=var "Get Map Convo", everyFrame=false)
+    SetFsmString(gameObject=var "Map Get Msg", fsmName="Map Msg", variableName="Convo", setValue=var "Get Map Convo", everyFrame=false)
+    CreateObject(gameObject=Map Update Msg (sharedassets7.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    on FINISHED → Talk Finish
+  }
+
+  state Talk Finish {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckMapAchievement", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Greet {
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Cornifer_03 (sharedassets64.assets), Cornifer_06 (sharedassets64.assets), Cornifer_07 (sharedassets64.assets), Cornifer_08 (sharedassets64.assets)], weights=[1, 1, 1, 1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    BuildString(stringParts=[var "Area", "_GREET"], separator="", addToEnd=true, storeResult=var "Greet Convo", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Greet Convo", "Cornifer"], storeResult=(unset var))
+    SetBoolValue(boolVariable=var "Spoken", boolValue=true, everyFrame=false)
+    on CONVO_FINISH → Box Down 2
+  }
+
+  state Introduce 1 {
+    SetPlayerDataBool(boolName="", value=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Cornifer_01 (sharedassets64.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_INTRO_1", "Cornifer"], storeResult=(unset var))
+    on CONVO_FINISH → Introduce 2
+  }
+
+  state Area Bought {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Cornifer_05 (sharedassets64.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    BuildString(stringParts=[var "Area", "_BOUGHT"], separator="", addToEnd=true, storeResult=var "Bought Convo", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Bought Convo", "Cornifer"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down Event 3
+  }
+
+  state Introduce 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_INTRO_2", "Cornifer"], storeResult=(unset var))
+    CreateObject(gameObject=Area Title Extra (sharedassets9.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Area Title", networkInstantiate=false, networkGroup=0)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="CORNIFER", everyFrame=false)
+    on CONVO_FINISH → Box Down Event 3
+  }
+
+  state Box Down Event {
+    SendEventByName(eventTarget=Self, sendEvent="", delay=0, everyFrame=false)
+  }
+
+  state Prompt Down {
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="FIRST MAP DOWN", delay=0, everyFrame=false)
+    on FINISHED → Box Up 3
+  }
+
+  state Box Up 3 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Iselda Mention
+  }
+
+  state Iselda Mention {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Cornifer_05 (sharedassets64.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_ISELDA", "Cornifer"], storeResult=(unset var))
+    on CONVO_FINISH → Box Down Event 2
+  }
+
+  state Not At Crossroads {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_crossroadsEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_crossroadsEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_crossroadsLeft", value=true)
+    on FINISHED → Not At Greenpath
+  }
+
+  state Check Active {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "Left Bool", isTrue=→"DESTROY", isFalse=(none))
+    on FINISHED → Set Map Price
+    on DESTROY → Destroy
+  }
+
+  state Not At Greenpath {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_greenpathEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_greenpathEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_greenpathLeft", value=true)
+    on FINISHED → Not At Fog Canyon
+  }
+
+  state Not At Fog Canyon {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_fogCanyonEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_fogCanyonEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_fogCanyonLeft", value=true)
+    on FINISHED → Not At Fungus
+  }
+
+  state Not At Fungus {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_fungalWastesEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_fungalWastesEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_fungalWastesLeft", value=true)
+    on FINISHED → Not At City
+  }
+
+  state Not At City {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_cityEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_cityEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_cityLeft", value=true)
+    on FINISHED → Not At Waterways
+  }
+
+  state Not At Waterways {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_waterwaysEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_waterwaysEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_waterwaysLeft", value=true)
+    on FINISHED → Not At Mines
+  }
+
+  state Not At Mines {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_minesEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_minesEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_minesLeft", value=true)
+    on FINISHED → Not At Deepnest
+  }
+
+  state Not At Deepnest {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_deepnestEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_deepnestEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_deepnestLeft", value=true)
+    on FINISHED → Not At Cliffs
+  }
+
+  state Not At Cliffs {
+    StringCompare(stringVariable=var "Encountered Bool", compareTo="corn_cliffsEncountered", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corn_cliffsEncountered", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="corn_cliffsLeft", value=true)
+    on FINISHED → Check Active
+  }
+
+  state Title Display {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corniferIntroduced", isTrue=(none), isFalse=→"FINISHED")
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="CORNIFER", everyFrame=false)
+    on FINISHED → Convo Choice
+  }
+
+  state Bought Choice {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="corniferIntroduced", isTrue=(none), isFalse=→"INTRODUCE")
+    on INTRODUCE → Introduce 3
+    on FINISHED → Area Bought
+  }
+
+  state Introduce 3 {
+    SetPlayerDataBool(boolName="corniferIntroduced", value=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=Cornifer_01 (sharedassets64.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    SetFsmBool(gameObject=var "DialogueText", fsmName="Dialogue Page Control", variableName="Use Stop", setValue=false, everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["CORNIFER_INTRO_1", "Cornifer"], storeResult=(unset var))
+    on CONVO_FINISH → Introduce 2
+  }
+
+  state Box Down Event 3 {
+    SendEventByName(eventTarget=Self, sendEvent="BOX DOWN", delay=0, everyFrame=false)
+  }
+
+  state Check Direction F {
+    AudioStop(gameObject=Self)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=→"LEFT", leftEvent=→"RIGHT", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), everyFrame=false)
+    on RIGHT → Talk R
+    on LEFT → Talk L
+  }
+
+  var Area: string = "CROSSROADS"
+  var Encountered Bool: string = "corn_crossroadsEncountered"
+  var Got Map Bool: string = "mapCrossroads"
+  var Left Bool: string = "corn_crossroadsLeft"
+
+  var Map Cost Float: float = 0
+  var Geo: int = 0
+  var Map Cost: int = 0
+  var Map Updated: bool = false
+  var Spoken: bool = false
+  var Talking R: bool = false
+  var Bought Convo: string = "MAP_CROSSROADS"
+  var Get Map Convo: string = "mapCrossroads"
+  var Greet Convo: string = ""
+  var Map Cost String: string = "MAP_CROSSROADS"
+  var Price String: string = "CROSSROADS"
+  var Area Title: gameObject = <null>
+  var Encounter Range: gameObject = <null>
+  var Hum: gameObject = <null>
+  var Map Get Msg: gameObject = <null>
+  var Self: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

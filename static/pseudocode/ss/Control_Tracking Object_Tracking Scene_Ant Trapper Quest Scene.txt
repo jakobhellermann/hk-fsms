@@ -1,0 +1,120 @@
+# Control
+# 1 location(s):
+#   Bone_East_02 / Ant Trapper Quest Scene/Tracking Scene/Tracking Object
+
+// uses template: tracking_object
+fsm Control {
+  start Pause
+  on TRAILS OFF → Off  // from any state
+  on TRAIL OBJECTS DEACTIVATE → Deactivate  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Ambient")
+    FindNamedChild(gameObject=Self, storeResult=var "Shiny Sprite")
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on INTERACT → Take Control
+  }
+
+  state Take Control {
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetPlayerDataBool(boolName="disablePause", value=true)  // disabled
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    on FINISHED → Kneel
+  }
+
+  state Kneel {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 1 Q")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=hornet_run_start_3 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Trap?
+    on HERO DAMAGED → Cancel
+  }
+
+  state Sense Flash {
+    SendEventToRegister(eventName="TRAILS END")
+    SendMessage(gameObject=var "Scent Trail", delivery=SendMessage, options=1, functionCall=StartTrail(var "Self"))
+    ActivateGameObject(gameObject=var "Shiny Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Tracking Sense Effect (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", position=(0, -1, 0), rotation=(unset), storeObject=var "Effect")
+    SetPosition(gameObject=var "Effect", vector=(unset), x=(unset), y=(unset), z=0, space=0, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=focus_ready (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ScreenFlash(flashColour=(1, 1, 1, 0.734))
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    StopParticleEmitter(gameObject=var "Pt Ambient")
+    on FINISHED → Stand
+    on HERO DAMAGED → Tracking
+  }
+
+  state Stand {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect Normal 3 Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Regain Control
+    on HERO DAMAGED → Tracking
+  }
+
+  state Regain Control {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    on FINISHED → Tracking
+  }
+
+  state Tracking {
+    Wait(time=4, finishEvent=→"END", realTime=false)
+    on END → End
+    on TRAILS END → End
+  }
+
+  state Cancel {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Idle
+  }
+
+  state End {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "Shiny Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Ambient", emit=0, resetIfPlaying=false)
+    on FINISHED → Idle
+  }
+
+  state Off {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SendMessage(gameObject=var "Scent Trail", delivery=SendMessage, options=1, functionCall=StopTrail())  // disabled
+    ActivateGameObject(gameObject=var "Shiny Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Pt Ambient")
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Init
+  }
+
+  state Trap? {
+    StringCompare(stringVariable=var "Trap Event", compareTo="", equalEvent=(none), notEqualEvent=→"TRAP", storeResult=(unset), everyFrame=false)
+    on FINISHED → Sense Flash
+    on TRAP → Send Trap Event
+  }
+
+  state Send Trap Event {
+    SendEventByNameUpwards(Target=Self, EventName=var "Trap Event")
+    ActivateGameObject(gameObject=var "Shiny Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Deactivate {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  var Trap Event: string = ""
+  var Scent Trail: gameObject = Ant Trapper Quest Scene/Tracking Scene/Tracking Trail
+
+  var Pt Ambient: gameObject = <null>
+  var Self: gameObject = <null>
+  var Effect: gameObject = <null>
+  var Shiny Sprite: gameObject = <null>
+}

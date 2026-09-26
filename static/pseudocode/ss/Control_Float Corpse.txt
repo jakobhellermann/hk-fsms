@@ -1,0 +1,101 @@
+# Control
+# 3 location(s):
+#   Hang_02 / Float Corpse
+#   Hang_02 / Black Thread States/Normal World/Float Corpse (1)
+#   Hang_09 / Float Corpse
+
+// uses template: floating_object
+fsm Control {
+  start Init
+
+  state Init {
+    FindNamedChild(gameObject=Self, storeResult=var "Bop L")
+    FindNamedChild(gameObject=Self, storeResult=var "Bop R")
+    FindNamedChild(gameObject=Self, storeResult=var "Bop Collider")
+    FindNamedChild(gameObject=Self, storeResult=var "Art")
+    GetRotation(gameObject=var "Art", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Art Rotation", space=0, everyFrame=false)
+    RandomFloat(min=-15, max=15, storeResult=var "Rotation Add")
+    FloatAdd(floatVariable=var "Art Rotation", add=var "Rotation Add", everyFrame=false, perSecond=false)
+    RandomFloat(min=0.9, max=1.15, storeResult=var "Scale")
+    SetScale(gameObject=Self, vector=(unset), x=var "Scale", y=var "Scale", z=(unset), everyFrame=false, lateUpdate=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Set Idle Pos
+  }
+
+  state Set Idle Pos {
+    GetPosition(gameObject=Self, vector=(unset), x=var "Current X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetRotation(gameObject=var "Art", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Art Rotation", space=0, everyFrame=false, lateUpdate=false)
+    SendRandomEvent(events=[→"L", →"R"], weights=[1, 1], delay=0)
+    on L → Drift L
+    on R → Drift R
+  }
+
+  state Drift L {
+    SetFloatValue(floatVariable=var "Target X", floatValue=var "Current X", everyFrame=false)
+    FloatAddRandom(floatVariable=var "Target X", addMin=-0.2, addMax=-0.1)
+    AccelerateToX(gameObject=Self, accelerationFactor=0.002, targetSpeed=-0.1)
+    CheckXPosition(gameObject=Self, compareTo=var "Target X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"R", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    Trigger2dEvent(gameObject=var "Bop Collider", trigger=0, collideTag="", sendEvent=→"BOP", storeCollider=var "Collider")
+    on R → Drift R
+    on BOP → Bop Dir
+  }
+
+  state Drift R {
+    SetFloatValue(floatVariable=var "Target X", floatValue=var "Current X", everyFrame=false)
+    FloatAddRandom(floatVariable=var "Target X", addMin=0.1, addMax=0.2)
+    AccelerateToX(gameObject=Self, accelerationFactor=0.002, targetSpeed=0.1)
+    CheckXPosition(gameObject=Self, compareTo=var "Target X", compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"L", greaterThanBool=(unset), everyFrame=true, space=0, activeBool=(unset))
+    Trigger2dEvent(gameObject=var "Bop Collider", trigger=0, collideTag="", sendEvent=→"BOP", storeCollider=var "Collider")
+    on L → Drift L
+    on BOP → Bop Dir
+  }
+
+  state Do Bop {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.96, brakeOnExit=true)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    AnimateRotationTo(gameObject=var "Art", fromValue=var "Art Rotation", toValue=var "Push Rotate", worldSpace=true, negativeSpace=false, time=0.3, speed=(unset), delay=0, easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    AnimateRotationTo(gameObject=var "Art", fromValue=var "Push Rotate", toValue=var "Art Rotation", worldSpace=true, negativeSpace=false, time=0.75, speed=(unset), delay=0.31, easeType=14, reverse=false, finishEvent=(none), realTime=false)
+    on FINISHED → Set Idle Pos
+  }
+
+  state Bop Dir {
+    PlayAudioEventRandom(audioClips=var "Bop Clips", pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEventRandom(audioClips=[lilypad_move_in_water_when_bumped_1 (sfxstatic_assets_areaclover.bundle), lilypad_move_in_water_when_bumped_2 (sfxstatic_assets_areaclover.bundle), lilypad_move_in_water_when_bumped_3 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CheckTargetDirection(gameObject=Self, target=var "Collider", aboveEvent=(none), belowEvent=(none), rightEvent=→"L", leftEvent=→"R", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    on L → Bop L
+    on R → Bop R
+  }
+
+  state Bop L {
+    RandomFloat(min=var "Push Speed Min", max=var "Push Speed Max", storeResult=var "X Speed")
+    FloatMultiply(floatVariable=var "X Speed", multiplyBy=-1, everyFrame=false)
+    FloatOperator(float1=var "Art Rotation", float2=var "Rotation", operation=Subtract, storeResult=var "Push Rotate", everyFrame=false)
+    on FINISHED → Do Bop
+  }
+
+  state Bop R {
+    RandomFloat(min=var "Push Speed Min", max=var "Push Speed Max", storeResult=var "X Speed")
+    FloatOperator(float1=var "Art Rotation", float2=var "Rotation", operation=Add, storeResult=var "Push Rotate", everyFrame=false)
+    on FINISHED → Do Bop
+  }
+
+  var Push Speed Min: float = 2
+  var Push Speed Max: float = 3
+  var Rotation: float = 4
+  var Bop Clips: array = var "Bop Clips"
+
+  var Current X: float = 0
+  var Target X: float = 0
+  var X Speed: float = 0
+  var Push Rotate: float = 0
+  var Art Rotation: float = 0
+  var Scale: float = 0
+  var Rotation Add: float = 0
+  var Art: gameObject = Lilypad Plat/Art (localpoolprefabs_assets_areagreymoorareahangareapeak.bundle)
+  var Lilypad Fly: gameObject = <null>
+  var Bop L: gameObject = <null>
+  var Bop R: gameObject = <null>
+  var Bop Collider: gameObject = <null>
+  var Collider: gameObject = <null>
+}

@@ -1,0 +1,477 @@
+# Attack
+# 2 location(s):
+#   Ward_03 / Song Pilgrim Ambush/Song Pilgrim 02
+#   Ward_06 / Song Pilgrim Ambush/Song Pilgrim 02
+
+fsm Attack {
+  start Init
+
+  state Idle {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=(unset), sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"PRAY", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)  // disabled
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"PRAY", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"PRAY", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    WaitRandom(timeMin=0.5, timeMax=0.75, finishEvent=→"MOVE", realTime=false)
+    RandomFloat(min=1, max=4, storeResult=var "Timer")  // disabled
+    SetBoolValue(boolVariable=var "Timed", boolValue=false, everyFrame=false)  // disabled
+    SetBoolValueAtTime(BoolVariable=var "Timed", BoolValue=true, Time=var "Timer", SetOppositeOnStateEntry=false)  // disabled
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Dig Range", storeResult=var "In Dig Range", sendEvent="", outOfRangeEvent="", everyFrame=true)  // disabled
+    BoolAllTrue(boolVariables=[var "Timed", var "Has Alerted"], sendEvent=→"DIG", storeResult=(unset), everyFrame=true)  // disabled
+    BoolAllTrue(boolVariables=[var "Timed", var "Battler"], sendEvent=→"DIG", storeResult=(unset), everyFrame=true)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    on ATTACK → Dig Instead?
+    on PRAY → Pray
+    on DIG → Dig In 1
+    on MOVE → Move Choice
+    on TOOK DAMAGE → Move Choice
+  }
+
+  state Init {
+    FindChild(gameObject=Self, childName="Attack Threads", storeResult=var "Attack Threads")
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Sleep", equalEvent=→"SLEEP", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Clip", compareTo="Dig Ambush", equalEvent=→"DIG", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Idle
+    on SLEEP → Off Plane?
+    on BG AMBUSH → BG Tele Antic
+    on DIG → Dig Ambush Ready
+  }
+
+  state Pray {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    StopWalker(target=Self, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=surgeon_sing (sfxdynamic_assets_areaward.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Pray End
+    on SING DURATION END → Pray End
+  }
+
+  state Pray End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Do Attack {
+    SetBoolValue(boolVariable=var "Has Alerted", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=surgeon_attack (sfxdynamic_assets_areaward.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Did Dig", boolValue=false, everyFrame=false)
+    StopWalker(target=Self, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SendEventToGameObjectOptimized(target=var "Attack Threads", sendEvent="START ATTACK", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on END ATTACK → Attack Recover
+    on MULTI HIT CONNECT → Hero Facing
+  }
+
+  state Attack Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    WaitRandom(timeMin=0.3, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Multihitting {
+    GetClosestGameObject(Target=var "Hero", GameObjects=[var "Attack Draw Point 1", var "Attack Draw Point 2", var "Attack Draw Point 3", var "Attack Draw Point 4", var "Attack Draw Point 5"], MatchEvents=[(none), (none), (none), (none), (none)], StoreGameObject=var "Attack Draw Point", EveryFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="PULL HERO", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    GetPosition(gameObject=var "Attack Draw Point", vector=var "Multihit Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SetVector3XYZ(vector3Variable=var "Multihit Pos", vector3Value=(unset), x=(unset), y=(unset), z=0.004, everyFrame=false)
+    GetVector3XYZ(vector3Variable=var "Multihit Pos", storeX=var "Multihit X", storeY=var "Multihit Y", storeZ=(unset), everyFrame=false)
+    AnimateRigidBody2DPositionToV2(GameObject=var "Hero", ToValue=(unset), ToX=var "Multihit X", ToY=var "Multihit Y", time=0.25, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    AnimatePositionTo(gameObject=var "Hero", toValue=var "Multihit Pos", localSpace=false, time=0.25, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)  // disabled
+    on FINISHED → Multihit End
+  }
+
+  state Hero Facing {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=→"FINISHED", aboveBool=(unset), belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on FINISHED → Multihitting
+  }
+
+  state Multihit End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="PULL HERO END", delay=0, everyFrame=false)
+    Translate(gameObject=var "Hero", vector=(unset), x=(unset), y=0.25, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Attack Recover
+  }
+
+  state Dig In 1 {
+    SetBoolValue(boolVariable=var "Did Dig", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=surgeon_jump (sfxdynamic_assets_areaward.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=CancelRecoil())
+    SetRecoilBlocked(Target=Self, IsUpBlocked=true, IsDownBlocked=true, IsLeftBlocked=true, IsRightBlocked=true)
+    SetFloatValue(floatVariable=var "Timer", floatValue=4, everyFrame=false)
+    StopWalker(target=Self, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig In", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetBoolValue(boolVariable=var "Timed", boolValue=false, everyFrame=false)
+    PlayAudioEvent(audioClip=song_pilgrim_02_dive_underground (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Dig In 2
+  }
+
+  state Dig In 2 {
+    PlayParticleEmitter(gameObject=var "Pt DigIn", emit=0, resetIfPlaying=false)
+    CancelRecoil(target=Self)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    on FINISHED → Dig In 3
+  }
+
+  state Dig In 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    on FINISHED → Underground
+  }
+
+  state Underground {
+    StopParticleEmitter(gameObject=var "Pt DigIn")
+    SetMeshRenderer(gameObject=Self, active=false)
+    WaitRandom(timeMin=0.75, timeMax=1.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Teleplane
+  }
+
+  state Dig Out Antic {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=song_pilgrim_02_emerging_pt_1 (sfxstatic_assets_areasong.bundle), WaitForEndOfClip=false, finishedEvent=(none))
+    SetPosition(gameObject=Self, vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Pt DigIn", emit=0, resetIfPlaying=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Dig Out 1
+  }
+
+  state Dig Out 1 {
+    PlayRandomAudioClipTable(Table=enemy_dig_in_emerge (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=rosary_pilgrim_attack (sfxdynamic_assets_areamossareaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    StopParticleEmitter(gameObject=var "Pt DigIn")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig Out", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetMeshRenderer(gameObject=Self, active=true)
+    PlayAudioEvent(audioClip=song_pilgrim_02_emerging_pt_2 (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → DigOut 2
+  }
+
+  state DigOut 2 {
+    ActivateGameObject(gameObject=var "DigOut Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → DigOut 3
+  }
+
+  state DigOut 3 {
+    ActivateGameObject(gameObject=var "DigOut Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → DigOut 4
+  }
+
+  state DigOut 4 {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    ActivateGameObject(gameObject=var "DigOut Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → DigOut 5
+  }
+
+  state DigOut 6 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetRecoilSpeed(target=Self, newRecoilSpeed=15)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetRecoilBlocked(Target=Self, IsUpBlocked=false, IsDownBlocked=false, IsLeftBlocked=false, IsRightBlocked=false)
+    on FINISHED → Idle
+  }
+
+  state Choose DigPoint {
+    RandomFloat(min=var "X Min", max=var "X Max", storeResult=var "Tele X")
+    SetVector3XYZ(vector3Variable=var "Teleport Point", vector3Value=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance From Hero", point1=var "Teleport Point", point2=var "Hero Pos", ignoreX=false, ignoreY=true, ignoreZ=true, everyFrame=false)
+    DistanceBetweenPoints(distanceResult=var "Distance From Self", point1=var "Teleport Point", point2=var "Self Pos", ignoreX=false, ignoreY=true, ignoreZ=true, everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Hero", lowerValue=0, upperValue=7, boolVariable=var "Hero Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Distance From Self", lowerValue=3, upperValue=9999, boolVariable=var "Self Distance Check", trueEvent=(none), falseEvent=(none), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Distance Check", var "Self Distance Check"], sendEvent=→"DIG", storeResult=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"RETRY", delay=0, everyFrame=false)
+    on DIG → Dig Out Antic
+    on RETRY → Retry
+  }
+
+  state Get Teleplane {
+    FindClosest(gameObject=var "Hero", withTag="Teleplane", ignoreOwner=true, mustBeVisible=false, storeObject=var "Teleplane", storeDistance=(unset), everyFrame=false)
+    GetColliderRange(gameObject=var "Teleplane", minX=var "X Min", maxX=var "X Max", minY=var "Y Min", maxY=var "Y Max", everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=var "Self Pos", x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetIntValue(intVariable=var "Attempts", intValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Y Min", everyFrame=false)
+    on FINISHED → Choose DigPoint
+  }
+
+  state Retry {
+    IntAdd(intVariable=var "Attempts", add=1, everyFrame=false)
+    IntCompare(integer1=var "Attempts", integer2=25, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    on FINISHED → Choose DigPoint
+    on CANCEL → Dig Out Antic
+  }
+
+  state Off Plane? {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    FloatCompare(float1=var "Z Pos", float2=1, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"BG", everyFrame=false)
+    FloatCompare(float1=var "Z Pos", float2=-1, tolerance=0, equal=(none), lessThan=→"FG", greaterThan=(none), everyFrame=false)
+    on FINISHED → Sleep
+    on BG → BG
+    on FG → FG
+  }
+
+  state Sleep {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetDamageHeroAmount(target=Self, damageDealt=0)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on BATTLE START → Battle Wake
+    on WAKE → Wake Pause
+    on TOOK DAMAGE → Wake
+    on JUNK BATTLE ANTIC → Battle Antic
+  }
+
+  state Wake Pause {
+    WaitRandom(timeMin=0.3, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    ObjectJitter(gameObject=Self, x=0.1, y=(unset), z=(unset), allowMovement=false, limitFps=30)
+    on FINISHED → Wake Thread
+  }
+
+  state Wake {
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Target")
+    EaseFloat(fromValue=var "Z Pos", toValue=var "Z Target", floatVariable=var "Z Tween", time=0.2, speed=(unset), delay=(unset), easeType=13, reverse=false, finishEvent=(none), realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Tween", space=0, everyFrame=true, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.2)
+    on FINISHED → Wake End
+  }
+
+  state Wake End {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    on FINISHED → Do Attack
+  }
+
+  state FG {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 1), everyframe=false)  // disabled
+    CallMethodProper(gameObject=Self, behaviour="SetZ", methodName="CancelSetZ", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Sleep
+  }
+
+  state BG {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    CallMethodProper(gameObject=Self, behaviour="SetZ", methodName="CancelSetZ", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0.75, 0.75, 0.75, 1), everyframe=false)  // disabled
+    on FINISHED → Sleep
+  }
+
+  state Battle Wake {
+    ObjectJitter(gameObject=Self, x=0.1, y=(unset), z=(unset), allowMovement=false, limitFps=30)  // disabled
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)  // disabled
+    SetBoolValue(boolVariable=var "Battler", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Has Alerted", boolValue=true, everyFrame=false)
+    CheckZPosition(gameObject=Self, compareTo=2, compareToOffset=0, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"BG AMBUSH", everyFrame=false, space=0)
+    CheckZPosition(gameObject=Self, compareTo=-1, compareToOffset=0, tolerance=0, equal=(none), lessThan=→"BG AMBUSH", greaterThan=(none), everyFrame=false, space=0)
+    on FINISHED → Wake Thread
+    on BG AMBUSH → Battle Ambush Pause
+  }
+
+  state Wake Thread {
+    GetOwner(storeGameObject=var "Self")
+    SpawnObjectFromGlobalPool(gameObject=Silk Possession Obj (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Silk")
+    SetParent(gameObject=var "Silk", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="SetEnemy", parameters=[var "Self"], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Silk", behaviour="SilkPossession", methodName="PlayPossess", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Wake
+  }
+
+  state BG Tele 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Start Battle Music?
+  }
+
+  state BG Tele 2 {
+    StopParticleEmitter(gameObject=var "Pt JunkAntic")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dig In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=song_pilgrim_02_dive_underground (sfxstatic_assets_areasong.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    BoolTest(boolVariable=var "Dummy", isTrue=→"DUMMY", isFalse=(none), everyFrame=false)
+    RandomFloat(min=0.006, max=0.007, storeResult=var "Z Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetDamageHeroAmount(target=Self, damageDealt=1)
+    on FINISHED → Underground
+    on DUMMY → Dummy Deactivate
+  }
+
+  state Dig Ambush Ready {
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=var "Tele X", y=var "Tele Y", space=0, everyFrame=false)
+    SetRecoilSpeed(target=Self, newRecoilSpeed=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    on WAKE → Dig Ambush Pause
+    on BATTLE START → Dig Out Antic
+  }
+
+  state BG Tele Antic {
+    PlayParticleEmitter(gameObject=var "Pt JunkEmerge", emit=0, resetIfPlaying=false)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)  // disabled
+    ObjectJitter(gameObject=Self, x=0.1, y=(unset), z=(unset), allowMovement=false, limitFps=30)  // disabled
+    PlayRandomAudioClipTable(Table=metal_break_hit (sfxdynamic_assets_areasong.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayAudioEvent(audioClip=enemy_bone_crack_2 (sfxstatic_assets_areabone.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=widow_pulling_down_on_web_loop (sfxstatic_assets_areabell.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → BG Tele 1
+  }
+
+  state Battle Ambush Pause {
+    WaitRandom(timeMin=0, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    ObjectJitter(gameObject=Self, x=0.1, y=0.05, z=(unset), allowMovement=false, limitFps=30)
+    on FINISHED → BG Tele Antic
+  }
+
+  state Start Battle Music? {
+    BoolTest(boolVariable=var "Battle Starter", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    ApplyMusicCue(musicCue=Enemy Battle Small (audiocuesdynamic_assets_areaboneareashellwoodareaslabareaward.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.5)
+    on FINISHED → BG Tele 2
+  }
+
+  state Battle Antic {
+    ObjectJitter(gameObject=Self, x=0.1, y=0.05, z=(unset), allowMovement=false, limitFps=30)
+    PlayParticleEmitter(gameObject=var "Pt JunkAntic", emit=0, resetIfPlaying=false)
+    on BATTLE START → Battle Wake
+    on JUNK BATTLE START → Battle Wake
+  }
+
+  state Move Choice {
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=5, minDepth=(unset), maxDepth=(unset), hitEvent=→"DIG", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SendEvent(eventTarget=Self, sendEvent=→"JUMP", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"DIG", →"JUMP"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on DIG → Dig In 1
+    on JUMP → Jump Antic
+  }
+
+  state Jump Antic {
+    PlayAudioEvent(audioClip=trobbio_recover_or_general_foley_movement (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1.15, volume=0.75, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Did Dig", boolValue=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=surgeon_jump (sfxdynamic_assets_areaward.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Jump
+  }
+
+  state Jump {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    PlayAudioEvent(audioClip=trobbio_jump (sfxstatic_assets_shared.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Jump X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=-0.8, everyFrame=false)
+    FloatClamp(floatVariable=var "Jump X", minValue=-12, maxValue=-3, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0.5)
+    SetVelocityByScale(gameObject=Self, speed=var "Jump X", ySpeed=14, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    on FINISHED → Jump Air
+  }
+
+  state Jump Air {
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Floor Below", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolAllTrue(boolVariables=[var "Floor Below", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    on ATTACK → Do Attack
+    on LAND → Land
+  }
+
+  state Land {
+    PlayAudioEvent(audioClip=trobbio_land (sfxstatic_assets_trobbio.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Dig Instead? {
+    BoolTest(boolVariable=var "Did Dig", isTrue=→"ATTACK", isFalse=(none), everyFrame=false)
+    SendRandomEventV4(events=[→"ATTACK", →"DIG"], weights=[1, 0.5], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    on ATTACK → Do Attack
+    on DIG → Dig In 1
+  }
+
+  state DigOut 5 {
+    ActivateGameObject(gameObject=var "DigOut Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → DigOut 6
+  }
+
+  sequence state Dummy Deactivate {
+    Wait(time=1, finishEvent=(none), realTime=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Dig Ambush Pause {
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Dig Out Antic
+  }
+
+  var Battle Starter: bool = false
+  var Dummy: bool = false
+
+  var Distance From Hero: float = 0
+  var Distance From Self: float = 0
+  var Self X: float = 0
+  var Tele X: float = 0
+  var Tele Y: float = 0
+  var X Max: float = 0
+  var X Min: float = 0
+  var Y Max: float = 0
+  var Y Min: float = 0
+  var Timer: float = 0
+  var Z Pos: float = 0
+  var Z Target: float = 0
+  var Z Tween: float = 0
+  var Jump X: float = 0
+  var Multihit X: float = 0
+  var Multihit Y: float = 0
+  var Attempts: int = 0
+  var Hero Distance Check: bool = false
+  var Self Distance Check: bool = false
+  var Has Alerted: bool = false
+  var Timed: bool = false
+  var In Dig Range: bool = false
+  var Battler: bool = false
+  var Did Dig: bool = false
+  var In Attack Range: bool = false
+  var Floor Below: bool = false
+  var Clip: string = ""
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Self Pos: vector3 = (0, 0, 0)
+  var Teleport Point: vector3 = (0, 0, 0)
+  var Multihit Pos: vector3 = (0, 0, 0)
+  var Attack Threads: gameObject = <null>
+  var Pt DigIn: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Pt DigIn
+  var Self: gameObject = Song Threaded Husk (localpoolprefabs_assets_areaward.bundle)
+  var DigOut Hit 1: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/DigOut Hit 1
+  var DigOut Hit 2: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/DigOut Hit 2
+  var Teleplane: gameObject = <null>
+  var Silk: gameObject = <null>
+  var Attack Draw Point: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Attack Draw Point 1
+  var Attack Draw Point 1: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Attack Draw Point 1
+  var Attack Draw Point 2: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Attack Draw Point 2
+  var Attack Draw Point 3: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Attack Draw Point 3
+  var Attack Draw Point 4: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Attack Draw Point 4
+  var Attack Draw Point 5: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Attack Draw Point 5
+  var Pt JunkEmerge: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Pt JunkEmerge
+  var Pt JunkAntic: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Pt JunkAntic
+  var DigOut Hit 3: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/DigOut Hit 3
+  var Audio Loop Voice: gameObject = Song Pilgrim Ambush/Song Pilgrim 02/Audio Loop Voice
+}

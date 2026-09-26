@@ -1,0 +1,187 @@
+# Shiny Control
+# 1 location(s):
+#   White_Palace_09 / White Charm/Shiny Item RoyalCharm
+
+fsm Shiny Control {
+  start Pause
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    GetHero(storeResult=var "Hero")
+    on FINISHED → Init
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    BoolTest(boolVariable=var "Activated", isTrue=→"ACTIVATE", isFalse=(none), everyFrame=false)
+    FindChild(gameObject=Self, childName="Inspect Region", storeResult=var "Inspect Region")
+    FindChild(gameObject=Self, childName="Appear Trail", storeResult=var "Trail")
+    on FINISHED → PD Bool?
+    on ACTIVATE → Destroy
+  }
+
+  state PD Bool? {
+    StringCompare(stringVariable=var "PD Bool Name", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "PD Bool Name", isTrue=→"COLLECTED", isFalse=(none))
+    on FINISHED → Fling?
+    on COLLECTED → Destroy
+  }
+
+  state Idle {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopBounce())
+    SetFsmBool(gameObject=var "Inspect Region", fsmName="inspect", variableName="Inspectable", setValue=true, everyFrame=false)
+    on START INSPECT → Hero Down
+  }
+
+  state Destroy {
+    DestroySelf(detachChildren=false)
+  }
+
+  state Hero Down {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 1")
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Big Get Flash
+  }
+
+  state Hero Up {
+    BoolTest(boolVariable=var "Queen Charm", isTrue=(none), isFalse=→"KING", everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="CheckCharmAchievements", parameters=[], storeResult=(unset var))
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Collect Normal 3", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Tute Msg"), sendEvent="CLOSE", delay=0, everyFrame=false)
+    on FINISHED → Finish
+    on KING → Fade Out
+  }
+
+  state Finish {
+    SetBoolValue(boolVariable=var "Activated", boolValue=true, everyFrame=false)
+    SetFsmBool(gameObject=var "Inspect Region", fsmName="inspect", variableName="Inspectable", setValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Tute Msg"), sendEvent="CLOSE", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Inspect Region"), sendEvent="END INSPECT", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="SHINY PICKED UP", delay=0, everyFrame=false)
+  }
+
+  state Fling? {
+    PlayParticleEmitter(gameObject=var "Trail", emit=0)
+    SetFsmBool(gameObject=var "Inspect Region", fsmName="inspect", variableName="Inspectable", setValue=false, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0.85)
+    BoolTest(boolVariable=var "Queen Charm", isTrue=→"DROP", isFalse=→"FLING R", everyFrame=false)
+    on FLING L → Fling L
+    on FLING R → Fling R
+    on DROP → Queen Drop
+  }
+
+  state Fling R {
+    FlingObject(flungObject=Self, speedMin=20, speedMax=20, angleMin=78, angleMax=78)
+    on FINISHED → Bounce Wait
+  }
+
+  state Fling L {
+    FlingObject(flungObject=Self, speedMin=20, speedMax=20, angleMin=98, angleMax=102)
+    on FINISHED → In Air
+  }
+
+  state In Air {
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=true)
+    FloatCompare(float1=var "Speed", float2=1, tolerance=0, equal=(none), lessThan=→"STOPPED", greaterThan=(none), everyFrame=true)  // disabled
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"STOPPED", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"STOPPED", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on STOPPED → Land
+  }
+
+  state Land {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Trail")
+    on FINISHED → Idle
+  }
+
+  state Msg {
+    on GET ITEM MSG END → Hero Up
+  }
+
+  state Big Get Flash {
+    CreateObject(gameObject=Item Get Effect (sharedassets7.assets), spawnPoint=var "Hero", position=(0, -0.76, -1), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=shiny_item_pickup (resources.assets))
+    SetSpriteRenderer(gameObject=var "Self", active=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Collect Normal 2")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Type
+  }
+
+  state Type {
+    BoolTest(boolVariable=var "Queen Charm", isTrue=→"QUEEN", isFalse=→"KING", everyFrame=false)
+    on QUEEN → Get Queen
+    on KING → Get King
+  }
+
+  state Get Queen {
+    SetPlayerDataBool(boolName="gotQueenFragment", value=true)
+    SetPlayerDataBool(boolName="gotCharm_36", value=true)
+    CreateObject(gameObject=UI Msg Get WhiteCharm (sharedassets137.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "UI Msg", networkInstantiate=false, networkGroup=0)
+    SetFsmBool(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Queen", setValue=true, everyFrame=false)
+    on FINISHED → Msg
+  }
+
+  state Queen Drop {
+    FlingObject(flungObject=Self, speedMin=15, speedMax=15, angleMin=90, angleMax=90)
+    on FINISHED → In Air
+  }
+
+  state Get King {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetBenchRespawn", parameters=["Death Respawn Marker", "Abyss_05", 0, false], storeResult=(unset var))
+    SetPlayerDataBool(boolName="gotKingFragment", value=true)
+    SetPlayerDataBool(boolName="gotCharm_36", value=true)
+    CreateObject(gameObject=UI Msg Get WhiteCharm (sharedassets137.assets), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "UI Msg", networkInstantiate=false, networkGroup=0)
+    SetFsmBool(gameObject=var "UI Msg", fsmName="Msg Control", variableName="Queen", setValue=false, everyFrame=false)
+    on FINISHED → Msg
+  }
+
+  state Bounce Wait {
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=true)
+    FloatCompare(float1=var "Speed", float2=1, tolerance=0, equal=(none), lessThan=→"STOPPED", greaterThan=(none), everyFrame=true)
+    on STOPPED → Land
+  }
+
+  state Fade Out {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="WHITE PALACE END", delay=0, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=dream_enter (resources.assets))
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetFsmFloat(gameObject=var "HUD Blanker White", fsmName="Blanker Control", variableName="Fade Time", setValue=4, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE IN", delay=0, everyFrame=false)
+    Wait(time=5.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → King Msg
+  }
+
+  state New Scene {
+    SetFsmBool(gameObject=var "MainCamera", fsmName="CameraFade", variableName="No Fade", setValue=true, everyFrame=false)
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=true, topRight=false, topCentre=false, topJustified=false, centreLeft=false, centreRight=false, centreCentre=false, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    SetTextMeshProColor(gameObject=var "DialogueText", color=(1, 1, 1, 1), everyFrame=false)
+    SetFsmBool(gameObject=var "Hero", fsmName="Dream Return", variableName="Dream Returning", setValue=true, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="EnterWithoutInput", parameters=[true], storeResult=(unset var))
+    BeginSceneTransition(sceneName="Abyss_05", entryGateName="door_dreamReturn", entryDelay=0, visualization=Default, preventCameraFadeOut=true)
+  }
+
+  state King Msg {
+    SetTextMeshProColor(gameObject=var "DialogueText", color=(0, 0, 0, 1), everyFrame=false)
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=false, topRight=false, topCentre=false, topJustified=false, centreLeft=false, centreRight=false, centreCentre=true, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["KING_FINAL_WORDS", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → New Scene
+  }
+
+  var Queen Charm: bool = false
+  var PD Bool Name: string = ""
+
+  var Speed: float = 0
+  var Activated: bool = false
+  var Return Door: string = "door_dreamReturn"
+  var Return Scene: string = "Crossroads_10"
+  var Hero: gameObject = <null>
+  var Inspect Region: gameObject = <null>
+  var Self: gameObject = <null>
+  var Trail: gameObject = White Charm/Shiny Item RoyalCharm/Appear Trail
+  var Tute Msg: gameObject = <null>
+  var UI Msg: gameObject = <null>
+}

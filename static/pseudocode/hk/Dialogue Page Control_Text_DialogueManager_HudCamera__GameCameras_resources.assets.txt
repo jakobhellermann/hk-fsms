@@ -1,0 +1,120 @@
+# Dialogue Page Control
+# 1 location(s):
+#   resources.assets / _GameCameras/HudCamera/DialogueManager/Text
+
+fsm Dialogue Page Control {
+  start Init
+  on PAGE_END → Page End  // from any state
+  on CONVERSATION_END → Stop Pause  // from any state
+  on CONVO CANCEL → End Conversation  // from any state
+  on HERO DAMAGED → Pause  // from any state
+  on LEAVING SCENE → End Conversation  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindChild(gameObject=Self, childName="Stop", storeResult=var "Stop")
+    FindChild(gameObject=Self, childName="Arrow", storeResult=var "Arrow")
+    SetParent(gameObject=var "Stop", parent=var "Parent", resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Arrow", parent=var "Parent", resetLocalPosition=false, resetLocalRotation=false)
+    SetBoolValue(boolVariable=var "Use Stop", boolValue=true, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  sequence state Idle {
+    Wait(time=0.1, finishEvent=(none), realTime=false)
+    ListenForPromptContinue(EventTarget=Self, ContinuePressed=→"SPEEDUP")
+    on PAGE_END → Page End
+    on CONVERSATION_END → Stop Pause
+    on SPEEDUP → Text Speedup
+    on INSTANT → Instant Display
+  }
+
+  state Page End {
+    SetMeshRenderer(gameObject=var "Arrow", active=true)
+    SendEventByName(eventTarget=GameObject(var "Arrow"), sendEvent="UP", delay=0, everyFrame=false)
+    ListenForPromptContinue(EventTarget=Self, ContinuePressed=→"NEXT")
+    on NEXT → Show Next Page
+  }
+
+  state Show Next Page {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player UI, spawnPoint=var "Self", audioClip=button, pitchMin=0.8, pitchMax=0.8, volume=0.6, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "Arrow"), sendEvent="DOWN", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="DialogueBox", methodName="ShowNextPage", parameters=[], storeResult=(unset var))
+    on FINISHED → Idle
+  }
+
+  state Conversation End {
+    GetButtonDown(buttonName="Jump", sendEvent=→"NEXT", storeResult=(unset))  // disabled
+    GetButtonDown(buttonName="Attack", sendEvent=→"NEXT", storeResult=(unset))  // disabled
+    ListenForAttack(eventTarget=Self, wasPressed=→"NEXT", wasReleased=(none), isPressed=(none), isNotPressed=(none))  // disabled
+    ListenForJump(eventTarget=Self, wasPressed=→"NEXT", wasReleased=(none), isPressed=(none), isNotPressed=(none))  // disabled
+    ListenForCast(eventTarget=Self, wasPressed=→"NEXT", wasReleased=(none), isPressed=(none), isNotPressed=(none), activeBool=(unset), stateEntryOnly=false)  // disabled
+    ListenForPromptContinue(EventTarget=Self, ContinuePressed=→"NEXT")
+    on NEXT → SFX
+  }
+
+  state End Conversation {
+    SetBoolValue(boolVariable=var "Use Stop", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Stop"), sendEvent="DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Arrow"), sendEvent="DOWN", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="DialogueBox", methodName="HideText", parameters=[], storeResult=(unset var))
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CONVO_FINISH", delay=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Text Speedup {
+    CallMethodProper(gameObject=Self, behaviour="DialogueBox", methodName="SpeedupTypewriter", parameters=[], storeResult=(unset var))
+    on FINISHED → Idle
+  }
+
+  state Instant Display {
+    CallMethodProper(gameObject=Self, behaviour="DialogueBox", methodName="SpeedupTypewriter", parameters=[], storeResult=(unset var))
+    on FINISHED → Idle
+  }
+
+  state Stop or Arrow? {
+    BoolTest(boolVariable=var "Use Stop", isTrue=→"STOP", isFalse=→"ARROW", everyFrame=false)
+    on ARROW → Arrow
+    on STOP → Stop
+  }
+
+  state Stop {
+    SetMeshRenderer(gameObject=var "Stop", active=true)
+    SetMeshRenderer(gameObject=var "Arrow", active=false)
+    SendEventByName(eventTarget=GameObject(var "Stop"), sendEvent="UP", delay=0, everyFrame=false)
+    on FINISHED → Conversation End
+  }
+
+  state Arrow {
+    SetMeshRenderer(gameObject=var "Arrow", active=true)
+    SetMeshRenderer(gameObject=var "Stop", active=false)
+    SendEventByName(eventTarget=GameObject(var "Arrow"), sendEvent="UP", delay=0, everyFrame=false)
+    on FINISHED → Conversation End
+  }
+
+  state Stop Pause {
+    Wait(time=var "Stop Pause", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stop or Arrow?
+  }
+
+  state SFX {
+    SetTextMeshProText(gameObject=Self, textString="")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player UI, spawnPoint=var "Self", audioClip=button, pitchMin=0.8, pitchMax=0.8, volume=0.6, delay=0, storePlayer=<null>)
+    DestroyAllChildren(gameObject=var "Self", disable=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → End Conversation
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → End Conversation
+  }
+
+  var Stop Pause: float = 0
+  var Use Stop: bool = false
+  var Arrow: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Self: gameObject = <null>
+  var Stop: gameObject = <null>
+}

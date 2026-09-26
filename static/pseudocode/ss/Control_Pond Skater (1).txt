@@ -1,0 +1,191 @@
+# Control
+# 4 location(s):
+#   Arborium_05 / Pond Skater (1)
+#   Shellwood_04b / Pond Skater (1)
+#   Shellwood_25 / Pond Skater (1)
+#   Shellwood_26 / Pond Skater (1)
+
+fsm Control {
+  start Init
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    RandomlyFlipScale(gameObject=Self)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Respawn X", y=var "Respawn Y", z=(unset), space=0, everyFrame=false)
+    RandomInt(min=4, max=8, storeResult=var "Turns Til Submerge", inclusiveMax=false, noRepeat=false)
+    GetHP(target=Self, storeValue=var "Init HP")
+    on FINISHED → Antic
+  }
+
+  state Antic {
+    AudioPlayV2(gameObject=Self, volume=1, oneShotClip=pond_scater_scate (sfxstatic_assets_areashellwood.bundle), finishedEvent=(none))
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    on FINISHED → Skim
+    on SING → Sing
+  }
+
+  state Skim {
+    SendRandomEventV4(events=[→"CALL", (none)], weights=[0.25, 0.75], eventMax=[1, 3], missedMax=[3, 1], activeBool=(unset))  // disabled
+    SendRandomEventV3(events=[→"CALL", (none)], weights=[0.25, 0.75], trackingInts=[var "Ct Call", var "Ct NoCall"], eventMax=[1, 3], trackingIntsMissed=[var "Ms Call", var "Ms NoCall"], missedMax=[3, 1])
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0.3, MinReactDelay=0.4, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Respawn X", y=(unset), z=(unset), space=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Skim")
+    RandomFloat(min=-20, max=-25, storeResult=var "Speed")
+    SetVelocityByScale(gameObject=Self, speed=var "Speed", ySpeed=(unset), everyFrame=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"BUMP", bottomHitEvent=(none), leftHitEvent=→"BUMP", otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=→"BUMP", bottomHitEvent=(none), leftHitEvent=→"BUMP", otherLayer=true, otherLayerNumber=15, ignoreTriggers=false)
+    RayCast2dV2(fromGameObject=var "Wall Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"BUMP", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Enemy Detector(15)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=(unset), brakeOnExit=true)
+    WaitRandom(timeMin=1.25, timeMax=3.5, finishEvent=→"FINISHED", realTime=false)
+    on BUMP → Bump
+    on FINISHED → Next Move
+    on TOOK DAMAGE → Antic
+    on SING → Sing
+    on CALL → Call
+  }
+
+  state Bump {
+    AudioStop(gameObject=Self, fadeTime=0)  // disabled
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Bump")
+    RandomFloat(min=8, max=10, storeResult=var "Speed")
+    SetVelocityByScale(gameObject=Self, speed=var "Speed", ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.95, decelerationY=(unset), brakeOnExit=true)
+    WaitRandom(timeMin=1, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0.3, MinReactDelay=0.4, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Turn
+    on SING → Sing
+  }
+
+  state Next Move {
+    RayCast2dV2(fromGameObject=var "Wall Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"TURN", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8), Enemy Detector(15)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    IntAdd(intVariable=var "Turns Til Submerge", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Turns Til Submerge", integer2=0, equal=→"SUBMERGE", lessThan=→"SUBMERGE", greaterThan=(none), everyFrame=false)
+    SendRandomEvent(events=[→"FINISHED", →"TURN"], weights=[0.7, 0.3], delay=0)
+    on TURN → Turn
+    on FINISHED → Antic
+    on SUBMERGE → Submerge 1
+  }
+
+  state Turn {
+    PlayAudioEvent(audioClip=pond_scater_turn_around (sfxstatic_assets_areashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player Actor ShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Turn")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    WaitRandom(timeMin=0.75, timeMax=1.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Antic
+  }
+
+  state Submerge 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dive", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Submerge 2
+  }
+
+  state Submerge 2 {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Splash", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Ripple", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=pond_scater_re_emerge (sfxstatic_assets_areashellwood.bundle), pitchMin=0.75, pitchMax=0.85, volume=1, audioPlayerPrefab=Audio Player Actor ShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Submerged
+  }
+
+  state Submerged {
+    SetMeshRenderer(gameObject=Self, active=false)
+    WaitRandom(timeMin=2, timeMax=6, finishEvent=→"EMERGE", realTime=false)
+    on EMERGE → Emerge Pos
+  }
+
+  state Emerge 1 {
+    PlayAudioEvent(audioClip=pond_scater_re_emerge (sfxstatic_assets_areashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player Actor ShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetMeshRenderer(gameObject=Self, active=true)
+    RandomlyFlipScale(gameObject=Self)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Emerge", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    RandomInt(min=4, max=8, storeResult=var "Turns Til Submerge", inclusiveMax=false, noRepeat=false)
+    PlayParticleEmitter(gameObject=var "Splash", emit=0, resetIfPlaying=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pond_skater_cry (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Emerge 2
+  }
+
+  state Emerge 2 {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    WaitRandom(timeMin=0.5, timeMax=1, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Ripple", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.2, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Antic
+    on TOOK DAMAGE → Antic
+    on SING → Sing
+  }
+
+  state Emerge Pos {
+    SetPosition(gameObject=Self, vector=(unset), x=var "Respawn X", y=var "Respawn Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Emerge Check
+  }
+
+  state Death {
+    SetVelocity2d(gameObject=Self, vector=(0, -5), x=(unset), y=(unset), everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    BlackThreadStateReset(Target=Self)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Splash", emit=0, resetIfPlaying=false)
+    FlingObjectsFromGlobalPool(gameObject=Shell Shard 01 (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(0, 0.5, 0), spawnMin=3, spawnMax=3, speedMin=15, speedMax=20, angleMin=40, angleMax=140, originVariationX=0.25, originVariationY=0, FSM="", FSMEvent="")
+    ActivateGameObject(gameObject=var "Ripple", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPlayerDataBool(boolName="hasKilled", value=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pond_skater_death (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Emerge Pause
+  }
+
+  state Emerge Pause {
+    SetMeshRenderer(gameObject=Self, active=false)
+    WaitRandom(timeMin=7, timeMax=8, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Heal
+  }
+
+  state Emerge Check {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Emerge Check", storeResult=false, sendEvent="", outOfRangeEvent="EMERGE", everyFrame=true)
+    on EMERGE → Emerge 1
+  }
+
+  state Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    CheckHeroPerformanceRegionV2(Target=Self, Radius=0, MinReactDelay=0.4, MaxReactDelay=0.5, None=→"SING END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, UseActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=pond_skater_sing (sfxdynamic_assets_areashellwood.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on SING END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=pond_scater_turn_around (sfxstatic_assets_areashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=Audio Player Actor ShortRange@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Next Move
+  }
+
+  state Call {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Call", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=pond_skater_cry (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Next Move
+  }
+
+  state Heal {
+    SetHP(target=Self, hp=var "Init HP")
+    on FINISHED → Emerge Pos
+  }
+
+  var Respawn X: float = 0
+  var Respawn Y: float = 0
+  var Speed: float = 0
+  var Init HP: int = 0
+  var Turns Til Submerge: int = 0
+  var Ct Call: int = 0
+  var Ct NoCall: int = 0
+  var Ms Call: int = 0
+  var Ms NoCall: int = 0
+  var Splash: gameObject = Pond Skater (1)/Splash
+  var Wall Ray: gameObject = Pond Skater (1)/Wall Ray
+  var Self: gameObject = Pond Skater (1)
+  var Ripple: gameObject = Pond Skater (1)/Ripple
+  var Audio Loop Voice: gameObject = Pond Skater (1)/Audio Loop Voice
+}

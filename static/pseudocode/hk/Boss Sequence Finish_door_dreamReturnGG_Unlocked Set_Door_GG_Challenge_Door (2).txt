@@ -1,0 +1,147 @@
+# Boss Sequence Finish
+# 1 location(s):
+#   GG_Atrium / GG_Challenge_Door (2)/Door/Unlocked Set/door_dreamReturnGG
+
+fsm Boss Sequence Finish {
+  start Pause
+
+  state Take Control {
+    SetAnimator(target=var "Door Animator", active=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=MaxHealth())
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="UPDATE BLUE HEALTH", delay=0, everyFrame=false)
+    on FINISHED → Facing
+  }
+
+  state Return Control {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AcceptInput())
+    StopParticleEmittersInChildren(gameObject=var "Behind Particles")
+    SetFsmBool(gameObject=var "Hero", fsmName="Dream Return", variableName="Dream Returning", setValue=false, everyFrame=false)
+    SetStaticVariable(variableName="finishedBossReturning", setValue=false)
+    on FINISHED → Enable Inspect
+  }
+
+  state Facing {
+    BoolTest(boolVariable=var "Hero Faces left", isTrue=(none), isFalse=(none), everyFrame=false)
+    on L → Left
+    on R → Right
+  }
+
+  state Left {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    on FINISHED → Knight Exit
+  }
+
+  state Right {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    on FINISHED → Knight Exit
+  }
+
+  state Pause {
+    ActivateGameObject(gameObject=var "Inspect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=false)
+    on FINISHED → Door Entry
+  }
+
+  state Door Entry {
+    GetName(gameObject=GG_Challenge_Door (2)/Door/Unlocked Set/door_dreamReturnGG, storeName=var "Door Entry", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="GetEntryGateName", parameters=[], storeResult=var "Door Entered")
+    StringCompare(stringVariable=var "Door Entry", compareTo=var "Door Entered", equalEvent=(none), notEqualEvent=→"INACTIVE", storeResult=(unset), everyFrame=false)
+    GetFsmBool(gameObject=var "Hero", fsmName="Dream Return", variableName="Dream Returning", storeValue=var "Dream Returning", everyFrame=false)
+    BoolTest(boolVariable=var "Dream Returning", isTrue=→"WAKE", isFalse=(none), everyFrame=false)
+    on INACTIVE → Not Returning
+    on FINISHED → Door Open
+    on WAKE → Wait for dream return
+  }
+
+  state Knight Return to Idle {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Exit Door To Idle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Exit Door To Idle")
+    on FINISHED → Door Close
+  }
+
+  state Knight Exit {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Exit")
+    on FINISHED → Fade In
+  }
+
+  state Wait {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Knight Return to Idle
+  }
+
+  state Not Returning {
+    ActivateGameObject(gameObject=GG_Challenge_Door (2)/Door/Unlocked Set/Inspect, activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Door Open {
+    SendEventByName(eventTarget=GameObject(var "MainCamera"), sendEvent="FADE OUT INSTANT", delay=0, everyFrame=false)
+    AnimatorPlay(gameObject=var "Door Animator", stateName="Close", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Take Control
+  }
+
+  state Door Close {
+    SetAnimator(target=var "Door Animator", active=true)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Door", audioClip=gg_rush_entrance_door_close (sharedassets424.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AnimatorPlayStateWait(target=var "Door Animator", stateName="Close", finishEvent=→"FINISHED")
+    on FINISHED → Return Control
+  }
+
+  state Fade In {
+    CameraRepositionToHero()
+    SendEventByName(eventTarget=GameObject(var "MainCamera"), sendEvent="FADE SCENE IN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    on FINISHED → Wait
+  }
+
+  state Dream Return {
+    SetFsmBool(gameObject=var "Hero", fsmName="Dream Return", variableName="Dream Returning", setValue=false, everyFrame=false)  // disabled
+    SetFsmFloat(gameObject=var "HUD Blanker White", fsmName="Blanker Control", variableName="", setValue=1, everyFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObject(var "HUD Blanker White"), sendEvent="FADE OUT", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Skip Save", boolValue=true, everyFrame=false)
+    on DREAM WAKE → Enable Inspect
+  }
+
+  state Enable Inspect {
+    ActivateGameObject(gameObject=var "Inspect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Reset
+  }
+
+  state Wait for dream return {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Dream Return
+  }
+
+  state Reset {
+    SetPlayerDataString(gameObject=var "GameManager", stringName="dreamReturnScene", value="GG_Waterways")
+    SetPlayerDataString(gameObject=var "GameManager", stringName="bossReturnEntryGate", value="")
+    GGResetBossSequenceController()
+    on FINISHED → Save
+  }
+
+  state Save {
+    BoolTest(boolVariable=var "Skip Save", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=TimePasses())
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=SaveGame())
+    on FINISHED → End
+  }
+
+  state End {
+  }
+
+  var Hero Faces left: bool = true
+
+  var Dream Returning: bool = false
+  var Skip Save: bool = false
+  var Door Entered: string = ""
+  var Door Entry: string = ""
+  var Behind Particles: gameObject = GG_Challenge_Door (2)/Door/gg_door_inner_glowy
+  var Door: gameObject = GG_Challenge_Door (2)/Door/Door
+  var Door Animator: gameObject = GG_Challenge_Door (2)/Door
+  var Inspect: gameObject = GG_Challenge_Door (2)/Door/Unlocked Set/Inspect
+}

@@ -1,0 +1,333 @@
+# Control
+# 1 location(s):
+#   Shellwood_01 / purple_flower_set/Wasps/Shellwood Wasp (2)
+
+fsm Control {
+  start Init
+  on ZERO HP → Death Anim  // from any state
+  on SPAWN BG → Fly In  // from any state
+  on SPAWN SHOOT → Shoot  // from any state
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Cluster")
+    GetName(gameObject=var "Cluster", storeName=var "Parent name", everyFrame=false)
+    StringCompare(stringVariable=var "Parent name", compareTo="Dead Wasps", equalEvent=(none), notEqualEvent=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SetGameObject(variable=var "Death Folder", gameObject=var "Cluster", everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    AudioPlaySimpleV2(gameObject=Self, volume=1, startTime=0, oneShotClip=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    RandomInt(min=0, max=3, storeResult=var "Frame", inclusiveMax=false, noRepeat=false)
+    Tk2dPlayFrame(gameObject=Self, frame=var "Frame")
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToFly", everyFrame=true, pauseBetweenTurns=true, pauseTime=0.5)
+    IdleBuzzV3(gameObject=Self, waitMin=1, waitMax=1.5, speedMax=1.5, accelerationMin=5, accelerationMax=15, roamingRangeX=1, roamingRangeY=1, manualStartPos=(unset))
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    BoolTest(boolVariable=var "Start Alert", isTrue=→"ALERT", isFalse=(none), everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=(none), ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+    on CLUSTER ALERT → Alert Pause
+  }
+
+  state Startle {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Alert", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Cluster"), sendEvent="CLUSTER ALERT", delay=0, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=shellwood_wasp_alert (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Chase
+  }
+
+  state Attack Range {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Aggro")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=6, acceleration=0.3, targetsHeight=false, height=0, minAboveHero=2)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    WaitRandom(timeMin=0.5, timeMax=1.5, finishEvent=→"ATTACK", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="", outOfRangeEvent="RANGE OUT", everyFrame=true)
+    on SING → Sing
+    on CANCEL → Idle
+    on ATTACK → Charge Antic
+    on GO UP → Go Up
+    on RANGE OUT → Chase
+  }
+
+  state Sing {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=shellwood_wasp_sing (sfxdynamic_assets_areashellwood.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Range
+  }
+
+  state Alert Pause {
+    WaitRandom(timeMin=0.15, timeMax=0.25, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Startle
+  }
+
+  state Charge Antic {
+    PlayAudioEvent(audioClip=shellwood_wasp_antic (sfxstatic_assets_areashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Audio")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=shellwood_wasp_attack (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=-20, position=(0, 0, 0), spread=0, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=0, storeAngle=var "Angle", pause=0, everyFrame=false)
+    on FINISHED → Fire
+  }
+
+  state Charge {
+    RayCast2dV2(fromGameObject=var "Ray Pt A", fromPosition=(unset), direction=(0, -1), space=1, distance=0.51, minDepth=(unset), maxDepth=(unset), hitEvent=→"THUNK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Ray Pt B", fromPosition=(unset), direction=(0, -1), space=1, distance=0.51, minDepth=(unset), maxDepth=(unset), hitEvent=→"THUNK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Collision2dEvent(gameObject=Self, collision=1, collideTag="", sendEvent=→"WALL", storeCollider=var "", storeForce=(unset))
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=false, pauseBetweenTurns=false, pauseTime=0)
+    FaceAngle(gameObject=Self, angleOffset=-180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=false)
+    SetVector2Value(vector2Variable=var "Velocity Prev", vector2Value=var "Velocity", everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=var "Velocity", x=(unset), y=(unset), space=0, everyFrame=true)
+    Wait(time=var "Charge Time", finishEvent=→"END", realTime=false)
+    Collision2dEventLayer(collision=OnCollisionEnter2D, collideTag="", collideLayer=Attack(17), sendEvent=→"END", storeCollider=var "", storeForce=(unset), contactPoint=(unset), contactNormal=(unset))
+    FloatCompare(float1=var "Speed", float2=0.2, tolerance=0, equal=(none), lessThan=→"END", greaterThan=(none), everyFrame=true)
+    on THUNK → Thunk
+    on WALL → Pull Out
+    on END → Charge End
+    on HIT DOWN → Hit Down
+    on HIT LEFT → Hit Left
+    on HIT RIGHT → Hit Right
+    on HIT UP → Hit Up
+    on GO UP → Charge Up
+  }
+
+  state Thunk {
+    PlayAudioEvent(audioClip=shellwood_wasp_wall_or_floor_impact (sfxstatic_assets_areashellwood.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Thunk Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Thunk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetPositionToObject2D(gameObject=Self, targetObject=var "Thunk Fwd Marker", xOffset=0, yOffset=0, everyFrame=false)
+    on FINISHED → Pull Out
+    on RECOIL → Pull Out
+  }
+
+  state Pull Out {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Vector2Multiply(vector2Variable=var "Velocity Prev", multiplyBy=-0.5, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=var "Velocity Prev", x=(unset), y=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pull Out", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimpleV2(gameObject=Self, volume=1, startTime=0, oneShotClip=<null>)
+    on FINISHED → Attack Range
+  }
+
+  state Hit Right {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=0.5, everyFrame=false)  // disabled
+    RandomFloat(min=-5, max=5, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=0, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=false)  // disabled
+    on FINISHED → Charge
+  }
+
+  state Hit Left {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=0.5, everyFrame=false)  // disabled
+    RandomFloat(min=175, max=185, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=false)  // disabled
+    on FINISHED → Charge
+  }
+
+  state Hit Up {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=0.5, everyFrame=false)  // disabled
+    RandomFloat(min=85, max=95, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=false)  // disabled
+    on FINISHED → Charge
+  }
+
+  state Hit Down {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    SetFloatValue(floatVariable=var "Lunge Wait", floatValue=0.5, everyFrame=false)  // disabled
+    RandomFloat(min=265, max=275, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=false)  // disabled
+    on FINISHED → Charge
+  }
+
+  state Fire {
+    PlayAudioEvent(audioClip=shellwood_wasp_attack (sfxstatic_assets_areashellwood.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Audio")
+    ActivateGameObjectDelay(gameObject=var "Dash Effect", activate=true, resetOnExit=false, delay=0.01)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=var "Lunge Speed", everyFrame=false)
+    Wait(time=0.02, finishEvent=→"FINISHED", realTime=false)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=false, pauseBetweenTurns=false, pauseTime=0)
+    FaceAngle(gameObject=Self, angleOffset=-180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=false)
+    GetSpeed2d(gameObject=Self, storeResult=var "Speed", everyFrame=true)
+    SetFloatValue(floatVariable=var "Charge Time", floatValue=0.6, everyFrame=false)
+    on FINISHED → Charge
+  }
+
+  state Death Anim {
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    SetIsDead(target=Self, setValue=true)
+    SetDamageHero(Target=Self, Enabled=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Death Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CancelRecoil(target=Self)
+    AudioStop(gameObject=var "Current Audio", fadeTime=0)
+    AudioStop(gameObject=Self, fadeTime=0)
+    on FINISHED → Dead
+  }
+
+  state Dead {
+    SetMeshRenderer(gameObject=Self, active=false)
+    BlackThreadStateReset(Target=Self)
+    GameObjectIsNull(gameObject=var "Death Folder", isNull=→"DIE", isNotNull=→"RETURN", storeResult=(unset), everyFrame=false)
+    on RETURN → Return Ready
+    on DIE → Die
+  }
+
+  state Return Ready {
+    SetParent(gameObject=Self, parent=var "Death Folder", resetLocalPosition=false, resetLocalRotation=false)
+    AddHP(target=Self, amount=0, healToMax=true)
+  }
+
+  state Fly In {
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Z Target")
+    EaseFloat(fromValue=30, toValue=var "Z Target", floatVariable=var "Z Pos", time=0.75, speed=(unset), delay=(unset), easeType=14, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Aggro")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=true, lateUpdate=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(0, 0, 0, 0), everyframe=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(1, 1, 1, 1), duration=0.2)
+    on FINISHED → Activate
+  }
+
+  state Activate {
+    AudioPlaySimpleV2(gameObject=Self, volume=1, startTime=0, oneShotClip=<null>)
+    SetDamageHero(Target=Self, Enabled=true)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    on FINISHED → Attack Range
+  }
+
+  state Go Up {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Aggro")
+    on FINISHED → Attack Range
+  }
+
+  state Charge Up {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=15, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pull Out", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Range
+  }
+
+  state Shoot {
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Z Target")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=shellwood_wasp_attack (sfxdynamic_assets_areashellwood.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    FaceAngle(gameObject=Self, angleOffset=-180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=false)
+    SetDamageHero(Target=Self, Enabled=true)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    SetFloatValue(floatVariable=var "Charge Time", floatValue=0.35, everyFrame=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    on FINISHED → Charge
+  }
+
+  state Charge End {
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    DecelerateV2(gameObject=Self, deceleration=0.96, brakeOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pull Out", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlaySimpleV2(gameObject=Self, volume=1, startTime=0, oneShotClip=<null>)
+    on FINISHED → Chase
+  }
+
+  state Chase {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="RANGE IN", outOfRangeEvent="", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Aggro")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnToAggro", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    DistanceFly(gameObject=Self, target=var "Hero", distance=6, speedMax=6, acceleration=0.3, targetsHeight=false, height=0, minAboveHero=2)
+    Wait(time=3, finishEvent=→"UNALERT", realTime=false)
+    on RANGE IN → Attack Range
+    on UNALERT → Return To Hive?
+  }
+
+  state Return To Hive? {
+    GameObjectIsNull(gameObject=var "Death Folder", isNull=(none), isNotNull=→"RETURN", storeResult=(unset), everyFrame=false)
+    on FINISHED → Idle
+    on RETURN → Return Pause
+  }
+
+  state Return Pause {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="RANGE IN", outOfRangeEvent="", everyFrame=true)
+    on RANGE IN → Attack Range
+    on TOOK DAMAGE → Chase
+    on FINISHED → Return Antic
+  }
+
+  state Return Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Return Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Fly Away
+  }
+
+  state Fly Away {
+    AnimatePositionBy(gameObject=Self, shiftBy=(0, 10, -15), time=0.5, speed=(unset), delay=(unset), easeType=12, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    Tk2dSpriteTweenColor(gameObject=Self, color=(0, 0, 0, 1), duration=0.25)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    on FINISHED → Finish Return
+  }
+
+  state Finish Return {
+    SetDamageHero(Target=Self, Enabled=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dSpriteSetColor(gameObject=Self, color=(1, 1, 1, 1), everyframe=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    on FINISHED → Dead
+  }
+
+  state Die {
+    DestroySelf(detachChildren=false)
+  }
+
+  var Aggro Timer: float = 0
+  var Angle: float = 0
+  var Lunge Speed: float = 25
+  var Lunge Wait: float = 0
+  var Z Pos: float = 0
+  var Z Target: float = 0
+  var Speed: float = 0
+  var Charge Time: float = 0
+  var Frame: int = 0
+  var In Alert Range: bool = false
+  var Start Alert: bool = false
+  var Parent name: string = ""
+  var Velocity: vector2 = (0, 0)
+  var Velocity Prev: vector2 = (0, 0)
+  var Cluster: gameObject = <null>
+  var Ray Pt A: gameObject = purple_flower_set/Wasps/Shellwood Wasp (2)/Ray Pt A
+  var Dash Effect: gameObject = purple_flower_set/Wasps/Shellwood Wasp (2)/Dash Effect
+  var Thunk Effect: gameObject = purple_flower_set/Wasps/Shellwood Wasp (2)/Thunk Effect
+  var Death Folder: gameObject = <null>
+  var Current Audio: gameObject = <null>
+  var Ray Pt B: gameObject = purple_flower_set/Wasps/Shellwood Wasp (2)/Ray Pt B
+  var Thunk Fwd Marker: gameObject = purple_flower_set/Wasps/Shellwood Wasp (2)/Thunk Fwd Marker
+  var Audio Loop Voice: gameObject = purple_flower_set/Wasps/Shellwood Wasp (2)/Audio Loop Voice
+}

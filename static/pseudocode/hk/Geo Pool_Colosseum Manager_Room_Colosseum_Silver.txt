@@ -1,0 +1,177 @@
+# Geo Pool
+# 1 location(s):
+#   Room_Colosseum_Silver / Colosseum Manager
+
+// uses template: colosseum_geo_pool
+fsm Geo Pool {
+  start Init
+  on GIVE GEO → Give  // from any state
+
+  state Idle {
+    on HERO DAMAGED → Decrement
+  }
+
+  state Decrement {
+    IntOperator(integer1=var "Starting Pool", integer2=var "Decrement", operation=Subtract, storeResult=var "Starting Pool", everyFrame=false)
+    IntClamp(intVariable=var "Starting Pool", minValue=var "Pool Min", maxValue=99999999, everyFrame=false)
+    IntCompare(integer1=var "Starting Pool", integer2=var "Pool Min", equal=→"MIN", lessThan=→"MIN", greaterThan=(none), everyFrame=false)
+    on FINISHED → Idle
+    on MIN → At min
+  }
+
+  state At min {
+  }
+
+  state Give {
+    IntCompare(integer1=var "Starting Pool", integer2=0, equal=→"COMPLETED", lessThan=→"COMPLETED", greaterThan=(none), everyFrame=false)
+    StringSwitch(stringVariable=var "Completion PD Bool", compareTo=["colosseumBronzeCompleted", "colosseumSilverCompleted", "colosseumGoldCompleted"], sendEvent=[→"BRONZE", →"SILVER", →"GOLD"], everyFrame=false)
+    SendRandomEvent(events=[→"SMALL", →"MED", →"LARGE"], weights=[0.4, 0.4, 0.2], delay=0)
+    on SMALL → Small
+    on MED → Med
+    on LARGE → Large
+    on COMPLETED → Achieve Check
+    on GOLD → Gold Geo
+    on SILVER → Gold Geo
+  }
+
+  state Init {
+    FindChild(gameObject=Self, childName="Walls", storeResult=var "Walls")
+    FindChild(gameObject=Self, childName="Reward", storeResult=var "Reward")
+    FindChild(gameObject=var "Reward", childName="Throw 1", storeResult=var "Throw 1")
+    FindChild(gameObject=var "Reward", childName="Throw 2", storeResult=var "Throw 2")
+    FindChild(gameObject=var "Reward", childName="Throw 3", storeResult=var "Throw 3")
+    FindChild(gameObject=var "Reward", childName="Throw 4", storeResult=var "Throw 4")
+    FindChild(gameObject=var "Reward", childName="Throw 5", storeResult=var "Throw 5")
+    FindChild(gameObject=var "Reward", childName="Throw 6", storeResult=var "Throw 6")
+    FindChild(gameObject=Self, childName="Shiny Item", storeResult=var "Shiny Obj")
+    ActivateGameObject(gameObject=var "Shiny Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init 2
+  }
+
+  state Open Gates {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="GATE OPEN", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Walls", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor 2D (resources.assets), spawnPoint=var "Hero", audioClip=switch_gate_gate (sharedassets30.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+  }
+
+  state Small {
+    SetGameObject(variable=var "Geo Type", gameObject=Geo Small (resources.assets), everyFrame=false)
+    SetIntValue(intVariable=var "Geo Value", intValue=1, everyFrame=false)
+    on FINISHED → Throw Direction
+  }
+
+  state Med {
+    SetGameObject(variable=var "Geo Type", gameObject=Geo Med (resources.assets), everyFrame=false)
+    SetIntValue(intVariable=var "Geo Value", intValue=5, everyFrame=false)
+    on FINISHED → Throw Direction
+  }
+
+  state Large {
+    SetGameObject(variable=var "Geo Type", gameObject=Geo Large (resources.assets), everyFrame=false)
+    SetIntValue(intVariable=var "Geo Value", intValue=25, everyFrame=false)
+    on FINISHED → Throw Direction
+  }
+
+  state Spawn {
+    CreateObject(gameObject=var "Geo Type", spawnPoint=var "Spawn", position=(unset), rotation=(unset), storeObject=var "Geo Object", networkInstantiate=false, networkGroup=0)  // disabled
+    SpawnObjectFromGlobalPool(gameObject=var "Geo Type", spawnPoint=var "Spawn", position=(unset), rotation=(unset), storeObject=var "Geo Object")
+    RandomFloat(min=30, max=35, storeResult=var "Fling Y")
+    SetVelocity2d(gameObject=var "Geo Object", vector=(unset), x=var "Fling X", y=var "Fling Y", everyFrame=false)
+    IntOperator(integer1=var "Starting Pool", integer2=var "Geo Value", operation=Subtract, storeResult=var "Starting Pool", everyFrame=false)
+    WaitRandom(timeMin=0.01, timeMax=0.02, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Give
+  }
+
+  state Throw Direction {
+    GetRandomChild(gameObject=var "Reward", storeResult=var "Spawn")
+    GetPosition(gameObject=var "Spawn", vector=(unset), x=var "Spawn X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Spawn X", float2=var "Centre X", tolerance=0, equal=(none), lessThan=(none), greaterThan=(none), everyFrame=false)
+    on R → Fling R
+    on L → Fling L
+  }
+
+  state Fling R {
+    RandomFloat(min=1, max=15, storeResult=var "Fling X")
+    on FINISHED → Spawn
+  }
+
+  state Fling L {
+    RandomFloat(min=-15, max=-1, storeResult=var "Fling X")
+    on FINISHED → Spawn
+  }
+
+  state Give Shiny? {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="CROWD IDLE", delay=0, everyFrame=false)
+    BoolTest(boolVariable=var "Shiny Item", isTrue=(none), isFalse=→"NO", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName=var "Completion PD Bool", isTrue=→"NO", isFalse=(none))
+    ActivateGameObject(gameObject=var "Shiny Obj", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on NO → Geo Given Pause
+    on SHINY PICKED UP → Open Gates
+  }
+
+  state Geo Given Pause {
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Open Gates
+  }
+
+  state Achieve Check {
+    SetPlayerDataBool(boolName=var "Completion PD Bool", value=true)  // disabled
+    StringSwitch(stringVariable=var "Completion PD Bool", compareTo=["colosseumBronzeCompleted", "colosseumSilverCompleted", "colosseumGoldCompleted"], sendEvent=[→"BRONZE", →"SILVER", →"GOLD"], everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"BRONZE", delay=0, everyFrame=false)
+    on BRONZE → Bronze
+    on SILVER → Silver
+    on GOLD → Gold
+  }
+
+  state Bronze {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="AwardAchievement", parameters=["COLOSSEUM_1"], storeResult=(unset var))
+    on FINISHED → Give Shiny?
+  }
+
+  state Silver {
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="AwardAchievement", parameters=["COLOSSEUM_2"], storeResult=(unset var))
+    on FINISHED → Give Shiny?
+  }
+
+  state Gold {
+    SetPlayerDataBool(boolName=var "Completion PD Bool", value=true)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="AwardAchievement", parameters=["COLOSSEUM_3"], storeResult=(unset var))
+    on FINISHED → Give Shiny?
+  }
+
+  state Gold Geo {
+    SendRandomEvent(events=[→"MED", →"LARGE"], weights=[0.5, 0.5], delay=0)
+    on MED → Med
+    on LARGE → Large
+  }
+
+  state Init 2 {
+    ActivateGameObject(gameObject=var "Shiny Obj", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Centre X: float = 102.5
+  var Decrement: int = 10
+  var Pool Min: int = 1700
+  var Starting Pool: int = 2000
+  var Shiny Item: bool = true
+  var Completion PD Bool: string = "colosseumSilverCompleted"
+
+  var Fling X: float = 0
+  var Fling Y: float = 0
+  var Spawn X: float = 0
+  var Geo Value: int = 0
+  var Geo Object: gameObject = <null>
+  var Geo Type: gameObject = <null>
+  var Reward: gameObject = <null>
+  var Shiny Obj: gameObject = <null>
+  var Spawn: gameObject = <null>
+  var Throw 1: gameObject = <null>
+  var Throw 2: gameObject = <null>
+  var Throw 3: gameObject = <null>
+  var Throw 4: gameObject = <null>
+  var Throw 5: gameObject = <null>
+  var Throw 6: gameObject = <null>
+  var Walls: gameObject = <null>
+}

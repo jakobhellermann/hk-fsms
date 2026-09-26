@@ -1,0 +1,724 @@
+# Roar and Wound States
+# 1 location(s):
+#   heroloading_assets_all.bundle / Hero_Hornet
+
+// uses template: roar_and_wound_states
+fsm Roar and Wound States {
+  start Init
+  on LEAVING SCENE → Cancel Effects  // from any state
+  on LEVEL LOADED → Cancel Effects  // from any state
+  on HERO GRAB RELEASE FORCED → Hero Grab Release  // from any state
+  on ROAR WOUND CANCEL → Cancel Effects  // from any state
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Force Roar Lock", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Damaged By Void Multihitter", boolValue=false, everyFrame=false)
+    SetFloatValue(floatVariable=var "Push Strength", floatValue=1, everyFrame=false)
+    SetBoolValue(boolVariable=var "Is Grabbed", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Freeze Velocity During Multihit", boolValue=true, everyFrame=false)
+    on ROAR ENTER → Roar Lock Start
+    on WOUND START → Get Sender
+    on ROAR BURST ENTER → Set Burst
+    on MULTI WOUND 3 → Damage Check
+    on HERO GRAB → Hero Grab Invuln
+    on MULTI WOUND FORCED → Multihit
+    on MULTI LAG HIT → Damage Check 2
+    on HERO GRAB VULNERABLE → Hero Grab
+    on MULTI WOUND HAZARD → Multihit Hazard
+    on MULTI WOUND STEAM → Multihit Hazard - Steam
+    on BONK BACK → Bonk Sfx
+    on ROAR ENTER FORCED → Set Forced
+    on ROAR BURST ENTER FORCED → Set Forced 2
+    on MULTI ZAP HIT → Damage Check 3
+    on MULTI POLLEN HIT → Damage Check 5
+    on MULTI DOUBLE STRIKE → Damage Check 4
+    on MULTI HIT NO EFFECT → Damage Check 6
+    on MULTI WOUND WEAK → Damage Check 7
+    on MULTI WOUND HAZARD WEAK → Multihit Hazard Weak
+  }
+
+  state Roar Lock Start {
+    PlayRandomAudioClipTable(Table=Hornet_roar_lock_grunt (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    GetHeroCState(VariableName="swimming", StoreValue=var "Is Swimming", EveryFrame=false)
+    BoolTest(boolVariable=var "Is Swimming", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    GetFsmBool(gameObject=Self, fsmName="Bind", variableName="Is Binding", storeValue=var "Is Binding", everyFrame=false)  // disabled
+    BoolTestMulti(boolVariables=[var "Force Roar Lock", var "Is Binding"], boolStates=[false, true], trueEvent=→"BINDING", falseEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Is Binding", isTrue=→"BINDING", isFalse=(none), everyFrame=false)  // disabled
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SetAllowNailChargingWhileRelinquished", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CancelAttackNotDownspikeBounce", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=0, functionCall=StopAnimationControl())
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["facingRight"], storeResult=var "Facing Right", EveryFrame=false)
+    SetGameObjectIfNull(target=var "Roar Wave Emitter", replaceWith=var "Roar Wave Emitter Main")
+    CheckTargetDirection(gameObject=Self, target=var "Roar Wave Emitter", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=(unset), rightBool=var "Roar is Right", leftBool=var "Roar is Left", selfOffsetX=0, selfOffsetY=0, reverseIfNegativeScale=false, everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Roar is Left", var "Facing Right"], sendEvent=→"FLIP", storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Facing Right", var "Roar is Right"], boolStates=[false, true], trueEvent=→"FLIP", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on CANCEL → Not Valid
+    on FLIP → Flip
+    on FINISHED → Set Push Direction
+    on BINDING → Binding
+  }
+
+  state Flip {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="FlipSprite", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolFlip(boolVariable=var "Facing Right")
+    on FINISHED → Set Push Direction
+  }
+
+  state Check On Ground {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="GetState", parameters=["onGround"], storeResult=var "On Ground", EveryFrame=false)
+    BoolTest(boolVariable=var "On Ground", isTrue=→"GROUNDED", isFalse=→"UNGROUNDED", everyFrame=false)
+    on GROUNDED → Lock Grounded
+    on UNGROUNDED → Lock Air
+  }
+
+  state Lock Grounded {
+    BoolTest(boolVariable=var "Burst", isTrue=→"BURST", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Grounded L", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Grounded R", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Wall Behind", boolValue=false, everyFrame=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatSignToBool(Value=var "X Scale", StoreIsPositive=var "Facing L", EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar Lock")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Push Strength Ground", y=(unset), everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=var "Push Strength Ground", ySpeed=(unset), everyFrame=false)  // disabled
+    DecelerateV2(gameObject=Self, deceleration=0.86, brakeOnExit=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(0.6, 0), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Grounded R", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(-0.6, 0), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Grounded L", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Centre", fromPosition=(0, 0), direction=(1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Grounded L", var "Facing L"], boolStates=[false, false], trueEvent=(none), falseEvent=(none), storeResult=var "Invalid Recoil L", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Grounded R", var "Facing L"], boolStates=[false, true], trueEvent=(none), falseEvent=(none), storeResult=var "Invalid Recoil R", everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Invalid Recoil L", var "Invalid Recoil R"], sendEvent=(none), storeResult=var "Stop Recoil", everyFrame=true)
+    SetVelocity2dBool(gameObject=Self, activeBool=var "Stop Recoil", vector=(unset), x=0, y=(unset), everyFrame=true)
+    SetVelocity2dBool(gameObject=Self, activeBool=var "Wall Behind", vector=(unset), x=0, y=(unset), everyFrame=true)
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=true, storeValue=(unused), isTrue=(none), isFalse=(none))
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=-4, tolerance=0, equal=(none), lessThan=→"LEFT GROUND", greaterThan=(none), everyFrame=true)
+    on ROAR EXIT → Regain Control
+    on LEFT GROUND → Lock Air
+    on ROAR EXIT SCENE → Cancel Effects
+    on BURST → Burst Lock
+    on ROAR ENTER → Roar Lock Start
+    on HERO DAMAGED → Cancel Effects
+    on HERO SURFACE ENTER → Cancel Effects
+  }
+
+  state Set Push Direction {
+    SetFloatValue(floatVariable=var "Push Strength Ground", floatValue=var "Push Strength", everyFrame=false)
+    FloatMultiply(floatVariable=var "Push Strength Ground", multiplyBy=9, everyFrame=false)
+    SetFloatValue(floatVariable=var "Push Strength Air", floatValue=var "Push Strength", everyFrame=false)
+    FloatMultiply(floatVariable=var "Push Strength Air", multiplyBy=5, everyFrame=false)
+    BoolTest(boolVariable=var "Facing Right", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    FloatMultiply(floatVariable=var "Push Strength Ground", multiplyBy=-1, everyFrame=false)
+    FloatMultiply(floatVariable=var "Push Strength Air", multiplyBy=-1, everyFrame=false)
+    on FINISHED → Check Roar Shove
+  }
+
+  state Regain Control {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControlToIdle())
+    on FINISHED → Cancel Effects
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    FindNamedChild(gameObject=Self, storeResult=var "HeroBox")
+    FindNamedChild(gameObject=Self, storeResult=var "Centre")
+    on FINISHED → Idle
+  }
+
+  state Cancel Effects {
+    SendEventToRegister(eventName="MULTI WOUND CANCEL")
+    Comment(comment="Reset Roar Emitter to main reference.")
+    SetGameObject(variable=var "Roar Wave Emitter", gameObject=var "Roar Wave Emitter Main", everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Lock Air {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Push Strength Air", y=-15, everyFrame=false)
+    Trigger2dEvent(gameObject=Self, trigger=2, collideTag="Roar", sendEvent=→"ROAR EXIT", storeCollider=var "")
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"HERO LANDED", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"HERO LANDED", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=true, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on ROAR EXIT → Regain Control
+    on HERO LANDED → Lock Grounded
+    on HERO DAMAGED → Cancel Effects
+    on HERO SURFACE ENTER → Cancel Effects
+  }
+
+  state Burst Lock {
+    SetBoolValue(boolVariable=var "Burst", boolValue=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar Lock")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=true)
+    Wait(time=0.5, finishEvent=→"ROAR EXIT", realTime=false)
+    HeroControllerMethods(method=RelinquishControl, parameters=[], everyFrame=true, storeValue=(unused), isTrue=(none), isFalse=(none))
+    GetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Y Speed", space=0, everyFrame=true)
+    FloatCompare(float1=var "Y Speed", float2=-4, tolerance=0, equal=(none), lessThan=→"LEFT GROUND", greaterThan=(none), everyFrame=true)
+    on LEFT GROUND → Regain Control
+    on ROAR EXIT → Regain Control
+    on ROAR EXIT SCENE → Regain Control
+    on HERO DAMAGED → Cancel Effects
+    on ROAR ENTER → Roar Lock Start
+    on HERO SURFACE ENTER → Cancel Effects
+  }
+
+  state Set Burst {
+    GetFsmBool(gameObject=Self, fsmName="Bind", variableName="Is Binding", storeValue=var "Is Binding", everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Is Binding", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)  // disabled
+    SetBoolValue(boolVariable=var "Burst", boolValue=true, everyFrame=false)
+    on FINISHED → Roar Lock Start
+    on CANCEL → Idle
+  }
+
+  state Wound Start {
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CancelDamageRecoil", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="AffectedByGravity", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    Wait(time=4, finishEvent=→"TIME OUT", realTime=false)
+    GameObjectIsActiveEveryFrame(Target=var "Wound Sender", ActiveSpace=0, TrueEvent=(none), FalseEvent=→"TIME OUT", StoreValue=(unset), EveryFrame=true)
+    on TIME OUT → Wound Time Out
+    on WOUND END → Wound Time Out
+    on HERO DAMAGED → Cancel Effects
+  }
+
+  state Wound Time Out {
+    SendEventToRegister(eventName="FSM CANCEL")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    SetCollider(gameObject=var "HeroBox", active=true, resetOnExit=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Idle
+  }
+
+  state Damage Check {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanTakeDamage", parameters=[], storeResult=var "Can Take Damage", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Take Damage", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Multihit
+    on MULTI WOUND HAZARD → Multihit Hazard
+  }
+
+  state Multihit {
+    PlayRandomAudioClipTable(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SendHeroDamagedEvent", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegisterV2(EventName="HERO DAMAGED", ExcludeTarget=Self)  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2dBool(gameObject=Self, activeBool=var "Freeze Velocity During Multihit", vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SpawnObjectFromGlobalPoolOverTime(gameObject=Thread Sphere Slash (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), frequency=0.05)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging (sfxstatic_assets_shared.bundle), pitchMin=1.5, pitchMax=1.5, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    HeroLockState(heroLockStates=All, mode=Add, setOppositeOnExit=true)
+    ConvertBoolToInt(boolVariable=var "Damaged By Void Multihitter", intVariable=var "Void Effect Amount", falseValue=0, trueValue=1, everyFrame=false)
+    SpawnObjectFromGlobalPoolV2(gameObject=void_multihit_effect (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(0, 0, -0.05), rotation=(unset), amount=var "Void Effect Amount", storeObject=var "", setParent=<null>)
+    on FINISHED → Multihit Void Strike
+    on MULTI WOUND HAZARD → Multihit Hazard
+    on MULTI HIT RELEASE → Multihit Void Strike
+  }
+
+  state Final Hit {
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging_final_hit (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventToRegister(eventName="FSM CANCEL")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    DamageHeroDirectly(damager=var "Multi Wounder", damageAmount=1, spikeHazard=false, sinkHazard=false)
+    GameObjectIsNull(gameObject=var "Multi Wounder", isNull=(none), isNotNull=→"FINISHED", storeResult=(unset), everyFrame=false)
+    SendEventToRegister(eventName="MULTI WOUND CANCEL")
+    on FINISHED → Multi Wound Recover
+    on MULTI WOUND HAZARD → Multihit Hazard
+  }
+
+  state Multi Wound Recover {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    SendEventToRegister(eventName="MULTI WOUND CANCEL")  // disabled
+    on FINISHED → Idle
+    on WOUND START → Get Sender
+    on MULTI WOUND HAZARD → Multihit Hazard
+  }
+
+  state Hero Grab {
+    SendEventToRegister(eventName="FSM CANCEL")
+    SetHeroStunned(stunned=true, resetOnExit=true)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelDownspikeAndDamage())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetMeshRendererEveryFrame(gameObject=Self, active=false)
+    SetBoolValue(boolVariable=var "Is Grabbed", boolValue=true, everyFrame=false)
+    on HERO GRAB END → Multihit Void Strike 2
+    on HERO GRAB RELEASE → Hero Grab Release
+    on HERO SPIT → Spit Out
+    on HERO GRAB RELEASE SOFT → Hero Grab Release Soft
+  }
+
+  state Hero Grab End {
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetBoolValue(boolVariable=var "Is Grabbed", boolValue=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Binding {
+    GetFsmBool(gameObject=Self, fsmName="Bind", variableName="Is Binding", storeValue=var "Is Binding", everyFrame=true)
+    BoolTest(boolVariable=var "Is Binding", isTrue=(none), isFalse=→"UNBIND", everyFrame=true)
+    on HERO DAMAGED → Regain Control
+    on UNBIND → Roar Lock Start
+    on ROAR EXIT → Idle
+  }
+
+  state Hero Grab Release {
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetBoolValue(boolVariable=var "Is Grabbed", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Grab Escape", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=hornet_sprint_jump_first_spin (herosfxstatic_assets_all.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.17, finishEvent=→"FINISHED", realTime=false)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"FINISHED", NotGroundedEvent=(none), EveryFrame=true)
+    on FINISHED → Release End
+    on HERO GRAB → Hero Grab
+  }
+
+  sequence state Release End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="DownSpikeBounce 1")
+    Wait(time=0.05, finishEvent=(none), realTime=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    on FINISHED → Idle
+  }
+
+  state Not Valid {
+    on FINISHED → Idle
+  }
+
+  state Damage Check 2 {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanTakeDamage", parameters=[], storeResult=var "Can Take Damage", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Take Damage", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Lag Hit Pause
+  }
+
+  state Lag Hit Pause {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SpawnObjectFromGlobalPoolOverTime(gameObject=Thread Sphere Slash (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), frequency=0.05)  // disabled
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    on FINISHED → First Lag Hit
+  }
+
+  state Final Lag Hit {
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging_final_hit (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventToRegister(eventName="FSM CANCEL")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    DamageHeroDirectly(damager=var "Multi Wounder", damageAmount=1, spikeHazard=false, sinkHazard=false)
+    on FINISHED → Multi Wound Recover
+  }
+
+  state First Lag Hit {
+    Wait(time=0.07, finishEvent=→"FINISHED", realTime=false)
+    SpawnObjectFromGlobalPool(gameObject=Thread Sphere Slash Large (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    PlayAudioEvent(audioClip=hero_damage_less_harsh (sfxstatic_assets_shared.bundle), pitchMin=1.25, pitchMax=1.25, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Final Lag Hit
+  }
+
+  state Hero Grab Invuln {
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    on FINISHED → Hero Grab
+  }
+
+  state Multihit Hazard {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    PlayRandomAudioClipTable(Table=Quick Wound Hornet Voice (sfxdynamic_assets_areacoralareamemory.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SpawnObjectFromGlobalPoolOverTime(gameObject=Thread Sphere Slash (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), frequency=0.05)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging (sfxstatic_assets_shared.bundle), pitchMin=1.5, pitchMax=1.5, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle
+  }
+
+  state Multihit Hazard - Steam {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    PlayRandomAudioClipTable(Table=Quick Wound Hornet Voice (sfxdynamic_assets_areacoralareamemory.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    SpawnObjectFromGlobalPool(gameObject=Knight Steam Death Effect (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(0, 0, -0.003), rotation=(unset), storeObject=var "")
+    on FINISHED → Idle
+  }
+
+  state Bonk Back {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayRandomAudioClipTable(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Bonked Fast", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CheckIfToolEquipped(Tool=Weighted Anklet (dataassets_assets_assets/dataassets/tools/toolitems.bundle), RequiredAmountLeft=(unset), trueEvent=(none), falseEvent=(none), storeValue=var "Is Weighted")
+    ConvertBoolToFloat(boolVariable=var "Is Weighted", floatVariable=var "X Speed", falseValue=10, trueValue=5, everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Is Weighted", floatVariable=var "Y Speed", falseValue=15, trueValue=12, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=var "X Speed", ySpeed=var "Y Speed", everyFrame=false)
+    on HERO DAMAGED → Regain Control
+    on FINISHED → Regain Control
+    on FSM CANCEL → Idle
+  }
+
+  state Bonk Sfx {
+    PlayAudioEvent(audioClip=brkn_wand_land (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → FSM CANCEL event
+  }
+
+  state Spit Out {
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetBoolValue(boolVariable=var "Is Grabbed", boolValue=false, everyFrame=false)
+    on FINISHED → Bonk Back
+  }
+
+  state Set Forced {
+    SetBoolValue(boolVariable=var "Force Roar Lock", boolValue=true, everyFrame=false)
+    on FINISHED → Roar Lock Start
+  }
+
+  state Set Forced 2 {
+    SetBoolValue(boolVariable=var "Force Roar Lock", boolValue=true, everyFrame=false)
+    on FINISHED → Set Burst
+  }
+
+  state Hero Grab Release Soft {
+    SetMeshRenderer(gameObject=Self, active=true)
+    SetBoolValue(boolVariable=var "Is Grabbed", boolValue=false, everyFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SetVelocity2d(gameObject=Self, vector=(0, 5), x=(unset), y=(unset), everyFrame=false)
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Grab Escape", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=hornet_sprint_jump_first_spin (herosfxstatic_assets_all.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.11, finishEvent=→"FINISHED", realTime=false)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"FINISHED", NotGroundedEvent=(none), EveryFrame=true)
+    on FINISHED → Release End
+    on HERO GRAB → Hero Grab
+  }
+
+  state Get Sender {
+    GetEventSender(sentByGameObject=var "Wound Sender")
+    GetStaticVariable(variableName="Wound Sender Override", storeValue=var "Wound Sender Override")
+    SetStaticVariable(variableName="Wound Sender Override", setValue=<null>, sceneTransitionsLimit=0)
+    GameObjectCompare(gameObjectVariable=var "Wound Sender Override", compareTo=<null>, equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SetGameObject(variable=var "Wound Sender", gameObject=var "Wound Sender Override", everyFrame=false)
+    on FINISHED → Wound Start
+  }
+
+  state Check Roar Shove {
+    BoolTest(boolVariable=var "No Roar Shove", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetFloatValue(floatVariable=var "Push Strength Ground", floatValue=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "No Roar Shove", boolValue=false, everyFrame=false)
+    on FINISHED → Check On Ground
+  }
+
+  state Damage Check 3 {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanTakeDamage", parameters=[], storeResult=var "Can Take Damage", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Take Damage", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Zap Hit 1
+  }
+
+  state Zap Hit 1 {
+    SpawnObjectFromGlobalPool(gameObject=Zap Damage (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    PlayRandomAudioClipTable(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    PlayAudioEvent(audioClip=projectile_zap_burst (herosfxstatic_assets_all.bundle), pitchMin=1.1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    on FINISHED → Zap Hit 2
+  }
+
+  state Zap Hit 2 {
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging_final_hit (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")  // disabled
+    SendEventToRegister(eventName="FSM CANCEL")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    DamageHeroDirectly(damager=var "Multi Wounder", damageAmount=1, spikeHazard=false, sinkHazard=false)
+    SpawnObjectFromGlobalPool(gameObject=Hornet_After_Damage_Effects (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Spawned")
+    ActivateAllChildren(gameObject=var "Spawned", activate=false)
+    FindChild(gameObject=var "Spawned", childName="Zap", storeResult=var "Spawned")
+    ActivateGameObject(gameObject=var "Spawned", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Multi Wound Recover
+  }
+
+  state Damage Check 4 {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanTakeDamage", parameters=[], storeResult=var "Can Take Damage", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Take Damage", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → 
+    on FINISHED → Double Strike 1
+  }
+
+  state Double Strike 1 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound Double Strike")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    Wait(time=var "Double Strike Pause", finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    on FINISHED → Double Strike Void
+  }
+
+  state Double Strike 2 {
+    SendEventToRegister(eventName="FSM CANCEL")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    DamageHeroDirectly(damager=var "Multi Wounder", damageAmount=1, spikeHazard=false, sinkHazard=false)
+    on FINISHED → Idle
+  }
+
+  state Multihit Void Strike {
+    BoolTest(boolVariable=var "Damaged By Void Multihitter", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Damaged By Void Multihitter", boolValue=false, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=black_health_hit (blackthread_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ActivateVoidAcid", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Final Hit
+  }
+
+  state Double Strike Void {
+    BoolTest(boolVariable=var "Damaged By Void Multihitter", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Damaged By Void Multihitter", boolValue=false, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=black_health_hit (blackthread_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ActivateVoidAcid", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Double Strike 2
+  }
+
+  state Damage Check 5 {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanTakeDamage", parameters=[], storeResult=var "Can Take Damage", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Take Damage", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Pollen Hit 1
+  }
+
+  state Pollen Hit 1 {
+    SpawnObjectFromGlobalPool(gameObject=Pollen Damage (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "")
+    PlayRandomAudioClipTable(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    on FINISHED → Polen Hit 2
+  }
+
+  state Polen Hit 2 {
+    SendEventToRegister(eventName="FSM CANCEL")
+    PlayAudioEvent(audioClip=Flower_queen_pollen_explode (sfxstatic_assets_shared.bundle), pitchMin=1.15, pitchMax=1.15, volume=0.9, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    DamageHeroDirectly(damager=var "Multi Wounder", damageAmount=1, spikeHazard=false, sinkHazard=false)
+    SpawnObjectFromGlobalPool(gameObject=Hornet_After_Damage_Effects (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "Spawned")
+    ActivateAllChildren(gameObject=var "Spawned", activate=false)
+    FindChild(gameObject=var "Spawned", childName="Pollen", storeResult=var "Spawned")
+    ActivateGameObject(gameObject=var "Spawned", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Multi Wound Recover
+  }
+
+  state Damage Check 6 {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanTakeDamage", parameters=[], storeResult=var "Can Take Damage", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Take Damage", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → 
+    on FINISHED → Multihit No Effect 1
+  }
+
+  state Multihit No Effect 1 {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    PlayRandomAudioClipTable(Table=Wound Hornet Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2dBool(gameObject=Self, activeBool=var "Freeze Velocity During Multihit", vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    on FINISHED → Multihit No Effect 2
+  }
+
+  state Multihit No Effect 2 {
+    SendEventToRegister(eventName="FSM CANCEL")
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RegainControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(true))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="isInvincible", value=false)
+    DamageHeroDirectly(damager=var "Multi Wounder", damageAmount=1, spikeHazard=false, sinkHazard=false)
+    on FINISHED → Multi Wound Recover
+  }
+
+  state Multihit Void Strike 2 {
+    BoolTest(boolVariable=var "Damaged By Void Multihitter", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Damaged By Void Multihitter", boolValue=false, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=black_health_hit (blackthread_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="ActivateVoidAcid", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Hero Grab End
+  }
+
+  state Damage Check 7 {
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="CanTakeDamage", parameters=[], storeResult=var "Can Take Damage", EveryFrame=false)
+    BoolTest(boolVariable=var "Can Take Damage", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Multihit Weak
+    on MULTI WOUND HAZARD → Multihit Hazard
+  }
+
+  state Multihit Weak {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=Self, behaviour="HeroController", methodName="SendHeroDamagedEvent", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)  // disabled
+    SendEventToRegisterV2(EventName="HERO DAMAGED", ExcludeTarget=Self)  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SpawnObjectFromGlobalPoolOverTime(gameObject=Thread Sphere Slash (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), frequency=0.05)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging (sfxstatic_assets_shared.bundle), pitchMin=1.5, pitchMax=1.5, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    HeroLockState(heroLockStates=All, mode=Add, setOppositeOnExit=true)
+    ConvertBoolToInt(boolVariable=var "Damaged By Void Multihitter", intVariable=var "Void Effect Amount", falseValue=0, trueValue=1, everyFrame=false)
+    SpawnObjectFromGlobalPoolV2(gameObject=void_multihit_effect (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(0, 0, -0.05), rotation=(unset), amount=var "Void Effect Amount", storeObject=var "", setParent=<null>)
+    on FINISHED → Multihit Void Strike
+    on MULTI WOUND HAZARD → Multihit Hazard
+    on MULTI HIT RELEASE → Multihit Void Strike
+  }
+
+  state Multihit Hazard Weak {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="HERO DAMAGED", delay=0, everyFrame=false)
+    PlayRandomAudioClipTable(Table=Quick Wound Hornet Voice (sfxdynamic_assets_areacoralareamemory.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))  // disabled
+    SendEventToRegister(eventName="FSM CANCEL")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="TakeQuickDamage", parameters=[1, true], storeResult=(unset var), EveryFrame=false)  // disabled
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=RelinquishControl())
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=StopAnimationControl())
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wound")
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SpawnObjectFromGlobalPoolOverTime(gameObject=Thread Sphere Slash (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), frequency=0.05)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=<null>, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.1)
+    PlayAudioEvent(audioClip=lace_multi_stab_hornet_damaging (sfxstatic_assets_shared.bundle), pitchMin=1.5, pitchMax=1.5, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle
+  }
+
+  state FSM CANCEL event {
+    SendEventToRegister(eventName="FSM CANCEL")
+    on FINISHED → Bonk Back
+  }
+
+  var Push Strength: float = 1
+  var Push Strength Air: float = 0
+  var Push Strength Ground: float = 0
+  var X Scale: float = 0
+  var X Speed: float = 0
+  var Y Speed: float = 0
+  var Double Strike Pause: float = 0.2
+  var Void Effect Amount: int = 0
+  var Burst: bool = false
+  var Can Take Damage: bool = false
+  var Damaged By Void Multihitter: bool = false
+  var Facing L: bool = false
+  var Facing Right: bool = false
+  var Force Roar Lock: bool = false
+  var Freeze Velocity During Multihit: bool = true
+  var Grounded L: bool = false
+  var Grounded R: bool = false
+  var Invalid Recoil L: bool = false
+  var Invalid Recoil R: bool = false
+  var Is Binding: bool = false
+  var Is Grabbed: bool = false
+  var Is Swimming: bool = false
+  var Is Weighted: bool = false
+  var No Roar Shove: bool = false
+  var On Ground: bool = false
+  var Roar is Left: bool = false
+  var Roar is Right: bool = false
+  var Stop Recoil: bool = false
+  var Wall Behind: bool = false
+  var Centre: gameObject = <null>
+  var HeroBox: gameObject = <null>
+  var Multi Wounder: gameObject = <null>
+  var Self: gameObject = Hero_Hornet (heroloading_assets_all.bundle)
+  var Spawned: gameObject = <null>
+  var Wound Sender: gameObject = <null>
+  var Wound Sender Override: gameObject = <null>
+}

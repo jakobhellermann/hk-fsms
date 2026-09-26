@@ -1,0 +1,170 @@
+# Hopper
+# 1 location(s):
+#   Deepnest_East_14 / Hopper Spawn (2)/Hopper (2)
+
+fsm Hopper {
+  start Init
+  on GO LEFT → Go Left  // from any state
+  on GO RIGHT → Go Right  // from any state
+
+  state In Air {
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetFloatValue(floatVariable=var "Old Velocity X", floatValue=var "Velocity X", everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Velocity X", y=(unset), space=0, everyFrame=true)
+    SetFloatValue(floatVariable=var "Mirror X", floatValue=var "Old Velocity X", everyFrame=true)
+    FloatMultiply(floatVariable=var "Mirror X", multiplyBy=-1, everyFrame=true)
+    BoolTest(boolVariable=var "Wall Check", isTrue=→"FLIP", isFalse=(none), everyFrame=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Forward Velocity", y=(unset), everyFrame=true)
+    on LAND → Range?
+    on LEFT → Hit Wall L
+    on RIGHT → Hit Wall R
+    on FLIP → Flip
+  }
+
+  state Jump Anticipate {
+    AudioPlayRandom(gameObject=var "Self", audioClips=[geo_hit_ground_1 (resources.assets), geo_hit_ground_2 (resources.assets)], weights=[1, 1], pitchMin=1, pitchMax=1)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Jump")
+    Wait(time=0.084, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Left Or Right?
+  }
+
+  state Left Or Right? {
+    AudioPlay(gameObject=Self, volume=1, oneShotClip=hopper_jump (sharedassets33.assets), finishedEvent=(none))
+    BoolTest(boolVariable=var "Moving Right", isTrue=→"RIGHT", isFalse=→"LEFT", everyFrame=false)
+    on RIGHT → Jump Right
+    on LEFT → Jump Left
+  }
+
+  state Jump Right {
+    SendEventByName(eventTarget=FSMComponent, sendEvent="JUMPED", delay=0, everyFrame=false)
+    RandomFloat(min=var "Jump Angle R Min", max=var "Jump Angle R Max", storeResult=var "Jump Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Jump Angle", speed=var "Jump Strength", everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Forward Velocity", y=(unset), space=0, everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  state Jump Left {
+    SendEventByName(eventTarget=FSMComponent, sendEvent="JUMPED", delay=0, everyFrame=false)
+    RandomFloat(min=var "Jump Angle L Min", max=var "Jump Angle L Max", storeResult=var "Jump Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Jump Angle", speed=var "Jump Strength", everyFrame=false)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "Forward Velocity", y=(unset), space=0, everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  state Hit Wall L {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Moving Right", boolValue=true, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Mirror X", y=(unset), everyFrame=false)
+    NextFrameEvent(sendEvent=→"WAIT")
+    on WAIT → In Air
+  }
+
+  state Hit Wall R {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Moving Right", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Mirror X", y=(unset), everyFrame=false)
+    NextFrameEvent(sendEvent=→"WAIT")
+    on WAIT → In Air
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetGameObject(variable=var "Camera", gameObject=var "MainCamera", everyFrame=false)
+    BoolTest(boolVariable=var "Start In Air", isTrue=→"IN AIR", isFalse=(none), everyFrame=false)
+    ActivateGameObject(gameObject=Hopper Spawn (2)/Hopper (2)/Wall Check, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on WAKE → Wake
+    on IN AIR → Wake 2
+  }
+
+  state Range? {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=35, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"SLEEP", everyFrame=false)
+    BoolTest(boolVariable=var "Roams Within Range", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Range Check
+    on FALSE → Jump Anticipate
+    on SLEEP → Sleep
+  }
+
+  state Range Check {
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Self X", float2=var "Range Min", tolerance=0, equal=(none), lessThan=→"LEFT", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Self X", float2=var "Range Max", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RIGHT", everyFrame=false)
+    on LEFT → Turn R
+    on RIGHT → Turn L
+    on FINISHED → Jump Anticipate
+  }
+
+  state Turn R {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Moving Right", boolValue=true, everyFrame=false)
+    on FINISHED → Jump Anticipate
+  }
+
+  state Turn L {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetBoolValue(boolVariable=var "Moving Right", boolValue=false, everyFrame=false)
+    on FINISHED → Jump Anticipate
+  }
+
+  state Flip {
+    BoolFlip(boolVariable=var "Moving Right")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Mirror X", y=(unset), everyFrame=false)
+    NextFrameEvent(sendEvent=→"WAIT")
+    SetBoolValue(boolVariable=var "Wall Check", boolValue=false, everyFrame=false)
+    FloatMultiply(floatVariable=var "Forward Velocity", multiplyBy=-1, everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  state Go Left {
+    BoolTest(boolVariable=var "Moving Right", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → Flip
+    on FALSE → In Air
+  }
+
+  state Go Right {
+    BoolTest(boolVariable=var "Moving Right", isTrue=→"FALSE", isFalse=→"TRUE", everyFrame=false)
+    on TRUE → Flip
+    on FALSE → In Air
+  }
+
+  state Sleep {
+    SetBoolValue(boolVariable=var "Start In Air", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Wake {
+    ActivateGameObject(gameObject=Hopper Spawn (2)/Hopper (2)/Wall Check, activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Left Or Right?
+  }
+
+  state Wake 2 {
+    ActivateGameObject(gameObject=Hopper Spawn (2)/Hopper (2)/Wall Check, activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → In Air
+  }
+
+  var Jump Angle L Max: float = 112
+  var Jump Angle L Min: float = 112
+  var Jump Angle R Max: float = 68
+  var Jump Angle R Min: float = 68
+  var Jump Strength: float = 18.5
+  var Mirror X: float = 0
+  var Range Max: float = 999
+  var Range Min: float = 111.67
+  var Velocity X: float = 0
+  var Moving Right: bool = false
+  var Roams Within Range: bool = true
+  var Start In Air: bool = false
+
+  var Distance: float = 0
+  var Forward Velocity: float = 0
+  var Jump Angle: float = 0
+  var Old Velocity X: float = 0
+  var Self X: float = 0
+  var Wall Check: bool = false
+  var Camera: gameObject = <null>
+  var Self: gameObject = <null>
+}

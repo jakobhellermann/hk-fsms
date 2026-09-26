@@ -1,0 +1,114 @@
+# Zombie Leap
+# 13 location(s):
+#   Fungus1_34 / Zombie Leaper
+#   Cliffs_04 / Zombie Leaper (1)
+#   Cliffs_04 / Zombie Leaper (2)
+#   Cliffs_04 / Zombie Leaper
+#   Crossroads_19 / _Enemies/Zombie Leaper
+#   Crossroads_21 / non_infected_event/Zombie Leaper
+#   Crossroads_37 / Zombie Leaper
+#   Crossroads_37 / _Enemies/Zombie Leaper
+#   Crossroads_40 / Uninfected Parent/Zombie Leaper
+#   Crossroads_40 / Uninfected Parent/Zombie Leaper 1
+#   Ruins1_01 / Zombie Leaper
+#   Ruins1_03 / Zombie Leaper
+#   Ruins1_17 / Zombie Leaper
+
+fsm Zombie Leap {
+  start Initialise
+
+  state Initialise {
+    FindGameObject(objectName="", withTag="Player", store=var "Hero")
+    FindChild(gameObject=Self, childName="Land Dust", storeResult=var "Land Dust")
+    FindChild(gameObject=Self, childName="Attack Range", storeResult=var "Attack Region")
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Ready
+  }
+
+  state Ready {
+    CheckCanSeeHero(storeResult=var "Can See Hero", everyFrame=true)
+    CheckAlertRangeByName(storeResult=var "In Attack Range", childName="Attack Range", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can See Hero", var "In Attack Range"], sendEvent=→"ATTACK ALERT", storeResult=(unset), everyFrame=true)
+    on ATTACK ALERT → Left or Right?
+  }
+
+  state Anticipate {
+    RandomFloat(min=0.9, max=1.1, storeResult=var "Chooser")
+    SetAudioPitch(gameObject=var "Self", pitch=var "Chooser", everyFrame=false)
+    AudioPlayRandom(gameObject=var "Self", audioClips=[zombie_chase_1 (sharedassets37.assets), zombie_chase_2 (sharedassets37.assets)], weights=[1, 1], pitchMin=1, pitchMax=1)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Attack")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=→"WAIT", animationCompleteEvent=(none))
+    on WAIT → Launch
+  }
+
+  state Left or Right? {
+    StopWalker(target=Self, everyFrame=false)
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Jump X Speed", floatValue=var "Hero X", everyFrame=false)
+    FloatSubtract(floatVariable=var "Jump X Speed", subtract=var "Self X", everyFrame=false, perSecond=false)
+    FloatMultiply(floatVariable=var "Jump X Speed", multiplyBy=1.25, everyFrame=false)
+    FloatCompare(float1=var "Hero X", float2=var "Self X", tolerance=0, equal=→"HERO IS LEFT", lessThan=→"HERO IS LEFT", greaterThan=→"HERO IS RIGHT", everyFrame=false)
+    on HERO IS RIGHT → Face Right
+    on HERO IS LEFT → Face Left
+  }
+
+  state Face Left {
+    SetScale(gameObject=var "Self", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetWalkerFacing(walkRight=false, randomStartDir=(unset), target=Self, everyFrame=false)
+    on FINISHED → Anticipate
+  }
+
+  state Face Right {
+    SetScale(gameObject=var "Self", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetWalkerFacing(walkRight=true, randomStartDir=(unset), target=Self, everyFrame=false)
+    on FINISHED → Anticipate
+  }
+
+  state Lunge {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Cooldown
+  }
+
+  state Cooldown {
+    PlayParticleEmitter(gameObject=var "Land Dust", emit=0)
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Land")
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"WAIT")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on WAIT → Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    Wait(time=var "Idle Time", finishEvent=→"WAIT", realTime=false)
+    on WAIT → Reset
+  }
+
+  state Reset {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Idle")
+    StartWalker(walkRight=(unset), target=Self, everyFrame=false)
+    on FINISHED → Ready
+  }
+
+  state Launch {
+    SetVelocity2d(gameObject=var "Self", vector=(unset), x=var "Jump X Speed", y=20, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Lunge
+  }
+
+  var Idle Time: float = 0.5
+
+  var Chooser: float = 0
+  var Hero X: float = 0
+  var Jump X Speed: float = 6
+  var Self X: float = 0
+  var Timer: float = 0
+  var Can See Hero: bool = false
+  var In Attack Range: bool = false
+  var Attack Region: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Land Dust: gameObject = <null>
+  var Self: gameObject = <null>
+}

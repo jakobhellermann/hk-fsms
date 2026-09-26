@@ -1,0 +1,1158 @@
+# Control
+# 1 location(s):
+#   Slab_10b / Boss Scene/First Weaver
+
+fsm Control {
+  start Init
+  on STUN → Stun Start  // from any state
+  on FAKE DEATH → Death Stagger F  // from any state
+  on ZERO HP → Deactivate Song Region  // from any state
+
+  state Init {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    PreBuildTK2DSprites(gameObject=var "Self", useChildren=true)
+    GetParent(gameObject=Self, storeResult=var "Boss Scene")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Blasts")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "CamLock Battle Intro")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Pin Projectiles")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Gates")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Song Region - Boss Active")
+    FindNamedChild(gameObject=var "Death Effects", storeResult=var "Bind Silk")
+    GetHP(target=Self, storeValue=var "Max HP")
+    MultiplyIntByFloat(integer=var "Max HP", multiplyFloat=0.85, storeResult=var "Can Bind HP", everyFrame=false, forceRoundUp=false)
+    MultiplyIntByFloat(integer=var "Max HP", multiplyFloat=0.1, storeResult=var "Bind Heal Amount", everyFrame=false, forceRoundUp=false)
+    MultiplyIntByFloat(integer=var "Max HP", multiplyFloat=0.5, storeResult=var "P2 HP", everyFrame=false, forceRoundUp=false)
+    SetFsmInt(gameObject=Self, fsmName="Fake Death", variableName="P2 HP", setValue=var "P2 HP", everyFrame=false)
+    on FINISHED → Dormant
+  }
+
+  state Idle {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    ConvertBoolToFloat(boolVariable=var "Phase 2", floatVariable=var "Idle Time", falseValue=0.5, trueValue=0.25, everyFrame=false)
+    Wait(time=var "Idle Time", finishEvent=→"FINISHED", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ActivateGameObject(gameObject=var "Head Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Evade Range", storeResult=var "In Evade Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    RandomBool(storeResult=var "Will Evade")  // disabled
+    SetBoolValue(boolVariable=var "Will Evade", boolValue=true, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Evade Wait", BoolValue=true, Time=0.08, SetOppositeOnStateEntry=true)
+    BoolTestMulti(boolVariables=[var "Evade Wait", var "In Evade Range", var "Will Evade"], boolStates=[true, true, true], trueEvent=→"EVADE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="NoCharge Range", storeResult=var "In NoCharge Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolTest(boolVariable=var "Hornet Dead", isTrue=→"HORNET DEAD", isFalse=(none), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Evade Wait", var "In NoCharge Range", var "Will Evade"], boolStates=[true, false, true], trueEvent=→"CHARGE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on FINISHED → Bind?
+    on EVADE → Evade Antic
+    on CHARGE → Charge Antic
+    on HORNET DEAD → Hornet Dead
+  }
+
+  state Tele Out {
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Hornet Dead", isTrue=→"HORNET DEAD", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out", animationTriggerEvent=(none), animationCompleteEvent=→"NEXT")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEvent(audioClip=first_sinner_teleport_pt_1 (sfxstatic_assets_areaslab.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SpawnObjectFromGlobalPoolDelay(gameObject=first_weaver_tele_flash (localpoolprefabs_assets_areaslab.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "", delayMin=0.13, delayMax=0.13)
+    on NEXT → Tele Event
+    on HORNET DEAD → Hornet Dead
+  }
+
+  state Tele Aim {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=var "Tele Min X", max=var "Tele Max X", storeResult=var "Target X")
+    GetDifferenceBetweenFloats(differenceResult=var "Distance", float1=var "Target X", float2=var "Hero X", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=var "Distance Min", tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=var "Distance Max", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETRY", everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Distance", float1=var "Target X", float2=var "Self X", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=4, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    on RETRY → Retry
+    on FINISHED → Tele In
+  }
+
+  state Retry {
+    IntAdd(intVariable=var "Retries", add=1, everyFrame=false)
+    IntCompare(integer1=var "Retries", integer2=100, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Tele Aim
+  }
+
+  state Tele In {
+    GetProperty(targetProperty=MeshRenderer.enabled on Boss Scene/First Weaver@MeshRenderer, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "MeshRenderer Enabled", isTrue=→"TEST", isFalse=(none), everyFrame=false)  // disabled
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "WeaverLight", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Target X", y=var "Tele Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=weaver_lift_arrive_2d (sfxstatic_assets_areaweaver.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → After Tele
+  }
+
+  state Slash Aim {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Target X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloatEither(value1=-7.5, value2=7.5, storeResult=var "X Offset")
+    FloatAdd(floatVariable=var "Target X", add=var "X Offset", everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Target X", float2=var "Slash Max X", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETRY", everyFrame=false)
+    FloatCompare(float1=var "Target X", float2=var "Slash Min X", tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    on RETRY → Retry 2
+    on FINISHED → Tele In Slash
+  }
+
+  state Retry 2 {
+    IntAdd(intVariable=var "Retries", add=1, everyFrame=false)
+    IntCompare(integer1=var "Retries", integer2=100, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Slash Aim
+  }
+
+  state Tele In Slash {
+    GetProperty(targetProperty=MeshRenderer.enabled on Boss Scene/First Weaver@MeshRenderer, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "MeshRenderer Enabled", isTrue=→"TEST", isFalse=(none), everyFrame=false)  // disabled
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TeleToSlash", animationTriggerEvent=(none), animationCompleteEvent=→"NEXT")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Target X", y=var "Slash Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=weaver_lift_arrive_2d (sfxstatic_assets_areaweaver.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on NEXT → Slash Antic Tele
+  }
+
+  state Slash Antic {
+    PlayAudioEvent(audioClip=roachkeeper_chef_antic (sfxstatic_assets_areadust.bundle), pitchMin=0.75, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=first_sinner_jump_for_slash (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slash Antic")
+    Wait(time=0.5, finishEvent=→"SLASH", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AnimateRigidBodyYPositionTo(GameObject=Self, ToValue=var "Slash Y", time=0.5, speed=(unset), delay=(unset), easeType=4, reverse=false, finishEvent=(none), realTime=false)
+    ActivateGameObjectDelay(gameObject=var "Air Slash Antic Flash", activate=true, resetOnExit=false, delay=0.08)
+    on SLASH → Slash 1
+  }
+
+  state Slash 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-75, ySpeed=-35, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.825, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=first_sinner_slash_1 (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 2
+  }
+
+  state Slash 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 3
+  }
+
+  state Slash 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    on FINISHED → Slash 4
+  }
+
+  state Slash 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=-75, ySpeed=-35, everyFrame=false)
+    PlayAudioEvent(audioClip=first_sinner_slash_2 (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 5
+  }
+
+  state Slash 5 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=false)
+    ActivateGameObject(gameObject=var "Slash Hit 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slash 6
+  }
+
+  state Slash 6 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.8, brakeOnExit=true)
+    on FINISHED → After Slash
+  }
+
+  state After Tele {
+    SendEventByName(eventTarget=Self, sendEvent=var "Attack Event", delay=0, everyFrame=false)
+    on IDLE → Idle
+    on BOMB → Bomb Cast Antic
+    on PINS → Double Cast?
+    on SLICE CHARGE → Slice Charge Antic
+    on P2 START → Music Stop
+  }
+
+  state Double Cast? {
+    SetBoolValue(boolVariable=var "Double Cast", boolValue=false, everyFrame=false)
+    CompareHPBool(enemy=var "Self", compareTo=var "Can Bind HP", equalBool=false, lessThanBool=var "Can Bind", greaterThanBool=false, everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Can Bind", var "Phase 2"], boolStates=[false, false], trueEvent=→"FINISHED", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "Can Bind HP", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"FINISHED", (none)], weights=[0.5, 0.5], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    SetBoolValue(boolVariable=var "Double Cast", boolValue=true, everyFrame=false)
+    SetIntValue(intVariable=var "Ct Pins", intValue=10, everyFrame=false)
+    on FINISHED → Pin Cast
+  }
+
+  state Bomb Cast Antic {
+    SendEventByName(eventTarget=GameObject(var "Blasts"), sendEvent="BLAST", delay=0, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_short_roar (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Cast", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ActivateGameObjectDelay(gameObject=var "Cast Silk Round", activate=true, resetOnExit=false, delay=0.25)  // disabled
+    ActivateGameObject(gameObject=var "Head Cast", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cast Hurtbox", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=20, everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.85, brakeOnExit=false)
+    on FINISHED → Bomb Cast
+  }
+
+  state Evade Antic {
+    RayCast2dV2(fromGameObject=var "Ray Pt", fromPosition=(unset), direction=(1, 0), space=1, distance=6, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_evade (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Scuttle", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEventRandom(audioClips=[widow_insectoid_walk_backwards_on_ground (sfxstatic_assets_areabell.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Did Movement", boolValue=true, everyFrame=false)
+    on FINISHED → Evade
+    on CANCEL → Cancel To Tele
+  }
+
+  state Evade {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=45, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    Wait(time=0.33, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Evade Recover
+  }
+
+  state Evade Recover {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Head Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Bind?
+    on TOOK DAMAGE → Bind?
+  }
+
+  state Charge Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    PlayAudioEventRandom(audioClips=[widow_insectoid_walk_backwards_on_ground (sfxstatic_assets_areabell.bundle)], pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetBoolValue(boolVariable=var "Prefer No Tele", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Movement", boolValue=true, everyFrame=false)
+    on FINISHED → Charge
+  }
+
+  state Charge {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=-30, ySpeed=(unset), everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=true)
+    FloatCompare(float1=var "Distance", float2=10, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    ActivateGameObject(gameObject=var "Head Charge", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Charge")
+    on FINISHED → Charge Recover
+  }
+
+  state Charge Recover {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="ChargeToIdle")
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Bind?
+    on TOOK DAMAGE → Bind?
+  }
+
+  state Tele? {
+    BoolTest(boolVariable=var "Force Tele", isTrue=→"TELE", isFalse=(none), everyFrame=false)
+    StringCompare(stringVariable=var "Attack Event", compareTo="IDLE", equalEvent=→"TELE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Attack Event", compareTo="BIND", equalEvent=→"TELE", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTest(boolVariable=var "Prefer No Tele", isTrue=→"NO TELE", isFalse=(none), everyFrame=false)
+    SendRandomEventV4(events=[→"TELE", →"NO TELE"], weights=[0.65, 0.35], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    on TELE → Tele Out
+    on NO TELE → No Tele Event
+  }
+
+  state After Slash {
+    SendRandomEventV4(events=[→"TELE", →"IDLE"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on TELE → Slash Recover
+    on IDLE → Idle
+  }
+
+  state Slash Antic Tele {
+    PlayAudioEvent(audioClip=roachkeeper_chef_antic (sfxstatic_assets_areadust.bundle), pitchMin=0.75, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Slash Antic")
+    Wait(time=0.6, finishEvent=→"SLASH", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AnimateRigidBodyYPositionTo(GameObject=Self, ToValue=var "Slash Y", time=0.5, speed=(unset), delay=(unset), easeType=4, reverse=false, finishEvent=(none), realTime=false)
+    ActivateGameObjectDelay(gameObject=var "Air Slash Antic Flash", activate=true, resetOnExit=false, delay=0.08)
+    on SLASH → Slash 1
+  }
+
+  state Stun Start {
+    SendEventToRegister(eventName="BOSS STUNNED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_stun (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetFloatValue(floatVariable=var "Stun Timer", floatValue=2, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    AudioStopV2(gameObject=var "Audio Player", fadeTime=0, cancelOnEarlyExit=false)
+    on FINISHED → Stun Air
+  }
+
+  state Stun Air {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    ObjectJitter(gameObject=Self, x=0.1, y=0.1, z=(unset), allowMovement=false, limitFps=0)  // disabled
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocityByScale(gameObject=Self, speed=50, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Stun Fall
+  }
+
+  state Stun Fall {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Fall")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-25, everyFrame=false)
+    CheckYPosition(gameObject=Self, compareTo=var "Ground Y", compareToOffset=0, tolerance=0, equal=→"LAND", lessThan=→"LAND", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    on LAND → Stun Land
+  }
+
+  state Stunned {
+    FloatAdd(floatVariable=var "Stun Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    on TOOK DAMAGE → Stun Damage
+    on END → Stun End
+  }
+
+  state Stun Damage {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Hit")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_stun_hit (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    FloatAdd(floatVariable=var "Stun Timer", add=-0.25, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Stunned
+    on END → Stun End
+  }
+
+  state Stun End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Stun Recover
+  }
+
+  state Stun Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetHitEffectOrigin(target=Self, effectOrigin=(0, 0.2, 0), everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Stun Hurtbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Bind?
+  }
+
+  state Stun Land {
+    SetHitEffectOrigin(target=Self, effectOrigin=(0, -1.8, 0), everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Land")
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Stun Hurtbox", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=skull_king_land (sfxstatic_assets_areabone.bundle), pitchMin=1.25, pitchMax=1.25, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Stunned
+  }
+
+  state Bind Aim {
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    RandomFloat(min=var "Tele Min X", max=var "Tele Max X", storeResult=var "Target X")
+    GetDifferenceBetweenFloats(differenceResult=var "Distance", float1=var "Target X", float2=var "Hero X", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=11, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=22, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"RETRY", everyFrame=false)
+    GetDifferenceBetweenFloats(differenceResult=var "Distance", float1=var "Target X", float2=var "Self X", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=2, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    on RETRY → Retry 3
+    on FINISHED → Tele In Bind
+  }
+
+  state Retry 3 {
+    IntAdd(intVariable=var "Retries", add=1, everyFrame=false)
+    IntCompare(integer1=var "Retries", integer2=100, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Bind Aim
+  }
+
+  state Tele In Bind {
+    GetProperty(targetProperty=MeshRenderer.enabled on Boss Scene/First Weaver@MeshRenderer, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "MeshRenderer Enabled", isTrue=→"TEST", isFalse=(none), everyFrame=false)  // disabled
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetPosition(gameObject=Self, vector=(unset), x=var "Target X", y=var "Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    PlayAudioEvent(audioClip=weaver_lift_arrive_2d (sfxstatic_assets_areaweaver.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Bind Pins
+  }
+
+  state Bind Pins {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SendEventByName(eventTarget=GameObject(var "Pin Projectiles"), sendEvent="ATTACK", delay=0.25, everyFrame=false)
+    ActivateGameObjectDelay(gameObject=var "Cast Silk Flat", activate=true, resetOnExit=false, delay=0.25)
+    ActivateGameObject(gameObject=var "Head Cast", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cast Hurtbox", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Bind Pre Idle
+  }
+
+  state Bind Antic {
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_evade (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=→"EVADE", greaterThan=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Bind Antic")
+    ActivateGameObject(gameObject=var "Bind Antic Silk", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Bind", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt HealAntic")
+    AudioPlaySimple(gameObject=var "Audio Loop Bind", volume=1, oneShotClip=<null>)
+    on FINISHED → Bind Silk
+    on TOOK DAMAGE → Bind Break
+    on EVADE → Bind Evade
+  }
+
+  state Bind Silk {
+    Wait(time=1.4, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Heal Bind Silk", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Bind", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Bind Antic Silk", activate=true, recursive=false, resetOnExit=true, everyFrame=false)  // disabled
+    on TOOK DAMAGE → Bind Break
+    on FINISHED → Bind Heal
+  }
+
+  state Bind Break {
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_stun (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SpawnObjectFromGlobalPool(gameObject=Bind_Fail_Burst (localpoolprefabs_assets_shared.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    AudioStop(gameObject=var "Audio Loop Bind", fadeTime=0)
+    PlayAudioEvent(audioClip=hornet_bind_break_v2_smeared (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    SetVelocityByScale(gameObject=Self, speed=40, ySpeed=(unset), everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=true)
+    on FINISHED → Phase Check
+  }
+
+  state Bind Heal {
+    AudioStop(gameObject=var "Audio Loop Bind", fadeTime=0)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Bind Heal Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=first_sinner_bind_burst (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AddHP(target=Self, amount=var "Bind Heal Amount", healToMax=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    SpawnObjectFromGlobalPool(gameObject=White Flash R (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", position=(0, 0, -0.21), rotation=(unset), storeObject=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Heal", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Head Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Restart Stun
+  }
+
+  state Dormant {
+    SetMeshRenderer(gameObject=Self, active=false)
+    on REFIGHT START → Refight Appear
+    on INTRO → Intro Wave
+  }
+
+  state Refight Appear {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetPosition2D(GameObject=Self, Vector=(unset), X=44.5, Y=(unset), Space=0, EveryFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=true, roarBurst=true, isSmall=false, noVisualEffect=true, forceThroughBind=false, stopOnExit=false)
+    on FINISHED → Roar
+  }
+
+  state Roar {
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_intro_roar (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=first_sinner_scream_long (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="FIRST_WEAVER")
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    SetPlayerDataBool(boolName="encounteredFirstWeaver", value=true)
+    ActivateGameObject(gameObject=var "Gates", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Intro Roar End
+  }
+
+  state Leave {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ApplyMusicCue(musicCue=FirstWeaver (audiocuesdynamic_assets_areaslab.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.1)
+    on FINISHED → First Idle
+  }
+
+  state First Idle {
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=var "Ground Y", z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ActivateGameObject(gameObject=var "Head Idle", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Evade Range", storeResult=var "In Evade Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    RandomBool(storeResult=var "Will Evade")
+    SetBoolValue(boolVariable=var "Will Evade", boolValue=true, everyFrame=false)
+    SetBoolValue(boolVariable=var "Evade Wait", boolValue=false, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Evade Wait", BoolValue=true, Time=0.35, SetOppositeOnStateEntry=false)
+    RayCast2dV2(fromGameObject=var "Ray Pt", fromPosition=(unset), direction=(1, 0), space=1, distance=6, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Evade Wait", var "In Evade Range", var "Will Evade", var "Wall Behind"], boolStates=[true, true, true, false], trueEvent=→"EVADE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="NoCharge Range", storeResult=var "In NoCharge Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Evade Wait", var "In NoCharge Range", var "Will Evade"], boolStates=[true, false, true], trueEvent=→"CHARGE", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on FINISHED → Idle
+    on TOOK DAMAGE → Idle
+  }
+
+  state Intro Wave {
+    PlayAudioEvent(audioClip=false_knight_land_1st_time (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Intro Land")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=11.2, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Big Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Medium Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Intro Wave", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=2.5, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt IntroWave")
+    AudioPlaySimple(gameObject=var "Audio Loop IntroRumble", volume=1, oneShotClip=<null>)
+    GetPlayerDataBool(boolName="encounteredFirstWeaver", storeValue=var "Encountered")
+    WaitBool(boolTest=var "Encountered", time=2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Intro Stand
+  }
+
+  state Intro Stand {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Intro Stand", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=grasshopper_child_getup_from_idle (sfxstatic_assets_areaclover.bundle), pitchMin=0.75, pitchMax=0.75, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    WaitBool(boolTest=var "Encountered", time=0.5, finishEvent=→"FINISHED", realTime=false)  // disabled
+    on FINISHED → Intro Flourish
+  }
+
+  state Intro Roar End {
+    ApplyMusicCue(musicCue=Spinner (audiocuesdynamic_assets_areabellareaslab.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.1)
+    ActivateGameObject(gameObject=var "CamLock Battle Intro", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Song Region - Boss Active", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → First Idle
+  }
+
+  state Slash Recover {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Bind?
+  }
+
+  state Intro Flourish {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Intro Flourish", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Flourish Silk", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayInState(gameObject=var "Audio Loop Bind", volume=1)
+    FadeAudio(gameObject=var "Audio Loop IntroRumble", startVolume=1, endVolume=0, time=0.25)
+    ActivateGameObject(gameObject=var "Intro Wave", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Flourish End
+  }
+
+  state Flourish End {
+    PlayAudioEvent(audioClip=hornet_bind_pt_2 (herosfxstatic_assets_all.bundle), pitchMin=0.8, pitchMax=0.8, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Bind Heal Anim", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Roar
+  }
+
+  state Bind Pre Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.65, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    on FINISHED → Bind Antic
+    on TOOK DAMAGE → Tele Out
+  }
+
+  state Death Stagger {
+    RecordJournalKill(Record=First Weaver (dataassets_assets_assets/dataassets/enemyjournal/journalrecords.bundle))
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Pos X", y=(unset), space=0, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    SendEventToRegister(eventName="BOSS STUNNED")
+    SetHitEffectOrigin(target=Self, effectOrigin=(0, 0.2, 0), everyFrame=false)
+    FloatClamp(floatVariable=var "Pos X", minValue=26, maxValue=51, everyFrame=false)
+    SetPosition2D(GameObject=Self, Vector=(unset), X=var "Pos X", Y=(unset), Space=0, EveryFrame=false)
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)
+    SetDamageHero(Target=Self, Enabled=false)
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=1)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    CreateObject(gameObject=Boss Death FinalHit (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=boss_death_pt_1 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ApplyMusicCue(musicCue=None (audiocuesdynamic_assets_shared.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=0.01)
+    AudioStopV2(gameObject=var "Audio Player", fadeTime=0, cancelOnEarlyExit=false)
+    on FINISHED → Hornet Dash
+  }
+
+  state Hornet Dash {
+    SendEventByName(eventTarget=GameObject(var "Hero"), sendEvent="FSM CANCEL", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AffectedByGravity(false))
+    SetPlayerDataBool(boolName="disableInventory", value=true)
+    SetPlayerDataBool(boolName="isInvincible", value=true)
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Hornet Dummy", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetParent(gameObject=var "Hornet Dummy", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetPositionToObject(gameObject=var "Hornet Dummy", targetObject=var "Hero", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=true)
+    FaceObjectV2(objectA=var "Hornet Dummy", objectB=var "Self", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetPosition2D(gameObject=Self, vector=var "Dummy Target Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatMultiply(floatVariable=var "Distance", multiplyBy=0.01, everyFrame=false)
+    AnimateRigidBody2DPositionToV2(GameObject=var "Hero", ToValue=var "Dummy Target Pos", ToX=0, ToY=0, time=var "Distance", speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Hornet Connect
+  }
+
+  state Hornet Connect {
+    ActivateGameObject(gameObject=var "Death Steam Audio", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPositionToObject2D(gameObject=var "Hero", targetObject=var "Self", xOffset=0, yOffset=0, everyFrame=false)
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    ActivateGameObject(gameObject=var "Hornet Dummy", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Connect")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt BindStab", emit=0, resetIfPlaying=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Can Bind
+  }
+
+  state Can Bind {
+    ListenForCast(eventTarget=Self, wasPressed=→"BIND", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    SendEventToRegisterDelay(EventName="BOSS BIND UP", delay=1, ExcludeTarget=Self)
+    on BIND → Bind
+  }
+
+  state Bind {
+    SendEventToRegister(eventName="BOSS BIND DOWN")
+    IntAdd(intVariable=var "Binds", add=-1, everyFrame=false)
+    PlayAudioEvent(audioClip=boss_final_hit (sfxstatic_assets_boss.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=bind_for_crest_silk_spin_around_hornet_2d (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    ActivateAllChildren(gameObject=var "Death Effects", activate=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Bind Silk", clipName="Bind Silk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Death Bind")
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    on FINISHED → Bind Burst
+  }
+
+  state Bind Burst {
+    PlayAudioEvent(audioClip=bind_for_crest_silk_slam_into_hornet_2d (sfxstatic_assets_crestshrine.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Death Bind Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ScreenFlash(flashColour=(1, 1, 1, 1))
+    IntCompare(integer1=var "Binds", integer2=0, equal=→"SHIFT", lessThan=→"SHIFT", greaterThan=(none), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=true, Delay=0)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    AddSilk(target=var "Hero", amount=3, playHeroEffect=false)
+    on FINISHED → Rebind Ready
+    on SHIFT → Final Bind Burst
+  }
+
+  state Rebind Ready {
+    ListenForCast(eventTarget=Self, wasPressed=→"BIND", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), pressedTimer=(unset), activeBool=(unset), stateEntryOnly=false)
+    SendEventToRegisterDelay(EventName="BOSS BIND UP", delay=1, ExcludeTarget=Self)
+    on BIND → Bind
+  }
+
+  state Final Bind Burst {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    ActivateGameObject(gameObject=var "Death Steam Audio", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=boss_death_pt_3 (sfxstatic_assets_boss.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=silk_cradle_head_rips_out (sfxstatic_assets_areacradle.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ScreenFader(startColour=(1, 1, 1, 0), endColour=(1, 1, 1, 1), duration=1.15)  // disabled
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt SilkDust", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Pt BindStabFinal", emit=0, resetIfPlaying=false)
+    AddSilk(target=var "Hero", amount=100, playHeroEffect=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Big Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    TransitionToAudioSnapshot(snapshot=at None (audioobjects_assets_all.bundle), transitionTime=0.5)
+    on FINISHED → Fade
+  }
+
+  state Hornet Dead {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+  }
+
+  state Fade To Black {
+    ScreenFader(startColour=(1, 1, 1, 1), endColour=(0, 0, 0, 1), duration=1)
+    Wait(time=4, finishEvent=→"FINISHED", realTime=false)
+    TransitionToAudioSnapshot(snapshot=Off (audioobjects_assets_all.bundle), transitionTime=3)
+    on FINISHED → To Memory Scene
+  }
+
+  state To Memory Scene {
+    ClearHeroEffectsInstant()
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    BeginSceneTransition(sceneName="Memory_First_Sinner", entryGateName="door_wakeOnGround", entryDelay=0, visualization=Default, preventCameraFadeOut=false)
+  }
+
+  state Fade {
+    ScreenFader(startColour=(1, 1, 1, 0), endColour=(1, 1, 1, 1), duration=0.05)
+    Wait(time=6, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=boss_death_pt_1 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Fade To Black
+  }
+
+  state Bomb Cast {
+    ActivateGameObject(gameObject=var "Bomb Cast Effect", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "Head Cast", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cast Hurtbox", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=bomb_cast_sonar_firstweaver (localpoolprefabs_assets_areaslab.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.85, brakeOnExit=true)
+    on FINISHED → Fall
+  }
+
+  state Slice Charge Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slice Charge Antic", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=30, ySpeed=(unset), everyFrame=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    RayCast2d(fromGameObject=var "Ray Pt", fromPosition=(unset), direction=(1, 0), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), storeDidHit=var "Wall Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2d(fromGameObject=var "Ray Pt", fromPosition=(unset), direction=(1, 0), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetBoolValueAtTime(BoolVariable=var "Can Cancel", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "Wall Behind", var "Can Cancel"], sendEvent=→"FINISHED", storeResult=(unset), everyFrame=true)
+    PlayAudioEvent(audioClip=widow_insectoid_antic_before_running_with_slashes (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObjectDelay(gameObject=var "Charge Slash Antic Flash", activate=true, resetOnExit=false, delay=0.06)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_dash_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Slice Charge Antic 2
+    on CANCEL → Slice Charge Cancel
+  }
+
+  state Slice Charge {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Silk Charge")
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=(unset), everyFrame=false)
+    AccelerateToXByScale(gameObject=Self, accelerationFactor=0.5, targetSpeed=-30)
+    ActivateGameObject(gameObject=var "Slice Effect", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Charge", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    RayCast2d(fromGameObject=var "Ray Pt", fromPosition=(unset), direction=(-1, 0), space=1, distance=3.75, minDepth=(unset), maxDepth=(unset), hitEvent=→"END", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeHitFraction=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    Wait(time=1.5, finishEvent=→"END", realTime=false)
+    PlayAudioEvent(audioClip=widow_run_n_slash (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Audio Player")
+    on END → Slice Charge End
+    on MULTI HIT CONNECT → Multislash
+  }
+
+  state Slice Charge End {
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObjectDelay(gameObject=var "Head Idle", activate=true, resetOnExit=true, delay=0.17)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.006, space=0, everyFrame=false, lateUpdate=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_evade (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Bind?
+  }
+
+  state Multislash {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Slice Effect", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Charge", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.003, space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Slice Charge End
+  }
+
+  state Slice Charge Antic 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)  // disabled
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=true)
+    on FINISHED → Slice Charge
+  }
+
+  state Phase Check {
+    SendEvent(eventTarget=GameObject(Self), sendEvent=→"P2", delay=0, everyFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Did Movement", boolValue=false, everyFrame=false)
+    CompareHP(enemy=var "Self", integer2=var "Can Bind HP", equal=(none), lessThan=(none), greaterThan=→"P1 EARLY", everyFrame=false)
+    CompareHPBool(enemy=var "Self", compareTo=var "P2 HP", equalBool=false, lessThanBool=var "Ready for P2", greaterThanBool=false, everyFrame=false)  // disabled
+    BoolTestMulti(boolVariables=[var "Phase 2", var "Ready for P2"], boolStates=[false, true], trueEvent=→"P2 START", falseEvent=(none), storeResult=(unset), everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Phase 2", isTrue=→"P2", isFalse=→"P1", everyFrame=false)
+    on P1 → P1
+    on P2 → P2
+    on P2 START → Set P2 Start
+    on P1 EARLY → P1 Early
+  }
+
+  state P1 {
+    SendRandomEventV3(events=[→"IDLE", (none)], weights=[0.2, 0.8], trackingInts=[var "Ct Idle", var "Ct No idle"], eventMax=[1, 4], trackingIntsMissed=[var "Ms Idle", var "Ms No Idle"], missedMax=[4, 1])
+    SendRandomEventV3(events=[→"PINS", →"SLASH", →"SLICE CHARGE"], weights=[0.5, 0.25, 0.25], trackingInts=[var "Ct Pins", var "Ct Slash", var "Ct Slice Charge"], eventMax=[2, 1, 1], trackingIntsMissed=[var "Ms Pins", var "Ms Slash", var "Ms Slice Charge"], missedMax=[2, 3, 4])
+    on PINS → Set Pins
+    on SLASH → Set Slash
+    on SLICE CHARGE → Set Slice Charge
+    on IDLE → Set Idle
+  }
+
+  state Bind? {
+    CompareHP(enemy=var "Self", integer2=var "Can Bind HP", equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SendRandomEventV4(events=[→"BIND", (none)], weights=[0.1, 0.5], eventMax=[1, 5], missedMax=[5, 1], activeBool=(unset))
+    on BIND → Set Bind
+    on FINISHED → Phase Check
+  }
+
+  state Set Pins {
+    SetStringValue(stringVariable=var "Attack Event", stringValue="PINS", everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Min", floatValue=6.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Max", floatValue=16, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Ground Y", everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Tele?
+  }
+
+  state Set Slash {
+    SetStringValue(stringVariable=var "Attack Event", stringValue="SLASH", everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Slash Y", everyFrame=false)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=false, everyFrame=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=8, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Tele?
+  }
+
+  state Set Slice Charge {
+    SetStringValue(stringVariable=var "Attack Event", stringValue="SLICE CHARGE", everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Min", floatValue=8.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Max", floatValue=16, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Ground Y", everyFrame=false)
+    on FINISHED → Tele?
+  }
+
+  state Set Idle {
+    SetStringValue(stringVariable=var "Attack Event", stringValue="IDLE", everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Min", floatValue=6.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Max", floatValue=16, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Ground Y", everyFrame=false)
+    on FINISHED → Tele?
+  }
+
+  state Set Bind {
+    SetStringValue(stringVariable=var "Attack Event", stringValue="BIND", everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Min", floatValue=11, everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Max", floatValue=22, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Ground Y", everyFrame=false)
+    on FINISHED → Tele Out
+  }
+
+  state Tele Event {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    SetDamageHero(Target=Self, Enabled=true)
+    SendEventByName(eventTarget=Self, sendEvent=var "Attack Event", delay=0, everyFrame=false)
+    on PINS → Tele Aim
+    on SLASH → Slash Aim
+    on SLICE CHARGE → Tele Aim
+    on IDLE → Tele Aim
+    on BIND → Bind Aim
+    on BOMB → Tele Aim
+    on P2 START → P2 Tele Pause
+  }
+
+  state No Tele Event {
+    SetBoolValue(boolVariable=var "Prefer No Tele", boolValue=false, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent=var "Attack Event", delay=0, everyFrame=false)
+    on PINS → Double Cast?
+    on SLASH → Slash Antic
+    on SLICE CHARGE → Slice Charge Antic
+    on BOMB → Bomb Cast Antic
+  }
+
+  state Slice Charge Cancel {
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=false, everyFrame=false)
+    on FINISHED → Bind?
+  }
+
+  state Pin Cast {
+    ConvertBoolToFloat(boolVariable=var "Double Cast", floatVariable=var "Cast Idle Time", falseValue=0.5, trueValue=1, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_attack (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Wait(time=var "Cast Idle Time", finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Cast")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ConvertBoolToString(boolVariable=var "Double Cast", stringVariable=var "Cast Event", falseString="ATTACK", trueString="ATTACK DOUBLE", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Pin Projectiles"), sendEvent=var "Cast Event", delay=0.25, everyFrame=false)
+    ActivateGameObjectDelay(gameObject=var "Cast Silk Flat", activate=true, resetOnExit=false, delay=0.25)
+    ActivateGameObject(gameObject=var "Head Cast", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Cast Hurtbox", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=first_sinner_summon (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetFloatValue(floatVariable=var "Cast Recover Time", floatValue=0.5, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Restart Stun {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    on FINISHED → Phase Check
+  }
+
+  state P2 {
+    SendRandomEventV3(events=[→"PINS", →"SLASH", →"SLICE CHARGE", →"BOMB"], weights=[0.5, 0.25, 0.25, 0.25], trackingInts=[var "Ct Pins", var "Ct Slash", var "Ct Bomb", var "Ct Bomb"], eventMax=[2, 1, 1, 1], trackingIntsMissed=[var "Ms Pins", var "Ms Slash", var "Ms Slice Charge", var "Ms Bomb"], missedMax=[3, 5, 5, 4])
+    on PINS → Set Pins
+    on SLASH → Set Slash
+    on SLICE CHARGE → Set Slice Charge
+    on BOMB → Set Bomb
+  }
+
+  state Set Bomb {
+    SetStringValue(stringVariable=var "Attack Event", stringValue="BOMB", everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Min", floatValue=7.5, everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Max", floatValue=16.5, everyFrame=false)
+    RandomFloatEither(value1=14, value2=var "Ground Y", storeResult=var "Tele Y")
+    FloatCompare(float1=var "Distance", float2=6, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Tele?
+  }
+
+  state Fall {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fall")
+    AccelerateToY(gameObject=Self, accelerationFactor=1, targetSpeed=-50)
+    CheckYPosition(gameObject=Self, compareTo=var "Ground Y", compareToOffset=0, tolerance=0, equal=(none), lessThan=→"LAND", greaterThan=(none), everyFrame=true, space=0, activeBool=(unset))
+    on LAND → Soft Land
+  }
+
+  state Soft Land {
+    SetPosition2d(gameObject=Self, vector=(unset), x=(unset), y=var "Ground Y", space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetFloatValue(floatVariable=var "Cast Recover Time", floatValue=0.25, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Cancel To Tele {
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Phase Check
+  }
+
+  state Set P2 Start {
+    SetStringValue(stringVariable=var "Attack Event", stringValue="P2 START", everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Min", floatValue=6, everyFrame=false)
+    SetFloatValue(floatVariable=var "Distance Max", floatValue=13, everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=14, everyFrame=false)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Tele?
+  }
+
+  state P2 Tele Pause {
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=2)
+    Wait(time=3, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on FINISHED → Tele Aim
+  }
+
+  state P2 Roar {
+    ApplyMusicCue(musicCue=SpinnerRage (audiocuesdynamic_assets_areabellareaslab.bundle), delayTime=0, transitionTime=0)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_intro_roar (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    TransitionToAudioSnapshot(snapshot=Normal (audioobjects_assets_all.bundle), transitionTime=0.1)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → P2 Start
+  }
+
+  state Music Stop {
+    ApplyMusicCue(musicCue=None (audiocuesdynamic_assets_shared.bundle), delayTime=0, transitionTime=0)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → P2 Roar
+  }
+
+  state P2 Start {
+    SetBoolValue(boolVariable=var "Phase 2", boolValue=true, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    SetIntValue(intVariable=var "Ct Bomb", intValue=1, everyFrame=false)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Set Bomb
+  }
+
+  state P1 Early {
+    SendRandomEventV3(events=[→"IDLE", (none)], weights=[0.5, 0.5], trackingInts=[var "Ct Idle", var "Ct No idle"], eventMax=[1, 1], trackingIntsMissed=[var "Ms Idle", var "Ms No Idle"], missedMax=[1, 1])
+    SendRandomEventV3(events=[→"PINS", →"SLASH", →"SLICE CHARGE"], weights=[0.5, 0.25, 0.25], trackingInts=[var "Ct Pins", var "Ct Slash", var "Ct Slice Charge"], eventMax=[2, 1, 1], trackingIntsMissed=[var "Ms Pins", var "Ms Slash", var "Ms Slice Charge"], missedMax=[2, 3, 4])
+    on PINS → Set Pins
+    on SLASH → Set Slash
+    on SLICE CHARGE → Set Slice Charge
+    on IDLE → Set Idle
+  }
+
+  state Death Stagger F {
+    SetDamageHero(Target=Self, Enabled=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=FirstWeaver_death_hit (sfxdynamic_assets_areaslab.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Pos X", y=(unset), space=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Stun Hurtbox", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Cast", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Bind", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Charge", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Head Idle", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventToRegister(eventName="BOSS STUNNED")
+    SetHitEffectOrigin(target=Self, effectOrigin=(0, 0.2, 0), everyFrame=false)
+    FloatClamp(floatVariable=var "Pos X", minValue=26, maxValue=51, everyFrame=false)
+    SetPosition2D(GameObject=Self, Vector=(unset), X=var "Pos X", Y=(unset), Space=0, EveryFrame=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=false)
+    AudioStop(gameObject=var "Sound Player", fadeTime=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    EnemyDeathEffectsRegular+SimulateDeath(target=Self)
+    CreateObject(gameObject=Boss Death FinalHit (sharedeffects_assets_all.bundle), spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "")
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="BigShake", delay=0, everyFrame=false)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=boss_death_pt_1 (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ApplyMusicCue(musicCue=None (audiocuesdynamic_assets_shared.bundle), delayTime=0, transitionTime=0)
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=0.01)
+    AudioStopV2(gameObject=var "Audio Player", fadeTime=0, cancelOnEarlyExit=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL RESET", delay=0, everyFrame=false)
+    SetBoolValue(boolVariable=var "Ready for P2", boolValue=true, everyFrame=false)  // disabled
+    ActivateGameObject(gameObject=var "WeaverLight", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Fake Stagger End
+  }
+
+  state Fake Stagger End {
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)  // disabled
+    SetDamageHero(Target=Self, Enabled=true)  // disabled
+    on FINISHED → Set P2 Start
+  }
+
+  state Bind Evade {
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Set Slash
+  }
+
+  state Deactivate Song Region {
+    ActivateGameObject(gameObject=var "Song Region - Boss Active", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  var Tele Min X: float = 26
+  var Tele Max X: float = 51
+  var Hero X: float = 0
+  var Target X: float = 0
+  var Distance: float = 0
+  var Self X: float = 0
+  var Ground Y: float = 11.2
+  var Slash Y: float = 15.5
+  var Slash Min X: float = 26.5
+  var Slash Max X: float = 50.5
+  var X Offset: float = 0
+  var Stun Timer: float = 0
+  var Pos X: float = 0
+  var Idle Time: float = 0
+  var Distance Min: float = 0
+  var Distance Max: float = 0
+  var Tele Y: float = 0
+  var Cast Idle Time: float = 0
+  var Cast Recover Time: float = 0
+  var Binds: int = 3
+  var Can Bind HP: int = 0
+  var Ct Bomb: int = 0
+  var Ct Pins: int = 0
+  var Ct Slash: int = 0
+  var Ct Slice Charge: int = 0
+  var HP: int = 0
+  var Max HP: int = 0
+  var Ms Bomb: int = 0
+  var Ms Pins: int = 0
+  var Ms Slash: int = 0
+  var P2 HP: int = 0
+  var Retries: int = 0
+  var Ms Slice Charge: int = 0
+  var Ct Idle: int = 0
+  var Ms Idle: int = 0
+  var Bind Heal Amount: int = 0
+  var Ct No idle: int = 0
+  var Ms No Idle: int = 0
+  var Will Evade: bool = false
+  var In Evade Range: bool = false
+  var Evade Wait: bool = false
+  var Wall Behind: bool = false
+  var In NoCharge Range: bool = false
+  var Can Bind: bool = false
+  var Phase 2: bool = false
+  var Encountered: bool = false
+  var Hornet Dead: bool = false
+  var Can Cancel: bool = false
+  var Force Tele: bool = false
+  var Double Cast: bool = false
+  var Ready for P2: bool = false
+  var Prefer No Tele: bool = false
+  var Do Idle Frequently: bool = false
+  var MeshRenderer Enabled: bool = false
+  var Attack Event: string = ""
+  var Cast Event: string = ""
+  var Dummy Target Pos: vector2 = (0, 0)
+  var Blasts: gameObject = <null>
+  var Boss Scene: gameObject = <null>
+  var Head Idle: gameObject = Boss Scene/First Weaver/Head Idle
+  var Slash Hit 1: gameObject = Boss Scene/First Weaver/Slash Hit 1
+  var Slash Hit 2: gameObject = Boss Scene/First Weaver/Slash Hit 2
+  var Slash Hit 3: gameObject = Boss Scene/First Weaver/Slash Hit 3
+  var Slash Hit 4: gameObject = Boss Scene/First Weaver/Slash Hit 4
+  var Pin Projectiles: gameObject = <null>
+  var Cast Silk Flat: gameObject = Boss Scene/First Weaver/Cast Silk Flat
+  var Cast Silk Round: gameObject = Boss Scene/First Weaver/Cast Silk Round
+  var Ray Pt: gameObject = Boss Scene/First Weaver/Ray Pt
+  var Slam Effect: gameObject = Boss Scene/First Weaver/Slam Effect
+  var Bind Antic Silk: gameObject = Boss Scene/First Weaver/Bind Antic Silk
+  var Bind Heal Anim: gameObject = Boss Scene/First Weaver/Bind Heal Anim
+  var Heal Bind Silk: gameObject = Boss Scene/First Weaver/Bind Silk
+  var Self: gameObject = <null>
+  var Pt Heal: gameObject = Boss Scene/First Weaver/Pt Heal
+  var Pt HealAntic: gameObject = Boss Scene/First Weaver/Pt HealAntic
+  var Stun Hurtbox: gameObject = Boss Scene/First Weaver/Stun Hurtbox
+  var Head Charge: gameObject = Boss Scene/First Weaver/Head Charge
+  var Head Cast: gameObject = Boss Scene/First Weaver/Head Cast
+  var Cast Hurtbox: gameObject = Boss Scene/First Weaver/Cast Hurtbox
+  var Head Bind: gameObject = Boss Scene/First Weaver/Head Bind
+  var Intro Wave: gameObject = Boss Scene/First Weaver/Intro Wave
+  var Pt IntroWave: gameObject = Boss Scene/First Weaver/Pt IntroWave
+  var Gates: gameObject = <null>
+  var Audio Loop IntroRumble: gameObject = Boss Scene/First Weaver/Audio Loop IntroRumble
+  var Pt Charge: gameObject = Boss Scene/First Weaver/Pt Charge
+  var Flourish Silk: gameObject = Boss Scene/First Weaver/Flourish Silk
+  var Audio Loop Bind: gameObject = Boss Scene/First Weaver/Audio Loop Bind
+  var CamLock Battle Intro: gameObject = <null>
+  var Pt BindStab: gameObject = Boss Scene/First Weaver/Pt BindStab
+  var Pt SilkDust: gameObject = Boss Scene/First Weaver/Pt SilkDust
+  var Hornet Dummy: gameObject = Boss Scene/First Weaver/Hornet Dummy
+  var Death Effects: gameObject = Boss Scene/First Weaver/Death Effects
+  var Sound Player: gameObject = <null>
+  var Death Bind Flash: gameObject = Boss Scene/First Weaver/Death Bind Flash
+  var Bind Silk: gameObject = <null>
+  var Pt BindStabFinal: gameObject = Boss Scene/First Weaver/Pt BindStabFinal
+  var Death Steam Audio: gameObject = Boss Scene/First Weaver/Death Steam Audio
+  var Bomb Cast Effect: gameObject = Boss Scene/First Weaver/Bomb Cast Effect
+  var Slice Effect: gameObject = Boss Scene/First Weaver/Slice Effect
+  var Audio Player: gameObject = <null>
+  var first_weaver_tele_flash: gameObject = <null>
+  var Charge Slash Antic Flash: gameObject = Boss Scene/First Weaver/Charge Slash Antic Flash
+  var Air Slash Antic Flash: gameObject = Boss Scene/First Weaver/Air Slash Antic Flash
+  var WeaverLight: gameObject = Boss Scene/First Weaver/WeaverLight
+  var Song Region - Boss Active: gameObject = <null>
+  var Audio Loop Voice: gameObject = Boss Scene/First Weaver/Audio Loop Voice
+}

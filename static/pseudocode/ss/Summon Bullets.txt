@@ -1,0 +1,138 @@
+# Summon Bullets
+# 1 location(s):
+#   Abyss_Cocoon / Boss Control/Lost Lace Boss
+
+fsm Summon Bullets {
+  start Init
+  on STUN → Idle  // from any state
+  on STOP → Idle  // from any state
+
+  state Idle {
+    on SUMMON → Set Amount
+    on CROSS SLASH → Catcher Start
+  }
+
+  state Summon  {
+    SpawnObjectFromGlobalPool(gameObject=Lost Lace Summon Bullet (localpoolprefabs_assets_laceboss.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Projectile")
+    SetPosition2d(gameObject=var "Projectile", vector=(unset), x=var "Spawn X", y=var "Spawn Y", space=0, everyFrame=false, lateUpdate=false)
+    SetFsmGameObject(gameObject=var "Projectile", fsmName="Control", variableName="Boss", setValue=var "Self", everyFrame=false)  // disabled
+    IntAdd(intVariable=var "Amount", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Amount", integer2=0, equal=(none), lessThan=(none), greaterThan=→"REPEAT", everyFrame=false)
+    on REPEAT → Repeat Pause
+    on FINISHED → Idle
+  }
+
+  state Set Amount {
+    SetIntValue(intVariable=var "Amount", intValue=3, everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Offset X Min", floatValue=6, everyFrame=false)
+    SetFloatValue(floatVariable=var "Offset X Max", floatValue=14, everyFrame=false)
+    on FINISHED → Start Pause
+  }
+
+  state Start Pause {
+    Wait(time=0.25, finishEvent=(none), realTime=false)
+    on FINISHED → Set Pos
+  }
+
+  state Repeat Pause {
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Set Pos
+  }
+
+  state Set Pos {
+    RandomFloat(min=12.5, max=16.5, storeResult=var "Spawn Y")
+    GetPosition2d(gameObject=var "Hero", vector_2d=(unset), x=var "Spawn X", y=(unset), space=0, everyFrame=false)
+    RandomFloat(min=var "Offset X Min", max=var "Offset X Max", storeResult=var "Offset X")
+    RandomlyFlipFloat(storeResult=var "Offset X")
+    FloatAdd(floatVariable=var "Spawn X", add=var "Offset X", everyFrame=false, perSecond=false)
+    FloatInRange(floatVariable=var "Spawn X", lowerValue=6, upperValue=52, boolVariable=(unset), trueEvent=(none), falseEvent=→"RETRY", everyFrame=false)
+    SetPosition2d(gameObject=var "Bullet Cursor", vector=(unset), x=var "Spawn X", y=var "Spawn Y", space=0, everyFrame=false, lateUpdate=false)
+    GetDistanceV2(gameObject=var "Bullet Cursor", target=var "Self", targetOffsetX=0, targetOffsetY=0, storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=3, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    FindClosest(gameObject=var "Bullet Cursor", withTag="Orb Target", ignoreOwner=true, mustBeVisible=false, storeObject=var "", storeDistance=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=3, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    on RETRY → Retry
+    on FINISHED → Summon 
+  }
+
+  state Retry {
+    IntAdd(intVariable=var "Retries", add=1, everyFrame=false)
+    IntCompare(integer1=var "Retries", integer2=100, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetIntValue(intVariable=var "Retries", intValue=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Offset X Min", add=-0.25, everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Offset X Max", add=1, everyFrame=false, perSecond=false)
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    Wait(time=0.001, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Set Pos
+  }
+
+  state Init {
+    SetParent(gameObject=var "Bullet Cursor", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    on FINISHED → Idle
+  }
+
+  state Catcher Start {
+    RandomBool(storeResult=var "Weighted Left")  // disabled
+    GetPosition2d(gameObject=var "Hero", vector_2d=(unset), x=var "Spawn X", y=(unset), space=0, everyFrame=false)
+    FloatClamp(floatVariable=var "Spawn X", minValue=6, maxValue=52, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=lost_lace_cross_slash_catcher (localpoolprefabs_assets_laceboss.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Projectile")
+    SetPosition2d(gameObject=var "Projectile", vector=(unset), x=var "Spawn X", y=6.5, space=0, everyFrame=false, lateUpdate=false)
+    CheckXPosition(gameObject=var "Hero", compareTo=8, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"R", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    CheckXPosition(gameObject=var "Hero", compareTo=50, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"L", greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    SendRandomEvent(events=[→"L", →"R"], weights=[1, 1], delay=0)
+    on L → Catch L
+    on R → Catch R
+  }
+
+  state Catch L {
+    SetFloatValue(floatVariable=var "Shift Offset A", floatValue=13, everyFrame=false)
+    SetFloatValue(floatVariable=var "Shift Offset B", floatValue=-16, everyFrame=false)
+    SetFloatValue(floatVariable=var "Shift Offset C", floatValue=-3.5, everyFrame=false)
+    on FINISHED → Remaining Catchers
+  }
+
+  sequence state Remaining Catchers {
+    Wait(time=var "Cross Slash Pause", finishEvent=(none), realTime=false)
+    SpawnObjectFromGlobalPool(gameObject=lost_lace_cross_slash_catcher (localpoolprefabs_assets_laceboss.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatOperator(float1=var "Spawn X", float2=var "Shift Offset A", operation=Add, storeResult=var "Shifted Spawn X", everyFrame=false)
+    SetPosition2d(gameObject=var "Projectile", vector=(unset), x=var "Shifted Spawn X", y=8.5, space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=var "Cross Slash Pause", finishEvent=(none), realTime=false)
+    SpawnObjectFromGlobalPool(gameObject=lost_lace_cross_slash_catcher (localpoolprefabs_assets_laceboss.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatOperator(float1=var "Spawn X", float2=var "Shift Offset B", operation=Add, storeResult=var "Shifted Spawn X", everyFrame=false)
+    SetPosition2d(gameObject=var "Projectile", vector=(unset), x=var "Shifted Spawn X", y=10.5, space=0, everyFrame=false, lateUpdate=false)
+    Wait(time=var "Cross Slash Pause", finishEvent=(none), realTime=false)
+    SpawnObjectFromGlobalPool(gameObject=lost_lace_cross_slash_catcher (localpoolprefabs_assets_laceboss.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Projectile")
+    FloatOperator(float1=var "Spawn X", float2=var "Shift Offset C", operation=Add, storeResult=var "Shifted Spawn X", everyFrame=false)
+    SetPosition2d(gameObject=var "Projectile", vector=(unset), x=var "Shifted Spawn X", y=12.5, space=0, everyFrame=false, lateUpdate=false)
+    SetVector2XY(vector2Variable=var "Stomp Pos", vector2Value=(unset), x=var "Shifted Spawn X", y=12.5, everyFrame=false)
+    SetFsmVector2(gameObject=Self, fsmName="Control", variableName="Stomp Pos", setValue=var "Stomp Pos", everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Catch R {
+    SetFloatValue(floatVariable=var "Shift Offset A", floatValue=-13, everyFrame=false)
+    SetFloatValue(floatVariable=var "Shift Offset B", floatValue=16, everyFrame=false)
+    SetFloatValue(floatVariable=var "Shift Offset C", floatValue=3.5, everyFrame=false)
+    on FINISHED → Remaining Catchers
+  }
+
+  var Distance: float = 0
+  var Offset X: float = 0
+  var Spawn X: float = 0
+  var Spawn Y: float = 0
+  var Offset X Min: float = 4.5
+  var Offset X Max: float = 10
+  var Cross Slash Pause: float = 0.2
+  var Shifted Spawn X: float = 0
+  var Shift Offset A: float = 0
+  var Shift Offset B: float = 0
+  var Shift Offset C: float = 0
+  var Amount: int = 0
+  var Retries: int = 0
+  var Weighted Left: bool = false
+  var Stomp Pos: vector2 = (0, 0)
+  var Self: gameObject = Boss Control/Lost Lace Boss
+  var Projectile: gameObject = <null>
+  var Bullet Cursor: gameObject = Boss Control/Lost Lace Boss/Bullet Cursor
+}

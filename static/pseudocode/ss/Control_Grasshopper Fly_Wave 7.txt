@@ -1,0 +1,535 @@
+# Control
+# 1 location(s):
+#   Clover_04b / Battle Scene/Wave 7/Grasshopper Fly
+
+fsm Control {
+  start Init
+  on SPLASH → Splash Enter  // from any state
+  on DISABLE → Stop  // from any state
+
+  sequence state Init {
+    NextFrameEvent(sendEvent=(none))
+    SetParent(gameObject=var "PrevPos", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Tele Marker", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    SetParent(gameObject=var "Target", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    FindAlertRange(target=Self, storeResult=var "Patrol Range", childName="Patrol Range")
+    SetParent(gameObject=var "Patrol Range Obj", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    GetPosition2d(gameObject=Self, vector_2d=(unset), x=var "Start X", y=var "Start Y", space=0, everyFrame=false)
+    on FINISHED → Rest
+  }
+
+  state Rest {
+    SelectRandomString(strings=["Rest 1", "Rest 2"], weights=[1, 1], storeString=var "Anim")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName=var "Anim")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Wake Range", storeResult=false, sendEvent="WAKE", outOfRangeEvent="", everyFrame=true)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=(unset), belowBool=var "Hero Below", rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=1, reverseIfNegativeScale=false, everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"WAKE", ActiveOuter=→"WAKE", IgnoreNeedolinRange=false, useActiveBool=true, ActiveBool=var "Hero Below", StoreState=None, EveryFrame=true)
+    AudioStop(gameObject=Self, fadeTime=0)
+    SetBoolValue(boolVariable=var "Is Returning", boolValue=false, everyFrame=false)
+    on WAKE → Do Call?
+    on TOOK DAMAGE → Do Call?
+    on BATTLE START → Battler
+    on CALL → Set Called
+  }
+
+  state Wake Drop {
+    SetBoolValue(boolVariable=var "Battle Scene Started", boolValue=false, everyFrame=false)
+    PlayAudioEvent(audioClip=grasshopper_fly_leave_hanging_idle (sfxstatic_assets_areaclover.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-27, everyFrame=false)
+    on FINISHED → Fly Idle
+  }
+
+  state Fly Idle {
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    WaitRandom(timeMin=0.25, timeMax=0.5, finishEvent=→"FINISHED", realTime=false)
+    RandomFloat(min=0, max=360, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=1, everyFrame=false)
+    BoolTest(boolVariable=var "Battle Scene Started", isTrue=→"FINISHED", isFalse=(none), everyFrame=true)
+    SetInvincible(target=Self, Invincible=var "Do Block", InvincibleFromDirection=0, resetOnStateExit=false)
+    on FINISHED → Range Check
+    on BLOCKED HIT → Block
+    on TOOK DAMAGE → Dmg Response
+  }
+
+  state TeleOut Antic {
+    SetIntValue(intVariable=var "Loop Count", intValue=0, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele Out", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → TeleOut
+    on BLOCKED HIT → Block
+  }
+
+  state Set Tele Point {
+    SetPositionToObject(gameObject=var "Tele Marker", targetObject=var "Hero", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    on FINISHED → Tele Dir
+  }
+
+  state Tele Dir {
+    SendRandomEvent(events=[→"L", →"R"], weights=[1, 1], delay=0)
+    on L → Check L
+    on R → Check R
+  }
+
+  state Check L {
+    RandomFloat(min=125, max=180, storeResult=var "Angle")
+    on FINISHED → Ray Check
+  }
+
+  state Retry {
+    IntAdd(intVariable=var "Loop Count", add=1, everyFrame=false)
+    IntCompare(integer1=var "Loop Count", integer2=990, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"CANCEL", everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Set Tele Point
+  }
+
+  state Cancel Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetIntValue(intVariable=var "Loop Count", intValue=0, everyFrame=false)
+    BoolTest(boolVariable=var "Battler", isTrue=→"BATTLE REACT", isFalse=(none), everyFrame=false)
+    on FINISHED → Fly Idle
+    on BATTLE REACT → Battle Tele Fail
+  }
+
+  state Check R {
+    RandomFloat(min=0, max=55, storeResult=var "Angle")
+    on FINISHED → Ray Check
+  }
+
+  state Ray Check {
+    ConvertAngleToVector2(angle=var "Angle", storeVector=var "Ray Vector", everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Tele Marker", fromPosition=(unset), direction=var "Ray Vector", space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Soft Terrain(25), Attack(17)], invertMask=false, ignoreTriggers=false, debugColor=(0, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2dV2(fromGameObject=var "Tele Marker", fromPosition=(0, 1), direction=var "Ray Vector", space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Soft Terrain(25), Attack(17)], invertMask=false, ignoreTriggers=false, debugColor=(0.92156863, 0, 0, 1), debug=true)
+    RayCast2dV2(fromGameObject=var "Tele Marker", fromPosition=(0, -1), direction=var "Ray Vector", space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Soft Terrain(25), Attack(17)], invertMask=false, ignoreTriggers=false, debugColor=(0, 0.7690335, 0.92156863, 1), debug=true)
+    RayCast2dV2(fromGameObject=var "Tele Marker", fromPosition=(-1, 0), direction=var "Ray Vector", space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Soft Terrain(25), Attack(17)], invertMask=false, ignoreTriggers=false, debugColor=(0.92156863, 0.74361056, 0, 1), debug=true)
+    RayCast2dV2(fromGameObject=var "Tele Marker", fromPosition=(1, 0), direction=var "Ray Vector", space=0, distance=10, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8), Soft Terrain(25), Attack(17)], invertMask=false, ignoreTriggers=false, debugColor=(0.9158216, 0.3897059, 1, 1), debug=true)
+    Vector2Multiply(vector2Variable=var "Ray Vector", multiplyBy=9, everyFrame=false)
+    Translate(gameObject=var "Tele Marker", vector=var "Ray Vector", x=(unset), y=(unset), z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SetBoolValue(boolVariable=var "Too Close Self", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Too Close Other", boolValue=false, everyFrame=false)
+    GetDistance(gameObject=Self, target=var "Tele Marker", storeResult=var "Distance", everyFrame=false)
+    FloatTestToBool(float1=var "Distance", float2=4, tolerance=0, equalBool=(unset), lessThanBool=var "Too Close Self", greaterThanBool=(unset), everyFrame=false)
+    FindClosest(gameObject=var "Tele Marker", withTag="Teleplane", ignoreOwner=true, mustBeVisible=false, storeObject=var "", storeDistance=var "Distance", everyFrame=false)
+    FloatTestToBool(float1=var "Distance", float2=4, tolerance=0, equalBool=(unset), lessThanBool=var "Too Close Other", greaterThanBool=(unset), everyFrame=false)
+    IntTestToBool(int1=var "Loop Count", int2=900, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "High Loop Count", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Too Close Other", var "High Loop Count"], boolStates=[true, false], trueEvent=→"CANCEL", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Too Close Self", var "High Loop Count"], boolStates=[true, false], trueEvent=→"CANCEL", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")  // disabled
+    GetSceneDimensions(StoreWidth=var "Scene Width", StoreHeight=var "Scene Height")
+    GetPosition(gameObject=var "Tele Marker", vector=(unset), x=var "Tele X", y=var "Tele Y", z=(unset), space=0, everyFrame=false)
+    FloatCompare(float1=var "Tele X", float2=3, tolerance=0, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Tele Y", float2=3, tolerance=0, equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    FloatAdd(floatVariable=var "Scene Width", add=-3, everyFrame=false, perSecond=false)
+    FloatAdd(floatVariable=var "Scene Height", add=-3, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Tele X", float2=var "Scene Width", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    FloatCompare(float1=var "Tele Y", float2=var "Scene Height", tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "Too Close Self", isTrue=→"THROW", isFalse=(none), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on CANCEL → Retry
+    on FINISHED → TeleOut Antic
+    on THROW → Throw Antic
+  }
+
+  state TeleOut {
+    PlayAudioEventRandom(audioClips=[grasshopper_child_dash_1 (sfxstatic_assets_areaclover.bundle), grasshopper_child_dash_2 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.85, pitchMax=0.95, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioStop(gameObject=Self, fadeTime=0)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    FloatAdd(floatVariable=var "Angle", add=-90, everyFrame=false, perSecond=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetDistance(gameObject=Self, target=var "Tele Marker", storeResult=var "Speed", everyFrame=false)
+    FloatMultiply(floatVariable=var "Speed", multiplyBy=7, everyFrame=false)
+    FireAtTarget(gameObject=Self, target=var "Tele Marker", speed=var "Speed", position=(0, 0, 0), spread=0, everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=180, angleOffsetIfMirrored=0, otherGameObject=<null>, everyFrame=true)
+    SetPositionToObject(gameObject=var "PrevPos", targetObject=var "Self", xOffset=0, yOffset=0, zOffset=0, overrideZ=(unset), everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    on FINISHED → Tele In 1
+  }
+
+  state Tele In 1 {
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false)
+    SetPositionToObject(gameObject=Self, targetObject=var "Tele Marker", xOffset=0, yOffset=0, zOffset=0, overrideZ=var "Z Pos", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Tele In", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "PrevPos", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    FireAtTarget(gameObject=Self, target=var "PrevPos", speed=-30, position=(0, 0, 0), spread=0, everyFrame=false)
+    FaceAngle(gameObject=Self, angleOffset=0, angleOffsetIfMirrored=180, otherGameObject=<null>, everyFrame=true)
+    DecelerateV2(gameObject=Self, deceleration=0.6, brakeOnExit=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=1, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    on FINISHED → Entry Sfx?
+  }
+
+  state Tele In 2 {
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    DecelerateV2(gameObject=Self, deceleration=0.6, brakeOnExit=true)
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → After Tele
+  }
+
+  state Throw Antic {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=clover_grasshopper_B (sfxdynamic_assets_areaclover.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    PlayAudioEvent(audioClip=grasshopper_fly_throw_antic (sfxstatic_assets_areaclover.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Throw", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetAngleToTarget2D(gameObject=var "Throw Point 1", target=var "Hero", offsetX=0, offsetY=-3, storeAngle=var "Angle", pause=0.25, everyFrame=false)  // disabled
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=5, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    on FINISHED → Throw Target Lock
+  }
+
+  state After Tele {
+    ActivateGameObject(gameObject=var "Terrain Collider", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Is Leaving", isTrue=→"LEAVE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Is Returning", isTrue=→"UNALERT", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Do Startle", isTrue=→"STARTLE", isFalse=(none), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Throw Range", storeResult=false, sendEvent="", outOfRangeEvent="FLIT", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=var "Close Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    SendRandomEventV4(events=[→"THROW", →"FLIT", →"SLASH"], weights=[0.3, 0.3, 0.4], eventMax=[1, 1, 2], missedMax=[4, 4, 1], activeBool=var "Close Range")
+    SendRandomEventV4(events=[→"THROW", →"FLIT"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on THROW → Evade?
+    on FLIT → Fly Idle
+    on SLASH → Slash Antic
+    on LEAVE → Leave
+    on STARTLE → Startle
+    on UNALERT → Rest
+  }
+
+  state Throw 1 {
+    PlayAudioEventRandom(audioClips=[grasshopper_fly_throw_1 (sfxstatic_assets_areaclover.bundle), grasshopper_fly_throw_2 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SpawnObjectFromGlobalPool(gameObject=Grasshopper Dart (localpoolprefabs_assets_areaclover.bundle), spawnPoint=var "Throw Point 1", position=(unset), rotation=(unset), storeObject=var "Dart")
+    SetVelocityAsAngle(gameObject=var "Dart", angle=var "Angle", speed=var "Speed", everyFrame=false)
+    FlingObject(flungObject=var "Dart", speedMin=var "Throw Speed", speedMax=var "Throw Speed", angleMin=var "Angle", angleMax=var "Angle")
+    SetFsmGameObject(gameObject=var "Dart", fsmName="Control", variableName="Target", setValue=var "Target", everyFrame=false)
+    on FINISHED → Throw Antic 2
+  }
+
+  state Throw Antic 2 {
+    PlayAudioEvent(audioClip=grasshopper_fly_throw_antic (sfxstatic_assets_areaclover.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    GetAngleToTarget2D(gameObject=var "Throw Point 2", target=var "Target", offsetX=0, offsetY=2, storeAngle=var "Angle", pause=(unset), everyFrame=false)
+    on FINISHED → Throw 2
+  }
+
+  state Throw 2 {
+    PlayAudioEventRandom(audioClips=[grasshopper_fly_throw_1 (sfxstatic_assets_areaclover.bundle), grasshopper_fly_throw_2 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SpawnObjectFromGlobalPool(gameObject=Grasshopper Dart (localpoolprefabs_assets_areaclover.bundle), spawnPoint=var "Throw Point 2", position=(unset), rotation=(unset), storeObject=var "Dart")
+    SetVelocityAsAngle(gameObject=var "Dart", angle=var "Angle", speed=var "Speed", everyFrame=false)
+    FlingObject(flungObject=var "Dart", speedMin=var "Throw Speed", speedMax=var "Throw Speed", angleMin=var "Angle", angleMax=var "Angle")
+    SetFsmGameObject(gameObject=var "Dart", fsmName="Control", variableName="Target", setValue=var "Target", everyFrame=false)
+    on FINISHED → Throw Antic 3
+  }
+
+  state Evade? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=false, sendEvent="EVADE", outOfRangeEvent="", everyFrame=false)
+    on FINISHED → Throw Antic
+    on EVADE → Evade Antic
+  }
+
+  state Evade Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic Q", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Evade
+    on BLOCKED HIT → Block
+  }
+
+  state Evade {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=30, ySpeed=8, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.92, brakeOnExit=false)
+    PlayAudioEventRandom(audioClips=[grasshopper_child_dash_1 (sfxstatic_assets_areaclover.bundle), grasshopper_child_dash_2 (sfxstatic_assets_areaclover.bundle)], pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Throw Antic
+    on BLOCKED HIT → Block
+  }
+
+  state Choice Far {
+    SendEvent(eventTarget=Self, sendEvent=→"TELE", delay=0, everyFrame=false)
+    on TELE → Set Tele Point
+  }
+
+  state Range Check {
+    BoolTest(boolVariable=var "Battle Scene Started", isTrue=→"LEAVE", isFalse=(none), everyFrame=false)  // disabled
+    CheckAlertRange(alertRange=var "Patrol Range", storeResult=var "In Patrol Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=false)
+    BoolTestMulti(boolVariables=[var "In Patrol Range", var "Battler"], boolStates=[false, false], trueEvent=→"UNALERT", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Close Range", storeResult=false, sendEvent="CLOSE", outOfRangeEvent="FAR", everyFrame=false)
+    on CLOSE → Choice Close
+    on FAR → Choice Far
+    on LEAVE → Set Leaving
+    on UNALERT → Set Returning
+  }
+
+  state Choice Close {
+    SendEvent(eventTarget=Self, sendEvent=→"TELE", delay=0, everyFrame=false)  // disabled
+    BoolTest(boolVariable=var "Force Tele", isTrue=→"TELE", isFalse=(none), everyFrame=false)
+    SendRandomEventV4(events=[→"TELE", →"EVADE", →"SLASH"], weights=[1, 1, 1], eventMax=[1, 1, 2], missedMax=[3, 3, 2], activeBool=(unset))
+    on TELE → Set Tele Point
+    on EVADE → Evade Antic
+    on SLASH → Slash Antic
+  }
+
+  state Slash Antic {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=clover_grasshopper_B (sfxdynamic_assets_areaclover.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    PlayAudioEvent(audioClip=grasshopper_fly_attack_antic_slashy (sfxstatic_assets_areaclover.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wild Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.925, brakeOnExit=true)
+    on FINISHED → Wild Slash
+  }
+
+  state Wild Slash {
+    PlayAudioEvent(audioClip=grasshopper_fly_attack_slashy (sfxstatic_assets_areaclover.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Wild Slash")
+    Wait(time=0.8, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "WildSlash", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=false)
+    FireAtTarget(gameObject=Self, target=var "Hero", speed=30, position=(0, 0, 0), spread=0, everyFrame=false)
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", everyFrame=false, pauseBetweenTurns=false, pauseTime=0)
+    on FINISHED → Wild Slash End
+    on MULTI HIT CONNECT → Multihit
+  }
+
+  state Wild Slash End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wild Slash End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fly Idle
+  }
+
+  state Splash Enter {
+    AudioStop(gameObject=Self, fadeTime=0)
+    PlayParticleEmitter(gameObject=var "Pt Splash", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Splash Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SetBoolValue(boolVariable=var "Will Stomp", boolValue=false, everyFrame=false)
+    SetRotation(gameObject=Self, quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=0, space=0, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetBoolValue(boolVariable=var "Force Tele", boolValue=true, everyFrame=false)
+    on FINISHED → Set Tele Point
+  }
+
+  state Throw Target Lock {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetPositionToObject2D(gameObject=var "Target", targetObject=var "Hero", xOffset=0, yOffset=0, everyFrame=false)
+    GetAngleToTarget2D(gameObject=var "Throw Point 1", target=var "Target", offsetX=0, offsetY=-3, storeAngle=var "Angle", pause=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=→"FINISHED")
+    on FINISHED → Throw 1
+  }
+
+  state Multihit {
+    Wait(time=0.4, finishEvent=→"FINISHED", realTime=false)
+    ActivateGameObject(gameObject=var "WildSlash", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Wild Slash End
+  }
+
+  state Stop {
+    AudioStop(gameObject=var "Current Clip", fadeTime=0)
+  }
+
+  state Set Leaving {
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Tele X", y=var "Tele Y", space=0, everyFrame=false)
+    FloatAddRandom(floatVariable=var "Tele X", addMin=-20, addMax=20)
+    FloatAdd(floatVariable=var "Tele Y", add=-30, everyFrame=false, perSecond=false)
+    SetPosition2D(GameObject=var "Tele Marker", Vector=(unset), X=var "Tele X", Y=var "Tele Y", Space=0, EveryFrame=false)
+    SetBoolValue(boolVariable=var "Is Leaving", boolValue=true, everyFrame=false)
+    on FINISHED → TeleOut Antic
+  }
+
+  state Leave {
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state Do Call {
+    SendEventByName(eventTarget=GameObject(var "Send Call To"), sendEvent="CALL", delay=0, everyFrame=false)
+    on FINISHED → Fly Idle
+  }
+
+  state Set Called {
+    SetBoolValue(boolVariable=var "Do Startle", boolValue=true, everyFrame=false)
+    on FINISHED → Set Tele Point
+  }
+
+  state Startle {
+    SetBoolValue(boolVariable=var "Do Startle", boolValue=false, everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Call", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fly Idle
+  }
+
+  state Wake Drop Call {
+    SetBoolValue(boolVariable=var "Battle Scene Started", boolValue=false, everyFrame=false)
+    PlayAudioEvent(audioClip=grasshopper_fly_leave_hanging_idle (sfxstatic_assets_areaclover.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="WakeToCall", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.875, brakeOnExit=true)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=-27, everyFrame=false)
+    on FINISHED → Do Call
+  }
+
+  state Do Call? {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=clover_grasshopper_B (sfxdynamic_assets_areaclover.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    GameObjectIsNull(gameObject=var "Send Call To", isNull=→"FINISHED", isNotNull=→"CALL", storeResult=(unset), everyFrame=false)
+    on FINISHED → Wake Drop
+    on CALL → Wake Drop Call
+  }
+
+  state Block {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ConvertBoolToString(boolVariable=var "Block Alt", stringVariable=var "Block Anim", falseString="Block 1", trueString="Block 2", everyFrame=false)
+    BoolFlip(boolVariable=var "Block Alt")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Block Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=30, ySpeed=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Block Recover
+  }
+
+  state Block Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    WaitRandom(timeMin=0.25, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    RandomFloat(min=0, max=360, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=1, everyFrame=false)  // disabled
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=0, resetOnStateExit=true)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Range Check
+    on BLOCKED HIT → Block 2
+  }
+
+  state Block 2 {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    ConvertBoolToString(boolVariable=var "Block Alt", stringVariable=var "Block Anim", falseString="Block 1", trueString="Block 2", everyFrame=false)
+    BoolFlip(boolVariable=var "Block Alt")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName=var "Block Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=22, ySpeed=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Block Recover 2
+  }
+
+  state Block Recover 2 {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    WaitRandom(timeMin=0.25, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    RandomFloat(min=0, max=360, storeResult=var "Angle")
+    SetVelocityAsAngle(gameObject=Self, angle=var "Angle", speed=1, everyFrame=false)  // disabled
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Range Check
+  }
+
+  state Set Returning {
+    SetFloatValue(floatVariable=var "Tele X", floatValue=var "Start X", everyFrame=false)
+    SetFloatValue(floatVariable=var "Tele Y", floatValue=var "Start Y", everyFrame=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=var "Tele X", y=var "Tele Y", space=0, everyFrame=false)  // disabled
+    SetPosition2D(GameObject=var "Tele Marker", Vector=(unset), X=var "Tele X", Y=var "Tele Y", Space=0, EveryFrame=false)
+    SetBoolValue(boolVariable=var "Is Returning", boolValue=true, everyFrame=false)
+    on FINISHED → TeleOut Antic
+  }
+
+  state Throw Antic 3 {
+    PlayAudioEvent(audioClip=grasshopper_fly_throw_antic (sfxstatic_assets_areaclover.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    GetAngleToTarget2D(gameObject=var "Throw Point 1", target=var "Target", offsetX=0, offsetY=2, storeAngle=var "Angle", pause=(unset), everyFrame=false)
+    on FINISHED → Throw 4
+  }
+
+  state Throw 4 {
+    PlayAudioEventRandom(audioClips=[grasshopper_fly_throw_1 (sfxstatic_assets_areaclover.bundle), grasshopper_fly_throw_2 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    FaceObjectV2(objectA=Self, objectB=var "Target", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SpawnObjectFromGlobalPool(gameObject=Grasshopper Dart (localpoolprefabs_assets_areaclover.bundle), spawnPoint=var "Throw Point 1", position=(unset), rotation=(unset), storeObject=var "Dart")
+    SetVelocityAsAngle(gameObject=var "Dart", angle=var "Angle", speed=var "Speed", everyFrame=false)
+    FlingObject(flungObject=var "Dart", speedMin=var "Throw Speed", speedMax=var "Throw Speed", angleMin=var "Angle", angleMax=var "Angle")
+    SetFsmGameObject(gameObject=var "Dart", fsmName="Control", variableName="Target", setValue=var "Target", everyFrame=false)
+    on FINISHED → Fly Idle
+  }
+
+  sequence state Dmg Response {
+    Wait(time=0.1, finishEvent=(none), realTime=false)
+    SendRandomEvent(events=[→"EVADE", →"TELE"], weights=[1, 1], delay=0)
+    on EVADE → Evade Antic
+    on TELE → Set Tele Point
+  }
+
+  state Entry Sfx? {
+    BoolTest(boolVariable=var "Do Sound On Tele Entry", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Sound On Tele Entry", boolValue=false, everyFrame=false)
+    PlayAudioEventRandom(audioClips=[grasshopper_slasher_dash_1 (sfxstatic_assets_areaclover.bundle), grasshopper_slasher_dash_2 (sfxstatic_assets_areaclover.bundle), grasshopper_slasher_dash_3 (sfxstatic_assets_areaclover.bundle), grasshopper_slasher_dash_4 (sfxstatic_assets_areaclover.bundle), grasshopper_slasher_dash_5 (sfxstatic_assets_areaclover.bundle)], pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=grasshopper_enemy_voice (sfxdynamic_assets_areaclover.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Tele In 2
+  }
+
+  state Battler {
+    SetBoolValue(boolVariable=var "Do Sound On Tele Entry", boolValue=true, everyFrame=false)
+    on FINISHED → Set Tele Point
+  }
+
+  state Battle Tele Fail {
+    SendRandomEventV4(events=[→"SLASH", →"THROW"], weights=[0.5, 0.5], eventMax=[3, 3], missedMax=[3, 3], activeBool=(unset))
+    on SLASH → Slash Antic
+    on THROW → Throw Antic
+  }
+
+  var Battler: bool = true
+  var Send Call To: gameObject = <null>
+
+  var Angle: float = 0
+  var Distance: float = 0
+  var Speed: float = 0
+  var Z Pos: float = 0
+  var Scene Height: float = 0
+  var Scene Width: float = 0
+  var Tele X: float = 0
+  var Tele Y: float = 0
+  var Throw Speed: float = 35
+  var Start X: float = 0
+  var Start Y: float = 0
+  var Loop Count: int = 0
+  var Close Range: bool = false
+  var Force Tele: bool = false
+  var Too Close Other: bool = false
+  var Too Close Self: bool = false
+  var Will Stomp: bool = false
+  var High Loop Count: bool = false
+  var Battle Scene Started: bool = false
+  var Is Leaving: bool = false
+  var Do Startle: bool = false
+  var Block Alt: bool = false
+  var Hero Below: bool = false
+  var Is Returning: bool = false
+  var In Patrol Range: bool = false
+  var Do Block: bool = false
+  var Do Sound On Tele Entry: bool = false
+  var Anim: string = ""
+  var Block Anim: string = ""
+  var Ray Vector: vector2 = (0, 0)
+  var PrevPos: gameObject = Battle Scene/Wave 7/Grasshopper Fly/PrevPos
+  var Self: gameObject = Battle Scene/Wave 7/Grasshopper Fly
+  var Tele Marker: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Tele Marker
+  var Throw Point 1: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Throw Point 1
+  var Throw Point 2: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Throw Point 2
+  var WildSlash: gameObject = Battle Scene/Wave 7/Grasshopper Fly/WildSlash
+  var Pt Splash: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Pt Splash
+  var Splash Effect: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Splash Effect
+  var Target: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Target
+  var Dart: gameObject = <null>
+  var Current Clip: gameObject = <null>
+  var Patrol Range Obj: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Patrol Range
+  var Audio Loop Voice: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Audio Loop Voice
+  var Terrain Collider: gameObject = Battle Scene/Wave 7/Grasshopper Fly/Terrain Collider
+  var Patrol Range: object = <null>
+}

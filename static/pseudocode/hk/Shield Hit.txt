@@ -1,0 +1,229 @@
+# Shield Hit
+# 1 location(s):
+#   resources.assets / Orbit Shield/Shield
+
+fsm Shield Hit {
+  start Init
+  on DISAPPEAR → Disappear  // from any state
+  on ORBIT SHIELD DOWN → Down  // from any state
+  on CHECK COMBO → Init  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindChild(gameObject=var "Parent", childName="Laser Stopper", storeResult=var "Laser Stopper")
+    GetPlayerDataInt(gameObject=var "GameManager", intName="nailDamage", storeValue=var "Damage")
+    FindChild(gameObject=Self, childName="Idle Pt", storeResult=var "Idle Pt")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Form")
+    SetAudioPitch(gameObject=Self, pitch=1, everyFrame=false)
+    SetAudioVolume(gameObject=Self, volume=1, everyFrame=false)
+    SetCollider(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Laser Stopper", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Dreamwielder?
+  }
+
+  state Idle {
+    Trigger2dEvent(trigger=OnTriggerEnter2D, collideTag="", collideLayer="", sendEvent=→"ENTER", storeCollider=var "Collider")
+    on ENTER → Type
+    on SLASH → Slash Anim
+  }
+
+  state Send Event {
+    SendEventByName(eventTarget=GameObject(var "Collider"), sendEvent="ORBIT SHIELD", delay=0, everyFrame=false)
+    DestroyEnemyBullet(target=var "Collider")
+    GetParent(gameObject=var "Collider", storeResult=var "Collider Parent")
+    GameObjectIsNull(gameObject=var "Collider Parent", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Collider Parent"), sendEvent="ORBIT SHIELD", delay=0, everyFrame=false)
+    DestroyEnemyBullet(target=var "Collider Parent")
+    on FINISHED → Idle
+  }
+
+  state Block Effect {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="BLOCK EFFECT", delay=0, everyFrame=false)
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=low_hit_nail_impact, motors=All, loopTime=(unset), isLooping=false, tag="", gamepadVibration=SmallImpact)
+    on FINISHED → Send Event
+  }
+
+  state Type {
+    GetTag(gameObject=var "Collider", storeResult=var "Tag", everyFrame=false)
+    GetLayer(gameObject=var "Collider", storeResult=var "Collider Layer", everyFrame=false)
+    IntCompare(integer1=var "Collider Layer", integer2=11, equal=→"ENEMY", lessThan=(none), greaterThan=(none), everyFrame=false)
+    IntCompare(integer1=var "Collider Layer", integer2=17, equal=→"NO EFFECT", lessThan=(none), greaterThan=(none), everyFrame=false)
+    StringCompare(stringVariable=var "Tag", compareTo="Nail Attack", equalEvent=→"HERO ATTACK", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Tag", compareTo="Hero Spell", equalEvent=→"HERO ATTACK", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"PROJECTILE", delay=0, everyFrame=false)
+    on HERO ATTACK → Idle
+    on ENEMY → Invincible?
+    on PROJECTILE → Block Effect
+    on NO EFFECT → Send Event
+  }
+
+  state Hit {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=dream_damage, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayVibration(lowFidelityVibration=None, highFidelityVibration=low_hit_nail_impact, motors=All, loopTime=(unset), isLooping=false, tag="", gamepadVibration=SmallImpact)
+    SendMessage(gameObject=var "Enemy", delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    SendEventByName(eventTarget=GameObject(var "Enemy"), sendEvent="TOOK DAMAGE", delay=0, everyFrame=false)
+    GetHP(target=var "Enemy", storeValue=var "Enemy HP")
+    IntOperator(integer1=var "Enemy HP", integer2=var "Damage", operation=Subtract, storeResult=var "Enemy HP", everyFrame=false)
+    SetHP(target=var "Enemy", hp=var "Enemy HP")
+    IntCompare(integer1=var "Enemy HP", integer2=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    InstaDeath(target=var "Enemy", direction=0)
+    on FINISHED → Parent?
+  }
+
+  state Invincible? {
+    SetBoxCollider2DSize(gameObject1=Self, width=0.8, height=2.7, offsetX=-0.07, offsetY=0)
+    SetGameObject(variable=var "Enemy", gameObject=var "Collider", everyFrame=false)
+    GetTag(gameObject=var "Enemy", storeResult=var "Tag", everyFrame=false)
+    StringCompare(stringVariable=var "Tag", compareTo="Spell Vulnerable", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    CheckInvincibility(target=var "Enemy", storeValue=var "Invincible")
+    BoolTest(boolVariable=var "Invincible", isTrue=→"INVINCIBLE", isFalse=(none), everyFrame=false)
+    GetParent(gameObject=var "Enemy", storeResult=var "Enemy Parent")
+    CheckInvincibility(target=var "Enemy Parent", storeValue=var "Invincible")
+    BoolTest(boolVariable=var "Invincible", isTrue=→"INVINCIBLE", isFalse=(none), everyFrame=false)
+    on INVINCIBLE → Tink
+    on FINISHED → Hit
+  }
+
+  state Parent? {
+    GetParent(gameObject=var "Enemy", storeResult=var "Enemy Parent")
+    GameObjectIsNull(gameObject=var "Enemy Parent", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Enemy Parent"), sendEvent="TOOK DAMAGE", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "Enemy Parent", delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    GetHP(target=var "Enemy Parent", storeValue=var "Enemy HP")
+    IntOperator(integer1=var "Enemy HP", integer2=var "Damage", operation=Subtract, storeResult=var "Enemy HP", everyFrame=false)
+    SetHP(target=var "Enemy Parent", hp=var "Enemy HP")
+    IntCompare(integer1=var "Enemy HP", integer2=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    InstaDeath(target=var "Enemy Parent", direction=0)
+    on FINISHED → G Parent?
+  }
+
+  state G Parent? {
+    GetParent(gameObject=var "Enemy Parent", storeResult=var "Enemy Grandparent")
+    GameObjectIsNull(gameObject=var "Enemy Grandparent", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SendMessage(gameObject=var "Enemy Grandparent", delivery=SendMessage, options=1, functionCall=flashFocusHeal())
+    SendEventByName(eventTarget=GameObject(var "Enemy Grandparent"), sendEvent="TOOK DAMAGE", delay=0, everyFrame=false)
+    GetHP(target=var "Enemy Grandparent", storeValue=var "Enemy HP")
+    IntOperator(integer1=var "Enemy HP", integer2=var "Damage", operation=Subtract, storeResult=var "Enemy HP", everyFrame=false)
+    SetHP(target=var "Enemy Grandparent", hp=var "Enemy HP")
+    IntCompare(integer1=var "Enemy HP", integer2=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    InstaDeath(target=var "Enemy Grandparent", direction=0)
+    on FINISHED → Break
+  }
+
+  state Break {
+    SetCollider(gameObject=Self, active=false)
+    ActivateGameObject(gameObject=var "Laser Stopper", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Enemy Hit")
+    Wait(time=2, finishEvent=→"END", realTime=false)
+    SetAudioPitch(gameObject=Self, pitch=0.75, everyFrame=false)
+    SetAudioVolume(gameObject=Self, volume=0.75, everyFrame=false)
+    on END → Reform
+  }
+
+  state Reform {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Reform", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetAudioPitch(gameObject=Self, pitch=1, everyFrame=false)
+    SetAudioVolume(gameObject=Self, volume=1, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=soul_pickup_1, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Reset
+  }
+
+  state Reset {
+    SetCollider(gameObject=Self, active=true)
+    ActivateGameObject(gameObject=var "Laser Stopper", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Idle
+  }
+
+  state Disappear {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Disappear")
+    StopParticleEmitter(gameObject=var "Idle Pt")
+    SetCollider(gameObject=Self, active=false)
+  }
+
+  state Down {
+    StopParticleEmitter(gameObject=var "Idle Pt")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Disappear")
+    SetBoxCollider2DSize(gameObject1=Self, width=0.8, height=2.7, offsetX=-0.07, offsetY=0)
+    on ORBIT SHIELD UP → Up
+  }
+
+  state Up {
+    PlayParticleEmitter(gameObject=var "Idle Pt", emit=0)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Form")
+    on FINISHED → Idle
+  }
+
+  state Pulsing {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pulse", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")  // disabled
+    SetBoxCollider2DSize(gameObject1=Self, width=1.9, height=2.7, offsetX=-0.63, offsetY=0)
+    Trigger2dEvent(trigger=OnTriggerEnter2D, collideTag="", collideLayer="", sendEvent=→"ENTER", storeCollider=var "Collider")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Slash End
+    on ENTER → Type 2
+  }
+
+  state Type 2 {
+    GetTag(gameObject=var "Collider", storeResult=var "Tag", everyFrame=false)
+    GetLayer(gameObject=var "Collider", storeResult=var "Collider Layer", everyFrame=false)
+    IntCompare(integer1=var "Collider Layer", integer2=11, equal=→"ENEMY", lessThan=(none), greaterThan=(none), everyFrame=false)
+    StringCompare(stringVariable=var "Tag", compareTo="Nail Attack", equalEvent=→"HERO ATTACK", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    StringCompare(stringVariable=var "Tag", compareTo="Hero Spell", equalEvent=→"HERO ATTACK", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"PROJECTILE", delay=0, everyFrame=false)
+    on HERO ATTACK → Pulsing
+    on ENEMY → Invincible?
+    on PROJECTILE → Pulse Block
+  }
+
+  state Slash End {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    SetBoxCollider2DSize(gameObject1=Self, width=0.8, height=2.7, offsetX=-0.07, offsetY=0)
+    on FINISHED → Idle
+  }
+
+  state Slash Anim {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Pulse")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=dreamshield_attack, pitchMin=0.8, pitchMax=1.2, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Pulsing
+  }
+
+  state Pulse Block {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SendEventByName(eventTarget=GameObject(var "Collider"), sendEvent="ORBIT SHIELD", delay=0, everyFrame=false)
+    GetParent(gameObject=var "Collider", storeResult=var "Collider Parent")
+    GameObjectIsNull(gameObject=var "Collider Parent", isNull=→"FINISHED", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Collider Parent"), sendEvent="ORBIT SHIELD", delay=0, everyFrame=false)
+    on FINISHED → Pulsing
+  }
+
+  state Dreamwielder? {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Laser Stopper", vector=(unset), x=1, y=1, z=(unset), everyFrame=false, lateUpdate=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_30", isTrue=(none), isFalse=→"FINISHED")
+    SetScale(gameObject=Self, vector=(unset), x=-1.15, y=1.15, z=(unset), everyFrame=false, lateUpdate=false)
+    SetScale(gameObject=var "Laser Stopper", vector=(unset), x=1.15, y=1.15, z=(unset), everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  state Tink {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor, spawnPoint=var "Self", audioClip=sword_hit_reject, pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    SendEventByName(eventTarget=GameObject(var "Collider"), sendEvent="ORBIT SHIELD B", delay=0, everyFrame=false)
+    on FINISHED → Break
+  }
+
+  var Collider Layer: int = 0
+  var Damage: int = 10
+  var Enemy HP: int = 0
+  var Invincible: bool = false
+  var Tag: string = ""
+  var Collider: gameObject = <null>
+  var Collider Parent: gameObject = <null>
+  var Enemy: gameObject = <null>
+  var Enemy Grandparent: gameObject = <null>
+  var Enemy Parent: gameObject = <null>
+  var Idle Pt: gameObject = <null>
+  var Laser Stopper: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Self: gameObject = <null>
+}

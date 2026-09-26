@@ -1,0 +1,127 @@
+# Animation
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Lava Bell HUD
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Lava Bell HUD
+
+fsm Animation {
+  start Wait for HP
+
+  sequence state Inert {
+    SetBoolValue(boolVariable=var "Appear Instant", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on TOOL EQUIPS CHANGED → Equipped?
+  }
+
+  state Appear {
+    ActivateGameObject(gameObject=var "Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sprite", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    BoolTest(boolVariable=var "Appear Instant", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    AnimatorPlayStateWait(target=Self, stateName="Appear", finishEvent=→"FINISHED")
+    on TOOL EQUIPS CHANGED → Equipped?
+    on FINISHED → Full
+  }
+
+  state Full {
+    AnimatorPlay(gameObject=Self, stateName="Idle", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on TOOL EQUIPS CHANGED → Unequipped? Full
+    on LAVA BELL USED → Use
+    on LAVA BELL SIZZLE START → Full Sizzle
+  }
+
+  state Disappear {
+    AnimatorPlayStateWait(target=Self, stateName="Disappear", finishEvent=(none))
+    on FINISHED → Inert
+    on TOOL EQUIPS CHANGED → Unequipped? Full
+    on INVENTORY OPEN COMPLETE → Inert
+  }
+
+  sequence state Use {
+    PlayAudioEvent(audioClip=ui_hud_magma_bell_expended (sfxstatic_assets_ui.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player HUD@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AnimatorPlayStateWait(target=Self, stateName="Burst", finishEvent=(none))
+    on TOOL EQUIPS CHANGED → Unequipped? Empty
+    on FINISHED → Empty
+  }
+
+  sequence state Restore {
+    AnimatorPlayStateWait(target=Self, stateName="Recharge", finishEvent=(none))
+    on TOOL EQUIPS CHANGED → Unequipped? Full
+    on FINISHED → Full
+  }
+
+  state Equipped? {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"TRUE", falseEvent=→"FALSE", storeValue=(unset))
+    on FALSE → Inert
+    on TRUE → Play Appear Audio?
+  }
+
+  state Empty {
+    EnableFsmSelf(SetEnabled=false)
+    on TOOL EQUIPS CHANGED → Unequipped? Empty
+    on LAVA BELL RECHARGING → Restore
+    on LAVA BELL RESET → Full
+  }
+
+  state Unequipped? Full {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"FALSE", falseEvent=→"TRUE", storeValue=(unset))
+    on FALSE → Full
+    on TRUE → Disappear
+  }
+
+  state Unequipped? Empty {
+    CheckIfToolEquipped(Tool=var "Tool", RequiredAmountLeft=(unset), trueEvent=→"FALSE", falseEvent=→"TRUE", storeValue=(unset))
+    on FALSE → Empty
+    on TRUE → Play Disappear Audio?
+  }
+
+  state Wait {
+    Wait(time=0.7, finishEvent=→"FINISHED", realTime=false)
+    on TOOL EQUIPS CHANGED → Equipped?
+    on FINISHED → Equipped?
+    on INVENTORY OPEN COMPLETE → Appear Instant
+  }
+
+  sequence state Wait for HP {
+    SetBoolValue(boolVariable=var "Appear Instant", boolValue=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Sprite", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Effects", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    AnimatorPlay(gameObject=Self, stateName="Disappear", layer=0, normalizedTime=1, everyFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on LAST HP ADDED → Wait
+    on INVENTORY OPEN COMPLETE → Appear Instant
+  }
+
+  state Appear Instant {
+    SetBoolValue(boolVariable=var "Appear Instant", boolValue=true, everyFrame=false)
+    on FINISHED → Equipped?
+  }
+
+  state Full Sizzle {
+    AudioPlayInState(gameObject=var "Sizzle Loop", volume=1)
+    AnimatorPlay(gameObject=Self, stateName="Sizzle", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    PlayParticleEmitterInState(gameObject=_GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Lava Bell HUD/sizzle effect)
+    on LAVA BELL USED → Use
+    on LAVA BELL SIZZLE STOP → Full
+  }
+
+  state Play Disappear Audio? {
+    CheckHudVisible(trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset), everyFrame=false)
+    PlayAudioEventV2(audioClip=magma_bell_regenerate_pt_1_2d (sfxstatic_assets_ui.bundle), stopOnExit=true, pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Disappear
+  }
+
+  state Play Appear Audio? {
+    CheckHudVisible(trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=magma_bell_regenerate_pt_2_2d (sfxstatic_assets_ui.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Appear
+  }
+
+  var Appear Instant: bool = false
+  var Is Visible: bool = false
+  var Sprite: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Lava Bell HUD/lava_bell_icon
+  var Sizzle Loop: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Lava Bell HUD/Sizzle Loop
+  var Effects: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Extras/Lava Bell HUD/Effects
+  var Tool: object = Lava Charm (dataassets_assets_assets/dataassets/tools/toolitems.bundle)
+}

@@ -1,0 +1,191 @@
+# Control
+# 1 location(s):
+#   Coral_19 / Encounter Scene Control/Lace Meet/Lace NPC Blasted Bridge
+
+fsm Control {
+  start Pause
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    FindNamedChild(gameObject=var "Parent", storeResult=var "CamLock")
+    SetPlayerDataBool(boolName="laceLeftDocks", value=true)
+    SendEventToRegister(eventName="LACE PRESENT")
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    on ENTER → Take Control
+  }
+
+  state Take Control {
+    ActivateGameObject(gameObject=var "CamLock", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    TransitionToAudioSnapshot(snapshot=Silent (audioobjects_assets_all.bundle), transitionTime=3)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    RunFSM(fsmTemplateControl=template=6159435039333135483 in[Clamp X<-var "Clamp X"], finishEvent=→"LAND", everyFrame=false)
+    on LAND → Start Pause
+  }
+
+  state Convo 1 {
+    RunDialogue(Sheet="Wanderers", Key="LACE_MEET_1", OverrideContinue=true, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=Lace_talk_haughty_01 (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    DisplayNPCTitle(areaTitleObject=var "AreaTitle", displayRight=false, npcTitle="LACE")
+    on CONVO_END → Sit Up
+  }
+
+  state Convo 2 {
+    RunDialogue(Sheet="Wanderers", Key="LACE_MEET_2", OverrideContinue=false, PlayerVoiceTableOverride=Retort Hornet Voice (herodynamic_assets_all.bundle), PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Convo 3
+  }
+
+  state End Dialogue {
+    EndDialogue(ReturnControl=false, ReturnHUD=false, Target=Self, UseChildren=false)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    HideNPCTitle(AreaTitleObject=var "AreaTitle")
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    on FINISHED → Jump Antic
+  }
+
+  state Pause {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Check Location
+  }
+
+  state Jump Antic {
+    BoolTest(boolVariable=var "In Dustpens", isTrue=→"DUSTPENS", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Jump AnticQ", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=lace_prepare_stance (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=Lace_short_laugh_02 (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Challenge Talk End")
+    on FINISHED → Jump Away
+    on DUSTPENS → Sit Antic
+  }
+
+  state Jump Away {
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Jump Away")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetVelocityByScale(gameObject=Self, speed=35, ySpeed=70, everyFrame=false)
+    ActivateGameObject(gameObject=var "Dust Trail", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=lace_horizontal_dash (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Look Up End
+  }
+
+  state End {
+    ActivateGameObject(gameObject=var "CamLock", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CancelCameraShake(Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Medium Rumble (dataassets_assets_assets/dataassets/camerashake.bundle))
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StartAnimationControl())
+    SetPlayerDataBool(boolName="encounteredLaceBlastedBridge", value=true)
+    SaveGame()
+    SendEventToRegisterDelay(EventName="LACE LEAVE", delay=0, ExcludeTarget=Self)
+  }
+
+  state Start Pause {
+    BoolTest(boolVariable=var "In Dustpens", isTrue=→"DUSTPENS", isFalse=(none), everyFrame=false)
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimationControlToIdle())
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")  // disabled
+    on FINISHED → Convo 1
+    on DUSTPENS → Start Pause 2
+  }
+
+  state Convo 4 {
+    RunDialogue(Sheet="Wanderers", Key="LACE_MEET_4_BRIDGE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=true, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=Lace_talk_haughty_05 (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Challenge Talk Idle")
+    on CONVO_END → To Idle Anim
+  }
+
+  state Convo 3 {
+    BoolTest(boolVariable=var "In Dustpens", isTrue=→"DUSTPENS", isFalse=(none), everyFrame=false)
+    RunDialogue(Sheet="Wanderers", Key="LACE_MEET_3", OverrideContinue=false, PlayerVoiceTableOverride=Retort Hornet Voice (herodynamic_assets_all.bundle), PreventHeroAnimation=true, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Challenge Talk Start")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Hero", audioClip=hornet_sword_1 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.25, storePlayer=<null>)
+    PlayAudioEvent(audioClip=hornet_misc_foley_move_2 (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on CONVO_END → Convo 4
+    on DUSTPENS → Convo 3 Dust
+  }
+
+  state Check Location {
+    CheckSceneName(sceneName="Dust_01", equalEvent=(none), notEqualEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "In Dustpens", boolValue=true, everyFrame=false)
+    on FINISHED → Init
+  }
+
+  state Sit Up {
+    BoolTest(boolVariable=var "In Dustpens", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="SitToIdle")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=0.006, space=0, everyFrame=false, lateUpdate=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=lace_prepare_stance (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=lace_prepare_stance (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Convo 2
+  }
+
+  state Sit Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="NPC Sit Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=lace_prepare_stance (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=Lace_short_laugh_02 (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Jump Away 2
+  }
+
+  state Jump Away 2 {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Jump Away")
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SetVelocity2d(gameObject=Self, vector=(35, 70), x=(unset), y=(unset), everyFrame=false)
+    ActivateGameObject(gameObject=var "Dust Trail", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=lace_horizontal_dash (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    on FINISHED → Look Up End
+  }
+
+  sequence state Start Pause 2 {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=0, functionCall=FaceRight())
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=StopAnimation())
+    NextFrameEvent(sendEvent=(none))
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo 1
+  }
+
+  state Convo 3 Dust {
+    RunDialogue(Sheet="Wanderers", Key="LACE_MEET_3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=true, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Look Up Talk")
+    on CONVO_END → Convo 4 Dust
+  }
+
+  state Convo 4 Dust {
+    RunDialogue(Sheet="Wanderers", Key="LACE_MEET_4_BRIDGE", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=true, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=Lace_talk_haughty_05 (sfxstatic_assets_laceboss.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookingUp")
+    on CONVO_END → End Dialogue
+  }
+
+  state To Idle Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Challenge Talk Idle")
+    on FINISHED → End Dialogue
+  }
+
+  state Look Up End {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="LookUpEnd", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → End
+  }
+
+  var Clamp X: float = 385.4
+
+  var In Dustpens: bool = false
+  var Scene Name: string = ""
+  var CamLock: gameObject = <null>
+  var Dust Trail: gameObject = <null>
+  var Self: gameObject = <null>
+  var Parent: gameObject = <null>
+}

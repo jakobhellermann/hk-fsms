@@ -1,0 +1,768 @@
+# Control
+# 1 location(s):
+#   Room_CrowCourt_02 / Battle Scene/Wave 6/Crawfather
+
+fsm Control {
+  start Init
+  on STUN → Stun Start  // from any state
+  on ZERO HP → Test break  // from any state
+
+  state Init {
+    GetGrandParent(gameObject=Self, storeResult=var "Boss Scene")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Court Floor")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Particle Splasher")
+    FindNamedChild(gameObject=var "Boss Scene", storeResult=var "Crow Summons")
+    FindNamedChild(gameObject=var "Crow Summons", storeResult=var "Pin Wielder")
+    FindNamedChild(gameObject=var "Crow Summons", storeResult=var "Dagger")
+    FindNamedChild(gameObject=var "Crow Summons", storeResult=var "Tinies")
+    GetHP(target=Self, storeValue=var "P2 HP")
+    MultiplyIntByFloat(integer=var "P2 HP", multiplyFloat=0.6, storeResult=var "P2 HP", everyFrame=false, forceRoundUp=false)
+    on FINISHED → BG Idle
+  }
+
+  state Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    IntTestToBool(int1=var "Summons Active", int2=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Minions Are Summoned", everyFrame=false)
+    ConvertBoolToFloat(boolVariable=var "Minions Are Summoned", floatVariable=var "Idle Time", falseValue=0.25, trueValue=0.5, everyFrame=false)
+    Wait(time=var "Idle Time", finishEvent=→"FINISHED", realTime=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=4, resetOnStateExit=false)
+    RayCast2dV2(fromGameObject=var "Ray Pt", fromPosition=(unset), direction=(-1, 0), space=1, distance=4.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Far Range", storeResult=var "Hero Nearby", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    SetBoolValue(boolVariable=var "Can Run Back", boolValue=false, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Can Run Back", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=false)
+    SetBoolValueAtTime(BoolVariable=var "Can Run Back", BoolValue=false, Time=0.75, SetOppositeOnStateEntry=false)
+    BoolTestMulti(boolVariables=[var "Can Run Back", var "Hero Nearby", var "Wall Behind"], boolStates=[true, true, false], trueEvent=→"RUN BACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    on FINISHED → Call?
+    on BLOCKED HIT → Head Bonk G
+    on RUN BACK → Evade Instead?
+  }
+
+  state Range Check {
+    CompareHPBool(enemy=var "Self", compareTo=var "P2 HP", equalBool=false, lessThanBool=var "Can Chain Attack", greaterThanBool=false, everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0, MaxReactDelay=0, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    SetBoolValue(boolVariable=var "Did First Move", boolValue=true, everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"CHAIN ATTACK", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"CHAIN ATTACK", (none)], weights=[0.2, 0.8], eventMax=[1, 4], missedMax=[4, 1], activeBool=var "Can Chain Attack")
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Near Range", storeResult=false, sendEvent="NEAR", outOfRangeEvent="", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Far Range", storeResult=false, sendEvent="MID", outOfRangeEvent="FAR", everyFrame=false)
+    on NEAR → Near
+    on MID → Mid
+    on FAR → Far
+    on FLY → Launch Antic
+    on SING → Sing
+    on CHAIN ATTACK → Pos Check
+  }
+
+  state Head Bonk G {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Head Bonk Ground", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_stun_hit (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Call?
+  }
+
+  state Peck Antic {
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Peck Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetIntValue(intVariable=var "Pecks", intValue=3, everyFrame=false)
+    PlayAudioEvent(audioClip=coral_judge_sword_antic (sfxstatic_assets_areacoral.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_small_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Peck Forward
+  }
+
+  state Peck Forward {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Peck", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    SetVelocityByScale(gameObject=Self, speed=33, ySpeed=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.92, brakeOnExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_small_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=false, forcePlay=false)
+    on FINISHED → Debris Shove?
+  }
+
+  state Peck Land {
+    SendEventToRegister(eventName="FLOOR SHOVE")
+    PlayAudioEvent(audioClip=cage_impact_by_roach_2 (sfxstatic_assets_areadocksareadust.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    PlayAudioEvent(audioClip=coral_judge_shield_hit (sfxstatic_assets_areacoral.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    ActivateGameObject(gameObject=var "Particle Splasher", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObjectDelay(gameObject=var "Particle Splasher", activate=true, resetOnExit=false, delay=0.1)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=true)
+    ActivateGameObject(gameObject=var "Peck Spark", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Flash FG", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SelectRandomString(strings=["Peck Spark 1", "Peck Spark 2"], weights=[1, 1], storeString=var "Peck Anim")
+    Tk2dPlayAnimation(gameObject=var "Peck Spark", animLibName="", clipName=var "Peck Anim")
+    PlayParticleEmitter(gameObject=var "Pt Peck", emit=0, resetIfPlaying=false)
+    on FINISHED → End Early?
+  }
+
+  state Peck End {
+    IntAdd(intVariable=var "Pecks", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Pecks", integer2=0, equal=(none), lessThan=(none), greaterThan=→"REPEAT", everyFrame=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=4, resetOnStateExit=false)
+    on REPEAT → Peck Forward
+    on FINISHED → Idle
+  }
+
+  state Near {
+    RayCast2dV2(fromGameObject=var "Ray Pt", fromPosition=(unset), direction=(-1, 0), space=1, distance=4.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"PECK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SendRandomEventV3(events=[→"PECK", →"EVADE", →"FLY"], weights=[0.4, 0.4, 0.4], trackingInts=[var "Ct Peck", var "Ct Evade", var "Ct Fly"], eventMax=[2, 1, 1], trackingIntsMissed=[var "Ms Peck", var "Ms Evade", var "Ms Fly"], missedMax=[3, 3, 2])
+    on PECK → Peck Antic
+    on EVADE → Evade Antic
+    on FLY → Launch Antic
+  }
+
+  state Evade Antic {
+    PlayAudioEvent(audioClip=coral_judge_jump_antic (sfxstatic_assets_areacoral.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioStopV2(gameObject=var "Audio Loop Footstep", fadeTime=0, cancelOnEarlyExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_small_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Evade
+    on BLOCKED HIT → Head Bonk G
+  }
+
+  state Chase Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=coral_judge_jump_antic (sfxstatic_assets_areacoral.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStopV2(gameObject=var "Audio Loop Footstep", fadeTime=0, cancelOnEarlyExit=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_med_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Run
+    on BLOCKED HIT → Head Bonk G
+  }
+
+  state Mid {
+    SendEvent(eventTarget=Self, sendEvent=→"PECK", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV3(events=[→"PECK", →"FLY"], weights=[0.5, 0.5], trackingInts=[var "Ct Peck", var "Ct Fly"], eventMax=[1, 1], trackingIntsMissed=[var "Ms Peck", var "Ms Fly"], missedMax=[1, 1])
+    on PECK → Peck Antic
+    on FLY → Launch Antic
+  }
+
+  state Far {
+    SendEvent(eventTarget=Self, sendEvent=→"CHASE", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV3(events=[→"CHASE", →"FLY"], weights=[0.65, 0.35], trackingInts=[var "Ct Chase", var "Ct Fly"], eventMax=[2, 2], trackingIntsMissed=[var "Ms Chase", var "Ms Fly"], missedMax=[2, 2])
+    on CHASE → Chase Antic
+    on FLY → Launch Antic
+  }
+
+  state Evade {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    SetVelocityByScale(gameObject=Self, speed=-30, ySpeed=(unset), everyFrame=false)
+    AudioPlaySimple(gameObject=var "Audio Loop Footstep", volume=1, oneShotClip=<null>)
+    on FINISHED → Evade Recover
+    on BLOCKED HIT → Head Bonk G
+  }
+
+  state Evade Recover {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AudioStopV2(gameObject=var "Audio Loop Footstep", fadeTime=0.25, cancelOnEarlyExit=false)
+    on FINISHED → Range Check
+    on BLOCKED HIT → Head Bonk G
+  }
+
+  state Run {
+    PlayParticleEmitterInState(gameObject=var "Pt Run")
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Run Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Run Speed", multiplyBy=13, everyFrame=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=0.5, targetSpeed=var "Run Speed")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, RepeatDelay=0.25)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Near Range", storeResult=false, sendEvent="END", outOfRangeEvent="", everyFrame=true)
+    AudioPlaySimple(gameObject=var "Audio Loop Footstep", volume=1, oneShotClip=<null>)
+    on END → Run End
+    on BLOCKED HIT → Head Bonk G
+  }
+
+  state Run End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    AudioStopV2(gameObject=var "Audio Loop Footstep", fadeTime=0.25, cancelOnEarlyExit=false)
+    on FINISHED → Range Check
+    on BLOCKED HIT → Head Bonk G
+  }
+
+  state Launch Antic {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=false_knight_jump (sfxstatic_assets_enemyheavy.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_med_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Launch
+  }
+
+  state Launch {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    PlayParticleEmitter(gameObject=var "Pt Launch", emit=0, resetIfPlaying=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Flap Y", localSpace=false, time=0.45, speed=(unset), delay=(unset), easeType=4, reverse=false, finishEvent=→"FINISHED", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FLAP START", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=true)
+    on FINISHED → Flapping
+    on BLOCKED HIT → Head Bonk A
+  }
+
+  state Flapping {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=0, everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0.027)
+    WaitRandom(timeMin=1, timeMax=1, finishEvent=→"FINISHED", realTime=false)  // disabled
+    DistanceWalkServitor(gameObject=Self, target=var "Hero", distance=12, acceleration=10, speed=10, range=2, changeAnimation=false, spriteFacesRight=false, forwardAnimation="", backAnimation="")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToFly", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    SetBoolValueAtTime(BoolVariable=var "Can Dive", BoolValue=true, Time=1, SetOppositeOnStateEntry=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Far Range", storeResult=var "Hero Nearby", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Dive", var "Hero Nearby"], sendEvent=→"PECK", storeResult=(unset), everyFrame=true)
+    Wait(time=2, finishEvent=→"PECK", realTime=false)
+    on PECK → Dive Antic
+    on BLOCKED HIT → Head Bonk A
+  }
+
+  state Dive Antic {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    PlayAudioEvent(audioClip=coral_judge_sword_antic (sfxstatic_assets_areacoral.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetVelocity2d(gameObject=Self, vector=(0, 15), x=(unset), y=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dive Antic")
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToDive Antic", resetFrame=true, everyFrame=false, pauseBetweenTurns=0.5)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_med_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Dive
+    on BLOCKED HIT → Head Bonk A
+  }
+
+  state Dive {
+    PlayAudioEvent(audioClip=bone_hunter_dive (sfxstatic_assets_areaant.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Dive")
+    SetVelocityByScale(gameObject=Self, speed=35, ySpeed=-35, everyFrame=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FLAP STOP", delay=0, everyFrame=false)
+    on LAND → Dive Land
+  }
+
+  state Dive Land {
+    SendEventToRegister(eventName="FLOOR SHOVE")
+    SendEventToRegister(eventName="DEBRIS SHOVE")
+    ActivateGameObject(gameObject=var "Particle Splasher", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObjectDelay(gameObject=var "Particle Splasher", activate=true, resetOnExit=false, delay=0.1)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Dive Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, -40), x=(unset), y=(unset), everyFrame=false)
+    Translate(gameObject=var "MainCamera", vector=(unset), x=(unset), y=-0.3, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShakeQuick", delay=0.01, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Spark", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Flash FG", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SelectRandomString(strings=["Peck Spark 1", "Peck Spark 2"], weights=[1, 1], storeString=var "Peck Anim")
+    Tk2dPlayAnimation(gameObject=var "Peck Spark", animLibName="", clipName=var "Peck Anim")
+    PlayParticleEmitter(gameObject=var "Pt DivePeck", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=cage_impact_by_roach_2 (sfxstatic_assets_areadocksareadust.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    PlayAudioEvent(audioClip=coral_judge_shield_hit (sfxstatic_assets_areacoral.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    on FINISHED → Bounce
+  }
+
+  state Head Bonk A {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Head Bonk Air")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_stun_hit (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    SetVelocity2d(gameObject=Self, vector=(0, -10), x=(unset), y=(unset), everyFrame=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Bonk Land
+  }
+
+  state Bonk Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Call Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Call
+    on BLOCKED HIT → Head Bonk G
+  }
+
+  state Call {
+    StartRoarEmitter(spawnPoint=var "Roar Pt", delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    PlayParticleEmitter(gameObject=var "Pt Roar", emit=0, resetIfPlaying=false)
+    SendEventToRegister(eventName="CROWD ROAR")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_big_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Call Type
+  }
+
+  state Call? {
+    BoolTest(boolVariable=var "Did First Move", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    IntCompare(integer1=var "Summons Active", integer2=0, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    SendRandomEventV4(events=[→"CALL", →"FINISHED"], weights=[0.75, 0.25], eventMax=[2, 1], missedMax=[1, 2], activeBool=(unset))
+    on CALL → Call Antic
+    on FINISHED → Range Check
+  }
+
+  state Call End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegister(eventName="CROWD IDLE")
+    on FINISHED → Idle
+  }
+
+  state Stun Start {
+    SendEventByName(eventTarget=GameObject(var "Chains"), sendEvent="CHAIN CANCEL", delay=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Stun Timer", floatValue=2, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_stun (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FLAP STOP", delay=0, everyFrame=false)
+    AudioStopV2(gameObject=var "Audio Loop Footstep", fadeTime=0, cancelOnEarlyExit=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=2)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Air")
+    SetVelocityByScale(gameObject=Self, speed=-10, ySpeed=30, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    PlayParticleEmitter(gameObject=var "Pt Stun", emit=0, resetIfPlaying=false)
+    PlayParticleEmitter(gameObject=var "Pt RagBurst", emit=0, resetIfPlaying=false)
+    SendEventToRegister(eventName="CROWD ROAR")
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    on FINISHED → Stun Air
+  }
+
+  state Stun Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Stun Land
+  }
+
+  state Stunned {
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=(unset), brakeOnExit=false)
+    FloatAdd(floatVariable=var "Stun Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=(none), everyFrame=true)
+    on END → Stun Recover
+    on TOOK DAMAGE → Stun Damage
+  }
+
+  state Stun Recover {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Stun Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegister(eventName="CROWD IDLE")
+    SetHitEffectOrigin(target=Self, effectOrigin=(0, 0, 0), everyFrame=false)
+    SetInvincible(target=Self, Invincible=true, InvincibleFromDirection=4, resetOnStateExit=false)
+    on FINISHED → Call Antic
+  }
+
+  state Stun Land {
+    SetHitEffectOrigin(target=Self, effectOrigin=(0, -2, 0), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Stun Land")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Launch", emit=0, resetIfPlaying=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=big_enemy_corpse_ground_land (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    PlayAudioEvent(audioClip=cage_impact_by_roach_2 (sfxstatic_assets_areadocksareadust.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    SendEventToRegister(eventName="FLOOR SHOVE")
+    SendEventToRegister(eventName="DEBRIS SHOVE")
+    on FINISHED → Stunned
+  }
+
+  state Stun Damage {
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_stun_hit (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    FloatAdd(floatVariable=var "Stun Timer", add=-0.25, everyFrame=false, perSecond=false)
+    FloatCompare(float1=var "Stun Timer", float2=0, tolerance=0, equal=→"END", lessThan=→"END", greaterThan=→"FINISHED", everyFrame=false)
+    on FINISHED → Stunned
+    on END → Damage Recover
+  }
+
+  state Damage Recover {
+    SendEventByName(eventTarget=Self, sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    on FINISHED → Stun Recover
+  }
+
+  state Run B Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run Back", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Run B
+    on BLOCKED HIT → Head Bonk G
+    on EVADE → Evade Antic
+  }
+
+  state Run B {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Run Back")
+    SetVelocityByScale(gameObject=Self, speed=-8, ySpeed=(unset), everyFrame=false)
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Run")
+    on FINISHED → Run B End
+    on BLOCKED HIT → Head Bonk G
+    on TOOK DAMAGE → Evade Antic
+  }
+
+  state Run B End {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run Back End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Run B Recover
+    on BLOCKED HIT → Head Bonk G
+    on TOOK DAMAGE → Run B End Cancel
+  }
+
+  state Run B Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=true, newAnimationClip="TurnToIdle", resetFrame=true, everyFrame=true, pauseBetweenTurns=0.5)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Call?
+    on BLOCKED HIT → Head Bonk G
+    on TOOK DAMAGE → Call?
+  }
+
+  state BG Idle {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on CROWD ROAR → BG Roar
+    on BATTLE START → Emerge Announce
+  }
+
+  state BG Roar {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="BG Roar")
+    SetIntValue(intVariable=var "Pecks", intValue=3, everyFrame=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_roar (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on CROWD IDLE → BG Peck 1
+  }
+
+  state BG Peck 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="BG Peck", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    on FINISHED → BG Peck 2
+  }
+
+  state BG Peck 2 {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Peck Spark BG", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Flash BG", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=cage_impact_by_roach_2 (sfxstatic_assets_areadocksareadust.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    PlayAudioEvent(audioClip=coral_judge_shield_hit (sfxstatic_assets_areacoral.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    on FINISHED → BG Peck End
+  }
+
+  state BG Peck End {
+    IntAdd(intVariable=var "Pecks", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Pecks", integer2=0, equal=(none), lessThan=(none), greaterThan=→"REPEAT", everyFrame=false)
+    on FINISHED → BG Idle
+    on REPEAT → BG Peck 1
+  }
+
+  state Emerge Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=false_knight_jump (sfxstatic_assets_enemyheavy.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_med_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Emerge
+  }
+
+  state Emerge {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FLAP START", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    AnimateZPositionTo(GameObject=Self, ToValue=0.007, localSpace=false, time=0.4, speed=(unset), delay=(unset), easeType=21, reverse=false, finishEvent=(none), realTime=false)
+    GetPosition2D(gameObject=Self, vector=(unset), x=(unset), y=var "Y Target", space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Y Target", add=4, everyFrame=false, perSecond=false)
+    AnimateYPositionTo(GameObject=Self, ToValue=var "Y Target", localSpace=false, time=0.4, speed=(unset), delay=(unset), easeType=4, reverse=false, finishEvent=(none), realTime=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Flap Down
+  }
+
+  state Flap Down {
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetGravity2dScale(gameObject=Self, gravityScale=0.5)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Emerge Land
+  }
+
+  state Emerge Land {
+    PlayParticleEmitter(gameObject=var "Pt Land", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=false_knight_land_1st_time (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="FLAP STOP", delay=0, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    SendEventToRegister(eventName="FLOOR SHOVE")
+    SendEventToRegister(eventName="DEBRIS SHOVE")
+    on FINISHED → Roar
+  }
+
+  state Roar {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Roar")
+    StartRoarEmitter(spawnPoint=var "Roar Pt", delay=0, stunHero=true, roarBurst=false, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=true)
+    DisplayBossTitle(areaTitleObject=var "AreaTitle", displayRight=false, bossTitle="CROWFATHER")
+    Wait(time=2.75, finishEvent=→"FINISHED", realTime=false)
+    SendEventToRegister(eventName="CROWD ROAR")
+    PlayParticleEmitter(gameObject=var "Pt Roar", emit=0, resetIfPlaying=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_roar (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    TransitionToAudioSnapshot(snapshot=Action (audioobjects_assets_all.bundle), transitionTime=0.25)
+    FadeNestedFadeGroup(Target=var "HeroLight Group", ToAlpha=1, FadeTime=0.5)
+    on FINISHED → Roar End
+  }
+
+  state Roar End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegister(eventName="CROWD IDLE")
+    on FINISHED → Idle
+  }
+
+  state Debris Shove? {
+    IntCompare(integer1=var "Pecks", integer2=2, equal=→"FINISHED", lessThan=(none), greaterThan=(none), everyFrame=false)
+    SendEventToRegister(eventName="DEBRIS SHOVE")
+    on FINISHED → Peck Land
+  }
+
+  state Call Type {
+    SendEvent(eventTarget=Self, sendEvent=→"TINIES", delay=0, everyFrame=false)  // disabled
+    SendRandomEventV4(events=[→"PIN WIELDER", →"DAGGER", →"TINIES"], weights=[1, 1, 1], eventMax=[1, 1, 1], missedMax=[3, 3, 3], activeBool=(unset))
+    on PIN WIELDER → Pin Wielder
+    on DAGGER → Dagger
+    on TINIES → Tinies
+  }
+
+  state Pin Wielder {
+    SendEventByName(eventTarget=GameObject(var "Pin Wielder"), sendEvent="SUMMON", delay=0, everyFrame=false)
+    IntAdd(intVariable=var "Summons Active", add=1, everyFrame=false)
+    on FINISHED → Call End
+  }
+
+  state Emerge Announce {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="BG Roar")
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Rumble (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=true, DoFreeze=false, Delay=0)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=var "Hero", spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_short_roar (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Emerge Antic
+  }
+
+  state Dagger {
+    SendEventByName(eventTarget=GameObject(var "Dagger"), sendEvent="SUMMON", delay=0, everyFrame=false)
+    IntAdd(intVariable=var "Summons Active", add=1, everyFrame=false)
+    on FINISHED → Call End
+  }
+
+  state Tinies {
+    SendEventByName(eventTarget=GameObject(var "Tinies"), sendEvent="SUMMON", delay=0, everyFrame=false)
+    IntAdd(intVariable=var "Summons Active", add=2, everyFrame=false)
+    on FINISHED → Call End
+  }
+
+  state Bounce Land {
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (globalpoolprefabs_assets_all.bundle), spawnPoint=var "Self", audioClip=big_enemy_corpse_ground_land (sfxstatic_assets_enemyheavy.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Head Bonk Ground", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(0, -40), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Bounce {
+    SetVelocityByScale(gameObject=Self, speed=6, ySpeed=30, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetGravity2dScale(gameObject=Self, gravityScale=2)
+    on FINISHED → Bounce Air
+  }
+
+  state Bounce Air {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Bounce Land
+  }
+
+  state Evade Instead? {
+    SendRandomEventV4(events=[→"RUN BACK", →"EVADE"], weights=[1, 1], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on RUN BACK → Run B Antic
+    on EVADE → Evade Antic
+  }
+
+  state End Early? {
+    IntCompare(integer1=var "Pecks", integer2=1, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=true, DistancePast=2, StoreResult=(unset), PassedEvent=→"END", NotPassedEvent=(none), EveryFrame=false)
+    on FINISHED → Peck End
+    on END → Idle
+  }
+
+  state Run B End Cancel {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Run Back End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Call?
+  }
+
+  state Test break {
+  }
+
+  state Sing {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"SING DURATION END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=crawfather_sing (sfxdynamic_assets_areadocks.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Call?
+  }
+
+  state Chain Jump Antic {
+    SetInvincible(target=Self, Invincible=false, InvincibleFromDirection=0, resetOnStateExit=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    PlayAudioEvent(audioClip=coral_judge_notice_hero (sfxstatic_assets_areacoral.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="ChainJump Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_big_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    on FINISHED → Chain Jump
+  }
+
+  state Chain Jump {
+    DoCameraShakeV4(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false, vibrate=true)
+    PlayParticleEmitter(gameObject=var "Pt Launch", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=false_knight_jump (sfxstatic_assets_enemyheavy.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Chain Attack Antic")
+    RandomFloat(min=46, max=46, storeResult=var "Jump Y")
+    SetVelocityByScale(gameObject=Self, speed=var "Jump X", ySpeed=var "Jump Y", everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    DecelerateXY(gameObject=Self, decelerationX=0.85, decelerationY=0.85, brakeOnExit=true)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Chain Attack Start
+  }
+
+  state Chain Attack Start {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL STOP", delay=0, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Chain Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=coral_judge_notice_hero (sfxstatic_assets_areacoral.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_short_roar (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor 2D (audioobjects_assets_all.bundle), spawnPoint=var "Self", audioClip=bell_bench_stuck_underneath_chain_break (sfxstatic_assets_bench.bundle), pitchMin=1, pitchMax=1, volume=1, delay=0.3, storePlayer=<null>)
+    on FINISHED → Chain Attack
+  }
+
+  state Chain Attack {
+    Wait(time=2.05, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    StartRoarEmitter(spawnPoint=Self, delay=0, stunHero=false, roarBurst=true, isSmall=false, noVisualEffect=false, forceThroughBind=false, stopOnExit=false)
+    PlayAudioEvent(audioClip=misc_rumble_impact (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=coral_final_judge_censer_throw (sfxstatic_assets_areacoral.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=roach_keeper_attack (sfxstatic_assets_areadust.bundle), pitchMin=0.85, pitchMax=0.85, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayParticleEmitter(gameObject=var "Pt RagBurst", emit=0, resetIfPlaying=false)
+    SendEventByName(eventTarget=GameObject(var "Chains"), sendEvent="ATTACK", delay=0, everyFrame=false)
+    on FINISHED → Chain Dive
+  }
+
+  state Chain Dive {
+    FaceObjectV4(ObjectA=Self, ObjectB=var "Hero", SpriteFacesRight=true, NewAnimationClip="", ResetFrame=false, PauseBetweenTurns=0.5, StoreDuration=(unset), turnAudioClipTable=<null>, EveryFrame=false)  // disabled
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="STUN CONTROL START", delay=0, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Chain Dive")
+    PlayAudioEvent(audioClip=false_knight_jump (sfxstatic_assets_enemyheavy.bundle), pitchMin=1.1, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_med_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetVelocityByScale(gameObject=Self, speed=4, ySpeed=20, everyFrame=false)
+    AccelerateToY(gameObject=Self, accelerationFactor=1.4, targetSpeed=-40)
+    CheckIsCharacterGrounded(Target=Self, RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=crawfather_med_yelp (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on LAND → Chain Dive Land
+  }
+
+  state Chain Dive Land {
+    DoCameraShakeV3(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=<null>, cancelOnExit=false, DoFreeze=false, Delay=0, Vibrate=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Chain Dive Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegister(eventName="FLOOR SHOVE")
+    SendEventToRegister(eventName="DEBRIS SHOVE")
+    ActivateGameObject(gameObject=var "Particle Splasher", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObjectDelay(gameObject=var "Particle Splasher", activate=true, resetOnExit=false, delay=0.1)
+    Translate(gameObject=var "MainCamera", vector=(unset), x=(unset), y=-0.3, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="AverageShakeQuick", delay=0.01, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Spark", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Flash", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Peck Flash FG", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SelectRandomString(strings=["Peck Spark 1", "Peck Spark 2"], weights=[1, 1], storeString=var "Peck Anim")
+    Tk2dPlayAnimation(gameObject=var "Peck Spark", animLibName="", clipName=var "Peck Anim")
+    PlayParticleEmitter(gameObject=var "Pt DivePeck", emit=0, resetIfPlaying=false)
+    PlayAudioEvent(audioClip=cage_impact_by_roach_2 (sfxstatic_assets_areadocksareadust.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    PlayAudioEvent(audioClip=coral_judge_shield_hit (sfxstatic_assets_areacoral.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Clip")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Pos Check {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    SetFloatValue(floatVariable=var "Jump X", floatValue=20, everyFrame=false)
+    CheckXPosition(gameObject=Self, compareTo=26, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=→"AIM RIGHT", lessThanBool=(unset), greaterThan=(none), greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    CheckXPosition(gameObject=Self, compareTo=42, compareToOffset=0, tolerance=0, equal=(none), equalBool=(unset), lessThan=(none), lessThanBool=(unset), greaterThan=→"AIM LEFT", greaterThanBool=(unset), everyFrame=false, space=0, activeBool=(unset))
+    on AIM LEFT → Aim Left
+    on AIM RIGHT → Aim Right
+    on FINISHED → Chain Jump Antic
+  }
+
+  state Aim Left {
+    SetScale(gameObject=Self, vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Jump X", floatValue=35, everyFrame=false)
+    on FINISHED → Chain Jump Antic
+  }
+
+  state Aim Right {
+    SetScale(gameObject=Self, vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    SetFloatValue(floatVariable=var "Jump X", floatValue=35, everyFrame=false)
+    on FINISHED → Chain Jump Antic
+  }
+
+  var Run Speed: float = 0
+  var Flap Y: float = 29.5
+  var Stun Timer: float = 0
+  var Y Target: float = 0
+  var Idle Time: float = 0
+  var Jump Y: float = 0
+  var Jump X: float = 0
+  var Pecks: int = 0
+  var Ct Peck: int = 0
+  var Ct Evade: int = 0
+  var Ms Peck: int = 0
+  var Ms Evade: int = 0
+  var Ct Fly: int = 0
+  var Ms Fly: int = 0
+  var Ct Chase: int = 0
+  var Ms Chase: int = 0
+  var Summons Active: int = 0
+  var P2 HP: int = 0
+  var Wall Behind: bool = false
+  var Hero Nearby: bool = false
+  var Can Run Back: bool = false
+  var Can Dive: bool = false
+  var Did First Move: bool = false
+  var Minions Are Summoned: bool = false
+  var Can Chain Attack: bool = false
+  var Peck Anim: string = ""
+  var Peck Spark: gameObject = Battle Scene/Wave 6/Crawfather/Peck Spark
+  var Peck Flash: gameObject = Battle Scene/Wave 6/Crawfather/Peck Flash
+  var Court Floor: gameObject = <null>
+  var Boss Scene: gameObject = <null>
+  var Pt Peck: gameObject = Battle Scene/Wave 6/Crawfather/Pt Peck
+  var Pt Run: gameObject = Battle Scene/Wave 6/Crawfather/Pt Run
+  var Ray Pt: gameObject = Battle Scene/Wave 6/Crawfather/Ray Pt
+  var Pt DivePeck: gameObject = Battle Scene/Wave 6/Crawfather/Pt DivePeck
+  var Particle Splasher: gameObject = <null>
+  var Pt Launch: gameObject = Battle Scene/Wave 6/Crawfather/Pt Launch
+  var Roar Pt: gameObject = Battle Scene/Wave 6/Crawfather/Roar Pt
+  var Pt Stun: gameObject = <null>
+  var Self: gameObject = Battle Scene/Wave 6/Crawfather
+  var Peck Flash FG: gameObject = Battle Scene/Wave 6/Crawfather/Peck Flash FG
+  var Peck Spark BG: gameObject = Battle Scene/Wave 6/Crawfather/Peck Spark BG
+  var Peck Flash BG: gameObject = Battle Scene/Wave 6/Crawfather/Peck Flash BG
+  var Crow Summons: gameObject = <null>
+  var Pin Wielder: gameObject = <null>
+  var Dagger: gameObject = <null>
+  var Tinies: gameObject = <null>
+  var Pt Roar: gameObject = Battle Scene/Wave 6/Crawfather/Pt Roar
+  var Pt RagBurst: gameObject = Battle Scene/Wave 6/Crawfather/Pt RagBurst
+  var Current Clip: gameObject = <null>
+  var Audio Loop Footstep: gameObject = Battle Scene/Wave 6/Crawfather/Audio Loop Footstep
+  var HeroLight Group: gameObject = Battle Scene/Wave 6/Crawfather/HeroLight Group
+  var Audio Loop Voice: gameObject = Battle Scene/Wave 6/Crawfather/Audio Loop Voice
+  var Slam Effect: gameObject = Battle Scene/Wave 6/Crawfather/Slam Effect
+  var Pt Land: gameObject = Battle Scene/Wave 6/Crawfather/Pt Land
+  var Chains: gameObject = Battle Scene/Wave 6/Crawfather/Chains
+}

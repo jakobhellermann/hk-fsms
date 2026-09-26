@@ -1,0 +1,247 @@
+# inspect_region
+# 1 location(s):
+#   Fungus3_archive_02 / Inspect Region
+
+// uses template: inspect_region
+fsm inspect_region {
+  start Init
+  on BIG TITLE START → Inert  // from any state
+  on CONVO CANCEL → Idle  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetBoolValue(boolVariable=var "Can Talk", boolValue=true, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Prompt Marker", storeResult=var "Prompt Marker")
+    FindChild(gameObject=var "Self", childName="Ranges", storeResult=var "Ranges Folder")
+    GetHero(storeResult=var "Hero")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    HidePromptMarker(storedObject=var "Prompt")
+    Trigger2dEvent(trigger=OnTriggerStay2D, collideTag="", collideLayer="", sendEvent=→"IN RANGE", storeCollider=var "")
+    on IN RANGE → Can Talk Bool?
+  }
+
+  state In Range {
+    SendEventByName(eventTarget=GameObject(var "Prompt"), sendEvent="UP", delay=0, everyFrame=false)
+    ShowPromptMarker(prefab=Arrow Prompt New (resources.assets), labelName=var "Prompt Name", spawnPoint=var "Prompt Marker", storeObject=var "Prompt")
+    Trigger2dEvent(trigger=OnTriggerExit2D, collideTag="", collideLayer="", sendEvent=→"OUT OF RANGE", storeCollider=var "")
+    ListenForUp(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    ListenForDown(eventTarget=Self, wasPressed=→"UP PRESSED", wasReleased=(none), isPressed=(none), isNotPressed=(none), isPressedBool=(unset), stateEntryOnly=false)
+    on OUT OF RANGE → Idle
+    on UP PRESSED → Can Talk?
+  }
+
+  state Cancel Frame {
+    HidePromptMarker(storedObject=var "Prompt")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Convo End {
+    SendEventByName(eventTarget=GameObject(var "Self"), sendEvent="INSPECT END", delay=0, everyFrame=false)
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=true, topRight=false, topCentre=false, topJustified=false, centreLeft=false, centreRight=false, centreCentre=false, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    ActivateGameObject(gameObject=var "Ranges Folder", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Talking", boolValue=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var))
+    on FINISHED → Pause
+  }
+
+  state Pause {
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Idle
+  }
+
+  state Check Proximity {
+    GetPosition(gameObject=var "Self", vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=false)
+    SetFloatValue(floatVariable=var "Left Prox", floatValue=var "Self X", everyFrame=false)
+    FloatSubtract(floatVariable=var "Left Prox", subtract=var "Move To Offset", everyFrame=false, perSecond=false)
+    SetFloatValue(floatVariable=var "Right Prox", floatValue=var "Self X", everyFrame=false)
+    FloatAdd(floatVariable=var "Right Prox", add=var "Move To Offset", everyFrame=false, perSecond=false)
+    FloatTestToBool(float1=var "Hero X", float2=var "Self X", tolerance=0, equalBool=(unset), lessThanBool=var "Hero On Left", greaterThanBool=var "Hero On Right", everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Always Left", var "Hero On Right"], sendEvent=→"MOVE LEFT", storeResult=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Always Right", var "Hero On Left"], sendEvent=→"MOVE RIGHT", storeResult=(unset), everyFrame=false)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Self X", upperValue=var "Right Prox", boolVariable=(unset), trueEvent=→"MOVE RIGHT", falseEvent=(none), everyFrame=false)
+    FloatInRange(floatVariable=var "Hero X", lowerValue=var "Left Prox", upperValue=var "Self X", boolVariable=(unset), trueEvent=→"MOVE LEFT", falseEvent=(none), everyFrame=false)
+    GetScale(gameObject=var "Hero", vector=(unset), xScale=var "Hero X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Hero X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Hero Facing Right", greaterThanBool=var "Hero Facing Left", everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Facing Right", var "Hero On Right"], sendEvent=→"TURN LEFT", storeResult=(unset), everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Hero Facing Left", var "Hero On Left"], sendEvent=→"TURN RIGHT", storeResult=(unset), everyFrame=false)
+    on MOVE RIGHT → Move Hero Right
+    on FINISHED → Hero Look Up?
+    on TURN LEFT → Turn Hero Left
+    on MOVE LEFT → Move Hero Left
+    on MOVE RIGHT → 
+    on TURN RIGHT → Turn Hero Right
+  }
+
+  state Move Hero Right {
+    ForceHeroFootstepSound(forceFootstepSound=Walk, endOnStateExit=true)
+    SetScale(gameObject=var "Hero", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Right Prox", tolerance=0, equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=true)
+    on FINISHED → Turn Hero Left
+    on HERO DAMAGED → Convo End
+  }
+
+  state Take Control {
+    SetBoolValue(boolVariable=var "Talking", boolValue=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Ranges Folder", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var))
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var))
+    HidePromptMarker(storedObject=var "Prompt")
+    on FINISHED → Check Proximity
+  }
+
+  state Turn Hero Left {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceLeft", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hero Look Up?
+    on HERO DAMAGED → Convo End
+  }
+
+  state Move Hero Left {
+    ForceHeroFootstepSound(forceFootstepSound=Walk, endOnStateExit=true)
+    SetScale(gameObject=var "Hero", vector=(unset), x=1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceLeft())
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Walk")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=-6, y=(unset), everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Hero X", y=(unset), z=(unset), space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero X", float2=var "Left Prox", tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    on FINISHED → Turn Hero Right
+    on HERO DAMAGED → Convo End
+  }
+
+  state Turn Hero Right {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Turn")
+    SetVelocity2d(gameObject=var "Hero", vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetScale(gameObject=var "Hero", vector=(unset), x=-1, y=(unset), z=(unset), everyFrame=false, lateUpdate=false)  // disabled
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=FaceRight())
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="FaceRight", parameters=[], storeResult=(unset var))
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Hero Look Up?
+    on HERO DAMAGED → Convo End
+  }
+
+  state Inert {
+    on BIG TITLE END → Idle
+  }
+
+  state Can Talk Bool? {
+    BoolTest(boolVariable=var "Can Talk", isTrue=→"TRUE", isFalse=→"FALSE", everyFrame=false)
+    on TRUE → In Range
+    on FALSE → Idle
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Convo End
+    on HERO DAMAGED → Convo End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Read
+    on HERO DAMAGED → Cancel
+  }
+
+  state Look Up End? {
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Read {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Game Text Convo", var "Game Text Sheet"], storeResult=(unset var))
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="DO INSPECT", delay=0, everyFrame=false)
+    on CONVO_FINISH → Look Up End?
+    on HERO DAMAGED → Cancel
+  }
+
+  state Hero Look Up? {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Idle")
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    BoolTest(boolVariable=var "Hero Looks Up", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Centre?
+    on HERO DAMAGED → Convo End
+  }
+
+  state Cancel {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    on FINISHED → Convo End
+  }
+
+  state Centre? {
+    BoolTest(boolVariable=var "Centre Centre", isTrue=→"CENTRE", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Centre Top", isTrue=→"CENTRE TOP", isFalse=(none), everyFrame=false)
+    on CENTRE → Centre
+    on CENTRE TOP → Top Centre
+    on FINISHED → Box Up
+  }
+
+  state Centre {
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=false, topRight=false, topCentre=false, topJustified=false, centreLeft=false, centreRight=false, centreCentre=true, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    on FINISHED → Box Up
+  }
+
+  state Top Centre {
+    SetTextMeshProAlignment(gameObject=var "DialogueText", topLeft=false, topRight=false, topCentre=true, topJustified=false, centreLeft=false, centreRight=false, centreCentre=false, centreJustified=false, bottomLeft=false, bottomRight=false, bottomCentre=false, bottomJustified=false)
+    on FINISHED → Box Up
+  }
+
+  state Can Talk? {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="CanTalk", parameters=[], storeResult=var "Talk Allowed")
+    BoolTest(boolVariable=var "Talk Allowed", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → Cancel Frame
+    on FINISHED → Take Control
+  }
+
+  var Move To Offset: float = 1
+  var Centre Centre: bool = false
+  var Centre Top: bool = true
+  var Hero Always Left: bool = true
+  var Hero Always Right: bool = false
+  var Hero Looks Up: bool = true
+  var Game Text Convo: string = "ARCHIVE_01"
+  var Game Text Sheet: string = "Lore Tablets"
+  var Prompt Name: string = "Inspect"
+
+  var Hero X: float = 0
+  var Hero X Scale: float = 0
+  var Left Prox: float = 0
+  var Right Prox: float = 0
+  var Self X: float = 0
+  var Can Talk: bool = true
+  var Hero Facing Left: bool = false
+  var Hero Facing Right: bool = false
+  var Hero On Left: bool = false
+  var Hero On Right: bool = false
+  var Talk Allowed: bool = false
+  var Talking: bool = false
+  var Hero: gameObject = <null>
+  var Main Camera: gameObject = <null>
+  var Prompt: gameObject = <null>
+  var Prompt Marker: gameObject = <null>
+  var Ranges Folder: gameObject = <null>
+  var Self: gameObject = <null>
+}

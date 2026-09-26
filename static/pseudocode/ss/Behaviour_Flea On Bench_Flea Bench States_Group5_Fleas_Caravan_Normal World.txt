@@ -1,0 +1,316 @@
+# Behaviour
+# 1 location(s):
+#   Bone_10 / Black Thread States Thread Only Variant/Normal World/Caravan/Fleas/Group5/Flea Bench States/Flea On Bench
+
+fsm Behaviour {
+  start Record Start Position
+  on DISABLE → Restore Bench  // from any state
+
+  sequence state Init {
+    GetHero(storeResult=var "Hero")
+    SetPosition(gameObject=Self, vector=var "Start Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    GetPosition(gameObject=Self, vector=var "Initial Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    FindGameObject(objectName="Flea Sleep Point", withTag="Untagged", store=var "Bench")
+    GetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Start Z", space=0, everyFrame=false)
+    NextFrameEvent(sendEvent=(none))
+    SetTransformParent(gameObject=var "Hide Marker", parent=<null>, worldPositionStays=true)
+    on FINISHED → React To Sing?
+  }
+
+  state Float {
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=→"ALERT", InRangeDelay=0.2, OutOfRangeEvent=(none), OutOfRangeDelay=1, everyFrame=true)
+    IdleBuzzV3(gameObject=Self, waitMin=1, waitMax=3, speedMax=5, accelerationMin=2, accelerationMax=5, roamingRangeX=(unset), roamingRangeY=(unset), manualStartPos=var "Initial Position")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FaceDirection(gameObject=Self, spriteFacesRight=false, playNewAnimation=true, newAnimationClip="Turn To Fly", everyFrame=true, pauseBetweenTurns=true, pauseTime=1)
+    on ALERT → Alert
+    on STARTLE → Alert
+  }
+
+  state Sing {
+    SendEventToRegister(eventName="LITTLE FLEA SING START")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.9, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    on CANCEL → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegister(eventName="LITTLE FLEA SING END")
+    on FINISHED → Float Alert
+  }
+
+  state Float Alert {
+    CheckAlertRange(alertRange=var "Unalert Range", storeResult=(unset), InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=→"UNALERT", OutOfRangeDelay=1, everyFrame=true)
+    IdleBuzzV3(gameObject=Self, waitMin=1, waitMax=3, speedMax=5, accelerationMin=2, accelerationMax=5, roamingRangeX=2, roamingRangeY=2, manualStartPos=var "Initial Position")
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    FaceObjectV3(ObjectA=Self, ObjectB=var "Hero", SpriteFacesRight=false, NewAnimationClip="Turn To Fly", ResetFrame=true, PauseBetweenTurns=0.5, StoreDuration=(unset), EveryFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.75, MaxReactDelay=2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on SING → Sing
+    on UNALERT → Float
+    on STARTLE → Alert
+  }
+
+  state Alert {
+    FaceObjectV3(ObjectA=Self, ObjectB=var "Hero", SpriteFacesRight=false, NewAnimationClip="", ResetFrame=false, PauseBetweenTurns=0, StoreDuration=(unset), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Alert", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Flea_bark (sfxdynamic_assets_fleacaravan.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Float Alert
+  }
+
+  state Random Start Pos {
+    FloatOperator(float1=var "Roaming Range", float2=-1, operation=Multiply, storeResult=var "Roaming Range Neg", everyFrame=false)
+    RandomFloatV2(min=var "Roaming Range Neg", max=var "Roaming Range", storeResult=var "Random Pos X", everyFrame=false)
+    RandomFloatV2(min=var "Roaming Range Neg", max=var "Roaming Range", storeResult=var "Random Pos Y", everyFrame=false)
+    SetVector3Value(vector3Variable=var "Random Position", vector3Value=var "Initial Position", everyFrame=false)
+    Vector3AddXYZ(vector3Variable=var "Random Position", addX=var "Random Pos X", addY=var "Random Pos Y", addZ=0, everyFrame=false, perSecond=false)
+    SetPosition(gameObject=Self, vector=var "Random Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Start Alert?
+  }
+
+  state Start State {
+    StringSwitch(stringVariable=var "Starting Clip Name", compareTo=["Sleep", "Sit"], sendEvent=[→"SLEEP", →"SIT"], everyFrame=false)
+    BoolTest(boolVariable=var "Start At Bench", isTrue=→"SLEEP BENCH", isFalse=(none), everyFrame=false)
+    SendEvent(eventTarget=Self, sendEvent=→"FLY", delay=0, everyFrame=false)
+    on FLY → Random Start Pos
+    on SIT → Sit
+    on SLEEP → Sleep
+    on SLEEP BENCH → At Bench?
+  }
+
+  state Sleep {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    SendEventToRegister(eventName="LITTLE FLEA SLEEP START")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.5, None=(none), ActiveInner=(none), ActiveOuter=→"SING", IgnoreNeedolinRange=true, useActiveBool=true, ActiveBool=var "React To Sing", StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sleep", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateInteractible(Target=var "Deactivate Bench In Sleep", Activate=false, AllowQueueing=false, UseChildren=false)
+    GetRandomAudioClipFromTable(Table=var "Sleep Loop Table", ForcePlay=false, StoreClip=var "Audio Clip")  // disabled
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=var "Audio Clip", autoPlay=true, stopOnExit=true)  // disabled
+    RandomiseAudioPosition(gameObject=var "Audio Loop Voice", timeMin=0, timeMax=19)  // disabled
+    on ALERT → Wake
+    on ATTACK DETECTED → Wake
+    on SING → Sleep Sing?
+  }
+
+  state Wake {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Flea_bark (sfxdynamic_assets_fleacaravan.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SendEventToRegister(eventName="LITTLE FLEA SLEEP END")
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    RandomFloatV2(min=8, max=10, storeResult=var "Launch Velocity", everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=var "Launch Velocity", everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.95, brakeOnExit=false)
+    ActivateInteractible(Target=var "Deactivate Bench In Sleep", Activate=true, AllowQueueing=false, UseChildren=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wake", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Woken
+  }
+
+  state Wait For State Event {
+    BoolTest(boolVariable=var "Force Regular", isTrue=→"CARAVAN STATE REGULAR", isFalse=(none), everyFrame=false)  // disabled
+    SendEvent(eventTarget=Self, sendEvent=→"CARAVAN STATE REGULAR", delay=0, everyFrame=false)
+    on CARAVAN STATE ATTACKED → Set Attacked
+    on CARAVAN STATE REGULAR → Set Not Attacked
+  }
+
+  state Start Screaming {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Scale X", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    RandomFloatEither(value1=-1, value2=1, storeResult=var "Scale Multiplier")
+    FloatOperator(float1=var "Scale X", float2=var "Scale Multiplier", operation=Multiply, storeResult=var "Scale X", everyFrame=false)
+    SetScale(gameObject=Self, vector=(unset), x=var "Scale X", y=(unset), z=(unset), everyFrame=false, lateUpdate=false)
+    on BATTLE SCENE STARTED → Random Wait 2
+  }
+
+  state Fly Away {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GetDirection2D(From=Self, To=var "Hide Marker", StoreVector=(unset), StoreX=var "Direction To Marker", StoreY=(unset), EveryFrame=false)
+    FaceDirectionV2(ObjectA=Self, Direction=var "Direction To Marker", SpriteFacesRight=false, NewAnimationClip="Turn to Fly", ResetFrame=true, PauseBetweenTurns=0.5, StoreDuration=(unset), EveryFrame=true)
+    iTweenMoveTo(gameObject=Self, id="", transformPosition=var "Hide Marker", vectorPosition=(unset), time=(unset), delay=(unset), speed=7, space=0, easeType=3, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=(none), realTime=false, stopOnExit=true, loopDontFinish=false)
+    on BATTLE SCENE ENDED → Random Wait
+  }
+
+  state Return {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Fly", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    GetPosition(gameObject=Self, vector=(unset), x=var "Current Pos X", y=(unset), z=(unset), space=0, everyFrame=false)
+    GetVector3XYZ(vector3Variable=var "Random Position", storeX=var "Target Pos X", storeY=(unset), storeZ=(unset), everyFrame=false)
+    FloatOperator(float1=var "Target Pos X", float2=var "Current Pos X", operation=Subtract, storeResult=var "Direction To Marker", everyFrame=false)
+    FloatSign(Value=var "Direction To Marker", StoreValue=var "Direction To Marker", EveryFrame=false)
+    FaceDirectionV2(ObjectA=Self, Direction=var "Direction To Marker", SpriteFacesRight=false, NewAnimationClip="Turn to Fly", ResetFrame=true, PauseBetweenTurns=0.5, StoreDuration=(unset), EveryFrame=true)
+    iTweenMoveTo(gameObject=Self, id="", transformPosition=var "", vectorPosition=var "Random Position", time=(unset), delay=(unset), speed=5, space=0, easeType=2, loopType=0, orientToPath=false, lookAtObject=var "", lookAtVector=(unset), lookTime=(unset), axis=none, moveToPath=false, lookAhead=(unset), transforms=[], vectors=[], reverse=false, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=false)
+    on FINISHED → Start Alert?
+  }
+
+  state Stop Screaming {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fly Away
+  }
+
+  state Random Wait {
+    WaitRandom(timeMin=4, timeMax=7, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Return
+  }
+
+  state Start Alert? {
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=→"ALERT", InRangeDelay=0.2, OutOfRangeEvent=(none), OutOfRangeDelay=1, everyFrame=false)
+    on ALERT → Float Alert
+    on FINISHED → Float
+  }
+
+  state Random Wait 2 {
+    WaitRandom(timeMin=0.1, timeMax=0.4, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Stop Screaming
+  }
+
+  state At Bench? {
+    SetCollider(gameObject=Self, active=true, resetOnExit=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    GetPosition2D(gameObject=var "Bench", vector=var "Bench Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    RandomVector2(Start=(-4, 0), End=(4, 0), StoreResult=var "Random Offset", EveryFrame=false)
+    Vector2Operator(vector1=var "Bench Pos", vector2=var "Random Offset", operation=Add, storeVector2Result=var "Bench Pos", storeFloatResult=(unset), everyFrame=false)
+    SetPosition2D(GameObject=Self, Vector=var "Bench Pos", X=0, Y=0, Space=0, EveryFrame=false)
+    PositionColliderOnGround(Target=Self)
+    on FINISHED → Sleep Bench
+  }
+
+  state Sleep Bench {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sleep", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    PlayerDataVariableTest(VariableName="atBench", ExpectedValue=false, IsExpectedEvent=→"ALERT", IsNotExpectedEvent=(none))
+    WaitRandom(timeMin=0.5, timeMax=2, finishEvent=→"RECHECK", realTime=false)
+    on ALERT → Wake
+    on RECHECK → Sleep Bench
+    on ATTACK DETECTED → Wake
+  }
+
+  state Start At Bench? {
+    CheckIsFirstLevelForPlayer(trueEvent=(none), falseEvent=→"FINISHED", storeValue=(unset))
+    CheckZPosition(gameObject=Self, compareTo=0, compareToOffset=0, tolerance=0.5, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false, space=0)
+    RandomBool(storeResult=var "Start At Bench")
+    on FINISHED → Attacked State?
+  }
+
+  state Sit {
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.5, None=(none), ActiveInner=→"ALERT", ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=true, ActiveBool=var "React To Sing", StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sit", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    on ALERT → Wake
+  }
+
+  state React To Sing? {
+    SetBoolValue(boolVariable=var "React To Sing", boolValue=true, everyFrame=false)
+    BoolTest(boolVariable=var "Always React To Sing", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    FloatCompare(float1=var "Start Z", float2=4, tolerance=0, equal=(none), lessThan=→"FINISHED", greaterThan=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "React To Sing", boolValue=false, everyFrame=false)
+    on FINISHED → Wait For State Event
+  }
+
+  state Wait Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Start At Bench?
+  }
+
+  state Set Attacked {
+    SetBoolValue(boolVariable=var "Attacked State", boolValue=true, everyFrame=false)
+    on FINISHED → Wait Frame
+  }
+
+  state Set Not Attacked {
+    SetBoolValue(boolVariable=var "Attacked State", boolValue=false, everyFrame=false)
+    on FINISHED → Wait Frame
+  }
+
+  state Attacked State? {
+    BoolTest(boolVariable=var "Force Regular", isTrue=→"CARAVAN STATE REGULAR", isFalse=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Attacked State", isTrue=→"CARAVAN STATE ATTACKED", isFalse=→"CARAVAN STATE REGULAR", everyFrame=false)
+    on CARAVAN STATE ATTACKED → Start Screaming
+    on CARAVAN STATE REGULAR → Start State
+  }
+
+  state Woken {
+    GetPosition(gameObject=Self, vector=var "Initial Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    Vector3AddXYZ(vector3Variable=var "Initial Position", addX=(unset), addY=1, addZ=(unset), everyFrame=false, perSecond=false)
+    on FINISHED → Check In Range
+  }
+
+  state Sleep Sing? {
+    BoolTest(boolVariable=var "Can Sleep Sing", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sleep Sing", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.7, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Wait(time=var "Sing Wait", finishEvent=→"FINISHED", realTime=false)
+    SendEventToRegister(eventName="LITTLE FLEA SING START")
+    on CANCEL → Check Sleep
+    on FINISHED → Stage 2
+  }
+
+  state Sleep Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sleep Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventToRegister(eventName="LITTLE FLEA SING END")
+    on FINISHED → Sleep
+  }
+
+  state Check In Range {
+    CheckAlertRange(alertRange=var "Alert Range", storeResult=(unset), InRangeEvent=→"ALERT", InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=1, everyFrame=false)
+    on ALERT → Float Alert
+    on FINISHED → Float
+  }
+
+  state Check Sleep {
+    BoolTest(boolVariable=var "Back To Sleep", isTrue=→"SLEEP", isFalse=(none), everyFrame=false)
+    on FINISHED → Wake
+    on SLEEP → Sleep
+  }
+
+  state Stage 2 {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.7, None=→"FINISHED", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=true, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Sleep Sing End
+  }
+
+  state Restore Bench {
+    ActivateInteractible(Target=var "Deactivate Bench In Sleep", Activate=true, AllowQueueing=false, UseChildren=false)
+  }
+
+  state Record Start Position {
+    BoolTest(boolVariable=var "Recorded Position", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    GetPosition(gameObject=Self, vector=var "Start Position", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Starting Clip Name")
+    SetBoolValue(boolVariable=var "Recorded Position", boolValue=true, everyFrame=false)
+    on FINISHED → Init
+  }
+
+  var Sing Wait: float = 0
+  var Force Regular: bool = true
+  var React To Sing: bool = false
+  var Can Sleep Sing: bool = false
+  var Deactivate Bench In Sleep: gameObject = Black Thread States Thread Only Variant/Normal World/Caravan/Caravan State Regular/RestBench
+  var Sleep Loop Table: object = Flea_sleep_loop (sfxdynamic_assets_fleacaravan.bundle)
+
+  var Current Pos X: float = 0
+  var Direction To Marker: float = 1
+  var Launch Velocity: float = 0
+  var Random Pos X: float = 0
+  var Random Pos Y: float = 0
+  var Roaming Range: float = 2
+  var Roaming Range Neg: float = 0
+  var Scale Multiplier: float = 0
+  var Scale X: float = 0
+  var Target Pos X: float = 0
+  var Start Z: float = 0
+  var Start At Bench: bool = false
+  var Attacked State: bool = false
+  var Always React To Sing: bool = false
+  var Back To Sleep: bool = false
+  var Recorded Position: bool = false
+  var Starting Clip Name: string = ""
+  var Bench Pos: vector2 = (0, 0)
+  var Random Offset: vector2 = (0, 0)
+  var Initial Position: vector3 = (0, 0, 0)
+  var Random Position: vector3 = (0, 0, 0)
+  var Start Position: vector3 = (0, 0, 0)
+  var Bench: gameObject = <null>
+  var Hero: gameObject = <null>
+  var Hide Marker: gameObject = Black Thread States Thread Only Variant/Normal World/Caravan/Fleas/Group5/Flea Bench States/Flea On Bench/Hide Marker
+  var Audio Loop Voice: gameObject = Black Thread States Thread Only Variant/Normal World/Caravan/Fleas/Group5/Flea Bench States/Flea On Bench/Audio Loop Voice
+  var Sing Loop 2: gameObject = <null>
+  var Alert Range: object = Black Thread States Thread Only Variant/Normal World/Caravan/Fleas/Group5/Flea Bench States/Flea On Bench/Alert Range@AlertRange
+  var Unalert Range: object = Black Thread States Thread Only Variant/Normal World/Caravan/Fleas/Group5/Flea Bench States/Flea On Bench/Unalert Range@AlertRange
+  var Audio Clip: object = <null>
+}

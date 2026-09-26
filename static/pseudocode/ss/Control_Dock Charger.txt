@@ -1,0 +1,465 @@
+# Control
+# 2 location(s):
+#   Dock_02b / Dock Charger
+#   Dock_03 / Dock Charger
+
+fsm Control {
+  start Init
+  on BLOCKED EXPLOSION → Block Explosion  // from any state
+
+  state Init {
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Leap", equalEvent=→"AMBUSH", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Idle
+    on AMBUSH → Ambush Ready
+  }
+
+  state Ambush Ready {
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    ActivateGameObject(gameObject=var "Scenery Breaker", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    on BATTLE START → Set Battler
+    on WAKE → Wake Antic
+  }
+
+  state Idle {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.25, None=(none), ActiveInner=→"ALERT", ActiveOuter=→"ALERT", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on ALERT → Startle
+    on TOOK DAMAGE → Startle
+    on BLOCKED DOWN → Idle Bonk
+    on BUDDY WAKE → Buddy Wake Delay
+  }
+
+  state Startle {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=coral_judge_notice_hero (sfxstatic_assets_areacoral.bundle), pitchMin=0.7, pitchMax=0.7, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CreateNoise(From=Self, LocalOrigin=(0, 0), Radius=8)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_alert (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Charge Pause
+    on BLOCKED DOWN → Idle Bonk
+  }
+
+  state Charge Pause {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Force Facing
+    on BLOCKED DOWN → Idle Bonk
+    on SING → Sing
+  }
+
+  state Charge Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Antic", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_small_move (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Can Pass", boolValue=false, everyFrame=false)
+    DockClamberCheck(hero=var "Hero", clamberRayL=var "Clamber Ray L", clamberRayR=var "Clamber Ray R", noClamber=var "No Clamber", clamberEvent=→"CLAMBER")
+    on FINISHED → Charge
+    on BLOCKED DOWN → Idle Bonk
+    on CLAMBER → Clamber Antic
+  }
+
+  state Charge {
+    AudioPlayInState(gameObject=var "Audio Loop Run", volume=1)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_charge_attack (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Charge Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Charge Speed", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Facing R", greaterThanBool=var "Facing L", everyFrame=false)
+    FloatMultiplyV2(floatVariable=var "Charge Speed", multiplyBy=-18, everyFrame=false, fixedUpdate=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge")
+    AccelerateToX(gameObject=Self, accelerationFactor=0.7, targetSpeed=var "Charge Speed")
+    SetBoolValue(boolVariable=var "Can Pass", boolValue=false, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Can Pass", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=false)
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=var "Can Pass", DefaultFacingRight=false, DistancePast=7, StoreResult=var "Wants To Pass", PassedEvent=→"TURN", NotPassedEvent=(none), EveryFrame=true)
+    SetParticleEmission(gameObject=var "Pt Charge", emission=true, resetOnExit=true)
+    RayCast2dV2(fromGameObject=var "Wall Ray Point", fromPosition=(unset), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Ahead Low", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Wall Ray Point", fromPosition=(0, 3), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    DockClamberCheck(hero=var "Hero", clamberRayL=var "Clamber Ray L", clamberRayR=var "Clamber Ray R", noClamber=var "No Clamber", clamberEvent=→"CLAMBER")
+    DoCameraShakeRepeating(Target=Self, MaxCameraDistance=var "Cam Shake Distance", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0.25, RepeatDelay=0.2)
+    RayCast2dV2(fromGameObject=var "Ground Ahead Ray", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Below", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=var "Hero Above", belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=-2, reverseIfNegativeScale=false, everyFrame=true)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=true, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    BoolTestMulti(boolVariables=[var "Ground Ahead", var "Hero Above", var "Ground Below", var "Facing Hero"], boolStates=[false, true, true, true], trueEvent=→"JUMP", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Wall Ahead", var "Ground Below"], boolStates=[true, true], trueEvent=→"WALL BONK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Wall Ahead Low", var "Ground Below"], boolStates=[true, true], trueEvent=→"WALL BONK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing L", var "Do Turn R"], boolStates=[true, true], trueEvent=→"FORCE TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing R", var "Do Turn L"], boolStates=[true, true], trueEvent=→"FORCE TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    SetFloatValue(floatVariable=var "X Speed", floatValue=10, everyFrame=false)
+    FloatCompare(float1=var "X Speed", float2=0, tolerance=0, equal=→"WALL BONK", lessThan=(none), greaterThan=(none), everyFrame=true)
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Speed", y=(unset), space=0, everyFrame=true)
+    CheckIsCharacterGrounded(Target=Self, RayCount=6, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=(none), NotGroundedEvent=→"FALL", EveryFrame=true)
+    on TURN → Skid
+    on BLOCKED DOWN → Charge Bonk
+    on WALL BONK → Wall Bonk
+    on CLAMBER → Clamber Antic
+    on JUMP → Jump Antic
+    on FORCE TURN → Unset Force Turn
+    on FALL → Fall
+  }
+
+  state Skid {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Skid", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    SetParticleEmissionTemp(gameObject=var "Pt Charge", emission=true, time=0.35)
+    RayCast2dV2(fromGameObject=var "Clamber Ray L", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2dV2(fromGameObject=var "Clamber Ray R", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Behind", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Ground Below", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    CheckTargetDirection(gameObject=Self, target=var "Hero", aboveEvent=(none), belowEvent=(none), rightEvent=(none), leftEvent=(none), aboveBool=var "Hero Above", belowBool=(unset), rightBool=(unset), leftBool=(unset), selfOffsetX=0, selfOffsetY=-2, reverseIfNegativeScale=false, everyFrame=true)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=true, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    BoolTestMulti(boolVariables=[var "Ground Ahead", var "Hero Above", var "Ground Below", var "Facing Hero"], boolStates=[false, true, true, true], trueEvent=→"JUMP", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing L", var "Do Turn R"], boolStates=[true, true], trueEvent=→"FORCE TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing R", var "Do Turn L"], boolStates=[true, true], trueEvent=→"FORCE TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolNoneTrue(boolVariables=[var "Ground Ahead", var "Ground Behind", var "Ground Below"], sendEvent=→"CHARGE", storeResult=(unset), everyFrame=true)
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.25, cancelOnEarlyExit=false)
+    on FINISHED → Turn
+    on BLOCKED DOWN → Idle Bonk
+    on JUMP → Jump Antic
+    on FORCE TURN → Unset Force Turn
+    on CHARGE → Charge
+  }
+
+  state Turn {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Jump?
+    on BLOCKED DOWN → Idle Bonk
+  }
+
+  state Force Facing {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    on FINISHED → Attack Jump?
+  }
+
+  state Charge Bonk {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Charge Tink", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_bonk (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    AccelerateToX(gameObject=Self, accelerationFactor=1, targetSpeed=var "Charge Speed")
+    SetBoolValue(boolVariable=var "Can Pass", boolValue=true, everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Wall Ray Point", fromPosition=(unset), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL BONK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Wall Ray Point", fromPosition=(0, 3), direction=(-1, 0), space=1, distance=1, minDepth=(unset), maxDepth=(unset), hitEvent=→"WALL BONK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetParticleEmission(gameObject=var "Pt Charge", emission=true, resetOnExit=true)
+    on FINISHED → Charge
+    on WALL BONK → Wall Bonk
+  }
+
+  state Idle Bonk {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Idle Tink", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_bonk (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Force Facing
+  }
+
+  state Wall Bonk {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_bonk (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    RayCast2dV2(fromGameObject=var "Wall Bump", fromPosition=(0, 4), direction=(-1, 0), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Can Not Jump", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    BoolTestMulti(boolVariables=[var "Can Not Jump", var "Facing Hero"], boolStates=[false, true], trueEvent=→"JUMP", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=var "Cam Shake Distance", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    ActivateAllChildren(gameObject=var "Wall Bump", activate=true)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=true)
+    SetVelocityByScale(gameObject=Self, speed=15, ySpeed=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Wall Bonk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    PlayAudioEvent(audioClip=false_knight_strike_ground (sfxstatic_assets_enemyheavy.bundle), pitchMin=1.2, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Bonk Turn
+    on JUMP → Jump Antic
+  }
+
+  state Clamber Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=dock_charger_climb_through_jump_antic (sfxstatic_assets_areadocks.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.25, cancelOnEarlyExit=false)
+    on FINISHED → Clamber Jump
+  }
+
+  state Clamber Jump {
+    SetGravity2dScale(gameObject=Self, gravityScale=0)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_clamber (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=last_judge_generic_move_1 (sfxstatic_assets_areacoral.bundle), pitchMin=1.6, pitchMax=1.6, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    SetVelocity2d(gameObject=Self, vector=(0, 30), x=(unset), y=(unset), everyFrame=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"CLAMBER", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=→"CLAMBER", rightHitEvent=(none), bottomHitEvent=(none), leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on CLAMBER → Clamber Hit
+  }
+
+  state Clamber Through {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=2.5, z=(unset), space=0, perSecond=true, everyFrame=true, lateUpdate=false, fixedUpdate=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Clamber")
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Clamber Fall
+  }
+
+  state Clamber Fall {
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=var "Gravity")
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Land Idle
+  }
+
+  state Land Idle {
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    on FINISHED → Force Facing
+  }
+
+  state Clamber Hit {
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=var "Cam Shake Distance", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=slab_fly_down_attack_impact (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetGravity2dScale(gameObject=Self, gravityScale=2)
+    on FINISHED → Clamber Slam
+  }
+
+  state Jump Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_small_move (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    Wait(time=0.35, finishEvent=→"FINISHED", realTime=false)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Charge Speed", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "Charge Speed", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Facing R", greaterThanBool=var "Facing L", everyFrame=false)
+    BoolTestMulti(boolVariables=[var "Facing L", var "Do Turn R"], boolStates=[true, true], trueEvent=→"FORCE TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing R", var "Do Turn L"], boolStates=[true, true], trueEvent=→"FORCE TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    PlayAudioEvent(audioClip=coral_judge_side_dash_antic (sfxstatic_assets_areacoral.bundle), pitchMin=0.7, pitchMax=0.7, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=slab_fly_large_land (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Set Jump Height
+    on FORCE TURN → Unset Force Turn
+  }
+
+  state Jump Launch {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    NextFrameEvent(sendEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=-14, ySpeed=var "Jump Height", everyFrame=false)
+    PlayAudioEvent(audioClip=last_judge_generic_move_1 (sfxstatic_assets_areacoral.bundle), pitchMin=1.6, pitchMax=1.6, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SetGravity2dScale(gameObject=Self, gravityScale=1.5)
+    on FINISHED → Jump Air
+  }
+
+  state Jump Air {
+    SetVelocityByScale(gameObject=Self, speed=-14, ySpeed=(unset), everyFrame=true)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetGameObject(variable=var "Bump Object", gameObject=<null>, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=1.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Bump Object", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetStringValue(stringVariable=var "Tag", stringValue="", everyFrame=false)
+    GetTag(gameObject=var "Bump Object", storeResult=var "Tag", everyFrame=true)
+    StringCompare(stringVariable=var "Tag", compareTo="Platform", equalEvent=→"CLAMBER", notEqualEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckIsCharacterGrounded(Target=Self, RayCount=6, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    on LAND → Land
+    on CLAMBER → Clamber Hit
+  }
+
+  state Land {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Land", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetGravity2dScale(gameObject=Self, gravityScale=2)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=0.5, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=var "Cam Shake Distance", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    PlayAudioEvent(audioClip=slab_fly_down_attack_impact (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=coral_judge_land_1 (sfxstatic_assets_areacoral.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Attack Jump?
+  }
+
+  state Set Jump Height {
+    BoolTest(boolVariable=var "Battler", isTrue=→"ATTACK JUMP", isFalse=(none), everyFrame=false)
+    SetFloatValue(floatVariable=var "Jump Height", floatValue=20, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=4, minDepth=(unset), maxDepth=(unset), hitEvent=→"FINISHED", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=true)
+    SetFloatValue(floatVariable=var "Jump Height", floatValue=25, everyFrame=false)
+    on FINISHED → Jump Launch
+    on ATTACK JUMP → Attack Jump Antic
+  }
+
+  state Wake Antic {
+    PlayParticleEmitterInState(gameObject=var "Pt Dust")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_antic (sfxdynamic_assets_battle.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Wake Drop
+  }
+
+  state Wake Drop {
+    SetMeshRenderer(gameObject=Self, active=true)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_alert (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=var "Cam Shake Distance", Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake Quick (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=-4, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    PlayRandomAudioClipTable(Table=enemy_dig_in_emerge (sfxdynamic_assets_shared.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Drop
+  }
+
+  state Drop {
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    ActivateGameObject(gameObject=var "Scenery Breaker", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    on LAND → Land
+  }
+
+  state Bonk Turn {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Jump?
+  }
+
+  state Clamber Slam {
+    Translate(gameObject=Self, vector=(unset), x=(unset), y=4, z=(unset), space=0, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Clamber", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=dock_charger_climb_through (sfxstatic_assets_areadocks.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Clamber Through
+  }
+
+  state Set Battler {
+    SetBoolValue(boolVariable=var "Battler", boolValue=true, everyFrame=false)
+    on FINISHED → Wake Antic
+  }
+
+  state Attack Jump? {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.2, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=false)
+    BoolTest(boolVariable=var "Battler", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendRandomEventV4(events=[→"FINISHED", →"JUMP"], weights=[0.5, 0.5], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on FINISHED → Charge Antic
+    on JUMP → Attack Jump Antic
+    on SING → Sing
+  }
+
+  state Attack Jump Antic {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_small_move (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Antic")
+    Wait(time=0.5, finishEvent=→"FINISHED", realTime=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Jump X", everyFrame=false)
+    FloatClamp(floatVariable=var "Jump X", minValue=-12, maxValue=12, everyFrame=false)
+    PlayAudioEvent(audioClip=coral_judge_side_dash_antic (sfxstatic_assets_areacoral.bundle), pitchMin=0.7, pitchMax=0.7, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=slab_fly_large_land (sfxstatic_assets_areaslab.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Attack Jump Launch
+  }
+
+  state Attack Jump Launch {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=40, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=last_judge_generic_move_1 (sfxstatic_assets_areacoral.bundle), pitchMin=1.6, pitchMax=1.6, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Atk Jump Air
+  }
+
+  state Fall {
+    PlayAudioEvent(audioClip=song_heavy_sentry_entrance_jump (sfxstatic_assets_areahang.bundle), pitchMin=2, pitchMax=2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    AudioStopV2(gameObject=var "Audio Loop Voice", fadeTime=0.25, cancelOnEarlyExit=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.98, decelerationY=(unset), brakeOnExit=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetGameObject(variable=var "Bump Object", gameObject=<null>, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=1.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Bump Object", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    GetTag(gameObject=var "Bump Object", storeResult=var "Tag", everyFrame=true)
+    on LAND → Land
+  }
+
+  state Atk Jump Air {
+    SetVelocityByScale(gameObject=Self, speed=-12, ySpeed=(unset), everyFrame=true)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    SetGameObject(variable=var "Bump Object", gameObject=<null>, everyFrame=false)
+    RayCast2dV2(fromGameObject=Self, fromPosition=(unset), direction=(0, 1), space=1, distance=1.5, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "Bump Object", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    GetTag(gameObject=var "Bump Object", storeResult=var "Tag", everyFrame=true)
+    StringCompare(stringVariable=var "Tag", compareTo="Platform", equalEvent=→"CLAMBER", notEqualEvent=(none), storeResult=(unset), everyFrame=true)
+    on LAND → Land
+  }
+
+  state Block Explosion {
+    FindClosest(gameObject=Self, withTag="Explosion", ignoreOwner=true, mustBeVisible=false, storeObject=var "Explosion", storeDistance=(unset), everyFrame=false)
+    FireAtTarget(gameObject=Self, target=var "Explosion", speed=-15, position=(0, 0, 0), spread=0, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.85, brakeOnExit=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Charge Antic")
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    PlayAudioEvent(audioClip=sword_hit_reject (sfxstatic_assets_shared.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Radial Burst", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="BLACKEN", delay=0, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Smoke", emit=0, resetIfPlaying=true)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=DD_bonk (sfxdynamic_assets_areadocks.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Block End
+  }
+
+  state Block End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Startle", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Charge Pause
+  }
+
+  state Sing {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=DD_sing (sfxdynamic_assets_areadocks.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=false, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.65, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Attack Jump?
+  }
+
+  state Unset Force Turn {
+    SetBoolValue(boolVariable=var "Do Turn L", boolValue=false, everyFrame=false)
+    SetBoolValue(boolVariable=var "Do Turn R", boolValue=false, everyFrame=false)
+    on FINISHED → Bonk Turn
+  }
+
+  state Buddy Wake Delay {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Startle
+  }
+
+  var Charge Speed: float = 0
+  var Gravity: float = 2
+  var Jump Height: float = 0
+  var Jump X: float = 0
+  var X Speed: float = 0
+  var Can Pass: bool = false
+  var Ground Ahead: bool = false
+  var Hero Above: bool = false
+  var Ground Below: bool = false
+  var Facing Hero: bool = false
+  var Wall Ahead: bool = false
+  var Wall Ahead Low: bool = false
+  var Can Not Jump: bool = false
+  var Do Turn R: bool = false
+  var Do Turn L: bool = false
+  var Facing R: bool = false
+  var Facing L: bool = false
+  var Wants To Pass: bool = false
+  var Ground Behind: bool = false
+  var Battler: bool = false
+  var No Clamber: bool = false
+  var Not Moving: bool = false
+  var Clip: string = ""
+  var Tag: string = ""
+  var Cam Shake Distance: vector2 = (25, 18)
+  var Pt Charge: gameObject = Dock Charger/Pt Charge
+  var Wall Bump: gameObject = Dock Charger/Wall Bump
+  var Wall Ray Point: gameObject = Dock Charger/Wall Ray Point
+  var Clamber Ray L: gameObject = Dock Charger/Clamber Ray L
+  var Clamber Ray R: gameObject = Dock Charger/Clamber Ray R
+  var Slam Effect: gameObject = Dock Charger/Slam Effect
+  var Pt Clamber: gameObject = Dock Charger/Pt Clamber
+  var Bump Object: gameObject = <null>
+  var Pt Dust: gameObject = Dock Charger/Pt Dust
+  var Audio Loop Run: gameObject = Dock Charger/Audio Loop Run
+  var Explosion: gameObject = <null>
+  var Pt Smoke: gameObject = Dock Charger/Pt Smoke
+  var Radial Burst: gameObject = Dock Charger/Radial Burst
+  var Ground Ahead Ray: gameObject = Dock Charger/Ground Ahead Ray
+  var Scenery Breaker: gameObject = Dock Charger/Scenery Breaker
+  var Audio Loop Voice: gameObject = Dock Charger/Audio Loop Voice
+}

@@ -1,0 +1,128 @@
+# Wake Up
+# 1 location(s):
+#   Slab_10b / door_wakeOnGround
+
+fsm Wake Up {
+  start Pause
+  on TEST → Take Control  // from any state
+
+  state Pause {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    ActivateGameObject(gameObject=var "Activate On First Enter", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on START ENTRY → Set Respawn?
+    on HERO RESPAWNING HERE → Wait For Scene Enter
+    on PREPARE HERO RESPAWNING HERE → Set Screen Blank
+  }
+
+  state Door Entry {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    ActivateGameObject(gameObject=var "Activate On First Enter", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    SendEventByNameUpwards(Target=Self, EventName="DOOR START ENTRY")
+    on FINISH ENTRY → Take Control
+  }
+
+  state Regain Control {
+    SetIsKinematic2d(gameObject=var "Hero", isKinematic=false)
+    SetPlayerDataBool(boolName="disablePause", value=false)
+    RemoveHeroInputBlocker(Blocker=Self)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    BoolTest(boolVariable=var "Return HUD", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="IN", delay=0, everyFrame=false)
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[false], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Before Save Event
+  }
+
+  state Take Control {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    AddHeroInputBlocker(Blocker=Self)
+    SendEventByName(eventTarget=GameObject(var "HUD Canvas"), sendEvent="OUT INSTANT", delay=0, everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    SendEventToRegister(eventName="WAKE ON GROUND START")
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    on FINISHED → Wait
+  }
+
+  state Wait {
+    ScreenFaderAlpha(EndAlpha=1, Duration=0)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Fade Up
+  }
+
+  state Fade Up {
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Prostrate", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ScreenFaderAlpha(EndAlpha=0, Duration=3)
+    Wait(time=4, finishEvent=→"FINISHED", realTime=false)
+    SendEventToRegister(eventName="THREAD BELL PRE DESTROY")
+    on FINISHED → Get Up Wait
+  }
+
+  state Get Up {
+    RunFSM(fsmTemplateControl=template=-4922903412483150305 in[Slow<-false], finishEvent=→"FINISHED", everyFrame=false)
+    SendEventToRegister(eventName="WAKE ON GROUND GETUP")
+    on FINISHED → Regain Control
+  }
+
+  state Save? {
+    BoolTest(boolVariable=var "Save Game", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SaveGame()
+    on FINISHED → Extra Register Event
+  }
+
+  state End {
+    SendEventByNameUpwards(Target=Self, EventName="DOOR GET UP FINISHED")
+    SendEventToRegister(eventName="WAKE ON GROUND END")
+  }
+
+  state Set Respawn? {
+    AddHeroInputBlocker(Blocker=Self)
+    HeroControllerMethods(method=SetSilkRegenBlocked, parameters=[true], everyFrame=false, storeValue=(unused), isTrue=(none), isFalse=(none))
+    BoolTest(boolVariable=var "Set Death Respawn", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    SetDeathRespawnMarker(Target=door_wakeOnGround/Death Respawn Marker)
+    on FINISHED → Door Entry
+  }
+
+  state Wait For Scene Enter {
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    AddHeroInputBlocker(Blocker=Self)
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    WaitForFinishedEnteringScene(sendEvent=→"FINISHED")
+    on FINISHED → Take Control
+  }
+
+  state Get Up Wait {
+    Wait(time=var "Get Up Wait Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Get Up
+  }
+
+  state Extra Register Event {
+    StringCompare(stringVariable=var "Extra Register Event", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEventToRegister(eventName=var "Extra Register Event")
+    on FINISHED → End
+  }
+
+  state Set Screen Blank {
+    ScreenFader(startColour=(0, 0, 0, 1), endColour=(0, 0, 0, 1), duration=0)
+    SetPlayerDataBool(boolName="disablePause", value=true)
+    AddHeroInputBlocker(Blocker=Self)
+    on HERO RESPAWNING HERE → Wait For Scene Enter
+  }
+
+  state Before Save Event {
+    StringCompare(stringVariable=var "F: Before Save FSM Event", compareTo="", equalEvent=→"FINISHED", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    SendEventByName(eventTarget=GameObject(Self), sendEvent=var "F: Before Save FSM Event", delay=0, everyFrame=false)
+    on FINISHED → Save?
+  }
+
+  var Get Up Wait Time: float = 0
+  var Save Game: bool = true
+  var Return HUD: bool = true
+  var Set Death Respawn: bool = true
+  var Extra Register Event: string = ""
+  var F: Before Save FSM Event: string = ""
+  var Activate On First Enter: gameObject = <null>
+
+  var Self: gameObject = <null>
+}

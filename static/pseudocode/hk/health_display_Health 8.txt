@@ -1,0 +1,252 @@
+# health_display
+# 2 location(s):
+#   Menu_Title / _GameCameras/HudCamera/Anchor TL/Hud Canvas Offset/Hud Canvas/Health/Health 8
+#   resources.assets / _GameCameras/HudCamera/Anchor TL/Hud Canvas Offset/Hud Canvas/Health/Health 8
+
+// uses template: health_display
+fsm health_display {
+  start Init
+  on CHARM INDICATOR CHECK → Charm Pause  // from any state
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    SetBoolValue(boolVariable=var "Initialised", boolValue=false, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Max Up", storeResult=var "Max Up")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=false)
+    FindChild(gameObject=var "Self", childName="Idle Bound", storeResult=var "Bound Sprite")
+    on FINISHED → Check Type
+  }
+
+  state Check Max HP {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="maxHealth", storeValue=var "Max HP")
+    IntCompare(integer1=var "Max HP", integer2=var "Health Number", equal=(none), lessThan=→"OVER MAX", greaterThan=(none), everyFrame=false)
+    on OVER MAX → Inactive
+    on FINISHED → Check Bound
+  }
+
+  state Inactive {
+    SetMeshRenderer(gameObject=var "Self", active=false)
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=false)
+    on MAX HP UP → Appear?
+  }
+
+  state Check if Full {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"FULL", lessThan=→"EMPTY", greaterThan=→"FULL", everyFrame=false)
+    on FULL → Idle
+    on EMPTY → Empty
+  }
+
+  state Idle {
+    SetMeshRenderer(gameObject=var "Self", active=false)
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=true)
+    SetMeshRenderer(gameObject=var "Idle Sprite Other", active=false)
+    on HERO DAMAGED → Pause Frame
+  }
+
+  state Empty {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName=var "Anim Empty")
+    on HERO HEALED → Heal?
+    on HERO HEALED FULL → Pause
+  }
+
+  state Break? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"FULL", lessThan=→"EMPTY", greaterThan=→"FULL", everyFrame=false)
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName=var "Anim Break", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="DAMAGE TAKEN", delay=0, everyFrame=false)
+    on FULL → Idle
+    on FINISHED → Empty
+    on HERO HEALED → Heal?
+    on HERO HEALED FULL → Pause
+  }
+
+  state Heal? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="health", storeValue=var "Current HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Health Number", equal=→"FULL", lessThan=→"EMPTY", greaterThan=→"FULL", everyFrame=false)
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=false)
+    CreateObject(gameObject=var "Heal Particles", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName=var "Anim Refill", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on EMPTY → Empty
+    on FINISHED → Idle
+    on HERO DAMAGED → Empty
+  }
+
+  state Appear? {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="maxHealth", storeValue=var "Max HP")
+    IntCompare(integer1=var "Max HP", integer2=var "Health Number", equal=(none), lessThan=→"OVER MAX", greaterThan=(none), everyFrame=false)
+    on OVER MAX → Inactive
+    on FINISHED → Max Up Appear
+  }
+
+  state Max Up Appear {
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName="Health Max Up", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Max Up Flash
+  }
+
+  state Max Up Flash {
+    ActivateGameObject(gameObject=var "Max Up", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dWatchAnimationEvents(gameObject=var "Self", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Pause {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="health", storeValue=var "Current HP")
+    SetIntValue(intVariable=var "Max Heal Int", intValue=var "Health Number", everyFrame=false)
+    IntOperator(integer1=var "Max Heal Int", integer2=var "Current HP", operation=Subtract, storeResult=var "Max Heal Int", everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Max Heal Int", floatVariable=var "Max Heal Pause", everyFrame=false)
+    FloatMultiply(floatVariable=var "Max Heal Pause", multiplyBy=0.2, everyFrame=false)
+    Wait(time=var "Max Heal Pause", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Max Heal Anim
+  }
+
+  state Max Heal Anim {
+    SetMeshRenderer(gameObject=var "Self", active=true)
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=false)
+    CreateObject(gameObject=var "Heal Particles", spawnPoint=var "Self", position=(unset), rotation=(unset), storeObject=var "", networkInstantiate=false, networkGroup=0)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName=var "Anim Refill", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Idle
+  }
+
+  state Load Animation? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="isFirstGame", isTrue=(none), isFalse=→"FULL")  // disabled
+    BoolTest(boolVariable=var "Initialised", isTrue=→"FULL", isFalse=(none), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetFloatValue(floatVariable=var "Appear Pause", floatValue=2.5, everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Health Number", floatVariable=var "Health Num Float", everyFrame=false)
+    FloatMultiply(floatVariable=var "Health Num Float", multiplyBy=0.2, everyFrame=false)
+    FloatAdd(floatVariable=var "Appear Pause", add=var "Health Num Float", everyFrame=false, perSecond=false)
+    Wait(time=var "Appear Pause", finishEvent=→"FINISHED", realTime=false)
+    GetRespawningHero(variable=var "Respawning Hero")
+    BoolTest(boolVariable=var "Respawning Hero", isTrue=→"RESPAWNING", isFalse=(none), everyFrame=false)
+    on FINISHED → First Pause
+    on FULL → Check if Full
+    on RESPAWNING → Waiting
+  }
+
+  state Load Anim {
+    SetMeshRenderer(gameObject=Self, active=true)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Self", clipName=var "Anim Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Initialised", boolValue=true, everyFrame=false)  // disabled
+    on FINISHED → Last HP?
+  }
+
+  state Charm Pause {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    SetBoolValue(boolVariable=var "Initialised", boolValue=true, everyFrame=false)  // disabled
+    on FINISHED → Check Type
+  }
+
+  state Check Type {
+    SetMeshRenderer(gameObject=var "Bound Sprite", active=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_29", isTrue=→"HIVE", isFalse=→"NORMAL")
+    on NORMAL → Normal
+    on HIVE → Hive
+  }
+
+  state Normal {
+    FindChild(gameObject=var "Self", childName="Idle", storeResult=var "Idle Sprite")
+    FindChild(gameObject=var "Self", childName="Idle Hive", storeResult=var "Idle Sprite Other")
+    SetStringValue(stringVariable=var "Anim Appear", stringValue="Health Appear", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Break", stringValue="Health Break", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Empty", stringValue="Health Empty", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Refill", stringValue="Health Refill", everyFrame=false)
+    SetMeshRenderer(gameObject=var "Idle Sprite Other", active=false)
+    SetGameObject(variable=var "Heal Particles", gameObject=HP Up Particles, everyFrame=false)
+    on FINISHED → Check Max HP
+  }
+
+  state Hive {
+    FindChild(gameObject=var "Self", childName="Idle Hive", storeResult=var "Idle Sprite")
+    FindChild(gameObject=var "Self", childName="Idle", storeResult=var "Idle Sprite Other")
+    SetStringValue(stringVariable=var "Anim Appear", stringValue="Hive Health Appear", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Break", stringValue="Hive Health Break", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Empty", stringValue="Hive Health Empty", everyFrame=false)
+    SetStringValue(stringVariable=var "Anim Refill", stringValue="Hive Health Refill", everyFrame=false)
+    SetMeshRenderer(gameObject=var "Idle Sprite Other", active=false)
+    SetGameObject(variable=var "Heal Particles", gameObject=HP Up Particles Hive, everyFrame=false)
+    on FINISHED → Check Max HP
+  }
+
+  state First Pause {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="enteredTutorialFirstTime", isTrue=→"FINISHED", isFalse=(none))
+    Wait(time=9.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Load Anim
+  }
+
+  state Last HP? {
+    SetBoolValue(boolVariable=var "Initialised", boolValue=true, everyFrame=false)
+    IntCompare(integer1=var "Max HP", integer2=var "Health Number", equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="LAST HP ADDED", delay=0, everyFrame=false)
+    on FINISHED → Check if Full
+  }
+
+  state ReInit {
+    SetBoolValue(boolVariable=var "Initialised", boolValue=false, everyFrame=false)
+    GetOwner(storeGameObject=var "Self")
+    SetBoolValue(boolVariable=var "Initialised", boolValue=false, everyFrame=false)
+    FindChild(gameObject=var "Self", childName="Max Up", storeResult=var "Max Up")
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=false)
+    on FINISHED → Check Type
+  }
+
+  state Pause Frame {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Break?
+  }
+
+  state Blue Refresh {
+    IntCompare(integer1=var "Health Number", integer2=1, equal=(none), lessThan=→"FINISHED", greaterThan=→"FINISHED", everyFrame=false)
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_27", isTrue=(none), isFalse=→"FINISHED")
+    Tk2dPlayAnimation(gameObject=var "Idle Sprite", animLibName="", clipName="Blue Idle")
+    SetPosition(gameObject=var "Idle Sprite", vector=(unset), x=(unset), y=0, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    on FINISHED → Idle
+  }
+
+  state Waiting {
+    Wait(time=1, finishEvent=→"WAIT", realTime=false)
+    on WAIT → Charm Pause
+  }
+
+  state Check Bound {
+    GGCheckBoundHeart(healthNumber=var "Health Number", checkSource=Regular, trueEvent=→"BOUND", falseEvent=→"FINISHED")
+    on BOUND → Bound
+    on FINISHED → Load Animation?
+  }
+
+  state Bound {
+    Tk2dPlayAnimation(gameObject=var "Self", animLibName="", clipName="Health Bound")
+    SetMeshRenderer(gameObject=var "Idle Sprite", active=false)
+    SetMeshRenderer(gameObject=var "Bound Sprite", active=true)
+  }
+
+  var Health Number: int = 8
+
+  var Appear Pause: float = 0
+  var Health Num Float: float = 0
+  var Max Heal Pause: float = 0
+  var Current HP: int = 0
+  var Max HP: int = 0
+  var Max Heal Int: int = 0
+  var Initialised: bool = false
+  var Respawning Hero: bool = false
+  var Anim Appear: string = "Health Appear"
+  var Anim Break: string = "Health Break"
+  var Anim Empty: string = "Health Empty"
+  var Anim Idle: string = "Health Idle"
+  var Anim Refill: string = "Health Refill"
+  var Bound Sprite: gameObject = <null>
+  var Heal Particles: gameObject = <null>
+  var Idle Sprite: gameObject = <null>
+  var Idle Sprite Other: gameObject = <null>
+  var Max Up: gameObject = <null>
+  var Parent: gameObject = <null>
+  var Self: gameObject = <null>
+}

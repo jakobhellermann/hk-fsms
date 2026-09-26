@@ -1,0 +1,352 @@
+# Control
+# 1 location(s):
+#   Dust_Chef / Battle Parent/Battle Scene/Wave 1/Roachkeeper Chef Tiny (1)
+
+fsm Control {
+  start Init
+  on DISABLE → Ended  // from any state
+
+  state Init {
+    on FINISHED → Start Work
+  }
+
+  state BG Work {
+    SetLayer(gameObject=Self, layer=Ignore Raycast(2))
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    on BATTLE START → BG Launch 1
+    on GONG HIT → Stop Work
+    on DID TAUNT → Taunt Look?
+  }
+
+  sequence state Stop Work {
+    WaitRandom(timeMin=0.5, timeMax=0.7, finishEvent=(none), realTime=false)
+    Tk2dStopAnimation(gameObject=Self)
+    AudioStop(gameObject=Self, fadeTime=0)
+    AudioStop(gameObject=var "Audio Loop Voice", fadeTime=0)
+    SetAudioLoop(gameObject=var "Audio Loop Voice", loop=false)
+    on BATTLE START → Launch Antic
+  }
+
+  state BG Launch 1 {
+    PlayAudioEvent(audioClip=phantom_jump (sfxstatic_assets_areaorgan.bundle), pitchMin=0.8, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Chef_small_exert (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    SetAudioClip(gameObject=Self, audioClip=roachkeeper_chef_fly_loop (sfxstatic_assets_areadust.bundle), autoPlay=true, stopOnExit=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="BG Launch", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → BG Launch 2
+  }
+
+  state BG Launch 2 {
+    BoolTest(boolVariable=var "z RunAway", isTrue=→"RUN AWAY", isFalse=(none), everyFrame=false)
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=(unset), y=30, everyFrame=false)
+    Wait(time=0.25, finishEvent=→"FINISHED", realTime=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=false)
+    RandomFloat(min=0.006, max=0.0069, storeResult=var "Z Pos")
+    on FINISHED → Activate
+    on RUN AWAY → Fly Away
+  }
+
+  state Activate {
+    Wait(time=0.2, finishEvent=→"FINISHED", realTime=false)
+    DecelerateXY(gameObject=Self, decelerationX=(unset), decelerationY=0.9, brakeOnExit=false)
+    SetPosition(gameObject=Self, vector=(unset), x=(unset), y=(unset), z=var "Z Pos", space=0, everyFrame=false, lateUpdate=false)
+    SetLayer(gameObject=Self, layer=Enemies(11))
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    on FINISHED → Recover
+  }
+
+  state Recover {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Recover")
+    on FINISHED → Setup Fly
+  }
+
+  state Fly F {
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=6.5, acceleration=0.25, targetsHeight=true, height=var "Height", maxHeight=(unset), stayLeft=var "Stay Left", stayRight=var "Stay Right")
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "X Velocity", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Going L", greaterThanBool=var "Going R", everyFrame=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Facing R", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly Forward")
+    BoolTestMulti(boolVariables=[var "Facing R", var "Going L", var "Can Shift"], boolStates=[true, true, true], trueEvent=→"BACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing R", var "Going R", var "Can Shift"], boolStates=[false, true, true], trueEvent=→"BACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    FloatAdd(floatVariable=var "Fly Time", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Fly Time", float2=0, tolerance=0, equal=→"AGGRO", lessThan=→"AGGRO", greaterThan=(none), everyFrame=true)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=true, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    SetBoolValueAtTime(BoolVariable=var "Can Turn", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    SetBoolValueAtTime(BoolVariable=var "Can Shift", BoolValue=true, Time=0.1, SetOppositeOnStateEntry=true)
+    BoolTestMulti(boolVariables=[var "Facing Hero", var "Can Turn"], boolStates=[false, true], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on BACK → Fly B
+    on AGGRO → Setup Aggro
+    on TOOK DAMAGE → Setup Aggro
+    on TURN → Fly Turn
+    on SING → Sing
+  }
+
+  state Set Facing {
+    RandomFloat(min=8, max=9, storeResult=var "Distance")
+    RandomFloat(min=2.5, max=3.5, storeResult=var "Height")
+    SetStringValue(stringVariable=var "Anim R", stringValue="Fly Forward", everyFrame=false)  // disabled
+    SetStringValue(stringVariable=var "Anim L", stringValue="Fly Back", everyFrame=false)  // disabled
+    SendEventByScale(gameObject=Self, eventTarget=Self, xScale=true, positiveEvent=→"FINISHED", negativeEvent=(none), space=0)  // disabled
+    SetStringValue(stringVariable=var "Anim L", stringValue="Fly Forward", everyFrame=false)  // disabled
+    SetStringValue(stringVariable=var "Anim R", stringValue="Fly Back", everyFrame=false)  // disabled
+    on FINISHED → Fly F
+  }
+
+  state Fly B {
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=6.5, acceleration=0.25, targetsHeight=true, height=var "Height", maxHeight=(unset), stayLeft=var "Stay Left", stayRight=var "Stay Right")
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "X Velocity", float2=0, tolerance=0, equalBool=(unset), lessThanBool=var "Going L", greaterThanBool=var "Going R", everyFrame=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Facing R", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly Back")
+    BoolTestMulti(boolVariables=[var "Facing R", var "Going R", var "Can Shift"], boolStates=[true, true, true], trueEvent=→"FORWARD", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing R", var "Going L", var "Can Shift"], boolStates=[false, true, true], trueEvent=→"FORWARD", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    FloatAdd(floatVariable=var "Fly Time", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Fly Time", float2=0, tolerance=0, equal=→"AGGRO", lessThan=→"AGGRO", greaterThan=(none), everyFrame=true)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=true, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    SetBoolValueAtTime(BoolVariable=var "Can Turn", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    SetBoolValueAtTime(BoolVariable=var "Can Shift", BoolValue=true, Time=0.1, SetOppositeOnStateEntry=true)
+    BoolTestMulti(boolVariables=[var "Facing Hero", var "Can Turn"], boolStates=[false, true], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FORWARD → Fly F
+    on AGGRO → Setup Aggro
+    on TOOK DAMAGE → Setup Aggro
+    on TURN → Fly Turn
+    on SING → Sing
+  }
+
+  state Fly Away {
+    AccelerateToX(gameObject=Self, accelerationFactor=0.75, targetSpeed=-50)
+    AccelerateToY(gameObject=Self, accelerationFactor=1, targetSpeed=50)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly Forward")
+    on FINISHED → Destroy
+  }
+
+  state Destroy {
+    DestroySelf(detachChildren=false)
+  }
+
+  sequence state Launch Antic {
+    WaitRandom(timeMin=0, timeMax=0.3, finishEvent=(none), realTime=false)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Chef_rest_look (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="BG Look")
+    WaitRandom(timeMin=1, timeMax=1.15, finishEvent=(none), realTime=false)
+    on FINISHED → BG Launch 1
+  }
+
+  state Setup Fly {
+    SetAudioClip(gameObject=Self, audioClip=roachkeeper_chef_fly_loop (sfxstatic_assets_areadust.bundle), autoPlay=true, stopOnExit=false)
+    SetAudioClip(gameObject=var "Audio Loop Voice", audioClip=Chef_fly_mutter_loop (sfxstatic_assets_areadust.bundle), autoPlay=true, stopOnExit=false)  // disabled
+    RandomiseAudioPosition(gameObject=var "Audio Loop Voice", timeMin=0, timeMax=17)  // disabled
+    RandomFloat(min=1, max=2, storeResult=var "Fly Time")
+    RandomFloat(min=11, max=12, storeResult=var "Distance")
+    RandomFloat(min=3, max=4, storeResult=var "Height")
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=false, facingEvent=(none), notFacingEvent=→"TURN", facingBool=(unset), notFacingBool=(unset))
+    on FINISHED → Fly F
+    on TURN → Fly Turn
+  }
+
+  state Setup Aggro {
+    RandomFloat(min=6, max=7, storeResult=var "Distance")
+    RandomFloat(min=2.5, max=3.5, storeResult=var "Height")
+    on FINISHED → Aggro F
+  }
+
+  state Aggro F {
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=6.5, acceleration=0.25, targetsHeight=true, height=var "Height", maxHeight=(unset), stayLeft=var "Stay Left", stayRight=var "Stay Right")
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "X Velocity", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Going R", everyFrame=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Facing R", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly Forward")
+    BoolTestMulti(boolVariables=[var "Facing R", var "Going R"], boolStates=[true, false], trueEvent=→"BACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing R", var "Going R"], boolStates=[false, true], trueEvent=→"BACK", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=true, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    SetBoolValueAtTime(BoolVariable=var "Can Turn", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    BoolTestMulti(boolVariables=[var "Facing Hero", var "Can Turn"], boolStates=[false, true], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on BACK → Aggro B
+    on ATTACK → Slash Antic
+    on TURN → Aggro Turn
+    on SING → Sing
+  }
+
+  state Aggro B {
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=var "Distance", speedMax=6.5, acceleration=0.25, targetsHeight=true, height=var "Height", maxHeight=(unset), stayLeft=var "Stay Left", stayRight=var "Stay Right")
+    GetVelocity2d(gameObject=Self, vector=(unset), x=var "X Velocity", y=(unset), space=0, everyFrame=true)
+    FloatTestToBool(float1=var "X Velocity", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Going R", everyFrame=true)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "X Scale", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatTestToBool(float1=var "X Scale", float2=0, tolerance=0, equalBool=(unset), lessThanBool=(unset), greaterThanBool=var "Facing R", everyFrame=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Fly Back")
+    BoolTestMulti(boolVariables=[var "Facing R", var "Going R"], boolStates=[true, true], trueEvent=→"FORWARD", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    BoolTestMulti(boolVariables=[var "Facing R", var "Going R"], boolStates=[false, false], trueEvent=→"FORWARD", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=true)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=true, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    SetBoolValueAtTime(BoolVariable=var "Can Turn", BoolValue=true, Time=0.25, SetOppositeOnStateEntry=true)
+    BoolTestMulti(boolVariables=[var "Facing Hero", var "Can Turn"], boolStates=[false, true], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FORWARD → Aggro F
+    on ATTACK → Slash Antic
+    on TURN → Aggro Turn
+    on SING → Sing
+  }
+
+  state Slash Antic {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Chef_small_exert (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    PlayAudioEvent(audioClip=roachkeeper_chef_antic (sfxstatic_assets_areadust.bundle), pitchMin=0.9, pitchMax=1.1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Audio")
+    AudioStop(gameObject=Self, fadeTime=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=true, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    DistanceFlyV2(gameObject=Self, target=var "Hero", distance=7, speedMax=3, acceleration=0.25, targetsHeight=true, height=3.5, maxHeight=(unset), stayLeft=var "Stay Left", stayRight=var "Stay Right")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Slash 1
+    on SING → Sing
+  }
+
+  state Slash 1 {
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Chef_attack (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    ActivateGameObject(gameObject=var "Slash Collider 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=40, ySpeed=-15, everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Slash", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=var "Attack Decel", brakeOnExit=false)
+    PlayAudioEventRandom(audioClips=[phantom_stab_1 (sfxstatic_assets_areaorgan.bundle), phantom_stab_2 (sfxstatic_assets_areaorgan.bundle), phantom_stab_3 (sfxstatic_assets_areaorgan.bundle)], pitchMin=0.6, pitchMax=0.7, volume=0.7, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 2
+  }
+
+  state Slash 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Attack Decel", brakeOnExit=false)
+    on FINISHED → Slash Between
+  }
+
+  state Slash Between {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Slash 3
+  }
+
+  state Slash 3 {
+    ActivateGameObject(gameObject=var "Slash Collider 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetVelocityByScale(gameObject=Self, speed=40, ySpeed=-15, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Attack Decel", brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEventRandom(audioClips=[phantom_stab_1 (sfxstatic_assets_areaorgan.bundle), phantom_stab_2 (sfxstatic_assets_areaorgan.bundle), phantom_stab_3 (sfxstatic_assets_areaorgan.bundle)], pitchMin=0.6, pitchMax=0.7, volume=0.7, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Slash 3a
+  }
+
+  state Slash 4 {
+    DecelerateV2(gameObject=Self, deceleration=var "Attack Decel", brakeOnExit=false)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Setup Fly
+  }
+
+  state Fly Turn {
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Fly B
+  }
+
+  state Aggro Turn {
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Aggro B
+  }
+
+  state Slash 3a {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Slash Collider 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=var "Attack Decel", brakeOnExit=false)
+    on FINISHED → Slash 4
+  }
+
+  state Ended {
+    AudioStop(gameObject=var "Current Audio", fadeTime=0)
+  }
+
+  state Taunt Look? {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="", outOfRangeEvent="CANCEL", everyFrame=false)
+    BoolTest(boolVariable=var "z2 LookAtNoise", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on CANCEL → BG Work
+    on FINISHED → Taunt Look
+  }
+
+  sequence state Taunt Look {
+    WaitRandom(timeMin=0.2, timeMax=0.55, finishEvent=(none), realTime=false)
+    AudioPause(gameObject=var "Audio Loop Voice")
+    AudioPause(gameObject=Self)
+    AudioPlayRandomVoiceFromTable(gameObject=var "Audio Loop Voice", audioClipTable=Chef_rest_look (sfxdynamic_assets_areadust.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="BG Look")
+    Wait(time=1, finishEvent=(none), realTime=false)
+    WaitRandom(timeMin=1.5, timeMax=1.7, finishEvent=(none), realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    AudioPlaySimple(gameObject=var "Audio Loop Voice", volume=1, oneShotClip=<null>)
+    SetAudioPitch(gameObject=var "Audio Loop Voice", pitch=1.1, everyFrame=false)
+    RandomiseAudioPosition(gameObject=var "Audio Loop Voice", timeMin=0, timeMax=16)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="BG Look To Work")
+    on FINISHED → BG Work
+  }
+
+  state Start Work {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="BG Work")
+    Tk2dPlayFrame(gameObject=Self, frame=var "Start Frame")
+    SetAudioLoop(gameObject=Self, loop=true)
+    SetAudioClip(gameObject=Self, audioClip=var "Cooking Loop", autoPlay=true, stopOnExit=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    on FINISHED → BG Work
+  }
+
+  state Slash To Turn? {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=true, everyFrame=false, facingEvent=(none), notFacingEvent=→"TURN", facingBool=(unset), notFacingBool=(unset))
+    on FINISHED → Setup Fly
+    on TURN → Fly Turn
+  }
+
+  state Sing {
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.6, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=Chef_sing (sfxdynamic_assets_areadust.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Setup Fly
+  }
+
+  var Start Frame: int = 2
+  var Stay Left: bool = false
+  var Stay Right: bool = true
+  var z RunAway: bool = false
+  var z2 LookAtNoise: bool = false
+  var Cooking Loop: object = roachkeeper_chef_cooking_right_loop (sfxstatic_assets_areadust.bundle)
+
+  var Z Pos: float = 0
+  var Distance: float = 0
+  var Height: float = 0
+  var X Velocity: float = 0
+  var X Scale: float = 0
+  var Fly Time: float = 0
+  var Attack Decel: float = 0.85
+  var Can Turn: bool = false
+  var Facing Hero: bool = false
+  var Facing R: bool = false
+  var Going R: bool = false
+  var Can Shift: bool = false
+  var Going L: bool = false
+  var Anim R: string = ""
+  var Anim L: string = ""
+  var Slash Collider 1: gameObject = Battle Parent/Battle Scene/Wave 1/Roachkeeper Chef Tiny (1)/Slash Collider 1
+  var Slash Collider 2: gameObject = Battle Parent/Battle Scene/Wave 1/Roachkeeper Chef Tiny (1)/Slash Collider 2
+  var Terrain Collider: gameObject = Battle Parent/Battle Scene/Wave 1/Roachkeeper Chef Tiny (1)/Terrain Collider
+  var Slash Collider 3: gameObject = Battle Parent/Battle Scene/Wave 1/Roachkeeper Chef Tiny (1)/Slash Collider 3
+  var Slash Collider 4: gameObject = Battle Parent/Battle Scene/Wave 1/Roachkeeper Chef Tiny (1)/Slash Collider 4
+  var Current Audio: gameObject = <null>
+  var Audio Loop Voice: gameObject = Battle Parent/Battle Scene/Wave 1/Roachkeeper Chef Tiny (1)/Audio Loop Voice
+}

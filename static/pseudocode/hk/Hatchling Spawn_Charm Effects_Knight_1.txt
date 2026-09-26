@@ -1,0 +1,127 @@
+# Hatchling Spawn
+# 1 location(s):
+#   resources.assets / Knight:1/Charm Effects
+
+fsm Hatchling Spawn {
+  start Init
+  on CHARM EQUIP CHECK → Check Equipped  // from any state
+  on LEAVING SCENE → Count Remaining  // from any state
+  on ALL CHARMS END → Unequipped  // from any state
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Check Equipped
+  }
+
+  state Check Equipped {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_22", isTrue=→"EQUIPPED", isFalse=→"UNEQUIPPED")
+    on EQUIPPED → Wait for Hero
+    on UNEQUIPPED → Unequipped
+  }
+
+  state Unequipped {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="K HATCHLING END", delay=0, everyFrame=false)
+  }
+
+  state Equipped {
+    Wait(time=var "Hatch Time", finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Can Hatch?
+  }
+
+  state Can Hatch? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="disablePause", isTrue=→"CANCEL", isFalse=(none))
+    GetPlayerDataInt(gameObject=var "GameManager", intName="MPCharge", storeValue=var "MP")
+    IntCompare(integer1=var "MP", integer2=var "Soul Cost", equal=(none), lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    on CANCEL → Equipped
+    on FINISHED → Check Count
+  }
+
+  state Check Count {
+    GetTagCount(tag="Knight Hatchling", storeResult=var "Hatchlings")
+    IntCompare(integer1=var "Hatchlings", integer2=var "Hatchling Max", equal=→"CANCEL", lessThan=→"FINISHED", greaterThan=→"CANCEL", everyFrame=false)
+    on CANCEL → Equipped
+    on FINISHED → Hatch
+  }
+
+  state Hatch {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=TakeMP(var "Soul Cost"))
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false)
+    SpawnObjectFromGlobalPool(gameObject=Knight Hatchling, spawnPoint=<null>, position=var "Hero Pos", rotation=(unset), storeObject=var "Hatchling Obj")
+    SetPosition(gameObject=var "Hatchling Obj", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    on FINISHED → Equipped
+  }
+
+  state Count Remaining {
+    GetTagCount(tag="Knight Hatchling", storeResult=var "Hatchlings")
+    IntCompare(integer1=var "Hatchlings", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    BoolTest(boolVariable=var "Dreamgate Entry", isTrue=→"DREAMGATE", isFalse=(none), everyFrame=false)
+    on LEVEL LOADED → Charms Allowed?
+    on DREAMGATE → Dreamgate Pause
+    on CANCEL → Check Equipped
+  }
+
+  state Respawn Check {
+    IntCompare(integer1=var "Hatchlings", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    BoolTest(boolVariable=(unset), isTrue=(none), isFalse=(none), everyFrame=false)
+    on CANCEL → Check Equipped
+    on FINISHED → Respawn
+  }
+
+  state Respawn {
+    SpawnObjectFromGlobalPool(gameObject=Knight Hatchling, spawnPoint=var "Hero", position=(unset), rotation=(unset), storeObject=var "Hatchling Obj")
+    SendEventByName(eventTarget=GameObject(var "Hatchling Obj"), sendEvent="QUICK SPAWN", delay=0, everyFrame=false)
+    IntAdd(intVariable=var "Hatchlings", add=-1, everyFrame=false)
+    on FINISHED → Respawn Check
+  }
+
+  state Respawn Pause {
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)  // disabled
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Respawn Check
+  }
+
+  state Dreamgate Pause {
+    SetBoolValue(boolVariable=var "Dreamgate Entry", boolValue=false, everyFrame=false)
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Respawn Check 2
+  }
+
+  state Respawn Check 2 {
+    IntCompare(integer1=var "Hatchlings", integer2=0, equal=→"CANCEL", lessThan=→"CANCEL", greaterThan=(none), everyFrame=false)
+    on CANCEL → Check Equipped
+    on FINISHED → Respawn 2
+  }
+
+  state Respawn 2 {
+    SpawnObjectFromGlobalPool(gameObject=Knight Hatchling, spawnPoint=var "Hero", position=(0, 0, 0), rotation=(unset), storeObject=var "Hatchling Obj")
+    SendEventByName(eventTarget=GameObject(var "Hatchling Obj"), sendEvent="DREAMGATE SPAWN", delay=0, everyFrame=false)
+    IntAdd(intVariable=var "Hatchlings", add=-1, everyFrame=false)
+    on FINISHED → Respawn Check 2
+  }
+
+  state Charms Allowed? {
+    GetFsmBool(gameObject=var "Hero", fsmName="ProxyFSM", variableName="No Charms", storeValue=var "No Charms", everyFrame=false)
+    BoolTest(boolVariable=var "No Charms", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "GameManager", behaviour="GameManager", methodName="IsGameplayScene", parameters=[], storeResult=var "Is Gameplay Scene")
+    BoolTest(boolVariable=var "Is Gameplay Scene", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    on FINISHED → Respawn Pause
+    on CANCEL → Unequipped
+  }
+
+  state Wait for Hero {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Equipped
+  }
+
+  var Hatch Time: float = 4
+  var Hatchling Max: int = 4
+  var Soul Cost: int = 8
+
+  var Hatchlings: int = 0
+  var MP: int = 0
+  var Dreamgate Entry: bool = false
+  var Is Gameplay Scene: bool = false
+  var No Charms: bool = false
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Hatchling Obj: gameObject = <null>
+}

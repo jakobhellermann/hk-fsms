@@ -1,0 +1,126 @@
+# Control
+# 1 location(s):
+#   Tut_01 / Fixer Bridge Bottom Control/Fixer Bridge Bottom
+
+fsm Control {
+  start Init
+
+  state Init {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Check
+  }
+
+  state Idle {
+    Collision2dEvent(gameObject=var "Collider", collision=0, collideTag="Player", sendEvent=→"ENTER", storeCollider=var "Player", storeForce=var "Force")
+    FadeAudio(gameObject=Self, startVolume=(unset), endVolume=0, time=0.2)
+    on ENTER → Impact?
+    on BREAK → Break
+    on STRIKE → Strike
+  }
+
+  state Still {
+    Collision2dEvent(gameObject=var "Collider", collision=2, collideTag="Player", sendEvent=→"EXIT", storeCollider=var "Player", storeForce=(unset))
+    GetSpeed2d(gameObject=var "Player", storeResult=var "Player Speed", everyFrame=true)
+    FloatCompare(float1=var "Player Speed", float2=0, tolerance=0.5, equal=(none), lessThan=(none), greaterThan=→"MOVE", everyFrame=true)
+    SendMessage(gameObject=var "Jitter Bits", delivery=BroadcastMessage, options=1, functionCall=Stop Jitter())
+    FadeAudio(gameObject=Self, startVolume=(unset), endVolume=0, time=0.2)
+    on EXIT → Idle
+    on MOVE → Moving
+    on BREAK → Break
+  }
+
+  state Moving {
+    Collision2dEvent(gameObject=var "Collider", collision=2, collideTag="Player", sendEvent=→"EXIT", storeCollider=var "Player", storeForce=(unset))
+    GetSpeed2d(gameObject=var "Player", storeResult=var "Player Speed", everyFrame=true)
+    FloatTestToBool(float1=var "Player Speed", float2=0, tolerance=0.5, equalBool=var "Player Is Still", lessThanBool=(unset), greaterThanBool=(unset), everyFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Can End", BoolValue=true, Time=0.2, SetOppositeOnStateEntry=true)
+    BoolAllTrue(boolVariables=[var "Player Is Still", var "Can End"], sendEvent=→"STILL", storeResult=(unset), everyFrame=true)
+    ObjectJitter(gameObject=var "Pivot", x=0.05, y=0.05, z=(unset), allowMovement=false, limitFps=20)
+    PlayParticleEmitterInState(gameObject=var "Pt Walk")
+    SendMessage(gameObject=var "Jitter Bits", delivery=BroadcastMessage, options=1, functionCall=Start Jitter())
+    AudioPlaySimpleV2(gameObject=Self, volume=0.75, startTime=0, oneShotClip=<null>)
+    on EXIT → Idle
+    on STILL → Still
+    on BREAK → Break
+  }
+
+  state Impact? {
+    FloatCompare(float1=var "Force", float2=20, tolerance=0, equal=(none), lessThan=→"SMALL IMPACT", greaterThan=(none), everyFrame=false)
+    FloatCompare(float1=var "Force", float2=30, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"BREAK", everyFrame=false)  // disabled
+    GetHeroCState(VariableName="willHardLand", StoreValue=var "Will Hard Land", EveryFrame=false)
+    BoolTest(boolVariable=var "Will Hard Land", isTrue=→"BREAK", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="IsHardLanding", parameters=[], storeResult=var "Will Hard Land", EveryFrame=false)
+    BoolTest(boolVariable=var "Will Hard Land", isTrue=→"BREAK", isFalse=(none), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Rotate(gameObject=var "Pivot", vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=-0.65, space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    IntAdd(intVariable=var "Impacts", add=1, everyFrame=false)
+    IntCompare(integer1=var "Impacts", integer2=4, equal=→"BREAK", lessThan=(none), greaterThan=(none), everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Impact", emit=0, resetIfPlaying=false)
+    PlayAudioEventRandom(audioClips=[enemy_bone_crack_1 (sfxstatic_assets_areabone.bundle), enemy_bone_crack_2 (sfxstatic_assets_areabone.bundle), enemy_bone_crack_3 (sfxstatic_assets_areabone.bundle)], pitchMin=1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Still
+    on BREAK → Break
+    on SMALL IMPACT → Moving
+  }
+
+  state Break {
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    SetPlayerDataBool(boolName="fixerBridgeBroken", value=true)
+    ActivateGameObject(gameObject=var "Pivot", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Jitter Bits", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Collider", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Enviro Region Simple", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayParticleEmitter(gameObject=var "Pt Break", emit=0, resetIfPlaying=false)
+    ActivateGameObject(gameObject=var "Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Break Chunks", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    FlingObjects(containerObject=var "Break Chunks", adjustPosition=(0, 0, 0), randomisePosition=false, speedMin=5, speedMax=5, angleMin=0, angleMax=360, space=0)
+    PlayAudioEvent(audioClip=enemy_bone_crack_3 (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=bone_goomba_large_death (sfxstatic_assets_areabone.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventToRegister(eventName="FIXER BRIDGE BREAK")
+    on FINISHED → End Breaking
+  }
+
+  state Check {
+    PlayerDataBoolTest(boolName="fixerBridgeBroken", isTrue=→"BREAK", isFalse=(none))
+    on FINISHED → Idle
+    on BREAK → Broken
+  }
+
+  state Broken {
+    SetParent(gameObject=var "Remains", parent=<null>, resetLocalPosition=false, resetLocalRotation=false)
+    ActivateGameObject(gameObject=Self, activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+  }
+
+  state End Breaking {
+    SetPlayerDataBool(boolName="fixerBridgeBreaking", value=false)
+  }
+
+  state Strike {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Tiny Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    Rotate(gameObject=var "Pivot", vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=-0.65, space=1, perSecond=false, everyFrame=false, lateUpdate=false, fixedUpdate=false)
+    IntAdd(intVariable=var "Impacts", add=1, everyFrame=false)
+    IntCompare(integer1=var "Impacts", integer2=4, equal=→"BREAK", lessThan=(none), greaterThan=(none), everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Impact", emit=0, resetIfPlaying=false)
+    PlayAudioEventRandom(audioClips=[enemy_bone_crack_1 (sfxstatic_assets_areabone.bundle), enemy_bone_crack_2 (sfxstatic_assets_areabone.bundle), enemy_bone_crack_3 (sfxstatic_assets_areabone.bundle)], pitchMin=1, pitchMax=1.2, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Idle
+    on BREAK → Break
+  }
+
+  var Player Speed: float = 0
+  var Force: float = 0
+  var Impacts: int = 0
+  var Player Is Still: bool = false
+  var Can End: bool = false
+  var Will Hard Land: bool = false
+  var Pivot: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Pivot
+  var Collider: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Terrain Collider
+  var Pt Walk: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Pt Walk
+  var Player: gameObject = <null>
+  var Pt Impact: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Pt Impact
+  var Pt Break: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Pt Break
+  var Slam Effect: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Slam Effect
+  var Jitter Bits: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Jitter Bits
+  var Remains: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Remains
+  var Enviro Region Simple: gameObject = <null>
+  var Break Chunks: gameObject = Fixer Bridge Bottom Control/Fixer Bridge Bottom/Break Chunks
+}

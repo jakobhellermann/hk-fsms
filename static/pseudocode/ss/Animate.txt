@@ -1,0 +1,203 @@
+# Animate
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool
+
+fsm Animate {
+  start Init
+  on SPOOL MAX UP → Get Max  // from any state
+  on TEST MAX SILK UP → State 2  // from any state
+  on HUD APPEAR RESET → Init  // from any state
+  on SPOOL UNBROKEN → Unbreak Activate  // from any state
+
+  state Init {
+    SetBoolValue(boolVariable=var "Spool Appeared", boolValue=false, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Cap L", active=false)
+    SetMeshRenderer(gameObject=var "Cap R", active=false)
+    SetMeshRenderer(gameObject=var "Bind Notch", active=false)
+    SetMeshRenderer(gameObject=var "Seg 1", active=false)
+    ActivateGameObject(gameObject=var "Superjump Halo", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → First?
+  }
+
+  state First? {
+    PlayerDataBoolTest(boolName="bindCutscenePlayed", isTrue=→"WAIT FOR HP", isFalse=→"WAIT FOR INTRO")
+    on WAIT FOR HP → Wait for HP
+    on WAIT FOR INTRO → Wait for Intro
+  }
+
+  state Wait for HP {
+    EnableFsmSelf(SetEnabled=false)
+    on LAST HP ADDED → Appear Anim
+  }
+
+  state Wait for Intro {
+    EnableFsmSelf(SetEnabled=false)
+    on SPOOL APPEAR → Appear Anim
+  }
+
+  state Appear Anim {
+    PlayerDataVariableTest(VariableName="IsAnyCursed", ExpectedValue=true, IsExpectedEvent=→"FINISHED", IsNotExpectedEvent=(none))
+    ActivateGameObject(gameObject=var "Spool Appear", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayFrame(gameObject=var "Spool Appear", frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Spool Appear", clipName="Spool Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    GetFsmBool(gameObject=var "HUD Canvas", fsmName="Slide Out", variableName="Is Visible", storeValue=var "Is Hud Visible", everyFrame=false)
+    BoolTest(boolVariable=var "Is Hud Visible", isTrue=(none), isFalse=→"FINISHED", everyFrame=false)
+    PlayAudioEvent(audioClip=hud_03_thing_on_bottom (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Activate Spool
+  }
+
+  state Idle {
+    ActivateGameObject(gameObject=var "Spool Appear", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="SilkSpool", methodName="DrawSpool", parameters=[], storeResult=(unset var), EveryFrame=false)
+    EnableFsmSelf(SetEnabled=false)
+    on HUD COMING IN → Idle
+    on SILK CURSED UPDATE → Idle
+    on SUPERJUMP HALO ACTIVATED → Activate Superjump Halo
+    on SUPERJUMP HALO READY → Ready Superjump Halo
+    on SUPERJUMP HALO END → End Superjump Halo
+  }
+
+  state Activate Spool {
+    SetBoolValue(boolVariable=var "Spool Appeared", boolValue=true, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Cap L", active=true)
+    SetMeshRenderer(gameObject=var "Cap R", active=true)
+    SetMeshRenderer(gameObject=var "Seg 1", active=true)
+    SetMeshRenderer(gameObject=var "Bind Notch", active=true)
+    SendEventToRegister(eventName="SPOOL APPEARED")
+    on FINISHED → Idle
+  }
+
+  state Fill Silk {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AddSilk", parameters=[1, false], storeResult=(unset var), EveryFrame=false)
+    Wait(time=0.025, finishEvent=→"FINISHED", realTime=false)
+    FloatAdd(floatVariable=var "Cap Time", add=-0.025, everyFrame=false, perSecond=false)
+    on FINISHED → Silk Full?
+  }
+
+  state Silk Full? {
+    PlayerDataVariableTest(VariableName="IsAnyCursed", ExpectedValue=true, IsExpectedEvent=→"CANCEL", IsNotExpectedEvent=(none))
+    GetPlayerDataInt(intName="silk", storeValue=var "Silk")
+    IntAdd(intVariable=var "Silk", add=1, everyFrame=false)
+    IntCompare(integer1=var "Silk", integer2=var "Silk Max", equal=(none), lessThan=→"ADD", greaterThan=(none), everyFrame=false)
+    on ADD → Fill Silk
+    on FINISHED → Final Chunk
+    on CANCEL → Final Chunk
+  }
+
+  state Get Max {
+    GetPlayerDataVariable(VariableName="silkMax", StoreValue=var "Silk Max")
+    PlayerDataVariableTest(VariableName="IsAnyCursed", ExpectedValue=true, IsExpectedEvent=→"CANCEL", IsNotExpectedEvent=(none))
+    on CANCEL → Skip Max Up
+    on FINISHED → Remove Silk
+  }
+
+  state Cap Extend {
+    PlayAudioEvent(audioClip=ui_spool_shard_extend (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Cap Extend", clipName="Cap Extend", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Cap Extend", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Cap R", active=false)
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=DrawSpool())
+    Wait(time=var "Cap Time", finishEvent=→"NEXT", realTime=false)
+    on NEXT → Lengthen Spool
+  }
+
+  sequence state Lengthen Spool {
+    SetMeshRenderer(gameObject=var "Cap R", active=true)
+    Tk2dPlayAnimationWait(Target=var "Cap Extend", ClipName="Cap Extend End", AnimationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Cap Extend", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Silk Full?
+  }
+
+  sequence state Final Chunk {
+    Wait(time=0.75, finishEvent=(none), realTime=false)
+    PlayAudioEvent(audioClip=ui_spool_shard_fill_up (sfxstatic_assets_ui.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=Audio Player UI@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=AddFinalMaxSilk())
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetSilkRegenBlocked", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    SendEventToRegister(eventName="SPOOL EXTENDER SHOW")
+    SendEventToRegister(eventName="SPOOL MAX UP ENDED")
+    on FINISHED → Idle
+  }
+
+  state State 2 {
+    PlayerDataIntAdd(intName="silkMax", amount=1)
+    on FINISHED → Get Max
+  }
+
+  sequence state Unbreak? {
+    PlayerDataVariableTest(VariableName="IsSilkSpoolBroken", ExpectedValue=true, IsExpectedEvent=(none), IsNotExpectedEvent=→"FINISHED")
+    SetPlayerDataVariable(VariableName="IsSilkSpoolBroken", SetValue=false)
+    ActivateGameObject(gameObject=var "Spool Appear", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWait(Target=var "Spool Appear", ClipName="Spool Appear", AnimationCompleteEvent=(none))
+    CallMethodProper(gameObject=Self, behaviour="SilkSpool", methodName="DrawSpool", parameters=[-1], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Spool Appear", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Cap Extend
+  }
+
+  sequence state Unbreak Anim {
+    ActivateGameObject(gameObject=var "Spool Appear", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Tk2dPlayAnimationWait(Target=var "Spool Appear", ClipName="Spool Appear", AnimationCompleteEvent=(none))
+    on FINISHED → Idle
+  }
+
+  state Remove Silk {
+    SendEventToRegister(eventName="SPOOL EXTENDER HIDE")
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetSilkRegenBlocked", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    TakeSilk(target=var "Hero", amount=9999)
+    ClearSpoolMossChunks()
+    Wait(time=0.5, finishEvent=(none), realTime=false)
+    on FINISHED → Unbreak?
+  }
+
+  state Skip Max Up {
+    SetPlayerDataVariable(VariableName="IsSilkSpoolBroken", SetValue=false)
+    SendEventToRegister(eventName="SPOOL MAX UP ENDED")
+    on FINISHED → Idle
+  }
+
+  state Unbreak Activate {
+    BoolTest(boolVariable=var "Spool Appeared", isTrue=→"FINISHED", isFalse=(none), everyFrame=false)
+    SetBoolValue(boolVariable=var "Spool Appeared", boolValue=true, everyFrame=false)
+    SetMeshRenderer(gameObject=var "Cap L", active=true)
+    SetMeshRenderer(gameObject=var "Cap R", active=true)
+    SetMeshRenderer(gameObject=var "Seg 1", active=true)
+    SetMeshRenderer(gameObject=var "Bind Notch", active=true)
+    SendEventToRegister(eventName="SPOOL APPEARED")
+    on FINISHED → Unbreak Anim
+  }
+
+  state Activate Superjump Halo {
+    ActivateGameObject(gameObject=var "Superjump Halo", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AnimatorPlay(gameObject=var "Superjump Halo Orb", stateName="Appear", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    AnimatorPlay(gameObject=var "Superjump Halo Bar", stateName="Appear", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state End Superjump Halo {
+    AnimatorPlay(gameObject=var "Superjump Halo Orb", stateName="Disappear", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    AnimatorPlay(gameObject=var "Superjump Halo Bar", stateName="Disappear", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Ready Superjump Halo {
+    AnimatorPlay(gameObject=var "Superjump Halo Orb", stateName="Ready", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    AnimatorPlay(gameObject=var "Superjump Halo Bar", stateName="Ready", layer=(unset), normalizedTime=(unset), everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  var Cap Time: float = 1
+  var Silk: int = 0
+  var Silk Max: int = 0
+  var Is Hud Visible: bool = false
+  var Spool Appeared: bool = false
+  var Bind Notch: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Bind Notch
+  var Cap Extend: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Active/Cap R/Cap Extend
+  var Cap L: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Active/Cap L
+  var Cap R: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Active/Cap R
+  var Seg 1: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Thread Spool/Parent/Active/Seg1 Parent/Seg1
+  var Spool Appear: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Spool Appear
+  var Superjump Halo: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Bind Orb/Lost_Lace_ending_sequence_HUD_effect
+  var Superjump Halo Orb: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Bind Orb/Lost_Lace_ending_sequence_HUD_effect/orb
+  var Superjump Halo Bar: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Thread/Spool/Bind Orb/Lost_Lace_ending_sequence_HUD_effect/Silk Bar Pivot/silk_bar
+}

@@ -1,0 +1,455 @@
+# Control
+# 1 location(s):
+#   Bonegrave / Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim
+
+fsm Control {
+  start Pause
+
+  state Init {
+    GetDefaultTk2dClipName(gameObject=Self, storeName=var "Clip")
+    StringCompare(stringVariable=var "Clip", compareTo="Grave Pray", equalEvent=→"GRAVE PRAY", notEqualEvent=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Patrol
+    on GRAVE PRAY → Grave Pray
+  }
+
+  state Patrol {
+    RandomBool(storeResult=var "Attack Far")
+    WalkLeftRight(gameObject=Self, walkSpeed=3, spriteFacesLeft=true, groundLayer="Terrain", turnDelay=0.5, wallLookAhead=3, walkAnimName="Walk", turnAnimName="Turn", moveWhileTurning=true, startLeft=false, startRight=false, keepDirection=true, flipBeforeTurn=true, turnAudioClipTable=<null>)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"SING", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    SetBoolValueAtTime(BoolVariable=var "Attack Ready", BoolValue=true, Time=0.2, SetOppositeOnStateEntry=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Leap Range", storeResult=var "In Leap Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Combat Range", storeResult=var "In Combat Range", sendEvent="", outOfRangeEvent="", everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Attack Ready", var "In Attack Range"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Attack Ready", var "In Leap Range", var "Attack Far"], sendEvent=→"FAR", storeResult=(unset), everyFrame=true)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=(none), notFacingEvent=(none), facingBool=var "Facing Hero", notFacingBool=(unset))
+    BoolTestMulti(boolVariables=[var "Startled", var "In Combat Range", var "Facing Hero"], boolStates=[true, true, false], trueEvent=→"TURN", falseEvent=(none), storeResult=(unset), everyFrame=true)
+    SetFloatValue(floatVariable=var "Charge Timer", floatValue=0, everyFrame=false)
+    FloatAddV2(floatVariable=var "Charge Timer", add=1, everyFrame=true, perSecond=true, fixedUpdate=false, activeBool=var "In Combat Range")
+    FloatCompare(float1=var "Charge Timer", float2=1.5, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"BARGE", everyFrame=true)
+    AudioPlayInState(gameObject=Self, volume=(unset))
+    on ATTACK → Close
+    on TOOK DAMAGE → Dmg React
+    on SING → Sing
+    on FAR → Far
+    on TURN → Turn To Hero
+    on BARGE → Barge Antic
+  }
+
+  state Sing {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.4, MaxReactDelay=0.5, None=→"END", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=rosary_pilgrim_sing (sfxdynamic_assets_areamossareaswamp.bundle), noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on END → Sing End
+    on SING DURATION END → Sing End
+  }
+
+  state Sing End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Patrol
+  }
+
+  state Dmg React {
+    SetBoolValue(boolVariable=var "Attack Ready", boolValue=true, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Patrol
+  }
+
+  state Close {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Attack Ready", boolValue=false, everyFrame=false)
+    SendRandomEventV4(events=[→"LEAP B", →"LEAP F", →"WHIP", →"EVADE"], weights=[0.15, 0.15, 0.6, 0.2], eventMax=[1, 2, 3, 1], missedMax=[4, 4, 3, 5], activeBool=(unset))
+    on WHIP → Whip Antic
+    on LEAP F → Leap F Aim
+    on LEAP B → Leap B Aim
+    on EVADE → Evade Antic
+  }
+
+  state Whip Antic {
+    SetIntValue(intVariable=var "Whips", intValue=3, everyFrame=false)
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=rosary_pilgrim_attack (sfxdynamic_assets_areamossareaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Whip Antic")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnTo Whip Antic", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=rosary_pilgrim_whipping_antic_spin (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Whip Start
+  }
+
+  state Whip 1 {
+    Tk2dPlayFrame(gameObject=Self, frame=0)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Whip", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Whip Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slam Check 1
+  }
+
+  state Whip 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Whip Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Whip 3
+  }
+
+  state Whip Start {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Whip Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Whip Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=rosary_pilgrim_whip_throw_1 (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Whip 1
+  }
+
+  state Whip 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Whip Hit 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=rosary_pilgrim_whip_throw_2 (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Whip 4
+  }
+
+  state Whip 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Whip Hit 5", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Whip 5
+  }
+
+  state Whip 5 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Whip Hit 6", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slam Check 2
+  }
+
+  state Whip 6 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Whip Hit 7", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Whip 7
+  }
+
+  state Whip 7 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Whip Start", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Whip Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayAudioEvent(audioClip=rosary_pilgrim_whip_throw_1 (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Continue?
+  }
+
+  state Continue? {
+    IntAdd(intVariable=var "Whips", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Whips", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"WHIP", everyFrame=false)
+    on WHIP → Whip 1
+    on FINISHED → Whip End
+  }
+
+  state Whip End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Whip Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=rosary_pilgrim_put_away_post_whip (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=<null>)
+    on FINISHED → Face Hero
+  }
+
+  state Leap F Aim {
+    SetBoolValue(boolVariable=var "Attack Ready", boolValue=false, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Offset", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Offset", multiplyBy=1.75, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Target X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Target X", add=var "Offset", everyFrame=false, perSecond=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Target X", float2=var "Self X", operation=Subtract, storeResult=var "Jump X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.15, everyFrame=false)
+    FloatClamp(floatVariable=var "Jump X", minValue=-15, maxValue=15, everyFrame=false)
+    on FINISHED → Leap Antic
+  }
+
+  state Leap Antic {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Antic", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=rosary_pilgrim_attack (sfxdynamic_assets_areamossareaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=rosary_pilgrim_jump_antic (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Leap Launch
+  }
+
+  state Leap Launch {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Leap")
+    SetVelocity2d(gameObject=Self, vector=(unset), x=var "Jump X", y=37, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=rosary_pilgrim_jump (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Leap Air
+  }
+
+  state Leap Air {
+    CheckCollisionSide(collidingObject=Self, topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    CheckCollisionSideEnter(topHit=(unset), rightHit=(unset), bottomHit=(unset), leftHit=(unset), topHitEvent=(none), rightHitEvent=(none), bottomHitEvent=→"LAND", leftHitEvent=(none), otherLayer=false, otherLayerNumber=0, ignoreTriggers=false)
+    on LAND → Jump Whip 1
+  }
+
+  state Jump Whip 1 {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Jump Whip", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Whip Hit 1", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=rosary_pilgrim_whip_throw_2 (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=pilgrim_staff_wielder_land (sfxstatic_assets_pilgrimslower.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Jump Whip 2
+  }
+
+  state Jump Whip 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Whip Hit 2", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Slam Check 3
+  }
+
+  state Jump Whip 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Whip Hit 3", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Jump Whip 4
+  }
+
+  state Jump Whip 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Whip Hit 4", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    on FINISHED → Whip End
+  }
+
+  state Face Hero {
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Evade?
+  }
+
+  state Leap B Aim {
+    RayCast2dV2(fromGameObject=var "Edge Ray B", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    GetScale(gameObject=Self, vector=(unset), xScale=var "Offset", yScale=(unset), zScale=(unset), space=0, everyFrame=false)
+    FloatMultiply(floatVariable=var "Offset", multiplyBy=7, everyFrame=false)
+    GetPosition(gameObject=var "Hero", vector=(unset), x=var "Target X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatAdd(floatVariable=var "Target X", add=var "Offset", everyFrame=false, perSecond=false)
+    GetPosition(gameObject=Self, vector=(unset), x=var "Self X", y=(unset), z=(unset), space=0, everyFrame=false)
+    FloatOperator(float1=var "Target X", float2=var "Self X", operation=Subtract, storeResult=var "Jump X", everyFrame=false)
+    FloatMultiply(floatVariable=var "Jump X", multiplyBy=1.15, everyFrame=false)
+    FloatClamp(floatVariable=var "Jump X", minValue=-15, maxValue=15, everyFrame=false)
+    on FINISHED → Leap Antic
+    on CANCEL → Close Attack
+  }
+
+  state Evade Antic {
+    RayCast2dV2(fromGameObject=var "Ray", fromPosition=(unset), direction=(1, 0), space=1, distance=5, minDepth=(unset), maxDepth=(unset), hitEvent=→"CANCEL", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Edge Ray B", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"CANCEL", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Evade", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    PlayAudioEvent(audioClip=rosary_pilgrim_backstep (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Evade
+    on CANCEL → Patrol
+  }
+
+  state Evade {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    RayCast2dV2(fromGameObject=var "Ray", fromPosition=(unset), direction=(1, 0), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=→"END", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetVelocityByScale(gameObject=Self, speed=16, ySpeed=(unset), everyFrame=false)
+    WaitRandom(timeMin=0.2, timeMax=0.2, finishEvent=→"END", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt RunDust")
+    on END → Evade Skid
+  }
+
+  state Evade End {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=false, sendEvent="ATTACK", outOfRangeEvent="", everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Leap Range", storeResult=false, sendEvent="FAR", outOfRangeEvent="", everyFrame=false)
+    on FINISHED → Patrol
+    on ATTACK → Close Attack
+    on FAR → Far
+  }
+
+  state Barge Antic {
+    PlayAudioEvent(audioClip=rosary_pilgrim_antic_charge (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=rosary_pilgrim_attack (sfxdynamic_assets_areamossareaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Barge Antic")
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=true, newAnimationClip="TurnTo Barge Antic", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=(unset), everyFrame=false)
+    DecelerateV2(gameObject=Self, deceleration=0.9, brakeOnExit=false)
+    on FINISHED → Barge
+  }
+
+  state Barge {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Barge")
+    SetBoolValue(boolVariable=var "Can Turn", boolValue=false, everyFrame=false)
+    SetBoolValueAtTime(BoolVariable=var "Can Turn", BoolValue=true, Time=0.5, SetOppositeOnStateEntry=false)
+    CheckPassedTarget(Self=Self, Target=var "Hero", IsActive=true, DefaultFacingRight=false, DistancePast=6, StoreResult=var "Passed Target", PassedEvent=(none), NotPassedEvent=(none), EveryFrame=true)
+    RayCast2dV2(fromGameObject=var "Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=1.5, minDepth=(unset), maxDepth=(unset), hitEvent=→"BONK", noHitEvent=(none), storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Ray", fromPosition=(unset), direction=(-1, 0), space=1, distance=2.6, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Wall Ahead", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    RayCast2dV2(fromGameObject=var "Edge Ray", fromPosition=(unset), direction=(0, -1), space=1, distance=3, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=(none), storeDidHit=var "Floor Below", storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=1, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    SetVelocityByScale(gameObject=Self, speed=-18, ySpeed=(unset), everyFrame=true)
+    BoolAllTrue(boolVariables=[var "Can Turn", var "Passed Target"], sendEvent=→"END", storeResult=(unset), everyFrame=true)
+    BoolNoneTrue(boolVariables=[var "Floor Below", var "Wall Ahead"], sendEvent=→"END", storeResult=(unset), everyFrame=true)
+    ActivateGameObject(gameObject=var "Body Damager", activate=false, recursive=false, resetOnExit=true, everyFrame=false)
+    ActivateGameObject(gameObject=var "Barge Collider", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    SetCollider(gameObject=Self, active=false, resetOnExit=true)
+    PlayParticleEmitterInState(gameObject=var "Pt RunDust")
+    ActivateGameObject(gameObject=var "Breaker", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    AudioPlayInState(gameObject=var "Charging Loop", volume=(unset))
+    PlayAudioEvent(audioClip=rosary_pilgrim_charge_burst (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on END → End Skid
+    on BONK → Bonk
+  }
+
+  state End Skid {
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="TurnToRecover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitterInState(gameObject=var "Pt RunDust")
+    PlayAudioEvent(audioClip=rosary_pilgrim_charge_end (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Patrol
+  }
+
+  state Bonk {
+    DecelerateXY(gameObject=Self, decelerationX=0.9, decelerationY=(unset), brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Barge Bonk", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetVelocityByScale(gameObject=Self, speed=10, ySpeed=(unset), everyFrame=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Wall Slam Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Wall Hit", emit=0, resetIfPlaying=false)
+    PlayParticleEmitterInState(gameObject=var "Pt RunDust")
+    PlayAudioEvent(audioClip=giant_hopper_land (sfxstatic_assets_areabellwayareamossareashellwoodareaswamp.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=rosary_pilgrim_charge_end (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    on FINISHED → Patrol
+  }
+
+  state Far {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Attack Ready", boolValue=false, everyFrame=false)
+    SendRandomEventV4(events=[→"BARGE", →"LEAP F"], weights=[0.6, 0.4], eventMax=[2, 2], missedMax=[2, 2], activeBool=(unset))
+    on BARGE → Barge Antic
+    on LEAP F → Leap F Aim
+  }
+
+  state Evade? {
+    RandomBool(storeResult=var "Evade Chance")
+    SetBoolValue(boolVariable=var "Evade Chance", boolValue=true, everyFrame=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Attack Range", storeResult=var "In Attack Range", sendEvent="", outOfRangeEvent="", everyFrame=false)
+    BoolAllTrue(boolVariables=[var "Evade Chance", var "In Attack Range"], sendEvent=→"EVADE", storeResult=(unset), everyFrame=false)
+    on FINISHED → Patrol
+    on EVADE → Evade Antic
+  }
+
+  state Pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init
+  }
+
+  state Grave Pray {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    SetRandomAudioClipFromTable(Table=rosary_pilgrim_idle (sfxdynamicpatch_assets_areamossareaswamp.bundle), AudioSource=var "Audio Loop Voice", AutoPlay=true, delay=0)
+    on ALERT → Grave Pray End
+    on TOOK DAMAGE → Grave Pray End
+  }
+
+  state Grave Pray End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Grave Pray End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayAudioEvent(audioClip=rosary_pilgrim_notice_hero (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    AudioPlayRandomVoiceFromTableV2(gameObject=var "Audio Loop Voice", audioClipTable=rosary_pilgrim_alert (sfxdynamic_assets_areamossareaswamp.bundle), pitchOffset=0, stopPreviousSound=true, forcePlay=false)
+    on FINISHED → Startle
+  }
+
+  state Startle {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Roar", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetBoolValue(boolVariable=var "Startled", boolValue=false, everyFrame=false)
+    on FINISHED → Dmg React
+  }
+
+  state Evade Skid {
+    DecelerateXY(gameObject=Self, decelerationX=0.875, decelerationY=(unset), brakeOnExit=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Recover", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayParticleEmitterInState(gameObject=var "Pt RunDust")
+    on FINISHED → Evade End
+  }
+
+  state Close Attack {
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    SetBoolValue(boolVariable=var "Attack Ready", boolValue=false, everyFrame=false)
+    SendRandomEventV4(events=[→"LEAP B", →"LEAP F", →"WHIP"], weights=[0.2, 0.2, 0.4], eventMax=[1, 2, 3], missedMax=[4, 4, 3], activeBool=(unset))
+    on WHIP → Whip Antic
+    on LEAP F → Leap F Aim
+    on LEAP B → Leap B Aim
+  }
+
+  state Turn To Hero {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="", outOfRangeEvent="FINISHED", everyFrame=false)
+    CheckFacingTarget(facingObject=Self, target=var "Hero", spriteFacesRight=false, everyFrame=false, facingEvent=→"FINISHED", notFacingEvent=(none), facingBool=(unset), notFacingBool=(unset))
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=(unset), everyFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Turn", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    FlipScale(gameObject=Self, flipHorizontally=true, flipVertically=false, everyFrame=false, lateUpdate=false)
+    on FINISHED → Patrol
+  }
+
+  state Slam Check 1 {
+    RayCast2dV2(fromGameObject=var "Whip Ray F", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Whip Slam F", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=rosary_pilgrim_whip_land_1 (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WHIP F", delay=0, everyFrame=false)
+    on FINISHED → Whip 2
+  }
+
+  state Slam Check 2 {
+    RayCast2dV2(fromGameObject=var "Whip Ray B", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Whip Slam B", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=rosary_pilgrim_whip_land_2 (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WHIP B", delay=0, everyFrame=false)
+    on FINISHED → Whip 6
+  }
+
+  state Slam Check 3 {
+    RayCast2dV2(fromGameObject=var "Whip Ray F", fromPosition=(unset), direction=(0, -1), space=1, distance=2, minDepth=(unset), maxDepth=(unset), hitEvent=(none), noHitEvent=→"FINISHED", storeDidHit=(unset), storeHitObject=var "", storeHitPoint=(unset), storeHitNormal=(unset), storeHitDistance=(unset), storeDistance=(unset), repeatInterval=0, layerMask=[Terrain(8)], invertMask=false, ignoreTriggers=false, debugColor=(1, 0.92156863, 0.015686275, 1), debug=false)
+    DoCameraShake(VisibleRenderer=Self, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    ActivateGameObject(gameObject=var "Whip Slam F", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    PlayAudioEvent(audioClip=rosary_pilgrim_whip_land_2 (sfxstatic_assets_rosarypilgrim.bundle), pitchMin=0.85, pitchMax=1.15, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="WHIP F", delay=0, everyFrame=false)
+    on FINISHED → Jump Whip 3
+  }
+
+  var Jump X: float = 36.53
+  var Self X: float = 0
+  var Target X: float = 0
+  var Offset: float = 0
+  var Charge Timer: float = 0
+  var Whips: int = 0
+  var Attack Ready: bool = false
+  var In Attack Range: bool = false
+  var In Leap Range: bool = false
+  var Evade Chance: bool = false
+  var Can Turn: bool = false
+  var Passed Target: bool = false
+  var Attack Far: bool = false
+  var Startled: bool = false
+  var In Combat Range: bool = false
+  var Facing Hero: bool = false
+  var Wall Ahead: bool = false
+  var Floor Below: bool = false
+  var Clip: string = ""
+  var Whip Hit 1: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Hit 1
+  var Whip Hit 2: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Hit 2
+  var Whip Hit 3: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Hit 3
+  var Whip Hit 4: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Hit 4
+  var Whip Hit 5: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Hit 5
+  var Whip Hit 6: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Hit 6
+  var Whip Hit 7: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Hit 7
+  var Ray: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Ray
+  var Body Damager: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Body Damager
+  var Barge Collider: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Barge Collider
+  var Wall Slam Effect: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Wall Slam Effect
+  var Pt Wall Hit: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Pt Wall Hit
+  var Whip Slam B: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Slam B
+  var Whip Slam F: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Slam F
+  var Pt RunDust: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Pt RunDust
+  var Edge Ray: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Edge Ray
+  var Edge Ray B: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Edge Ray B
+  var Breaker: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Breaker
+  var Charging Loop: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Charging Loop
+  var Whip Ray B: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Ray B
+  var Whip Ray F: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Whip Ray F
+  var Audio Loop Voice: gameObject = Pilgrim Groups/Rosary Pilgrim Scene/Rosary Pilgrim/Audio Loop Voice
+}

@@ -1,0 +1,95 @@
+# Orb Control
+# 1 location(s):
+#   sharedassets34.assets / Mage Orb
+
+fsm Orb Control {
+  start Init
+  on DESTROY → Dissipate  // from any state
+  on ORBIT → Orbiting  // from any state
+
+  state Init {
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    SetScale(gameObject=Self, vector=(unset), x=1, y=1, z=1, everyFrame=false, lateUpdate=false)
+    PlayParticleEmitter(gameObject=var "Particle System", emit=0)
+    SetMeshRenderer(gameObject=Self, active=true)
+    NextFrameEvent(sendEvent=→"FIRE")
+    SetDamageHeroAmount(target=var "Hero Hurter", damageDealt=0)
+    on FIRE → Chase Hero
+    on ORBIT → Orbiting
+  }
+
+  state Orbiting {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    SetDamageHeroAmount(target=var "Hero Hurter", damageDealt=1)
+    Wait(time=0.5, finishEvent=→"CHECK", realTime=false)
+    SetIsKinematic2d(gameObject=Self, isKinematic=true)
+    on FIRE → Chase Hero
+    on DISSIPATE → Dissipate
+    on CHECK → Check Spinner
+    on ORBIT SHIELD → Dissipate
+  }
+
+  state Chase Hero {
+    Trigger2dEventLayer(trigger=OnTriggerEnter2D, collideTag="", collideLayer=Hero Box(20), sendEvent=→"END", storeCollider=var "")
+    SetDamageHeroAmount(target=var "Hero Hurter", damageDealt=1)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    Collision2dEventLayer(collision=OnCollisionEnter2D, collideTag="", collideLayer=Terrain(8), sendEvent=→"END", storeCollider=var "", storeForce=(unset))
+    Wait(time=2.25, finishEvent=→"DISSIPATE", realTime=false)
+    ChaseObjectV2(gameObject=Self, target=var "Hero", speedMax=20, accelerationForce=50, offsetX=0, offsetY=0)
+    on END → Impact pause
+    on DISSIPATE → Dissipate
+    on ORBIT SHIELD → Impact pause
+  }
+
+  state Recycle {
+    RecycleSelf()
+  }
+
+  state Impact {
+    AudioStop(gameObject=Self)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=mage_lord_projectile_impact (resources.assets))
+    SetMeshRenderer(gameObject=Self, active=false)
+    SetDamageHeroAmount(target=var "Hero Hurter", damageDealt=0)
+    ActivateGameObject(gameObject=var "Impact", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetRandomRotation(gameObject=var "Impact", x=false, y=false, z=true)
+    PlayParticleEmitter(gameObject=var "Impact Particles", emit=0)
+    Wait(time=2, finishEvent=→"FINISHED", realTime=false)
+    SendEventByName(eventTarget=GameObjectFSM(var "CameraParent", fsm="CameraShake"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    SetVelocity2d(gameObject=Self, vector=(unset), x=0, y=0, everyFrame=false)
+    StopParticleEmitter(gameObject=var "Particle System")
+    on FINISHED → Recycle
+  }
+
+  state Dissipate {
+    AudioStop(gameObject=Self)
+    iTweenScaleTo(gameObject=Self, id="", transformScale=var "", vectorScale=(0.1, 0.1, 0.1), time=0.2, delay=0, speed=(unset), easeType=linear, loopType=none, startEvent=(none), finishEvent=→"FINISHED", realTime=false, stopOnExit=true, loopDontFinish=true)
+    SetDamageHeroAmount(target=var "Hero Hurter", damageDealt=0)
+    DecelerateV2(gameObject=Self, deceleration=0.9)
+    on FINISHED → Stop Particles
+  }
+
+  state Stop Particles {
+    StopParticleEmitter(gameObject=var "Particle System")
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    SetMeshRenderer(gameObject=Self, active=false)
+    on FINISHED → Recycle
+  }
+
+  state Impact pause {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Impact
+  }
+
+  state Check Spinner {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    GameObjectIsNull(gameObject=var "Parent", isNull=→"DISSIPATE", isNotNull=(none), storeResult=(unset), everyFrame=false)
+    on FINISHED → Orbiting
+    on DISSIPATE → Dissipate
+  }
+
+  var Hero Hurter: gameObject = Mage Orb/Hero Hurter
+  var Impact: gameObject = Mage Orb/Impact
+  var Impact Particles: gameObject = Mage Orb/Impact Particles
+  var Parent: gameObject = <null>
+  var Particle System: gameObject = Mage Orb/Particle System
+}

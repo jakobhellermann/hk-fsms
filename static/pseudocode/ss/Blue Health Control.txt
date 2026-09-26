@@ -1,0 +1,187 @@
+# Blue Health Control
+# 2 location(s):
+#   coremanagers_assets__gamecameras.bundle / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Health
+#   Menu_Title / _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Health
+
+fsm Blue Health Control {
+  start Init
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    ActivateGameObject(gameObject=var "Overblue Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    CreateChildWithParentedOffset(Parent=var "MainCamera", Offset=(unset), Prefab=blue_health_over_blue_flash (localpoolprefabs_assets_shared.bundle), StoreObject=var "Overblue Camera Effect")
+    ActivateGameObject(gameObject=var "Overblue Camera Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SetPosition(gameObject=var "Overblue Camera Effect", vector=(unset), x=(unset), y=(unset), z=0, space=0, everyFrame=false, lateUpdate=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Wait
+  }
+
+  state Idle {
+    SetBoolValue(boolVariable=var "Is Poison", boolValue=false, everyFrame=false)
+    CanAddBlueHealth(CanAddEvent=→"ADD QUEUED BLUE HEALTH", CannotAddEvent=(none), Consume=false)
+    on ADD BLUE HEALTH → Do Heal?
+    on UPDATE BLUE HEALTH → Set Blue
+    on HERO DAMAGED → Blue Health Events Wait
+    on ADD QUEUED BLUE HEALTH → Can Add?
+    on ADD PURPLE HEALTH → Add Purple Health
+  }
+
+  state Add Blue Health {
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Blue HP")
+    GetPlayerDataVariable(VariableName="CurrentMaxHealth", StoreValue=var "Max HP")
+    CallStaticMethod(className="BlueHealth", methodName="get_ActiveCount", parameters=[], storeResult=var "Active Blue HP", everyFrame=false)
+    IntAdd(intVariable=var "Max HP", add=var "Active Blue HP", everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Max HP", floatVariable=var "Spawn Offset Multiplier", everyFrame=false)
+    IntAdd(intVariable=var "Blue HP", add=1, everyFrame=false)
+    SetPlayerDataInt(intName="healthBlue", value=var "Blue HP")
+    IntCompare(integer1=var "Blue HP", integer2=var "Blue HP Max", equal=→"CANCEL", lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    SetFloatValue(floatVariable=var "Blue Spawn X", floatValue=-10.32, everyFrame=false)
+    SetFloatValue(floatVariable=var "Spawn X Offset", floatValue=0.94, everyFrame=false)
+    FloatMultiply(floatVariable=var "Spawn X Offset", multiplyBy=var "Spawn Offset Multiplier", everyFrame=false)
+    FloatAdd(floatVariable=var "Blue Spawn X", add=var "Spawn X Offset", everyFrame=false, perSecond=false)
+    CreateObject(gameObject=var "Blue HP Prefab", spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Blue HP Object")
+    SetParent(gameObject=var "Blue HP Object", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=var "Blue HP Object", vector=(unset), x=var "Blue Spawn X", y=7.69, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    SetFsmBool(gameObject=var "Blue HP Object", fsmName="blue_health_display", variableName="Start Idle", setValue=false, everyFrame=false)
+    SetFsmInt(gameObject=var "Blue HP Object", fsmName="blue_health_display", variableName="Health Number", setValue=var "Active Blue HP", everyFrame=false)
+    SetFsmBool(gameObject=var "Blue HP Object", fsmName="blue_health_display", variableName="Is Poison", setValue=var "Is Poison", everyFrame=false)
+    on FINISHED → Approaching Max?
+    on CANCEL → Hit Max
+  }
+
+  state Add Existing? {
+    IntCompare(integer1=var "Blue HP counter", integer2=0, equal=(none), lessThan=(none), greaterThan=→"ADD BLUE HEALTH", everyFrame=false)
+    on ADD BLUE HEALTH → Add Blue Health 2
+    on FINISHED → Idle
+  }
+
+  state Add Blue Health 2 {
+    IntOperator(integer1=var "Blue HP counter", integer2=1, operation=Subtract, storeResult=var "Blue HP counter", everyFrame=false)
+    GetPlayerDataInt(intName="maxHealth", storeValue=var "Max HP")
+    IntAdd(intVariable=var "Max HP", add=var "Blues Added", everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Max HP", floatVariable=var "Spawn Offset Multiplier", everyFrame=false)
+    SetFloatValue(floatVariable=var "Blue Spawn X", floatValue=-10.32, everyFrame=false)
+    SetFloatValue(floatVariable=var "Spawn X Offset", floatValue=0.94, everyFrame=false)
+    FloatMultiply(floatVariable=var "Spawn X Offset", multiplyBy=var "Spawn Offset Multiplier", everyFrame=false)
+    FloatAdd(floatVariable=var "Blue Spawn X", add=var "Spawn X Offset", everyFrame=false, perSecond=false)
+    CreateObject(gameObject=Blue Health (localpoolprefabs_assets_shared.bundle), spawnPoint=<null>, position=(unset), rotation=(unset), storeObject=var "Blue HP Object")
+    SetParent(gameObject=var "Blue HP Object", parent=var "Self", resetLocalPosition=false, resetLocalRotation=false)
+    SetPosition(gameObject=var "Blue HP Object", vector=(unset), x=var "Blue Spawn X", y=7.69, z=(unset), space=1, everyFrame=false, lateUpdate=false)
+    IntAdd(intVariable=var "Blues Added", add=1, everyFrame=false)
+    SetFsmBool(gameObject=var "Blue HP Object", fsmName="blue_health_display", variableName="Start Idle", setValue=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Blue HP Object", fsmName="blue_health_display", variableName="Init", setValue=true, everyFrame=false)
+    SetFsmInt(gameObject=var "Blue HP Object", fsmName="blue_health_display", variableName="Health Number", setValue=var "Blues Added", everyFrame=false)
+    on FINISHED → Add Existing?
+  }
+
+  state Set Blue {
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="REMOVE BLUE HEALTH", delay=0, everyFrame=false)
+    SetIntValue(intVariable=var "Blues Added", intValue=0, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=UpdateBlueHealth())
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Blue HP counter")
+    on FINISHED → Add Existing?
+  }
+
+  state Wait {
+    on LAST HP ADDED → Set Blue
+    on INVENTORY OPENED → Set Blue
+  }
+
+  state At Max? {
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Blue HP")
+    GetConstantsValue(variableName="MAX_BLUE_HEALTH", storeValue=var "Blue HP Max")
+    IntCompare(integer1=var "Blue HP", integer2=var "Blue HP Max", equal=→"CANCEL", lessThan=→"FINISHED", greaterThan=→"CANCEL", everyFrame=false)
+    on CANCEL → Idle
+    on FINISHED → Add Blue Health
+  }
+
+  state Hit Max {
+    BoolTest(boolVariable=var "Has Regen", isTrue=→"CANCEL", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="HitMaxBlueHealth", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateGameObject(gameObject=var "Overblue Camera Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Overblue Camera Effect", ToAlpha=1, FadeTime=0)
+    ActivateGameObject(gameObject=var "Overblue Camera Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AnimatorPlay(gameObject=var "Overblue Camera Effect", stateName="Long", layer=0, normalizedTime=0, everyFrame=false)
+    SendEventToRegister(eventName="BLUE HEALTH HIT MAX")
+    on CANCEL → Idle
+    on CHARM INDICATOR CHECK → Max Burst
+  }
+
+  state Do Heal? {
+    SendEventToRegisterV2(EventName="BLUE HEALTH UPDATE", ExcludeTarget=Self)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="get_IsInLifebloodState", parameters=[], storeResult=var "Has Regen", EveryFrame=false)
+    BoolTest(boolVariable=var "Has Regen", isTrue=(none), isFalse=→"CANCEL", everyFrame=false)
+    GetPlayerDataVariable(VariableName="health", StoreValue=var "Current HP")
+    GetPlayerDataVariable(VariableName="CurrentMaxHealth", StoreValue=var "Max HP")
+    IntCompare(integer1=var "Current HP", integer2=var "Max HP", equal=→"FINISHED", lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="AddHealth", parameters=[1], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Idle
+    on CANCEL → At Max?
+  }
+
+  state Approaching Max? {
+    IntOperator(integer1=var "Blue HP Max", integer2=var "Blue HP", operation=Subtract, storeResult=var "Amount To Max", everyFrame=false)
+    IntCompare(integer1=var "Amount To Max", integer2=4, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    ConvertIntToFloat(intVariable=var "Amount To Max", floatVariable=var "Value", everyFrame=false)
+    FloatOperator(float1=var "Value", float2=4, operation=Divide, storeResult=var "Value", everyFrame=false)
+    FloatOperator(float1=1, float2=var "Value", operation=Subtract, storeResult=var "Value", everyFrame=false)
+    SampleCurve(curve=curve[(time=0, value=0.1, inSlope=0, outSlope=0), (time=1, value=1, inSlope=2.061995, outSlope=2.061995)], sampleAt=var "Value", storeValue=var "Value", everyFrame=false)
+    ActivateGameObject(gameObject=var "Overblue Camera Effect", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    FadeNestedFadeGroup(Target=var "Overblue Camera Effect", ToAlpha=var "Value", FadeTime=0)
+    ActivateGameObject(gameObject=var "Overblue Camera Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    AnimatorPlay(gameObject=var "Overblue Camera Effect", stateName="Regular", layer=0, normalizedTime=0, everyFrame=false)
+    on FINISHED → Blue Health Events Wait
+  }
+
+  state Max Burst {
+    ActivateGameObject(gameObject=var "Overblue Effect", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Idle
+  }
+
+  state REALLY Approaching Max? {
+    GetPlayerDataInt(intName="healthBlue", storeValue=var "Blue HP")
+    GetConstantsValue(variableName="MAX_BLUE_HEALTH", storeValue=var "Blue HP Max")
+    IntOperator(integer1=var "Blue HP Max", integer2=var "Blue HP", operation=Subtract, storeResult=var "Amount To Max", everyFrame=false)
+    IntCompare(integer1=var "Amount To Max", integer2=2, equal=(none), lessThan=(none), greaterThan=→"FINISHED", everyFrame=false)
+    FormatString(format="BLUE HEALTH JITTER {0}", variables=[var "Amount To Max"], storeResult=var "Event", everyFrame=false)
+    SendEventToRegister(eventName=var "Event")
+    on FINISHED → Idle
+  }
+
+  state Blue Health Events Wait {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → REALLY Approaching Max?
+  }
+
+  state Can Add? {
+    CanAddBlueHealth(CanAddEvent=(none), CannotAddEvent=→"CANCEL", Consume=true)
+    on FINISHED → Do Heal?
+    on CANCEL → Idle
+  }
+
+  state Add Purple Health {
+    SetBoolValue(boolVariable=var "Is Poison", boolValue=true, everyFrame=false)
+    on FINISHED → Do Heal?
+  }
+
+  var Blue Spawn X: float = 0
+  var Spawn Offset Multiplier: float = 0
+  var Spawn X Offset: float = 0
+  var Value: float = 0
+  var Blue HP: int = 0
+  var Blue HP counter: int = 0
+  var Blues Added: int = 0
+  var Max HP: int = 0
+  var Blue HP Max: int = 0
+  var Current HP: int = 0
+  var Amount To Max: int = 0
+  var Active Blue HP: int = 0
+  var Has Regen: bool = false
+  var Is Poison: bool = false
+  var Event: string = ""
+  var Blue HP Object: gameObject = <null>
+  var Self: gameObject = <null>
+  var Blue HP Prefab: gameObject = Blue Health (localpoolprefabs_assets_shared.bundle)
+  var Overblue Effect: gameObject = _GameCameras/HudCamera/In-game/Anchor TL/Hud Canvas Offset/Hud Canvas/Blue_Health_Overblue_HUD_burst
+  var Overblue Camera Effect: gameObject = <null>
+}

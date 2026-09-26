@@ -1,0 +1,118 @@
+# Teleport Arrive
+# 1 location(s):
+#   Bellway_Centipede_additive / Bell Centipede Bellway Scene/door_centipedeExit
+
+fsm Teleport Arrive {
+  start Init
+
+  state Hero Fling Out {
+    PlayAudioEvent(audioClip=bell_goomba_emerge_from_under (sfxstatic_assets_areabell.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=hornet_sprint_jump_2nd_spin (herosfxstatic_assets_all.bundle), pitchMin=1, pitchMax=1, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    ActivateGameObject(gameObject=var "Teleport Arrive Effects", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    DoCameraShakeV2(Target=Self, MaxCameraDistance=(unset), Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Average Shake (dataassets_assets_assets/dataassets/camerashake.bundle), DoFreeze=false, Delay=0, CancelOnExit=false)
+    SetMeshRenderer(gameObject=var "Hero", active=true)
+    SetVelocity2d(gameObject=var "Hero", vector=(0, 23), x=(unset), y=(unset), everyFrame=false)
+    on FINISHED → Fling Anim 1
+  }
+
+  state Land {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControlToIdle", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → End
+  }
+
+  state End {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RegainControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+  }
+
+  state Fling Anim 1 {
+    SelectRandomString(strings=["DownSpikeBounce 1", "DownSpikeBounce 2"], weights=[1, 1], storeString=var "Bounce Anim")
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName=var "Bounce Anim", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ListenForDash(eventTarget=Self, wasPressed=→"DASH", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    GetVelocity2d(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Vel Y", space=0, everyFrame=true)
+    FloatTestToBool(float1=var "Hero Vel Y", float2=0, tolerance=0, equalBool=var "Hero Y 0", lessThanBool=var "Hero Moving Down", greaterThanBool=(unset), everyFrame=true)
+    BoolAnyTrue(boolVariables=[var "Hero Y 0", var "Hero Moving Down"], sendEvent=(none), storeResult=var "Hero Moving Down", everyFrame=true)
+    CheckIsCharacterGrounded(Target=var "Hero", RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=var "Is Hero Grounded", GroundedEvent=(none), NotGroundedEvent=(none), EveryFrame=true)
+    BoolAllTrue(boolVariables=[var "Is Hero Grounded", var "Hero Moving Down"], sendEvent=→"LAND", storeResult=(unset), everyFrame=true)
+    on FINISHED → Fling Anim Loop
+    on DASH → Dash Queued
+    on LAND → Land
+  }
+
+  state Fling Anim Loop {
+    CheckIsCharacterGrounded(Target=var "Hero", RayCount=3, GroundDistance=0.2, SkinWidth=-0.05, SkinHeight=0.1, StoreResult=(unset), GroundedEvent=→"LAND", NotGroundedEvent=(none), EveryFrame=true)
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="Airborne")
+    Tk2dPlayFrame(gameObject=var "Hero", frame=9)
+    ListenForDash(eventTarget=Self, wasPressed=→"DASH", wasReleased=(none), isPressed=(none), isNotPressed=(none), delayBeforeActive=0)
+    on DASH → Dash Cancel
+    on LAND → Land
+  }
+
+  state Position {
+    SetMeshRenderer(gameObject=var "Hero", active=false)
+    GetPosition2D(gameObject=Bell Centipede Bellway Scene/door_centipedeExit, vector=var "Hero Pos", x=(unset), y=(unset), space=0, everyFrame=false)
+    PositionColliderOnGroundV2(Target=var "Hero", GroundPos=var "Hero Pos")
+    CallMethodProper(gameObject=var "MainCamera", behaviour="CameraController", methodName="PositionToHero", parameters=[false], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Fling Wait
+  }
+
+  state Dash Queued {
+    GetVelocity2d(gameObject=var "Hero", vector=(unset), x=(unset), y=var "Hero Vel Y", space=0, everyFrame=true)
+    FloatCompare(float1=var "Hero Vel Y", float2=0, tolerance=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=(none), everyFrame=true)
+    Tk2dWatchAnimationEvents(gameObject=var "Hero", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    on FINISHED → Dash Cancel
+  }
+
+  state Dash Cancel {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="SetStartWithDashKeepFacing", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → End
+  }
+
+  state Teleport Arrive? {
+    GetEntryGateName(StoreValue=var "Entry Gate")
+    GetName(gameObject=var "Self", storeName=var "Name", everyFrame=false)
+    StringCompare(stringVariable=var "Entry Gate", compareTo=var "Name", equalEvent=→"TRUE", notEqualEvent=→"FALSE", storeResult=(unset), everyFrame=false)
+    on FALSE → Inert
+    on TRUE → Position
+  }
+
+  state Wait For Boss Load {
+    WaitForBossLoad(sendEvent=→"FINISHED")
+    on FINISHED → Wait For Position
+  }
+
+  state Wait For Position {
+    WaitForHeroInPosition(sendEvent=→"FINISHED", skipIfAlreadyPositioned=true)
+    on FINISHED → Teleport Arrive?
+  }
+
+  state Init {
+    SetGameObjectSelf(variable=var "Self", gameObject=Self, everyFrame=false)
+    GetHero(storeResult=var "Hero")
+    ActivateGameObject(gameObject=var "Teleport Arrive Effects", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Wait For Boss Load
+  }
+
+  state Inert {
+  }
+
+  sequence state Fling Wait {
+    WaitForFinishedEnteringScene(sendEvent=(none))
+    SendEventToRegisterV2(EventName="FSM CANCEL", ExcludeTarget=Self)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="RelinquishControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Hero Fling Out
+  }
+
+  var Hero Vel Y: float = 0
+  var Hero Moving Down: bool = false
+  var Is Hero Grounded: bool = false
+  var Hero Y 0: bool = false
+  var Bounce Anim: string = ""
+  var Entry Gate: string = ""
+  var Name: string = ""
+  var Hero Pos: vector2 = (0, 0)
+  var Hero: gameObject = <null>
+  var Self: gameObject = <null>
+  var Teleport Arrive Effects: gameObject = Bell Centipede Bellway Scene/door_centipedeExit/Burst Effects
+}

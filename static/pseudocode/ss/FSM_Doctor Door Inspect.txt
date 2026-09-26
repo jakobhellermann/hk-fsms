@@ -1,0 +1,176 @@
+# FSM
+# 1 location(s):
+#   Wisp_03 / bell bits/closed/Doctor Door Inspect
+
+fsm FSM {
+  start Init
+  on CONVO_END_FORCED → Idle  // from any state
+
+  state Init {
+    CallMethodProper(gameObject=var "Transition Gate", behaviour="TransitionPoint", methodName="SetIsInactive", parameters=[true], storeResult=(unset var), EveryFrame=false)
+    on FINISHED → Idle
+  }
+
+  state Idle {
+    on INTERACT → Inspect
+    on START ENTRY → Door Opened
+    on DID TAUNT → Taunt React
+  }
+
+  state Inspect {
+    DialogueYesNoV2(TranslationSheet="Belltown", TranslationKey="DOCTOR_DOOR_INSPECT", UseCurrency=false, CurrencyCost=0, CurrencyType=0, ConsumeCurrency=false, WillGetItem=<null>, YesEvent=→"YES", NoEvent=→"NO", ReturnHUDAfter=false)
+    on YES → Call Pause
+    on NO → End Dialogue
+  }
+
+  state End Dialogue {
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    on FINISHED → Idle
+  }
+
+  state Call {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StopAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=var "Hero", clipName="Bellway Call", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    PlayRandomAudioClipTable(Table=Doctor Call Voice (herodynamic_assets_all.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    on FINISHED → Response Pause
+  }
+
+  state Response Pause {
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="StartAnimationControl", parameters=[], storeResult=(unset var), EveryFrame=false)
+    CallMethodProper(gameObject=Self, behaviour="PlayMakerNPC", methodName="BeginHeroAnimManual", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=1.5, finishEvent=(none), realTime=false)
+    on FINISHED → Convo Check
+  }
+
+  state Convo Check {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=ruins_big_lift_activate (sfxstatic_assets_areawisp.bundle), pitchMin=1.25, pitchMax=1.25, volume=0.4, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=song_gate_hit (sfxstatic_assets_areasong.bundle), pitchMin=0.8, pitchMax=0.8, volume=0.2, audioPlayerPrefab=Audio Player Actor Lowpass@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    CheckQuestStateV2(NotTrackedEvent=(none), IncompleteEvent=→"QUEST", CompletedEvent=(none), Quest=Doctor Curse Cure (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    GetPlayerDataBool(boolName="blackThreadWorld", storeValue=var "Is Act 3")
+    GetPlayerDataBool(boolName="MetBelltownDoctorDoor", storeValue=var "Test")
+    BoolTestMulti(boolVariables=[var "Is Act 3", var "Test"], boolStates=[false, false], trueEvent=→"MEET", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    GetPlayerDataBool(boolName="MetBelltownDoctorDoorAct3", storeValue=var "Test")
+    BoolTestMulti(boolVariables=[var "Is Act 3", var "Test"], boolStates=[true, false], trueEvent=→"MEET ACT3", falseEvent=(none), storeResult=(unset), everyFrame=false)
+    on MEET → Meet
+    on MEET ACT3 → Meet Act3
+    on QUEST → Quest
+    on FINISHED → Repeat
+  }
+
+  state Meet {
+    SetPlayerDataBool(boolName="MetBelltownDoctorDoor", value=true)
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CLOSED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Repeat {
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CLOSED_REPEAT", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → State?
+  }
+
+  state State? {
+    PlayerDataVariableTest(VariableName="IsAnyCursed", ExpectedValue=true, IsExpectedEvent=→"CURSED", IsNotExpectedEvent=(none))
+    GetHeroCState(VariableName="isMaggoted", StoreValue=var "Test", EveryFrame=false)
+    BoolTest(boolVariable=var "Test", isTrue=→"MAGGOTED", isFalse=(none), everyFrame=false)
+    CallMethodProper(gameObject=var "Hero", behaviour="HeroController", methodName="get_IsInLifebloodState", parameters=[], storeResult=var "Test", EveryFrame=false)
+    BoolTest(boolVariable=var "Test", isTrue=→"LIFEBLOOD", isFalse=(none), everyFrame=false)
+    on CURSED → Cursed
+    on MAGGOTED → Maggoted
+    on LIFEBLOOD → Lifeblood State
+    on FINISHED → End Dialogue
+  }
+
+  state Cursed {
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CLOSED_CURSED", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Door Open
+  }
+
+  state Maggoted {
+    GetPlayerDataVariable(VariableName="BelltownDoctorMaggotSpoke", StoreValue=var "Test")
+    SetPlayerDataVariable(VariableName="BelltownDoctorMaggotSpoke", SetValue=true)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="DOCTOR_MAGGOT", trueString="DOCTOR_MAGGOT_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  sequence state Door Open {
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    EndDialogue(ReturnControl=true, ReturnHUD=true, Target=Self, UseChildren=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    CallMethodProper(gameObject=var "Door Animator", behaviour="Gate", methodName="Open", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    CallMethodProper(gameObject=var "Transition Gate", behaviour="TransitionPoint", methodName="SetIsInactive", parameters=[false], storeResult=(unset var), EveryFrame=false)
+  }
+
+  state Door Opened {
+    CallMethodProper(gameObject=var "Door Animator", behaviour="Gate", methodName="Opened", parameters=[], storeResult=(unset var), EveryFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    on FINISH ENTRY → Door Close
+  }
+
+  sequence state Door Close {
+    CallMethodProper(gameObject=var "Door Animator", behaviour="Gate", methodName="Close", parameters=[], storeResult=(unset var), EveryFrame=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    PlayerDataBoolTest(boolName="BelltownDoctorCuredCurse", isTrue=(none), isFalse=→"FINISHED")
+    SetPlayerDataBool(boolName="BelltownDoctorCuredCurse", value=false)
+    SetDeathRespawnMarker(Target=bell bits/closed/Doctor Door Inspect/Death Respawn Marker)
+    on FINISHED → Idle
+  }
+
+  state Call Pause {
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Call
+  }
+
+  state Lifeblood State {
+    GetPlayerDataVariable(VariableName="BelltownDoctorLifebloodSpoke", StoreValue=var "Test")
+    SetPlayerDataVariable(VariableName="BelltownDoctorLifebloodSpoke", SetValue=true)
+    ConvertBoolToString(boolVariable=var "Test", stringVariable=var "Dlg", falseString="DOCTOR_LIFEBLOOD_STATE", trueString="DOCTOR_LIFEBLOOD_STATE_REPEAT", everyFrame=false)
+    RunDialogue(Sheet="Belltown", Key=var "Dlg", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  state Quest {
+    CanEndQuest(CannotEndEvent=(none), CanEndEvent=→"CANCEL", StoreValue=(unset), Quest=Doctor Curse Cure (dataassets_assets_assets/dataassets/questsystem/quests.bundle))
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CLOSED_QUEST", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CANCEL → Quest Completable
+    on CONVO_END → End Dialogue
+  }
+
+  state Quest Completable {
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CLOSED_QUEST_END", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → Door Open
+  }
+
+  state Meet Act3 {
+    SetPlayerDataBool(boolName="MetBelltownDoctorDoorAct3", value=true)
+    RunDialogue(Sheet="Belltown", Key="DOCTOR_CLOSED_ACT3", OverrideContinue=false, PlayerVoiceTableOverride=<null>, PreventHeroAnimation=false, HideDecorators=false, TextAlignment=TopLeft, OffsetY=0, Target=Self)
+    on CONVO_END → End Dialogue
+  }
+
+  sequence state Taunt React {
+    GetDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    FloatCompare(float1=var "Distance", float2=9, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"CANCEL", everyFrame=false)
+    ActivateInteractible(Target=Self, Activate=false, AllowQueueing=false, UseChildren=false)
+    Wait(time=1, finishEvent=(none), realTime=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    PlayAudioEvent(audioClip=ruins_big_lift_activate (sfxstatic_assets_areawisp.bundle), pitchMin=1.25, pitchMax=1.25, volume=0.4, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayAudioEvent(audioClip=song_gate_hit (sfxstatic_assets_areasong.bundle), pitchMin=0.8, pitchMax=0.8, volume=0.2, audioPlayerPrefab=Audio Player Actor Lowpass@AudioSource (audioobjects_assets_all.bundle), spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "")
+    PlayRandomAudioClipTable(Table=Yarnaby_door_talk (sfxdynamic_assets_areawisp.bundle), AudioPlayerPrefab=var "", SpawnPoint=Self, SpawnPosition=(0, 0, 0))
+    Wait(time=2, finishEvent=(none), realTime=false)
+    ActivateInteractible(Target=Self, Activate=true, AllowQueueing=false, UseChildren=false)
+    on CANCEL → Idle
+    on FINISHED → Idle
+  }
+
+  var Transition Gate: gameObject = bell bits/door1
+  var Bell Home: gameObject = bell bits
+
+  var Distance: float = 0
+  var Test: bool = false
+  var Is Act 3: bool = false
+  var Dlg: string = ""
+  var Door Animator: gameObject = bell bits/closed/Doctor Door Inspect/Door Group
+}

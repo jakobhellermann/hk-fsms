@@ -1,0 +1,109 @@
+# Control
+# 1 location(s):
+#   GG_Mighty_Zote / Battle Control/Zote Salubra
+
+fsm Control {
+  start Init
+  on ZERO HP → Death  // from any state
+
+  state Init {
+    FindChild(gameObject=Self, childName="Pt Suck", storeResult=var "Pt Suck")
+    FindChild(gameObject=Self, childName="Pt Send", storeResult=var "Pt Send")
+    FindChild(gameObject=Self, childName="Voice", storeResult=var "Voice")
+    GetOwner(storeGameObject=var "Self")
+    GetHP(target=Self, storeValue=var "Start HP")
+    on FINISHED → Dormant
+  }
+
+  state Dormant {
+    on START → Appear
+  }
+
+  state Appear {
+    SetCircleCollider(gameObject=Self, active=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ghost Appear", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    RandomFloat(min=92.8, max=113.77, storeResult=var "X Pos")
+    SetPosition(gameObject=Self, vector=(unset), x=var "X Pos", y=13.59, z=(unset), space=0, everyFrame=false, lateUpdate=false)
+    GetXDistance(gameObject=Self, target=var "Hero", storeResult=var "Distance", everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=dream_ghost_appear (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    FloatCompare(float1=var "Distance", float2=8.25, tolerance=0, equal=(none), lessThan=→"RETRY", greaterThan=(none), everyFrame=false)
+    SetMeshRenderer(gameObject=Self, active=true)
+    on FINISHED → Activate
+    on RETRY → Retry
+  }
+
+  state Idle {
+    GhostMovement(gameObject=Self, xPosMin=92.8, xPosMax=113.77, accel_x=0.25, speedMax_x=6, yPosMin=13, yPosMax=13.5, accel_y=0.4, speedMax_y=6, direction_x=var "Direction X", direction_y=var "Direction Y")
+    Wait(time=1, finishEvent=→"FINISHED", realTime=false)
+    AudioPlaySimple(gameObject=Self, volume=1, oneShotClip=<null>)
+    ActivateGameObject(gameObject=var "Voice", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Sucking
+  }
+
+  state Activate {
+    SetCircleCollider(gameObject=Self, active=true)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Ghost Idle")
+    on FINISHED → Idle
+  }
+
+  state Sucking {
+    GetPosition(gameObject=var "Hero", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=true)
+    SetPosition(gameObject=var "Pt Send", vector=var "Hero Pos", x=(unset), y=(unset), z=(unset), space=0, everyFrame=true, lateUpdate=false)
+    GetAngleToTarget2D(gameObject=var "Pt Send", target=var "Self", offsetX=0, offsetY=0, storeAngle=var "Angle", everyFrame=true)
+    FloatAdd(floatVariable=var "Angle", add=90, everyFrame=true, perSecond=false)
+    SetRotation(gameObject=var "Pt Send", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Angle", space=0, everyFrame=true, lateUpdate=false)
+    GetAngleToTarget2D(gameObject=Self, target=var "Hero", offsetX=0, offsetY=-0.5, storeAngle=var "Angle", everyFrame=true)
+    FloatAdd(floatVariable=var "Angle", add=-30, everyFrame=true, perSecond=false)
+    SetRotation(gameObject=var "Pt Suck", quaternion=(unset), vector=(unset), xAngle=(unset), yAngle=(unset), zAngle=var "Angle", space=0, everyFrame=true, lateUpdate=false)
+    GhostMovement(gameObject=Self, xPosMin=92.8, xPosMax=113.77, accel_x=0.25, speedMax_x=6, yPosMin=13, yPosMax=13.5, accel_y=0.4, speedMax_y=6, direction_x=var "Direction X", direction_y=var "Direction Y")
+    Wait(time=0.5, finishEvent=→"SUCK", realTime=false)
+    PlayParticleEmitter(gameObject=var "Pt Send", emit=0)
+    PlayParticleEmitter(gameObject=var "Pt Suck", emit=0)
+    on SUCK → Suck
+  }
+
+  state Suck {
+    SendMessage(gameObject=var "Hero", delivery=SendMessage, options=1, functionCall=TakeMPQuick(5))
+    on FINISHED → Sucking
+  }
+
+  state Death {
+    SendEventByName(eventTarget=GameObject(var "CameraParent"), sendEvent="EnemyKillShake", delay=0, everyFrame=false)
+    ActivateGameObject(gameObject=var "Voice", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    SendMessage(gameObject=var "GameManager", delivery=SendMessage, options=1, functionCall=FreezeMoment(1))
+    SendEventToRegister(eventName="ZOTE WARRIOR KILLED")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    AudioPlayerOneShotSingle(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClip=ghost_dialogue_death_explode (resources.assets), pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=<null>)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Ghost Burst", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    SetCircleCollider(gameObject=Self, active=false)
+    StopParticleEmitter(gameObject=var "Pt Send")
+    StopParticleEmitter(gameObject=var "Pt Suck")
+    SetIsDead(target=Self, setValue=false)
+    SetHP(target=Self, hp=var "Start HP")
+    AudioStop(gameObject=Self)
+    on FINISHED → Dead
+  }
+
+  state Dead {
+    SetMeshRenderer(gameObject=Self, active=false)
+    Wait(time=10, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Appear
+  }
+
+  state Retry {
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Appear
+  }
+
+  var Angle: float = 0
+  var Distance: float = 0
+  var X Pos: float = 0
+  var Direction X: int = 0
+  var Direction Y: int = 0
+  var Start HP: int = 0
+  var Hero Pos: vector3 = (0, 0, 0)
+  var Pt Send: gameObject = <null>
+  var Pt Suck: gameObject = <null>
+  var Self: gameObject = <null>
+  var Voice: gameObject = <null>
+}

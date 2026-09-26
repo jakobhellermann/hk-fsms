@@ -1,0 +1,159 @@
+# Conversation Control
+# 7 location(s):
+#   Room_nailmaster / Mr Mushroom NPC
+#   Fungus2_18 / Card & Mushroom/Mr Mushroom NPC
+#   Fungus3_44 / Mr Mushroom NPC
+#   Deepnest_40 / Mr Mushroom NPC
+#   Deepnest_East_01 / Mr Mushroom NPC
+#   Abyss_21 / Mr Mushroom NPC
+#   Tutorial_01 / Mr Mushroom NPC (1)
+
+fsm Conversation Control {
+  start Init
+  on RESET CONVO → Idle  // from any state
+  on TALK FINISH → Anim End  // from any state
+
+  state Idle {
+    on CONVO START → Hero Anim
+  }
+
+  state Init {
+    GetOwner(storeGameObject=var "Self")
+    on FINISHED → Idle
+  }
+
+  state End {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="CONVO END", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=Self, sendEvent="RESET CONVO", delay=0, everyFrame=false)
+  }
+
+  state Box Down {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → End
+  }
+
+  state Box Up {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Charm?
+  }
+
+  state Anim End {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUpToIdle")
+    on FINISHED → Box Down
+  }
+
+  state Talk Finish {
+    SendEventByName(eventTarget=Self, sendEvent="TALK FINISH", delay=0, everyFrame=false)
+  }
+
+  state Hero Anim {
+    Tk2dPlayAnimation(gameObject=var "Hero", animLibName="", clipName="LookUp")
+    on FINISHED → Title?
+  }
+
+  state Convo {
+    GetPlayerDataInt(gameObject=var "GameManager", intName="mrMushroomState", storeValue=var "Mushroom State")
+    IncrementPlayerDataInt(gameObject=var "GameManager", intName="mrMushroomState")
+    ConvertIntToString(intVariable=var "Mushroom State", stringVariable=var "State String", format="", everyFrame=false)
+    BuildString(stringParts=["MR_MUSHROOM_", var "State String"], separator="", addToEnd=true, storeResult=var "Convo String", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=[var "Convo String", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Excuse Pause
+  }
+
+  state Convo Choice {
+    BoolTest(boolVariable=var "Spoken", isTrue=→"REPEAT", isFalse=→"GREET", everyFrame=false)
+    on GREET → Convo
+    on REPEAT → 
+  }
+
+  state Title? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_17", isTrue=(none), isFalse=→"FINISHED")
+    SetGameObject(variable=var "Area Title", gameObject=var "AreaTitle", everyFrame=false)
+    ActivateGameObject(gameObject=var "Area Title", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    SetFsmBool(gameObject=var "Area Title", fsmName="", variableName="NPC Title", setValue=true, everyFrame=false)
+    SetFsmString(gameObject=var "Area Title", fsmName="", variableName="Area Event", setValue="MR_MUSHROOM", everyFrame=false)
+    on FINISHED → Box Up
+  }
+
+  state Charm? {
+    PlayerDataBoolTest(gameObject=var "GameManager", boolName="equippedCharm_17", isTrue=→"EQUIPPED", isFalse=→"UNEQUIPPED")
+    on EQUIPPED → Convo
+    on UNEQUIPPED → Shrumish Choice
+  }
+
+  state Shrumish Choice {
+    SendRandomEvent(events=[(none), (none), (none)], weights=[1, 1, 1], delay=0)
+    on 1 → Shrumish 1
+    on 2 → Shrumish 2
+    on 3 → Shrumish 3
+  }
+
+  state Shrumish 1 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MR_MUSHROOM_SHROOMISH1", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Shrumish 2 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MR_MUSHROOM_SHROOMISH2", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Shrumish 3 {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MR_MUSHROOM_SHROOMISH2", "Minor NPC"], storeResult=(unset var))
+    on CONVO_FINISH → Talk Finish
+  }
+
+  state Excuse Pause {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    Wait(time=1.5, finishEvent=→"FINISHED", realTime=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Silent")
+    AudioStop(gameObject=Self)
+    on FINISHED → Box Up 2
+  }
+
+  state Box Up 2 {
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX UP", delay=0, everyFrame=false)
+    Wait(time=0.3, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Excuse
+  }
+
+  state Excuse {
+    IntCompare(integer1=var "Mushroom State", integer2=7, equal=→"FINAL", lessThan=(none), greaterThan=→"FINAL", everyFrame=false)
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MR_MUSHROOM_EXCUSE", "Minor NPC"], storeResult=(unset var))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Mr_Mush_talk_short (sharedassets6.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Send Leave
+    on FINAL → Final
+  }
+
+  state Send Leave {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="LEAVE", delay=0, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    on FINISHED → Talk Finish
+  }
+
+  state Final {
+    CallMethodProper(gameObject=var "DialogueText", behaviour="DialogueBox", methodName="StartConversation", parameters=["MR_MUSHROOM_FINAL", "Minor NPC"], storeResult=(unset var))
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Idle")
+    AudioPlayerOneShot(audioPlayer=Audio Player Actor (resources.assets), spawnPoint=var "Self", audioClips=[Mr_Mush_talk_02 (sharedassets6.assets)], weights=[1], pitchMin=1, pitchMax=1, volume=1, delay=0, storePlayer=var "Voice Player")
+    on CONVO_FINISH → Send Rocket
+  }
+
+  state Send Rocket {
+    SendEventByName(eventTarget=GameObject(Self), sendEvent="ROCKET", delay=0, everyFrame=false)
+    SetCollider(gameObject=Self, active=false)
+    SendEventByName(eventTarget=GameObject(var "DialogueManager"), sendEvent="BOX DOWN", delay=0, everyFrame=false)
+    SendEventByName(eventTarget=BroadcastAll, sendEvent="NPC TITLE DOWN", delay=0, everyFrame=false)
+  }
+
+  var Mushroom State: int = 0
+  var Spoken: bool = false
+  var Convo String: string = ""
+  var State String: string = ""
+  var Area Title: gameObject = <null>
+  var Self: gameObject = <null>
+  var Voice Player: gameObject = <null>
+}

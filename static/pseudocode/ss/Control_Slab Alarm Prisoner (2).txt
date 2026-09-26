@@ -1,0 +1,190 @@
+# Control
+# 11 location(s):
+#   Slab_14 / Slab Alarm Prisoner (2)
+#   Slab_14 / Slab Alarm Prisoner (1)
+#   Slab_14 / Slab Alarm Prisoner Fly (2)
+#   Slab_15 / Slab Prisoner Set (1)/Slab Alarm Prisoner Fly (1)
+#   Slab_15 / Slab Alarm Prisoner Fly (1)
+#   Slab_15 / Slab Prisoner Set (1)/Slab Alarm Prisoner (1)
+#   Slab_15 / Slab Alarm Prisoner (2)
+#   Slab_15 / Slab Alarm Prisoner (3)
+#   Slab_15 / Slab Prisoner Set (1)/Slab Alarm Prisoner Fly (2)
+#   Slab_15 / Slab Alarm Prisoner (1)
+#   Slab_15 / Slab Prisoner Set (1)/Slab Alarm Prisoner
+
+// uses template: slab_alarm_prisoner
+fsm Control {
+  start Init
+
+  state Init {
+    GetParent(gameObject=Self, storeResult=var "Parent")
+    RandomInt(min=0, max=12, storeResult=var "Start Frame", inclusiveMax=false, noRepeat=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest")
+    Tk2dPlayFrame(gameObject=Self, frame=var "Start Frame")
+    CheckZPosition(gameObject=Self, compareTo=0, compareToOffset=0, tolerance=0, equal=(none), lessThan=→"FG", greaterThan=(none), everyFrame=false, space=0)
+    SetIsKinematic2d(gameObject=Self, isKinematic=false)
+    FindNamedChild(gameObject=Self, storeResult=var "Shake Box F")
+    FindNamedChild(gameObject=Self, storeResult=var "Shake Box B")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Shake F")
+    FindNamedChild(gameObject=Self, storeResult=var "Pt Shake B")
+    on FINISHED → Rest
+    on FG → FG Rest
+  }
+
+  state Rest {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"NOISE", ActiveOuter=→"NOISE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on TOOK DAMAGE → Roar Start
+    on NOISE → Roar Start
+    on ALARM → Roar Start
+    on ALERT → Alert Start
+  }
+
+  state Roar Start {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Sing", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Roar Shake
+  }
+
+  state Roar {
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="ALARM", delay=0, everyFrame=false)
+    WaitRandom(timeMin=5, timeMax=6, finishEvent=→"FINISHED", realTime=false)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Shake Range", storeResult=false, sendEvent="SHAKE", outOfRangeEvent="", everyFrame=true)
+    on FINISHED → Roar End
+    on SHAKE → Set Shakes
+    on TOOK DAMAGE → Set Shakes
+  }
+
+  state Alert {
+    FloatClamp(floatVariable=var "Alert Timer", minValue=0.5, maxValue=100, everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Alert")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"NOISE", ActiveOuter=→"NOISE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    FloatAdd(floatVariable=var "Alert Timer", add=1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Alert Timer", float2=1.5, tolerance=0, equal=(none), lessThan=(none), greaterThan=→"ALERT WAKE", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="", outOfRangeEvent="UNALERT", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Shake Range", storeResult=false, sendEvent="SHAKE", outOfRangeEvent="", everyFrame=true)
+    on ALERT WAKE → Roar Start
+    on ALARM → Roar Start
+    on TOOK DAMAGE → Roar Start
+    on NOISE → Roar Start
+    on UNALERT → Unalert Idle
+    on HERO DAMAGED → Roar Start
+    on SHAKE → Set Shakes
+  }
+
+  state Alert Recheck {
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=false)
+    on ALERT → Roar Start
+    on FINISHED → Alert End
+  }
+
+  state Alert End {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Alert End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"NOISE", ActiveOuter=→"NOISE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on FINISHED → Rest Restart
+    on NOISE → Roar Start
+    on TOOK DAMAGE → Roar Start
+    on ALARM → Roar Start
+    on HERO DAMAGED → Roar Start
+  }
+
+  state Rest Restart {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Rest")
+    on FINISHED → Rest
+  }
+
+  state FG Rest {
+    SendMessage(gameObject=Self, delivery=SendMessage, options=1, functionCall=CancelSetZ())
+    SetCollider(gameObject=Self, active=false, resetOnExit=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"NOISE", ActiveOuter=→"NOISE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    on NOISE → Roar Start
+    on ALARM → Roar Start
+  }
+
+  state Unalert Idle {
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.1, MaxReactDelay=0.3, None=(none), ActiveInner=→"NOISE", ActiveOuter=→"NOISE", IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    FloatAdd(floatVariable=var "Alert Timer", add=-1, everyFrame=true, perSecond=true)
+    FloatCompare(float1=var "Alert Timer", float2=0, tolerance=0, equal=(none), lessThan=→"UNALERT", greaterThan=(none), everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Alert Range", storeResult=false, sendEvent="ALERT", outOfRangeEvent="", everyFrame=true)
+    CheckAlertRangeByName(eventTarget=Self, alertRangeName="Shake Range", storeResult=false, sendEvent="SHAKE", outOfRangeEvent="", everyFrame=true)
+    on ALARM → Roar Start
+    on TOOK DAMAGE → Roar Start
+    on NOISE → Roar Start
+    on ALERT → Alert
+    on UNALERT → Alert End
+    on HERO DAMAGED → Roar Start
+    on SHAKE → Set Shakes
+  }
+
+  state Alert Start {
+    FaceObjectV2(objectA=Self, objectB=var "Hero", spriteFacesRight=false, playNewAnimation=false, newAnimationClip="", resetFrame=false, everyFrame=false, pauseBetweenTurns=0.5)  // disabled
+    SetFloatValue(floatVariable=var "Alert Timer", floatValue=0.5, everyFrame=false)
+    on FINISHED → Alert
+  }
+
+  state Roar End {
+    on FINISHED → Alert End
+  }
+
+  state Set Shakes {
+    SetIntValue(intVariable=var "Shakes", intValue=2, everyFrame=false)
+    SendEventByName(eventTarget=GameObject(var "Parent"), sendEvent="ALARM", delay=0, everyFrame=false)
+    on FINISHED → Shake 1
+  }
+
+  state Shake 1 {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Shake Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Shake 2
+  }
+
+  state Shake 2 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    ActivateGameObject(gameObject=var "Shake Box F", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Shake F", emit=0, resetIfPlaying=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Shake 3
+  }
+
+  state Shake 3 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Shake 4
+  }
+
+  state Shake 4 {
+    Tk2dWatchAnimationEvents(gameObject=Self, animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    ActivateGameObject(gameObject=var "Shake Box B", activate=true, recursive=false, resetOnExit=true, everyFrame=false)
+    PlayParticleEmitter(gameObject=var "Pt Shake B", emit=0, resetIfPlaying=false)
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Small Shake (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Repeat?
+  }
+
+  state Repeat? {
+    IntAdd(intVariable=var "Shakes", add=-1, everyFrame=false)
+    IntCompare(integer1=var "Shakes", integer2=0, equal=→"FINISHED", lessThan=→"FINISHED", greaterThan=→"REPEAT", everyFrame=false)
+    on FINISHED → Restart Roar
+    on REPEAT → ReShake
+  }
+
+  state Restart Roar {
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Sing")
+    on FINISHED → Roar
+  }
+
+  state ReShake {
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="ReShake Attack", animationTriggerEvent=→"FINISHED", animationCompleteEvent=(none))
+    on FINISHED → Shake 2
+  }
+
+  state Roar Shake {
+    DoCameraShake(VisibleRenderer=<null>, Camera=Main Camera (dataassets_assets_assets/dataassets/camerashake.bundle), Profile=Enemy Kill (dataassets_assets_assets/dataassets/camerashake.bundle), cancelOnExit=false, DoFreeze=false, Delay=0)
+    on FINISHED → Roar
+  }
+
+  var Alert Timer: float = 0
+  var Start Frame: int = 0
+  var Shakes: int = 0
+  var Parent: gameObject = <null>
+  var Shake Box F: gameObject = <null>
+  var Shake Box B: gameObject = <null>
+  var Pt Shake F: gameObject = <null>
+  var Pt Shake B: gameObject = <null>
+}

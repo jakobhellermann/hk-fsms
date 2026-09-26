@@ -1,0 +1,138 @@
+# Behaviour
+# 1 location(s):
+#   Dock_03 / Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)
+
+fsm Behaviour {
+  start Init1
+  on DISABLE → Stop Audio  // from any state
+
+  state Climbing {
+    GetProperty(targetProperty=Climber.IsTurning on Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)@Climber, everyFrame=true)
+    BoolTest(boolVariable=var "Is Turning", isTrue=→"TURNING", isFalse=(none), everyFrame=true)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.2, MaxReactDelay=0.4, None=(none), ActiveInner=→"PRAY", ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    GetRotation(gameObject=Self, quaternion=(unset), vector=var "Rotation", xAngle=(unset), yAngle=(unset), zAngle=(unset), space=0, everyFrame=true)
+    SpawnObjectFromGlobalPoolOverTime(gameObject=Tar Trail (localpoolprefabs_assets_areadocks.bundle), spawnPoint=var "Flame Point", position=(unset), rotation=var "Rotation", frequency=0.4)  // disabled
+    CheckAlertRange(alertRange=Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)/Attack Range@AlertRange, storeResult=var "In Attack Range", InRangeEvent=(none), InRangeDelay=0, OutOfRangeEvent=(none), OutOfRangeDelay=0, everyFrame=true)
+    TimeLimitCheckV2(StoredValue=var "Attack Cooldown Time", AboveEvent=(none), BelowEvent=(none), StoreBool=var "Can Attack", EveryFrame=true)
+    BoolAllTrue(boolVariables=[var "In Attack Range", var "Can Attack"], sendEvent=→"ATTACK", storeResult=(unset), everyFrame=true)
+    SetParticleEmission(gameObject=var "Pt Idle", emission=true, resetOnExit=true)
+    BoolTest(boolVariable=var "Lift Move", isTrue=→"LIFT", isFalse=(none), everyFrame=true)
+    on PRAY → Stop Climber
+    on TURNING → Turning
+    on ATTACK → Stop Climber 2
+    on TOOK DAMAGE → Stop Climber 2
+    on LIFT → Moving Lift
+  }
+
+  state Praying {
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    CheckHeroPerformanceRegion(Target=Self, MinReactDelay=0.3, MaxReactDelay=0.5, None=→"CANCEL", ActiveInner=(none), ActiveOuter=(none), IgnoreNeedolinRange=false, useActiveBool=false, ActiveBool=(unset), StoreState=None, EveryFrame=true)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Pray", animationTriggerEvent=(none), animationCompleteEvent=(none))
+    EnemySingControl(enemyGameObject=Self, audioPlayer=var "Audio Loop Voice", singAudioTable=<null>, noThreadEffects=false, noPuppetString=false, randomSingStartTime=true, dontStopAudioOnExit=false, altThreadSpawnPoint=<null>)
+    on CANCEL → Start Climbing
+    on SING DURATION END → Start Climbing
+  }
+
+  state Stop Climber {
+    StopClimber(Target=Self, WaitForTurn=true)
+    AudioStop(gameObject=Self, fadeTime=0)
+    on FINISHED → Praying
+  }
+
+  state Turning {
+    GetProperty(targetProperty=Climber.IsTurning on Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)@Climber, everyFrame=true)
+    BoolTest(boolVariable=var "Is Turning", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    on FINISHED → Climbing
+  }
+
+  state Start Climbing {
+    StartClimber(Target=Self)
+    AudioPlayV2(gameObject=Self, volume=1, oneShotClip=var "", finishedEvent=(none))
+    SendEvent(eventTarget=Self, sendEvent=→"FINISHED", delay=0, everyFrame=false)
+    on FINISHED → Climbing
+  }
+
+  state Attack Antic {
+    PlayAudioEvent(audioClip=tar_slug_antic (sfxstatic_assets_areadocks.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Audio")
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack Antic")
+    Wait(time=0.6, finishEvent=→"FINISHED", realTime=false)
+    PlayParticleEmitterInState(gameObject=var "Pt Antic")
+    on FINISHED → Attack
+  }
+
+  state Attack {
+    CheckIsBlackThreaded(Target=Self, TrueEvent=(none), FalseEvent=(none), StoreValue=var "Is Black Threaded", EveryFrame=false)
+    BoolTestToGameObject(Test=var "Is Black Threaded", ExpectedValue=true, TrueGameObject=var "Attack Void", FalseGameObject=var "Attack Object", StoreResult=var "Attack Object Crt", EveryFrame=false)
+    PlayAudioEvent(audioClip=tar_slug_attack (sfxstatic_assets_areadocks.bundle), pitchMin=0.95, pitchMax=1.05, volume=1, audioPlayerPrefab=var "", spawnPoint=Self, spawnPosition=(0, 0, 0), SpawnedPlayerRef=var "Current Audio")
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    ActivateGameObject(gameObject=var "Attack Object Crt", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    ActivateGameObject(gameObject=var "Attack Object Crt", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    Wait(time=1.2, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Attack End
+  }
+
+  state Attack End {
+    TimeLimitSetV2(TimeDelay=1, StoreValue=var "Attack Cooldown Time", CanSet=(unset), EveryFrame=false)
+    Tk2dPlayAnimationWithEvents(gameObject=Self, clipName="Attack End", animationTriggerEvent=(none), animationCompleteEvent=→"FINISHED")
+    Wait(time=0.1, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Start Climbing
+  }
+
+  state Init2 {
+    AnimatorPlay(gameObject=var "Attack Object", stateName="Attack", layer=0, normalizedTime=1, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init3
+  }
+
+  state Init3 {
+    ActivateGameObject(gameObject=var "Attack Object", activate=false, recursive=false, resetOnExit=false, everyFrame=false)
+    on FINISHED → Start Climbing
+  }
+
+  state Init1 {
+    ActivateGameObject(gameObject=var "Attack Object", activate=true, recursive=false, resetOnExit=false, everyFrame=false)
+    NextFrameEvent(sendEvent=→"FINISHED")
+    on FINISHED → Init2
+  }
+
+  state Moving Lift {
+    AudioStop(gameObject=Self, fadeTime=0)
+    SetVelocity2d(gameObject=Self, vector=(0, 0), x=(unset), y=(unset), everyFrame=false)
+    Tk2dPlayAnimation(gameObject=Self, animLibName="", clipName="Attack")
+    BoolTest(boolVariable=var "Lift Move", isTrue=(none), isFalse=→"FINISHED", everyFrame=true)
+    StopClimber(Target=Self, WaitForTurn=true)
+    on FINISHED → Lift End Pause
+  }
+
+  state Lift End Pause {
+    Wait(time=0.75, finishEvent=→"FINISHED", realTime=false)
+    on FINISHED → Attack End
+  }
+
+  state Stop Audio {
+    AudioStop(gameObject=var "Current Audio", fadeTime=0)
+  }
+
+  state Stop Climber 2 {
+    StopClimber(Target=Self, WaitForTurn=true)
+    AudioStop(gameObject=Self, fadeTime=0)
+    on FINISHED → Attack Antic
+  }
+
+  var Attack Cooldown Time: float = 0
+  var Is Turning: bool = false
+  var In Attack Range: bool = false
+  var Can Attack: bool = false
+  var Lift Move: bool = false
+  var Is Black Threaded: bool = false
+  var Rotation: vector3 = (0, 0, 0)
+  var Flame Point: gameObject = Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)/Flame Point
+  var Attack Object: gameObject = Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)/Attack
+  var Pt Idle: gameObject = Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)/Pt Idle
+  var Pt Antic: gameObject = Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)/Pt Antic
+  var Current Audio: gameObject = <null>
+  var Audio Loop Voice: gameObject = Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)/Audio Loop Voice
+  var Attack Void: gameObject = Coal Bucket Plat_multi/Plat (4)/Tar Slug (2)/Attack Void
+  var Attack Object Crt: gameObject = <null>
+}
