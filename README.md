@@ -3,6 +3,7 @@
 Dump of all PlayMaker FSMs of the games Hollow Knight and Silksong.
 Available online at https://jakobhellermann.github.io/hk-fsms/ss
 
+Additionaly, a text-only pseudocode dump is available at [./static/pseudocode](./static/pseudocode).
 
 ## Development
 
