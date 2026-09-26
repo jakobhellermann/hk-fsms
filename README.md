@@ -1,42 +1,23 @@
-# sv
+# hk-fsms
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Dump of all PlayMaker FSMs of the games Hollow Knight and Silksong.
+Available online at https://jakobhellermann.github.io/hk-fsms/ss
 
-## Creating a project
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Development
 
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
+The project contains two parts, the indexer at [./indexer](./indexer), which scans the game files and builds some static 
+json files containing a cleaned up presentation, and the frontend in [./src](./src) which renders that data on a static website.
 
 ```sh
-# recreate this project
-pnpm dlx sv@0.16.1 create --template minimal --types ts --install pnpm web
+# run the indexer and compress the results into ./static/data/{hk,ss}.tar.zst
+just index
+
+# generate a text-only pseudocode dump in ./out/pseudo.
+just dump-pseudo
+
+# start the frontend with hot-reloading
+pnpm run dev
 ```
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+For deployment, the static `tar.zst`s are checked in and extracted in the github action which build the github pages website build.
