@@ -22,11 +22,11 @@ export type Favorite = {
 	mode?: string;
 };
 
-export type GameDef = { id: Game; label: string; favorites?: Favorite[] };
+export type GameDef = { id: Game; label: string; short: string; favorites?: Favorite[] };
 
 export const GAMES: GameDef[] = [
-	{ id: 'hk', label: 'Hollow Knight', favorites: hkFavorites },
-	{ id: 'ss', label: 'Silksong', favorites: ssFavorites }
+	{ id: 'hk', label: 'Hollow Knight', short: 'HK', favorites: hkFavorites },
+	{ id: 'ss', label: 'Silksong', short: 'SS', favorites: ssFavorites }
 ];
 
 export const DEFAULT_GAME: Game = 'ss';

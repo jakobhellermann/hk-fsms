@@ -68,7 +68,7 @@
 {:else}
 	{@const m = modelQuery.data}
 	{#if mode === 'graph'}
-		<!-- the graph hosts the mode tabs in its own toolbar (same row as +/−/fit) -->
+		<!-- the graph hosts the mode tabs in its own toolbar (same row as fit) -->
 		<GraphView model={m} {tooltips} {modeTabs} />
 	{:else}
 		<div class="bar">{@render modeTabs()}</div>

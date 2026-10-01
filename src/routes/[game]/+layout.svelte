@@ -112,8 +112,12 @@
 				<a
 					class="gamebtn"
 					class:active={game === g.id}
-					href="{base}/{g.id}{query ? `?q=${encodeURIComponent(query)}` : ''}">{g.label}</a
+					title={g.label}
+					href="{base}/{g.id}{query ? `?q=${encodeURIComponent(query)}` : ''}"
 				>
+					<span class="lbl-long">{g.label}</span>
+					<span class="lbl-short">{g.short}</span>
+				</a>
 			{/each}
 		</div>
 	</div>
@@ -181,6 +185,19 @@
 		cursor: pointer;
 		border-radius: 4px;
 		text-decoration: none;
+		white-space: nowrap;
+	}
+	/* full game names don't fit a phone-width topline — show the short labels from config */
+	.lbl-short {
+		display: none;
+	}
+	@media (max-width: 480px) {
+		.lbl-long {
+			display: none;
+		}
+		.lbl-short {
+			display: inline;
+		}
 	}
 	.gamebtn.active {
 		border-color: var(--accent);

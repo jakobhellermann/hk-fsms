@@ -18,7 +18,7 @@
 	import GraphSvg from '$lib/graph/GraphSvg.svelte';
 	import StateBody from './StateBody.svelte';
 
-	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as +/−/fit)
+	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as fit)
 	let {
 		model,
 		modeTabs,
@@ -41,6 +41,14 @@
 	$effect(() => {
 		if (browser) localStorage.setItem(CFG_KEY, JSON.stringify(layoutCfg));
 	});
+
+	// narrow screens: the layout controls collapse behind the toggle (the toolbar styles switch
+	// this group into a dropdown)
+	let cfgOpen = $state(false);
+	let toolbarEl = $state<HTMLElement>();
+	function closeCfgOnOutside(e: PointerEvent) {
+		if (cfgOpen && e.target instanceof Node && !toolbarEl?.contains(e.target)) cfgOpen = false;
+	}
 
 	// the selected state lives in the URL (?state=) so it survives reload and is shareable; its
 	// pseudocode shows in the sidebar
@@ -275,26 +283,36 @@
 
 <svelte:window
 	onhashchange={applyAnchor}
+	onpointerdown={closeCfgOnOutside}
 	onpointermove={move}
 	onpointerup={end}
 	onpointercancel={end}
 />
 
-<div class="toolbar">
-	<span class="tb-label">transitions</span>
-	<div class="seg">
-		{#each ['routed', 'side', 'bottom'] as s}
-			<button
-				class:active={layoutCfg.edgeStyle === s}
-				onclick={() => (layoutCfg.edgeStyle = s as EdgeStyle)}
-				>{s === 'routed' ? 'edge' : s === 'bottom' ? 'vertical' : s}</button
-			>
-		{/each}
+<div class="toolbar" bind:this={toolbarEl}>
+	<button
+		class="tb-toggle"
+		class:active={cfgOpen}
+		aria-label="layout options"
+		aria-expanded={cfgOpen}
+		onclick={() => (cfgOpen = !cfgOpen)}>⚙</button
+	>
+	<div class="tb-secondary" class:open={cfgOpen}>
+		<span class="tb-label">transitions</span>
+		<div class="seg">
+			{#each ['routed', 'side', 'bottom'] as s}
+				<button
+					class:active={layoutCfg.edgeStyle === s}
+					onclick={() => (layoutCfg.edgeStyle = s as EdgeStyle)}
+					>{s === 'routed' ? 'edge' : s === 'bottom' ? 'vertical' : s}</button
+				>
+			{/each}
+		</div>
+		<label class="tb-check">
+			<input type="checkbox" bind:checked={layoutCfg.collapseChains} />
+			collapse chains
+		</label>
 	</div>
-	<label class="tb-check">
-		<input type="checkbox" bind:checked={layoutCfg.collapseChains} />
-		collapse chains
-	</label>
 	<button onclick={() => (view = { ...fit })}>fit</button>
 	{#if modeTabs}
 		<span class="grow"></span>
@@ -366,6 +384,22 @@
 		align-items: center;
 		gap: 0.4rem;
 		padding: 0.5rem var(--pad-x);
+		position: relative;
+		z-index: 3; /* dropdown paints above canvas and panel */
+	}
+	.tb-secondary {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.tb-toggle {
+		display: none;
+		align-items: center;
+		justify-content: center;
+	}
+	.tb-toggle.active {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 	.grow {
 		flex: 1;
@@ -506,5 +540,30 @@
 		display: block;
 		width: 100%;
 		height: 100%;
+	}
+	@media (max-width: 680px) {
+		.tb-toggle {
+			display: flex;
+		}
+		.tb-secondary {
+			display: none;
+			position: absolute;
+			top: 100%;
+			left: var(--pad-x);
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.6rem;
+			padding: 0.6rem;
+			background: var(--panel);
+			border: 1px solid #333;
+			border-radius: 4px;
+		}
+		.tb-secondary.open {
+			display: flex;
+		}
+		.tb-label,
+		.tb-check {
+			margin-left: 0;
+		}
 	}
 </style>
