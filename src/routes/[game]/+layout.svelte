@@ -1,3 +1,11 @@
+<script lang="ts" module>
+	import { SvelteMap } from 'svelte/reactivity';
+	import type { Game } from '$lib/data';
+
+	// per game, the version last shown this session (`null` = latest)
+	const lastVersion = new SvelteMap<Game, string | null>();
+</script>
+
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { goto } from '$app/navigation';
@@ -23,6 +31,9 @@
 	const game = $derived(gameRef.game);
 	const segment = $derived(gameSegment(gameRef));
 	const gameLabel = $derived(GAMES.find((g) => g.id === game)?.label ?? game);
+	$effect(() => {
+		lastVersion.set(gameRef.game, gameRef.version);
+	});
 
 	const versions = $derived(versionsFor(game));
 	const latest = $derived(versions.at(-1));
@@ -148,7 +159,10 @@
 						class="gamebtn"
 						class:active={game === g.id}
 						title={g.label}
-						href="{base}/{g.id}{query ? `?q=${encodeURIComponent(query)}` : ''}"
+						href="{base}/{gameSegment({
+							game: g.id,
+							version: lastVersion.get(g.id) ?? null
+						})}{query ? `?q=${encodeURIComponent(query)}` : ''}"
 					>
 						<span class="lbl-long">{g.label}</span>
 						<span class="lbl-short">{g.short}</span>
