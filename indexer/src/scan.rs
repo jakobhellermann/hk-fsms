@@ -87,57 +87,56 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
     let written: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
     let entries: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
 
-    let scan = |file_label: String,
-                handle: &rabex_env::handle::SerializedFileHandle|
-     -> Result<()> {
-        // `scripts` reports "not in this file" as an error, and most files hold
-        // no FSM at all.
-        let Ok(scripts) = handle.scripts::<MonoBehaviour>("PlayMakerFSM") else {
-            return Ok(());
-        };
-        let mut qualifier = Qualifier::new(handle);
-        let mut local: Vec<Entry> = Vec::new();
+    let scan =
+        |file_label: String, handle: &rabex_env::handle::SerializedFileHandle| -> Result<()> {
+            // `scripts` reports "not in this file" as an error, and most files hold
+            // no FSM at all.
+            let Ok(scripts) = handle.scripts::<MonoBehaviour>("PlayMakerFSM") else {
+                return Ok(());
+            };
+            let mut qualifier = Qualifier::new(handle);
+            let mut local: Vec<Entry> = Vec::new();
 
-        for mb in scripts {
-            let path_id = mb.path_id();
-            let label = qualifier
-                .qualify_local(path_id)
-                .with_context(|| format!("no component path for {file_label} obj:{path_id}"))?
-                .to_string();
-            let game_object = label
-                .rsplit_once('@')
-                .map(|(go, _)| go)
-                .unwrap_or(&label)
-                .to_string();
+            for mb in scripts {
+                let path_id = mb.path_id();
+                let label = qualifier
+                    .qualify_local(path_id)
+                    .with_context(|| format!("no component path for {file_label} obj:{path_id}"))?
+                    .to_string();
+                let game_object = label
+                    .rsplit_once('@')
+                    .map(|(go, _)| go)
+                    .unwrap_or(&label)
+                    .to_string();
 
-            let component = ComponentFsm::read(handle, path_id)?;
-            let mut model = component.decode(handle)?;
-            game.apply(&mut model);
-            let json = serde_json::to_vec(&model)?;
+                let component = ComponentFsm::read(handle, path_id)?;
+                let mut model = component.decode(handle)?;
+                game.apply(&mut model);
+                let json = serde_json::to_vec(&model)?;
 
-            let mut hasher = DefaultHasher::new();
-            json.hash(&mut hasher);
-            let hash = format!("{:016x}", hasher.finish());
+                let mut hasher = DefaultHasher::new();
+                json.hash(&mut hasher);
+                let hash = format!("{:016x}", hasher.finish());
 
-            let is_new = written.lock().unwrap().insert(hash.clone());
-            if is_new {
-                std::fs::write(content_dir.join(format!("{hash}.json")), &json)?;
+                let is_new = written.lock().unwrap().insert(hash.clone());
+                if is_new {
+                    std::fs::write(content_dir.join(format!("{hash}.json")), &json)?;
+                }
+                local.push(Entry {
+                    file: file_label.clone(),
+                    path_id,
+                    name: model.name.to_string(),
+                    game_object,
+                    hash,
+                });
             }
-            local.push(Entry {
-                file: file_label.clone(),
-                path_id,
-                name: model.name.to_string(),
-                game_object,
-                hash,
-            });
-        }
 
-        if !local.is_empty() {
-            eprintln!("  {file_label}: {} fsms", local.len());
-        }
-        entries.lock().unwrap().extend(local);
-        Ok(())
-    };
+            if !local.is_empty() {
+                eprintln!("  {file_label}: {} fsms", local.len());
+            }
+            entries.lock().unwrap().extend(local);
+            Ok(())
+        };
 
     sources.par_iter().try_for_each(|source| -> Result<()> {
         let label = source.label();
