@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use rabex_env::Environment;
 use rabex_env::addressables::catalog::resource_providers;
 use rabex_env::resolver::EnvResolver;
@@ -52,10 +52,18 @@ pub fn build_scene_lookup<R: EnvResolver, P: rabex_env::rabex::typetree::TypeTre
                 .iter()
                 .find(|dep| dep.provider_id.as_str() == resource_providers::ASSET_BUNDLE)
             {
-                let path = addressables.evaluate_string(&dep.internal_id);
+                // Windows builds' catalogs use `\` separators.
+                let path = addressables
+                    .evaluate_string(&dep.internal_id)
+                    .replace('\\', "/");
                 let relative = Path::new(&path)
                     .strip_prefix(&build_folder)
-                    .unwrap_or(Path::new(&path));
+                    .with_context(|| {
+                        format!(
+                            "scene bundle {path} is outside the addressables build folder {}",
+                            build_folder.display()
+                        )
+                    })?;
                 lookup.insert(relative.to_string_lossy().to_string(), name.to_owned());
             }
         }

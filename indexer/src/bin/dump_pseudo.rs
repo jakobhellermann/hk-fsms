@@ -1,7 +1,7 @@
 //! Dump every FSM of a game to pseudocode text files (one per unique FSM).
 //!
-//! Reads the content-addressed store produced by the indexer (`just index` +
-//! `just unpack-data`) from `static/data/<slug>/` and renders each model with
+//! Reads the latest version's index from the content-addressed store produced by the
+//! indexer (`just index` + `just unpack-data`) in `static/data/<slug>/` and renders each model with
 //! [`playmakerfsm::pseudo`]. Identical FSMs (same content hash) collapse to one
 //! file. Filenames start with the FSM name; if that collides, game-object path
 //! components are appended until unique, then the scene name.
@@ -24,8 +24,6 @@ struct Config {
 #[derive(Deserialize)]
 struct GameConfig {
     slug: String,
-    #[allow(dead_code)]
-    path: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -118,6 +116,15 @@ fn build_filenames(hashes: &[(String, String, String)]) -> Vec<String> {
 }
 
 fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
+    let versions: Vec<String> = serde_json::from_str(
+        &std::fs::read_to_string(data_dir.join("versions.json"))
+            .with_context(|| format!("versions.json for {slug}"))?,
+    )?;
+    let latest = versions
+        .last()
+        .with_context(|| format!("{slug}: versions.json is empty"))?;
+    let version_dir = data_dir.join(latest);
+
     // index.json is the compact columnar format: a shared file table + one tuple per FSM.
     #[derive(Deserialize)]
     struct Compact {
@@ -125,7 +132,7 @@ fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
         e: Vec<(usize, String, String, String)>,
     }
     let compact: Compact = serde_json::from_str(
-        &std::fs::read_to_string(data_dir.join("index.json"))
+        &std::fs::read_to_string(version_dir.join("index.json"))
             .with_context(|| format!("index.json for {slug}"))?,
     )?;
     let index: Vec<Entry> = compact
@@ -141,7 +148,7 @@ fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
 
     // scene names (file → scene_name)
     let scenes: HashMap<String, String> = serde_json::from_str(
-        &std::fs::read_to_string(data_dir.join("scenes.json"))
+        &std::fs::read_to_string(version_dir.join("scenes.json"))
             .with_context(|| format!("scenes.json for {slug}"))?,
     )?;
 

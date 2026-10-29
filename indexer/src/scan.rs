@@ -24,20 +24,21 @@ use crate::config::Entry;
 use crate::scene_lookup;
 use crate::tooltip_map::{Tooltips, build_tooltips};
 
-/// Output of a single game scan: the index entries and the set of content hashes written.
 pub struct ScanResult {
     pub entries: Vec<Entry>,
-    pub written: BTreeSet<String>,
     pub scene_names: BTreeMap<String, String>,
     pub tooltips: Tooltips,
 }
 
-/// Scan one game: find all PlayMakerFSM components, decode them, write content-addressed
-/// JSON files, and return the index entries.
-pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
-    let path = shellexpand::tilde(steam_path);
-    let game_files = GameFiles::probe(path.as_ref())
-        .with_context(|| format!("could not probe game at {path}"))?;
+/// Scan one game version: find all PlayMakerFSM components, decode them, write content-addressed
+/// JSON files into `content_dir` (skipping hashes already in `written`), and return the index entries.
+pub fn scan_game(
+    game_dir: &Path,
+    content_dir: &Path,
+    written: &Mutex<BTreeSet<String>>,
+) -> Result<ScanResult> {
+    let game_files = GameFiles::probe(game_dir)
+        .with_context(|| format!("could not probe game at {}", game_dir.display()))?;
     let tpk = TypeTreeCache::new(TpkTypeTreeBlob::embedded());
     let env = Environment::new(game_files, tpk);
 
@@ -81,10 +82,6 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
     let sources = files::sources(&env)?;
     eprintln!("scanning {} files and bundles...", sources.len());
 
-    let content_dir = out_dir.join("content");
-    std::fs::create_dir_all(&content_dir)?;
-
-    let written: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
     let entries: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
 
     let scan =
@@ -144,39 +141,10 @@ pub fn scan_game(steam_path: &str, out_dir: &Path) -> Result<ScanResult> {
     })?;
 
     let mut entries = entries.into_inner().unwrap();
-    let written = written.into_inner().unwrap();
     entries.sort_by(|a, b| (&a.name, &a.file, a.path_id).cmp(&(&b.name, &b.file, b.path_id)));
 
-    // Prune orphaned content files from earlier runs
-    let mut pruned = 0usize;
-    for entry in std::fs::read_dir(&content_dir)?.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("json") {
-            continue;
-        }
-        let referenced = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .is_some_and(|stem| written.contains(stem));
-        if !referenced {
-            std::fs::remove_file(&path)?;
-            pruned += 1;
-        }
-    }
-
-    eprintln!(
-        "{} fsms → {} distinct models in {} ({pruned} stale pruned), index in {} ({:.1}s)",
-        entries.len(),
-        written.len(),
-        content_dir.display(),
-        out_dir.join("index.json").display(),
-        0.0,
-    );
-
-    std::mem::forget(env);
     Ok(ScanResult {
         entries,
-        written,
         scene_names,
         tooltips,
     })

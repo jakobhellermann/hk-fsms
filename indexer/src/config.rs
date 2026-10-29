@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct Config {
+    /// Mount point of a steam depot filesystem laid out as `<root>/<appid>/<depot>/<manifest>/`.
+    pub root: String,
     pub games: Vec<GameConfig>,
 }
 
@@ -13,7 +15,16 @@ pub struct GameConfig {
     pub slug: String,
     #[allow(dead_code)]
     pub label: String,
-    pub path: String,
+    pub appid: u32,
+    pub depot: u32,
+    /// Oldest first.
+    pub versions: Vec<VersionConfig>,
+}
+
+#[derive(Deserialize)]
+pub struct VersionConfig {
+    pub version: String,
+    pub manifest: String,
 }
 
 #[derive(Serialize)]
