@@ -14,11 +14,13 @@ const readModel = (dir: string, hash: string): FsmModel =>
 
 describe.each(games)('real store (%s)', (game) => {
 	const dir = resolve(`static/data/${game}`);
-	const hasData = existsSync(resolve(dir, 'index.json'));
+	const hasData = existsSync(resolve(dir, 'versions.json'));
 
 	describe.skipIf(!hasData)('sample', () => {
+		const versions: string[] = JSON.parse(readFileSync(resolve(dir, 'versions.json'), 'utf8'));
+		const latest = versions[versions.length - 1];
 		const index: IndexEntry[] = expandIndex(
-			JSON.parse(readFileSync(resolve(dir, 'index.json'), 'utf8'))
+			JSON.parse(readFileSync(resolve(dir, latest, 'index.json'), 'utf8'))
 		);
 
 		// Deterministic pick: one FSM per name, ordered by where it sits. Ordering or

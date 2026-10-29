@@ -5,26 +5,38 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import {
 		GAMES,
-		DEFAULT_GAME,
 		fetchIndex,
 		fetchSceneNames,
 		encodePath,
-		isGame,
+		gameSegment,
+		parseGameRef,
 		resolveScenePath,
 		sceneLabel,
-		type Game
+		versionsFor
 	} from '$lib/data';
 
 	let { children } = $props();
 
-	const game = $derived<Game>(
-		isGame(page.params.game ?? null) ? (page.params.game as Game) : DEFAULT_GAME
-	);
+	const gameRef = $derived(parseGameRef(page.params.game));
+	const game = $derived(gameRef.game);
+	const segment = $derived(gameSegment(gameRef));
 	const gameLabel = $derived(GAMES.find((g) => g.id === game)?.label ?? game);
 
+	const versions = $derived(versionsFor(game));
+	const latest = $derived(versions.at(-1));
+
+	// switch version in place: keep everything after the game segment (scene, FSM path, query, hash)
+	function setVersion(v: string) {
+		const prefix = `${base}/${encodeURIComponent(page.params.game ?? '')}`;
+		const path = page.url.pathname;
+		const tail = path.startsWith(prefix) ? path.slice(prefix.length) : '';
+		const target = gameSegment({ game, version: v === latest ? null : v });
+		goto(`${base}/${target}${tail}${page.url.search}${page.url.hash}`);
+	}
+
 	const indexQuery = createQuery(() => ({
-		queryKey: ['index', game],
-		queryFn: () => fetchIndex(game)
+		queryKey: ['index', gameRef.game, gameRef.version],
+		queryFn: () => fetchIndex(gameRef)
 	}));
 	const entries = $derived(indexQuery.data ?? []);
 
@@ -42,12 +54,12 @@
 	const query = $derived(page.url.searchParams.get('q') ?? '');
 
 	const sceneNamesQuery = createQuery(() => ({
-		queryKey: ['sceneNames', game],
-		queryFn: () => fetchSceneNames(game)
+		queryKey: ['sceneNames', gameRef.game, gameRef.version],
+		queryFn: () => fetchSceneNames(gameRef)
 	}));
 	const sceneTitle = (file: string) => sceneNamesQuery.data?.get(file) ?? sceneLabel(file);
 
-	const sceneHref = $derived(scene ? `${base}/${game}/${encodePath(scene)}` : '');
+	const sceneHref = $derived(scene ? `${base}/${segment}/${encodePath(scene)}` : '');
 	// the FSM name shown in the breadcrumb (drop the disambiguating ":n" suffix)
 	const fsmCrumb = $derived(isDetail ? rest[rest.length - 1].replace(/:\d+$/, '') : '');
 
@@ -104,26 +116,45 @@
 
 <svelte:window onkeydown={onKeydown} />
 
+<!-- rendered beside the game buttons on wide screens and in the crumb row on phones -->
+{#snippet versionSelect(placement: 'wide' | 'narrow')}
+	{#if versions.length > 1}
+		<select
+			class="version {placement}"
+			title="game version"
+			value={gameRef.version ?? latest}
+			onchange={(e) => setVersion(e.currentTarget.value)}
+		>
+			{#each [...versions].reverse() as v (v)}
+				<option value={v}>{v}</option>
+			{/each}
+		</select>
+	{/if}
+{/snippet}
+
 <header>
 	<div class="topline">
-		<a class="home" href="{base}/{game}"><h1>PlayMaker FSM browser</h1></a>
-		<div class="games">
-			{#each GAMES as g (g.id)}
-				<a
-					class="gamebtn"
-					class:active={game === g.id}
-					title={g.label}
-					href="{base}/{g.id}{query ? `?q=${encodeURIComponent(query)}` : ''}"
-				>
-					<span class="lbl-long">{g.label}</span>
-					<span class="lbl-short">{g.short}</span>
-				</a>
-			{/each}
+		<a class="home" href="{base}/{segment}"><h1>PlayMaker FSM browser</h1></a>
+		<div class="switch">
+			<div class="games">
+				{#each GAMES as g (g.id)}
+					<a
+						class="gamebtn"
+						class:active={game === g.id}
+						title={g.label}
+						href="{base}/{g.id}{query ? `?q=${encodeURIComponent(query)}` : ''}"
+					>
+						<span class="lbl-long">{g.label}</span>
+						<span class="lbl-short">{g.short}</span>
+					</a>
+				{/each}
+			</div>
+			{@render versionSelect('wide')}
 		</div>
 	</div>
 
 	<nav class="crumbs">
-		<a class="crumb" class:active={scene === null} href="{base}/{game}">{gameLabel}</a>
+		<a class="crumb" class:active={scene === null} href="{base}/{segment}">{gameLabel}</a>
 		{#if scene !== null}
 			<span class="sep">›</span>
 			{#if isDetail}
@@ -134,6 +165,7 @@
 				<span class="crumb active" title={scene}>{sceneTitle(scene)}</span>
 			{/if}
 		{/if}
+		{@render versionSelect('narrow')}
 	</nav>
 
 	{#if !isDetail}
@@ -198,6 +230,43 @@
 		.lbl-short {
 			display: inline;
 		}
+	}
+	.switch {
+		display: flex;
+		align-items: center;
+		gap: 0.8rem;
+	}
+	.version {
+		background: none;
+		color: var(--fg);
+		opacity: 0.75;
+		border: none;
+		padding: 0;
+		font-size: 0.85rem;
+		text-align-last: right;
+		cursor: pointer;
+	}
+	.version.wide {
+		order: -1;
+	}
+	.version.narrow {
+		display: none;
+		margin-left: auto;
+	}
+	@media (max-width: 480px) {
+		.version.wide {
+			display: none;
+		}
+		.version.narrow {
+			display: block;
+		}
+	}
+	.version:hover {
+		opacity: 1;
+	}
+	.version option {
+		background: var(--panel);
+		color: var(--fg);
 	}
 	.gamebtn.active {
 		border-color: var(--accent);

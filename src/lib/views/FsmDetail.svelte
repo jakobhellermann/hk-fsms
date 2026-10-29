@@ -3,12 +3,12 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { fetchModel, fetchTooltips, isGame, type Game } from '$lib/data';
+	import { fetchModel, fetchTooltips, type GameRef } from '$lib/data';
 	import RawView from '$lib/views/RawView.svelte';
 	import PseudoView from '$lib/views/PseudoView.svelte';
 	import GraphView from '$lib/views/GraphView.svelte';
 
-	let { game, hash }: { game: Game; hash: string } = $props();
+	let { gameRef, hash }: { gameRef: GameRef; hash: string } = $props();
 
 	type Mode = 'raw' | 'pseudo' | 'graph';
 	const MODES: { id: Mode; label: string }[] = [
@@ -46,16 +46,15 @@
 	}
 
 	const modelQuery = createQuery(() => ({
-		queryKey: ['model', game, hash],
-		queryFn: () => fetchModel(game, hash),
-		enabled: isGame(game) && hash !== ''
+		queryKey: ['model', gameRef.game, hash],
+		queryFn: () => fetchModel(gameRef.game, hash),
+		enabled: hash !== ''
 	}));
 
-	// per-game action tooltips — immutable per game, so cache forever (like the model content)
+	// immutable per version, so cache forever (like the model content)
 	const tooltipsQuery = createQuery(() => ({
-		queryKey: ['tooltips', game],
-		queryFn: () => fetchTooltips(game),
-		enabled: isGame(game),
+		queryKey: ['tooltips', gameRef.game, gameRef.version],
+		queryFn: () => fetchTooltips(gameRef),
 		staleTime: Infinity
 	}));
 	const tooltips = $derived(tooltipsQuery.data ?? {});

@@ -1,7 +1,15 @@
 import { base } from '$app/paths';
 import { expandIndex, type CompactIndex, type FsmModel, type IndexEntry } from './model';
-export { type Game, type Favorite, GAMES, DEFAULT_GAME, isGame, favoritesFor } from './config';
-import { type Game } from './config';
+export {
+	type Game,
+	type Favorite,
+	GAMES,
+	DEFAULT_GAME,
+	isGame,
+	favoritesFor,
+	versionsFor
+} from './config';
+import { type Game, DEFAULT_GAME, isGame, versionsFor } from './config';
 import type { Tooltips } from './tooltips';
 export type { Tooltips, ActionTip } from './tooltips';
 
@@ -24,25 +32,50 @@ export function encodePath(p: string): string {
 	return p.split('/').map(encodeURIComponent).join('/');
 }
 
-export async function fetchIndex(game: Game): Promise<IndexEntry[]> {
-	const r = await fetch(`${base}/data/${game}/index.json`);
-	if (!r.ok) throw new Error(`index ${game}: ${r.status}`);
+/** A game at one of its indexed versions; `version: null` is the latest. */
+export type GameRef = { game: Game; version: string | null };
+
+/** Parse the `[game]` route segment: `hk` (latest version) or `hk-1.4.3.2`. */
+export function parseGameRef(segment: string | undefined): GameRef {
+	const s = segment ?? '';
+	const dash = s.indexOf('-');
+	const id = dash < 0 ? s : s.slice(0, dash);
+	if (!isGame(id)) return { game: DEFAULT_GAME, version: null };
+	return { game: id, version: dash < 0 ? null : s.slice(dash + 1) };
+}
+
+export function gameSegment(ref: GameRef): string {
+	return ref.version === null ? ref.game : `${ref.game}-${ref.version}`;
+}
+
+/** data directory of a concrete version (resolving `null` to the latest) */
+function versionDir(ref: GameRef): string {
+	const versions = versionsFor(ref.game);
+	const version = ref.version ?? versions.at(-1);
+	if (version === undefined || !versions.includes(version))
+		throw new Error(`unknown version ${gameSegment(ref)}`);
+	return `${base}/data/${ref.game}/${version}`;
+}
+
+export async function fetchIndex(ref: GameRef): Promise<IndexEntry[]> {
+	const r = await fetch(`${versionDir(ref)}/index.json`);
+	if (!r.ok) throw new Error(`index ${gameSegment(ref)}: ${r.status}`);
 	return expandIndex((await r.json()) as CompactIndex);
 }
 
 // scene name per file (levelN → "Cliffs_03", bundle → "Dust_01"). Files without a scene
 // (sharedassets, resources.assets, non-scene bundles) simply have no entry.
-export async function fetchSceneNames(game: Game): Promise<Map<string, string>> {
-	const r = await fetch(`${base}/data/${game}/scenes.json`);
-	if (!r.ok) throw new Error(`scene names ${game}: ${r.status}`);
+export async function fetchSceneNames(ref: GameRef): Promise<Map<string, string>> {
+	const r = await fetch(`${versionDir(ref)}/scenes.json`);
+	if (!r.ok) throw new Error(`scene names ${gameSegment(ref)}: ${r.status}`);
 	const j = (await r.json()) as Record<string, string>;
 	return new Map(Object.entries(j));
 }
 
 // per-action `[Tooltip]` help text (class description + per-param). A game without an extracted
 // tooltips.json (e.g. an IL2CPP build) simply yields an empty map, so the UI shows no tooltips.
-export async function fetchTooltips(game: Game): Promise<Tooltips> {
-	const r = await fetch(`${base}/data/${game}/tooltips.json`);
+export async function fetchTooltips(ref: GameRef): Promise<Tooltips> {
+	const r = await fetch(`${versionDir(ref)}/tooltips.json`);
 	if (!r.ok) return {};
 	return (await r.json()) as Tooltips;
 }

@@ -3,30 +3,27 @@
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
 	import {
-		DEFAULT_GAME,
 		fetchIndex,
 		fsmSegments,
 		encodePath,
+		gameSegment,
 		goLeaf,
-		isGame,
+		parseGameRef,
 		resolveFsm,
-		resolveScenePath,
-		type Game
+		resolveScenePath
 	} from '$lib/data';
 	import type { IndexEntry } from '$lib/model';
 	import FsmDetail from '$lib/views/FsmDetail.svelte';
 
-	const game = $derived<Game>(
-		isGame(page.params.game ?? null) ? (page.params.game as Game) : DEFAULT_GAME
-	);
+	const gameRef = $derived(parseGameRef(page.params.game));
 	const query = $derived(page.url.searchParams.get('q') ?? '');
 
 	const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 	const byName = <T extends { name: string }>(a: T, b: T) => coll.compare(a.name, b.name);
 
 	const indexQuery = createQuery(() => ({
-		queryKey: ['index', game],
-		queryFn: () => fetchIndex(game)
+		queryKey: ['index', gameRef.game, gameRef.version],
+		queryFn: () => fetchIndex(gameRef)
 	}));
 	const entries = $derived(indexQuery.data ?? []);
 
@@ -46,7 +43,7 @@
 		return terms.every((t) => lower.includes(t));
 	};
 	const fsmHref = (e: IndexEntry) =>
-		`${base}/${game}/${fsmSegments(entries, e).map(encodePath).join('/')}`;
+		`${base}/${gameSegment(gameRef)}/${fsmSegments(entries, e).map(encodePath).join('/')}`;
 
 	type TreeNode = { name: string; children: Map<string, TreeNode>; fsms: IndexEntry[] };
 	const newNode = (name: string): TreeNode => ({ name, children: new Map(), fsms: [] });
@@ -117,7 +114,7 @@
 
 {#if rest.length}
 	{#if detailEntry}
-		<FsmDetail {game} hash={detailEntry.hash} />
+		<FsmDetail {gameRef} hash={detailEntry.hash} />
 	{:else if indexQuery.isPending}
 		<p class="msg dim">loading…</p>
 	{:else}

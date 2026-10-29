@@ -1,6 +1,7 @@
 /** Single source of truth for game identity in the frontend. */
 import { hkFavorites } from './favorites/hk';
 import { ssFavorites } from './favorites/ss';
+import indexerConfig from '../../indexer/config.json';
 
 export type Game = 'hk' | 'ss';
 
@@ -35,6 +36,13 @@ const GAME_IDS = new Set(GAMES.map((g) => g.id));
 
 export function isGame(s: string | null): s is Game {
 	return s !== null && GAME_IDS.has(s as Game);
+}
+
+/** indexed versions of a game, oldest first */
+export function versionsFor(game: Game): string[] {
+	const g = indexerConfig.games.find((g) => g.slug === game);
+	if (!g) throw new Error(`${game} is missing from indexer/config.json`);
+	return g.versions.map((v) => v.version);
 }
 
 /** curated favorites for a game (empty if none) */

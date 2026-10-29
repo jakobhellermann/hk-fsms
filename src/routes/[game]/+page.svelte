@@ -3,24 +3,22 @@
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
 	import {
-		GAMES,
-		DEFAULT_GAME,
 		fetchIndex,
 		fetchSceneNames,
 		favoritesFor,
 		fsmSegments,
 		encodePath,
-		isGame,
-		sceneLabel,
-		type Game
+		gameSegment,
+		parseGameRef,
+		sceneLabel
 	} from '$lib/data';
 	import { groupNamedScenes, groupOtherFiles, type SceneGroup } from '$lib/scenes';
 	import { untrack } from 'svelte';
 	import { isGroupOpen, setGroupOpen } from '$lib/openGroups';
 
-	const game = $derived<Game>(
-		isGame(page.params.game ?? null) ? (page.params.game as Game) : DEFAULT_GAME
-	);
+	const gameRef = $derived(parseGameRef(page.params.game));
+	const game = $derived(gameRef.game);
+	const segment = $derived(gameSegment(gameRef));
 	const query = $derived(page.url.searchParams.get('q') ?? '');
 
 	// debounced query for filtering — lets the input render the typed char before the heavy
@@ -36,14 +34,14 @@
 	const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 	const indexQuery = createQuery(() => ({
-		queryKey: ['index', game],
-		queryFn: () => fetchIndex(game)
+		queryKey: ['index', gameRef.game, gameRef.version],
+		queryFn: () => fetchIndex(gameRef)
 	}));
 	const entries = $derived(indexQuery.data ?? []);
 
 	const sceneNamesQuery = createQuery(() => ({
-		queryKey: ['sceneNames', game],
-		queryFn: () => fetchSceneNames(game)
+		queryKey: ['sceneNames', gameRef.game, gameRef.version],
+		queryFn: () => fetchSceneNames(gameRef)
 	}));
 	const sceneNames = $derived(sceneNamesQuery.data ?? new Map<string, string>());
 
@@ -55,7 +53,7 @@
 	};
 	const byFile = (a: { file: string }, b: { file: string }) => coll.compare(a.file, b.file);
 	const sceneHref = (s: SceneRow) =>
-		`${base}/${game}/${encodePath(s.file)}${s.contentMatch ? `?q=${encodeURIComponent(debouncedQuery.trim())}` : ''}`;
+		`${base}/${segment}/${encodePath(s.file)}${s.contentMatch ? `?q=${encodeURIComponent(debouncedQuery.trim())}` : ''}`;
 
 	type SceneRow = {
 		file: string;
@@ -118,7 +116,10 @@
 					if (!entries.some((x) => x.file === f.file)) return null;
 					path = encodePath(f.file);
 				}
-				return { name: f.name, href: `${base}/${game}/${path}${f.mode ? `?mode=${f.mode}` : ''}` };
+				return {
+					name: f.name,
+					href: `${base}/${segment}/${path}${f.mode ? `?mode=${f.mode}` : ''}`
+				};
 			})
 			.filter((f) => f !== null)
 	);

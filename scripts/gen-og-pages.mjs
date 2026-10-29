@@ -77,11 +77,14 @@ const skipped = [];
 for (const g of GAMES) {
 	const favorites = g.favorites ?? [];
 	if (!favorites.length) continue;
-	const indexPath = path.join(DATA, g.id, 'index.json');
-	if (!existsSync(indexPath)) {
-		console.warn(`gen-og-pages: ${indexPath} missing (data not unpacked?) — skipping ${g.id}`);
+	const versionsPath = path.join(DATA, g.id, 'versions.json');
+	if (!existsSync(versionsPath)) {
+		console.warn(`gen-og-pages: ${versionsPath} missing (data not unpacked?) — skipping ${g.id}`);
 		continue;
 	}
+	// favorites link to the bare game route, which shows the latest version
+	const versions = JSON.parse(await readFile(versionsPath, 'utf8'));
+	const indexPath = path.join(DATA, g.id, versions[versions.length - 1], 'index.json');
 	const entries = expandIndex(JSON.parse(await readFile(indexPath, 'utf8')));
 	// (scene display names not needed — favorite cards show just the name)
 	
