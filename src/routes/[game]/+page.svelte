@@ -10,7 +10,8 @@
 		encodePath,
 		gameSegment,
 		parseGameRef,
-		sceneLabel
+		sceneLabel,
+		sceneSegment
 	} from '$lib/data';
 	import { groupNamedScenes, groupOtherFiles, type SceneGroup } from '$lib/scenes';
 	import { untrack } from 'svelte';
@@ -53,7 +54,7 @@
 	};
 	const byFile = (a: { file: string }, b: { file: string }) => coll.compare(a.file, b.file);
 	const sceneHref = (s: SceneRow) =>
-		`${base}/${segment}/${encodePath(s.file)}${s.contentMatch ? `?q=${encodeURIComponent(debouncedQuery.trim())}` : ''}`;
+		`${base}/${segment}/${encodePath(sceneSegment(sceneNames, s.file))}${s.contentMatch ? `?q=${encodeURIComponent(debouncedQuery.trim())}` : ''}`;
 
 	type SceneRow = {
 		file: string;
@@ -110,11 +111,11 @@
 						(x) => x.file === f.file && x.game_object === (f.game_object ?? '') && x.name === f.fsm
 					);
 					if (!e) return null;
-					path = fsmSegments(entries, e).map(encodePath).join('/');
+					path = fsmSegments(entries, sceneNames, e).map(encodePath).join('/');
 				} else {
 					// scene favorite: link to the bundle's object tree (only if it has any FSMs)
 					if (!entries.some((x) => x.file === f.file)) return null;
-					path = encodePath(f.file);
+					path = encodePath(sceneSegment(sceneNames, f.file));
 				}
 				return {
 					name: f.name,

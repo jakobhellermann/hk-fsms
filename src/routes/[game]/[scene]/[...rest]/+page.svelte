@@ -4,6 +4,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import {
 		fetchIndex,
+		fetchSceneNames,
 		fsmSegments,
 		encodePath,
 		gameSegment,
@@ -27,9 +28,16 @@
 	}));
 	const entries = $derived(indexQuery.data ?? []);
 
-	// recover [scene, ...rest] from the params — a scene file may contain '/' (see resolveScenePath),
-	// so it can arrive split across the scene param and the head of rest
-	const path = $derived(resolveScenePath(entries, page.params.scene ?? '', page.params.rest ?? ''));
+	const sceneNamesQuery = createQuery(() => ({
+		queryKey: ['sceneNames', gameRef.game, gameRef.version],
+		queryFn: () => fetchSceneNames(gameRef)
+	}));
+	const sceneNames = $derived(sceneNamesQuery.data ?? new Map<string, string>());
+	const pending = $derived(indexQuery.isPending || sceneNamesQuery.isPending);
+
+	const path = $derived(
+		resolveScenePath(entries, sceneNames, page.params.scene ?? '', page.params.rest ?? '')
+	);
 	const scene = $derived(path.scene);
 	const rest = $derived(path.rest);
 
@@ -43,7 +51,7 @@
 		return terms.every((t) => lower.includes(t));
 	};
 	const fsmHref = (e: IndexEntry) =>
-		`${base}/${gameSegment(gameRef)}/${fsmSegments(entries, e).map(encodePath).join('/')}`;
+		`${base}/${gameSegment(gameRef)}/${fsmSegments(entries, sceneNames, e).map(encodePath).join('/')}`;
 
 	type TreeNode = { name: string; children: Map<string, TreeNode>; fsms: IndexEntry[] };
 	const newNode = (name: string): TreeNode => ({ name, children: new Map(), fsms: [] });
@@ -115,12 +123,12 @@
 {#if rest.length}
 	{#if detailEntry}
 		<FsmDetail {gameRef} hash={detailEntry.hash} />
-	{:else if indexQuery.isPending}
+	{:else if pending}
 		<p class="msg dim">loading…</p>
 	{:else}
 		<p class="msg err">no FSM at this path</p>
 	{/if}
-{:else if indexQuery.isPending}
+{:else if pending}
 	<p class="msg dim">loading…</p>
 {:else if indexQuery.isError}
 	<p class="msg err">{String(indexQuery.error)}</p>

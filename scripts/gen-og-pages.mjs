@@ -33,12 +33,13 @@ try {
 
 // --- mirror of data.ts/model.ts (kept in sync by hand; both are tiny and pure) ---
 const fsmKey = (e) => `${e.file}\0${e.game_object}\0${e.name}`;
-function fsmSegments(entries, e) {
+const sceneSegment = (sceneNames, file) => sceneNames[file] ?? file;
+function fsmSegments(entries, sceneNames, e) {
 	const group = entries.filter((x) => fsmKey(x) === fsmKey(e));
 	const ord = group.indexOf(e);
 	const name = ord > 0 ? `${e.name}:${ord}` : e.name;
 	const go = e.game_object ? e.game_object.split('/') : [];
-	return [e.file, ...go, name];
+	return [sceneSegment(sceneNames, e.file), ...go, name];
 }
 const expandIndex = (raw) =>
 	raw.e.map(([fi, name, game_object, hash], id) => ({ id, file: raw.f[fi], name, game_object, hash }));
@@ -84,10 +85,10 @@ for (const g of GAMES) {
 	}
 	// favorites link to the bare game route, which shows the latest version
 	const versions = JSON.parse(await readFile(versionsPath, 'utf8'));
-	const indexPath = path.join(DATA, g.id, versions[versions.length - 1], 'index.json');
-	const entries = expandIndex(JSON.parse(await readFile(indexPath, 'utf8')));
-	// (scene display names not needed — favorite cards show just the name)
-	
+	const versionDir = path.join(DATA, g.id, versions[versions.length - 1]);
+	const entries = expandIndex(JSON.parse(await readFile(path.join(versionDir, 'index.json'), 'utf8')));
+	const sceneNames = JSON.parse(await readFile(path.join(versionDir, 'scenes.json'), 'utf8'));
+
 	for (const f of favorites) {
 		let segments;
 		let fsmHash = null;
@@ -99,14 +100,14 @@ for (const g of GAMES) {
 				skipped.push(`${g.id}/${f.name} (fsm not found)`);
 				continue;
 			}
-			segments = fsmSegments(entries, e);
+			segments = fsmSegments(entries, sceneNames, e);
 				fsmHash = e.hash;
 		} else {
 			if (!entries.some((x) => x.file === f.file)) {
 				skipped.push(`${g.id}/${f.name} (scene empty)`);
 				continue;
 			}
-			segments = [f.file];
+			segments = [sceneSegment(sceneNames, f.file)];
 		}
 
 		const route = [g.id, ...segments]; // decoded segments = on-disk dir names GH Pages resolves to

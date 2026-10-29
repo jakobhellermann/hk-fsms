@@ -86,13 +86,26 @@ export async function fetchTooltips(ref: GameRef): Promise<Tooltips> {
 
 const fsmKey = (e: IndexEntry) => `${e.file}\0${e.game_object}\0${e.name}`;
 
+/**
+ * The URL segment naming a scene file: its scene name where it has one (stable across game versions,
+ * unlike `levelN`), else the file label. Scene names are unique per version (checked in
+ * `store.test.ts`).
+ */
+export function sceneSegment(sceneNames: Map<string, string>, file: string): string {
+	return sceneNames.get(file) ?? file;
+}
+
 /** path segments after the game for an entry: `[scene, ...gameObject parts, name(+":n" on collision)]` */
-export function fsmSegments(entries: IndexEntry[], e: IndexEntry): string[] {
+export function fsmSegments(
+	entries: IndexEntry[],
+	sceneNames: Map<string, string>,
+	e: IndexEntry
+): string[] {
 	const group = entries.filter((x) => fsmKey(x) === fsmKey(e));
 	const ord = group.indexOf(e);
 	const name = ord > 0 ? `${e.name}:${ord}` : e.name;
 	const go = e.game_object ? e.game_object.split('/') : [];
-	return [e.file, ...go, name];
+	return [sceneSegment(sceneNames, e.file), ...go, name];
 }
 
 /** resolve a tree path (`rest` = `[...gameObject parts, name]`) within a scene back to its entry */
@@ -115,15 +128,12 @@ export function resolveFsm(
 }
 
 /**
- * Recover the true `[scene, ...rest]` from raw route params. A scene/bundle file may itself contain
- * `/` (e.g. Silksong `scenes_scenes_scenes/foo.bundle`). The app links to such a file as a single URL
- * segment via `%2F`, but GitHub Pages decodes `%2F` back to `/` (and 301-redirects), so a
- * shared/redirected link arrives with the file split across `scene` and the head of `rest`. Recover
- * it by taking the shortest leading run of segments that names a real file in the index. Falls back
- * to the raw single-segment scene (e.g. while the index is still loading, or for a genuine miss).
+ * Recover `[scene file, ...rest]` from route params. Old links use file labels, which may contain `/`
+ * and so span several segments (e.g. Silksong `scenes_scenes_scenes/foo.bundle`).
  */
 export function resolveScenePath(
 	entries: IndexEntry[],
+	sceneNames: Map<string, string>,
 	sceneParam: string,
 	restParam: string
 ): { scene: string; rest: string[] } {
@@ -131,6 +141,9 @@ export function resolveScenePath(
 	// stub directory) would otherwise add an empty final segment, making resolveFsm look for name ""
 	const restSegs = restParam ? restParam.split('/').filter(Boolean) : [];
 	if (!sceneParam) return { scene: sceneParam, rest: restSegs };
+	for (const [file, name] of sceneNames) {
+		if (name === sceneParam) return { scene: file, rest: restSegs };
+	}
 	const segs = [sceneParam, ...restSegs];
 	const files = new Set(entries.map((e) => e.file));
 	for (let i = 1; i <= segs.length; i++) {

@@ -16,6 +16,26 @@ describe.each(games)('real store (%s)', (game) => {
 	const dir = resolve(`static/data/${game}`);
 	const hasData = existsSync(resolve(dir, 'versions.json'));
 
+	// scene names replace file labels in URLs, so each must name exactly one file
+	it.skipIf(!hasData)('scene names are unambiguous URL segments in every version', () => {
+		const versions: string[] = JSON.parse(readFileSync(resolve(dir, 'versions.json'), 'utf8'));
+		const ambiguous: string[] = [];
+		for (const v of versions) {
+			const names: Record<string, string> = JSON.parse(
+				readFileSync(resolve(dir, v, 'scenes.json'), 'utf8')
+			);
+			const files = new Set<string>(
+				JSON.parse(readFileSync(resolve(dir, v, 'index.json'), 'utf8')).f
+			);
+			const seen = new Set<string>();
+			for (const name of Object.values(names)) {
+				if (seen.has(name) || files.has(name)) ambiguous.push(`${v}: ${name}`);
+				seen.add(name);
+			}
+		}
+		expect(ambiguous).toEqual([]);
+	});
+
 	describe.skipIf(!hasData)('sample', () => {
 		const versions: string[] = JSON.parse(readFileSync(resolve(dir, 'versions.json'), 'utf8'));
 		const latest = versions[versions.length - 1];

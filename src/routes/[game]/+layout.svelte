@@ -12,6 +12,7 @@
 		parseGameRef,
 		resolveScenePath,
 		sceneLabel,
+		sceneSegment,
 		versionsFor
 	} from '$lib/data';
 
@@ -40,11 +41,17 @@
 	}));
 	const entries = $derived(indexQuery.data ?? []);
 
-	// recover [scene, ...rest]; a scene file may contain '/' and arrive split across the params
-	// (see resolveScenePath). Empty scene param → the game index page (no scene selected).
+	const sceneNamesQuery = createQuery(() => ({
+		queryKey: ['sceneNames', gameRef.game, gameRef.version],
+		queryFn: () => fetchSceneNames(gameRef)
+	}));
+	const sceneNames = $derived(sceneNamesQuery.data ?? new Map<string, string>());
+	const sceneTitle = (file: string) => sceneNames.get(file) ?? sceneLabel(file);
+
+	// no scene param: the game index page
 	const resolved = $derived(
 		page.params.scene
-			? resolveScenePath(entries, page.params.scene, page.params.rest ?? '')
+			? resolveScenePath(entries, sceneNames, page.params.scene, page.params.rest ?? '')
 			: { scene: null as string | null, rest: [] as string[] }
 	);
 	const scene = $derived(resolved.scene);
@@ -53,13 +60,9 @@
 	const isDetail = $derived(scene !== null && rest.length > 0);
 	const query = $derived(page.url.searchParams.get('q') ?? '');
 
-	const sceneNamesQuery = createQuery(() => ({
-		queryKey: ['sceneNames', gameRef.game, gameRef.version],
-		queryFn: () => fetchSceneNames(gameRef)
-	}));
-	const sceneTitle = (file: string) => sceneNamesQuery.data?.get(file) ?? sceneLabel(file);
-
-	const sceneHref = $derived(scene ? `${base}/${segment}/${encodePath(scene)}` : '');
+	const sceneHref = $derived(
+		scene ? `${base}/${segment}/${encodePath(sceneSegment(sceneNames, scene))}` : ''
+	);
 	// the FSM name shown in the breadcrumb (drop the disambiguating ":n" suffix)
 	const fsmCrumb = $derived(isDetail ? rest[rest.length - 1].replace(/:\d+$/, '') : '');
 
