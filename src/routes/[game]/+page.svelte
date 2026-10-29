@@ -10,8 +10,10 @@
 		encodePath,
 		gameSegment,
 		parseGameRef,
+		sceneFile,
 		sceneLabel,
-		sceneSegment
+		sceneSegment,
+		versionsFor
 	} from '$lib/data';
 	import { groupNamedScenes, groupOtherFiles, type SceneGroup } from '$lib/scenes';
 	import { untrack } from 'svelte';
@@ -102,20 +104,21 @@
 	// curated quick-links (e.g. named bosses) resolved against the index to real FSM URLs; filtered by
 	// the same search terms as the scenes, and dropped silently if the target FSM no longer exists
 	const favorites = $derived(
-		favoritesFor(game)
+		favoritesFor(game, gameRef.version ?? versionsFor(game).at(-1)!)
 			.filter((f) => match(f.name))
 			.map((f) => {
 				let path: string;
+				const file = sceneFile(sceneNames, f.scene);
 				if (f.fsm) {
 					const e = entries.find(
-						(x) => x.file === f.file && x.game_object === (f.game_object ?? '') && x.name === f.fsm
+						(x) => x.file === file && x.game_object === (f.game_object ?? '') && x.name === f.fsm
 					);
 					if (!e) return null;
 					path = fsmSegments(entries, sceneNames, e).map(encodePath).join('/');
 				} else {
 					// scene favorite: link to the bundle's object tree (only if it has any FSMs)
-					if (!entries.some((x) => x.file === f.file)) return null;
-					path = encodePath(sceneSegment(sceneNames, f.file));
+					if (!entries.some((x) => x.file === file)) return null;
+					path = encodePath(sceneSegment(sceneNames, file));
 				}
 				return {
 					name: f.name,

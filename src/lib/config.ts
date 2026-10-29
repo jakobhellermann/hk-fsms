@@ -13,14 +13,16 @@ export type Game = 'hk' | 'ss';
 export type Favorite = {
 	/** display name, e.g. the boss's in-game name */
 	name: string;
-	/** the scene/bundle file (the `[scene]` URL segment) */
-	file: string;
+	/** the `[scene]` URL segment: a scene name (stable across versions), or the file label of a file without one */
+	scene: string;
 	/** GameObject hierarchy path of the FSM component; omit (with `fsm`) to link to the scene tree */
 	game_object?: string;
 	/** FSM (PlayMakerFSM) name; omit to link to the scene/bundle tree instead of a single FSM */
 	fsm?: string;
 	/** optional view mode (`?mode=`), e.g. 'graph' */
 	mode?: string;
+	/** per game version: where the FSM lives in versions that place it elsewhere */
+	overrides?: Record<string, Pick<Favorite, 'scene' | 'game_object'>>;
 };
 
 export type GameDef = { id: Game; label: string; short: string; favorites?: Favorite[] };
@@ -45,7 +47,8 @@ export function versionsFor(game: Game): string[] {
 	return g.versions.map((v) => v.version);
 }
 
-/** curated favorites for a game (empty if none) */
-export function favoritesFor(game: Game): Favorite[] {
-	return GAMES.find((g) => g.id === game)?.favorites ?? [];
+/** curated favorites for a game at a version (empty if none), with that version's overrides applied */
+export function favoritesFor(game: Game, version: string): Favorite[] {
+	const favorites = GAMES.find((g) => g.id === game)?.favorites ?? [];
+	return favorites.map((f) => ({ ...f, ...f.overrides?.[version] }));
 }

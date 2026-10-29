@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import { fmtValue } from './fmt';
 import { actionTokens } from './pseudo';
 import { expandIndex, type FsmModel, type IndexEntry, type Param } from './model';
+import { GAMES } from './config';
+import { sceneFile } from './scenes';
 
 // Runs against the real content store (the gitignored static/data symlink → ../playmakerfsm/out).
 // Skips cleanly in environments without the data (e.g. fresh CI).
@@ -34,6 +36,25 @@ describe.each(games)('real store (%s)', (game) => {
 			}
 		}
 		expect(ambiguous).toEqual([]);
+	});
+
+	it.skipIf(!hasData)('favorite overrides point at an FSM of their version', () => {
+		const unresolved: string[] = [];
+		for (const fav of GAMES.find((g) => g.id === game)?.favorites ?? []) {
+			for (const [v, target] of Object.entries(fav.overrides ?? {})) {
+				const names: Record<string, string> = JSON.parse(
+					readFileSync(resolve(dir, v, 'scenes.json'), 'utf8')
+				);
+				const index = expandIndex(JSON.parse(readFileSync(resolve(dir, v, 'index.json'), 'utf8')));
+				const file = sceneFile(new Map(Object.entries(names)), target.scene);
+				const go = target.game_object ?? fav.game_object ?? '';
+				const found = index.some(
+					(e) => e.file === file && e.game_object === go && (!fav.fsm || e.name === fav.fsm)
+				);
+				if (!found) unresolved.push(`${v}: ${fav.name}`);
+			}
+		}
+		expect(unresolved).toEqual([]);
 	});
 
 	describe.skipIf(!hasData)('sample', () => {

@@ -34,6 +34,8 @@ try {
 // --- mirror of data.ts/model.ts (kept in sync by hand; both are tiny and pure) ---
 const fsmKey = (e) => `${e.file}\0${e.game_object}\0${e.name}`;
 const sceneSegment = (sceneNames, file) => sceneNames[file] ?? file;
+const sceneFile = (sceneNames, segment) =>
+	Object.keys(sceneNames).find((file) => sceneNames[file] === segment) ?? segment;
 function fsmSegments(entries, sceneNames, e) {
 	const group = entries.filter((x) => fsmKey(x) === fsmKey(e));
 	const ord = group.indexOf(e);
@@ -94,7 +96,7 @@ for (const g of GAMES) {
 		let fsmHash = null;
 		if (f.fsm) {
 			const e = entries.find(
-				(x) => x.file === f.file && x.game_object === (f.game_object ?? '') && x.name === f.fsm
+				(x) => x.file === sceneFile(sceneNames, f.scene) && x.game_object === (f.game_object ?? '') && x.name === f.fsm
 			);
 			if (!e) {
 				skipped.push(`${g.id}/${f.name} (fsm not found)`);
@@ -103,11 +105,11 @@ for (const g of GAMES) {
 			segments = fsmSegments(entries, sceneNames, e);
 				fsmHash = e.hash;
 		} else {
-			if (!entries.some((x) => x.file === f.file)) {
+			if (!entries.some((x) => x.file === sceneFile(sceneNames, f.scene))) {
 				skipped.push(`${g.id}/${f.name} (scene empty)`);
 				continue;
 			}
-			segments = [sceneSegment(sceneNames, f.file)];
+			segments = [f.scene];
 		}
 
 		const route = [g.id, ...segments]; // decoded segments = on-disk dir names GH Pages resolves to

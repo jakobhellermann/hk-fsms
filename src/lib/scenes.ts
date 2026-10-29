@@ -68,3 +68,16 @@ export function groupOtherFiles<T extends SceneRowLike>(rows: T[]): SceneGroup<T
 		(items) => items.length > 1
 	);
 }
+
+/** URL segment for a scene file: its scene name (stable across versions, unlike `levelN`), else the file label */
+export function sceneSegment(sceneNames: Map<string, string>, file: string): string {
+	return sceneNames.get(file) ?? file;
+}
+
+/** the file a `[scene]` URL segment names (inverse of `sceneSegment`) */
+export function sceneFile(sceneNames: Map<string, string>, segment: string): string {
+	for (const [file, name] of sceneNames) {
+		if (name === segment) return file;
+	}
+	return segment;
+}

@@ -14,7 +14,8 @@ import type { Tooltips } from './tooltips';
 export type { Tooltips, ActionTip } from './tooltips';
 
 // scene-name display/grouping helpers live in `scenes.ts` (kept free of `$app` so they're unit-testable)
-export { sceneLabel } from './scenes';
+export { sceneLabel, sceneSegment, sceneFile } from './scenes';
+import { sceneSegment, sceneFile } from './scenes';
 
 /** leaf name of a `/`-separated GameObject hierarchy path */
 export function goLeaf(path: string): string {
@@ -86,15 +87,6 @@ export async function fetchTooltips(ref: GameRef): Promise<Tooltips> {
 
 const fsmKey = (e: IndexEntry) => `${e.file}\0${e.game_object}\0${e.name}`;
 
-/**
- * The URL segment naming a scene file: its scene name where it has one (stable across game versions,
- * unlike `levelN`), else the file label. Scene names are unique per version (checked in
- * `store.test.ts`).
- */
-export function sceneSegment(sceneNames: Map<string, string>, file: string): string {
-	return sceneNames.get(file) ?? file;
-}
-
 /** path segments after the game for an entry: `[scene, ...gameObject parts, name(+":n" on collision)]` */
 export function fsmSegments(
 	entries: IndexEntry[],
@@ -141,9 +133,8 @@ export function resolveScenePath(
 	// stub directory) would otherwise add an empty final segment, making resolveFsm look for name ""
 	const restSegs = restParam ? restParam.split('/').filter(Boolean) : [];
 	if (!sceneParam) return { scene: sceneParam, rest: restSegs };
-	for (const [file, name] of sceneNames) {
-		if (name === sceneParam) return { scene: file, rest: restSegs };
-	}
+	const named = sceneFile(sceneNames, sceneParam);
+	if (named !== sceneParam) return { scene: named, rest: restSegs };
 	const segs = [sceneParam, ...restSegs];
 	const files = new Set(entries.map((e) => e.file));
 	for (let i = 1; i <= segs.length; i++) {

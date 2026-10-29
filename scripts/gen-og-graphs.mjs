@@ -137,13 +137,16 @@ async function main() {
 		}
 		// favorites link to the bare game route, which shows the latest version
 		const versions = JSON.parse(await readFile(versionsPath, 'utf8'));
-		const indexPath = path.join(DATA, g.id, versions[versions.length - 1], 'index.json');
-		const entries = expandIndex(JSON.parse(await readFile(indexPath, 'utf8')));
+		const versionDir = path.join(DATA, g.id, versions[versions.length - 1]);
+		const entries = expandIndex(JSON.parse(await readFile(path.join(versionDir, 'index.json'), 'utf8')));
+		const sceneNames = JSON.parse(await readFile(path.join(versionDir, 'scenes.json'), 'utf8'));
+		// a favorite's `scene` is a scene name, or the file label of a file without one
+		const sceneFile = (scene) => Object.keys(sceneNames).find((file) => sceneNames[file] === scene) ?? scene;
 
 		for (const f of favorites) {
 			favoritesWithFsm++;
 			const e = entries.find(
-				(x) => x.file === f.file && x.game_object === (f.game_object ?? '') && x.name === f.fsm
+				(x) => x.file === sceneFile(f.scene) && x.game_object === (f.game_object ?? '') && x.name === f.fsm
 			);
 			if (!e) {
 				skipped.push(`${g.id}/${f.name} (fsm not found)`);
