@@ -5,8 +5,10 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::io::IsTerminal as _;
 use std::path::Path;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context as _, Result};
 use playmakerfsm::component::ComponentFsm;
@@ -128,17 +130,24 @@ pub fn scan_game(
                 });
             }
 
-            if !local.is_empty() {
-                eprintln!("  {file_label}: {} fsms", local.len());
-            }
             entries.lock().unwrap().extend(local);
             Ok(())
         };
 
+    let progress = std::io::stderr().is_terminal();
+    let done = AtomicUsize::new(0);
     sources.par_iter().try_for_each(|source| -> Result<()> {
         let label = source.label();
-        source.for_each_file(&env, |handle| scan(label.clone(), handle))
+        source.for_each_file(&env, |handle| scan(label.clone(), handle))?;
+        let done = done.fetch_add(1, Ordering::Relaxed) + 1;
+        if progress {
+            eprint!("\r{done}/{}", sources.len());
+        }
+        Ok(())
     })?;
+    if progress {
+        eprintln!();
+    }
 
     let mut entries = entries.into_inner().unwrap();
     entries.sort_by(|a, b| (&a.name, &a.file, a.path_id).cmp(&(&b.name, &b.file, b.path_id)));

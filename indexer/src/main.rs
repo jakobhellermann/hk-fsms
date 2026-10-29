@@ -31,9 +31,15 @@ fn main() -> Result<()> {
         std::fs::create_dir_all(&content_dir)?;
         let written = Mutex::new(BTreeSet::new());
 
-        for version in &game.versions {
+        for (i, version) in game.versions.iter().enumerate() {
             let start = std::time::Instant::now();
-            eprintln!("\n=== {} {} ===", game.slug, version.version);
+            eprintln!(
+                "\n=== {} {} ({}/{}) ===",
+                game.slug,
+                version.version,
+                i + 1,
+                game.versions.len()
+            );
 
             let depot_dir = Path::new(&config.root)
                 .join(game.appid.to_string())
