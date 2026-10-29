@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { fetchModel, fetchTooltips, type GameRef } from '$lib/data';
+	import { fetchModel, fetchTooltips, type GameRef, keepWithinGame } from '$lib/data';
 	import RawView from '$lib/views/RawView.svelte';
 	import PseudoView from '$lib/views/PseudoView.svelte';
 	import GraphView from '$lib/views/GraphView.svelte';
@@ -47,6 +47,7 @@
 
 	const modelQuery = createQuery(() => ({
 		queryKey: ['model', gameRef.game, hash],
+		placeholderData: keepWithinGame(gameRef.game),
 		queryFn: () => fetchModel(gameRef.game, hash),
 		enabled: hash !== ''
 	}));
@@ -54,6 +55,7 @@
 	// immutable per version, so cache forever (like the model content)
 	const tooltipsQuery = createQuery(() => ({
 		queryKey: ['tooltips', gameRef.game, gameRef.version],
+		placeholderData: keepWithinGame(gameRef.game),
 		queryFn: () => fetchTooltips(gameRef),
 		staleTime: Infinity
 	}));

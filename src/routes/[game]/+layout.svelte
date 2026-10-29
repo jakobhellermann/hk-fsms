@@ -13,7 +13,8 @@
 		resolveScenePath,
 		sceneLabel,
 		sceneSegment,
-		versionsFor
+		versionsFor,
+		keepWithinGame
 	} from '$lib/data';
 
 	let { children } = $props();
@@ -37,12 +38,14 @@
 
 	const indexQuery = createQuery(() => ({
 		queryKey: ['index', gameRef.game, gameRef.version],
+		placeholderData: keepWithinGame(gameRef.game),
 		queryFn: () => fetchIndex(gameRef)
 	}));
 	const entries = $derived(indexQuery.data ?? []);
 
 	const sceneNamesQuery = createQuery(() => ({
 		queryKey: ['sceneNames', gameRef.game, gameRef.version],
+		placeholderData: keepWithinGame(gameRef.game),
 		queryFn: () => fetchSceneNames(gameRef)
 	}));
 	const sceneNames = $derived(sceneNamesQuery.data ?? new Map<string, string>());

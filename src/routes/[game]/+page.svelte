@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
-	import { createQuery } from '@tanstack/svelte-query';
+	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import {
 		fetchIndex,
 		fetchSceneNames,
@@ -13,7 +13,8 @@
 		sceneFile,
 		sceneLabel,
 		sceneSegment,
-		versionsFor
+		versionsFor,
+		keepWithinGame
 	} from '$lib/data';
 	import { groupNamedScenes, groupOtherFiles, type SceneGroup } from '$lib/scenes';
 	import { untrack } from 'svelte';
@@ -36,17 +37,29 @@
 
 	const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-	const indexQuery = createQuery(() => ({
-		queryKey: ['index', gameRef.game, gameRef.version],
-		queryFn: () => fetchIndex(gameRef)
+	// index and scene names as one query, so favorites and scene names never mix two versions while
+	// another version loads
+	const client = useQueryClient();
+	const versionQuery = createQuery(() => ({
+		queryKey: ['versionData', gameRef.game, gameRef.version],
+		placeholderData: keepWithinGame(gameRef.game),
+		queryFn: async () => {
+			const ref = gameRef;
+			const [entries, sceneNames] = await Promise.all([
+				client.fetchQuery({
+					queryKey: ['index', ref.game, ref.version],
+					queryFn: () => fetchIndex(ref)
+				}),
+				client.fetchQuery({
+					queryKey: ['sceneNames', ref.game, ref.version],
+					queryFn: () => fetchSceneNames(ref)
+				})
+			]);
+			return { version: ref.version ?? versionsFor(ref.game).at(-1)!, entries, sceneNames };
+		}
 	}));
-	const entries = $derived(indexQuery.data ?? []);
-
-	const sceneNamesQuery = createQuery(() => ({
-		queryKey: ['sceneNames', gameRef.game, gameRef.version],
-		queryFn: () => fetchSceneNames(gameRef)
-	}));
-	const sceneNames = $derived(sceneNamesQuery.data ?? new Map<string, string>());
+	const entries = $derived(versionQuery.data?.entries ?? []);
+	const sceneNames = $derived(versionQuery.data?.sceneNames ?? new Map<string, string>());
 
 	const terms = $derived(debouncedQuery.trim().toLowerCase().split(/\s+/));
 	const match = (s: string) => {
@@ -104,7 +117,7 @@
 	// curated quick-links (e.g. named bosses) resolved against the index to real FSM URLs; filtered by
 	// the same search terms as the scenes, and dropped silently if the target FSM no longer exists
 	const favorites = $derived(
-		favoritesFor(game, gameRef.version ?? versionsFor(game).at(-1)!)
+		favoritesFor(game, versionQuery.data?.version ?? '')
 			.filter((f) => match(f.name))
 			.map((f) => {
 				let path: string;
@@ -163,15 +176,15 @@
 	</ul>
 {/snippet}
 
-{#if indexQuery.isPending}
+{#if versionQuery.isPending}
 	<p class="msg dim">loading…</p>
-{:else if indexQuery.isError}
-	<p class="msg err">{String(indexQuery.error)}</p>
+{:else if versionQuery.isError}
+	<p class="msg err">{String(versionQuery.error)}</p>
 {:else}
 	{#if favorites.length}
 		<section class="favorites">
 			<ul class="favlist">
-				{#each favorites as f (f.href)}
+				{#each favorites as f (f.name)}
 					<li><a class="favlink" href={f.href}>{f.name}</a></li>
 				{/each}
 			</ul>

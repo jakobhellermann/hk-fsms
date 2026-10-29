@@ -58,6 +58,15 @@ function versionDir(ref: GameRef): string {
 	return `${base}/data/${ref.game}/${version}`;
 }
 
+/**
+ * `placeholderData` that keeps showing the previous key's data while another version of the same game
+ * loads, instead of flashing a loading state.
+ */
+export function keepWithinGame(game: Game) {
+	return <T>(previous: T | undefined, previousQuery?: { queryKey: readonly unknown[] }) =>
+		previousQuery?.queryKey[1] === game ? previous : undefined;
+}
+
 export async function fetchIndex(ref: GameRef): Promise<IndexEntry[]> {
 	const r = await fetch(`${versionDir(ref)}/index.json`);
 	if (!r.ok) throw new Error(`index ${gameSegment(ref)}: ${r.status}`);

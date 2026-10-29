@@ -11,7 +11,8 @@
 		goLeaf,
 		parseGameRef,
 		resolveFsm,
-		resolveScenePath
+		resolveScenePath,
+		keepWithinGame
 	} from '$lib/data';
 	import type { IndexEntry } from '$lib/model';
 	import FsmDetail from '$lib/views/FsmDetail.svelte';
@@ -24,12 +25,14 @@
 
 	const indexQuery = createQuery(() => ({
 		queryKey: ['index', gameRef.game, gameRef.version],
+		placeholderData: keepWithinGame(gameRef.game),
 		queryFn: () => fetchIndex(gameRef)
 	}));
 	const entries = $derived(indexQuery.data ?? []);
 
 	const sceneNamesQuery = createQuery(() => ({
 		queryKey: ['sceneNames', gameRef.game, gameRef.version],
+		placeholderData: keepWithinGame(gameRef.game),
 		queryFn: () => fetchSceneNames(gameRef)
 	}));
 	const sceneNames = $derived(sceneNamesQuery.data ?? new Map<string, string>());
