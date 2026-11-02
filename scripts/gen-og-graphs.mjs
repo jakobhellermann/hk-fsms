@@ -44,7 +44,7 @@ const BUILD_OUT = 'build/og';
 
 // concrete palette (src/app.css :root) — a standalone SVG can't resolve the app's CSS vars
 const VARS = {
-	'--bg': '#1a1b1e',
+	'--bg': '#141417',
 	'--panel': '#232428',
 	'--fg': '#e6e6e6',
 	'--dim': '#8b8d92',
