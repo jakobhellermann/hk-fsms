@@ -11,6 +11,7 @@ export {
 } from './config';
 import { type Game, DEFAULT_GAME, isGame, versionsFor } from './config';
 import type { Tooltips } from './tooltips';
+import type { HNode } from './colliders';
 export type { Tooltips, ActionTip } from './tooltips';
 
 // scene-name display/grouping helpers live in `scenes.ts` (kept free of `$app` so they're unit-testable)
@@ -151,6 +152,12 @@ export function resolveScenePath(
 		if (files.has(candidate)) return { scene: candidate, rest: segs.slice(i) };
 	}
 	return { scene: sceneParam, rest: restSegs };
+}
+
+export async function fetchHierarchy(game: Game, hash: string): Promise<HNode> {
+	const r = await fetch(`${base}/data/${game}/content/${hash}.json`);
+	if (!r.ok) throw new Error(`hierarchy ${hash}: ${r.status}`);
+	return r.json();
 }
 
 export async function fetchModel(game: Game, hash: string): Promise<FsmModel> {

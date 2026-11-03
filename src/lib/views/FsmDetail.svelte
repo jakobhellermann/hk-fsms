@@ -3,20 +3,64 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { fetchModel, fetchTooltips, type GameRef, keepWithinGame } from '$lib/data';
+	import {
+		fetchHierarchy,
+		fetchModel,
+		fetchTooltips,
+		type GameRef,
+		keepWithinGame
+	} from '$lib/data';
 	import RawView from '$lib/views/RawView.svelte';
 	import PseudoView from '$lib/views/PseudoView.svelte';
 	import GraphView from '$lib/views/GraphView.svelte';
+	import CollidersView from '$lib/views/CollidersView.svelte';
+	import { setContext } from 'svelte';
+	import { COLLIDER_LINKS, type ColliderLinks, nodePaths } from '$lib/colliders';
 
-	let { gameRef, hash }: { gameRef: GameRef; hash: string } = $props();
+	let {
+		gameRef,
+		hash,
+		hierarchy,
+		owner
+	}: { gameRef: GameRef; hash: string; hierarchy: string | null; owner: string } = $props();
 
-	type Mode = 'raw' | 'pseudo' | 'graph';
+	// links from actions to the colliders view, with the referenced objects selected. The hierarchy
+	// (shared with the colliders view's query) tells which references have colliders to show.
+	const colliderTargets = $derived(page.url.searchParams.getAll('collider'));
+	const hierarchyQuery = createQuery(() => ({
+		queryKey: ['hierarchy', gameRef.game, hierarchy],
+		queryFn: () => fetchHierarchy(gameRef.game, hierarchy!),
+		enabled: hierarchy !== null,
+		staleTime: Infinity
+	}));
+	const linkable = $derived(
+		hierarchyQuery.data && hierarchy !== null
+			? nodePaths(hierarchyQuery.data, owner)
+			: new Set<string>()
+	);
+	setContext<ColliderLinks>(COLLIDER_LINKS, {
+		get owner() {
+			return owner;
+		},
+		known: (target) => linkable.has(target.endsWith('/*') ? target.slice(0, -2) : target),
+		href: (targets) => {
+			const p = new URLSearchParams(page.url.searchParams);
+			p.set('mode', 'colliders');
+			p.delete('collider');
+			for (const t of targets) p.append('collider', t);
+			return `${page.url.pathname}?${p}`;
+		}
+	});
+
+	type Mode = 'raw' | 'pseudo' | 'graph' | 'colliders';
 	const MODES: { id: Mode; label: string }[] = [
 		{ id: 'graph', label: 'graph' },
 		{ id: 'pseudo', label: 'pseudocode' },
-		{ id: 'raw', label: 'raw' }
+		{ id: 'raw', label: 'raw' },
+		{ id: 'colliders', label: 'colliders' }
 	];
-	const isMode = (s: string | null): s is Mode => s === 'raw' || s === 'pseudo' || s === 'graph';
+	const isMode = (s: string | null): s is Mode =>
+		s === 'raw' || s === 'pseudo' || s === 'graph' || s === 'colliders';
 
 	// view mode is a global preference (localStorage), overridable per-FSM via ?mode=
 	const STORAGE_KEY = 'fsm:view-mode';
@@ -24,9 +68,15 @@
 	if (browser && isMode(localStorage.getItem(STORAGE_KEY)))
 		stored = localStorage.getItem(STORAGE_KEY) as Mode;
 	const urlMode = $derived(page.url.searchParams.get('mode'));
-	const mode = $derived<Mode>(isMode(urlMode) ? urlMode : stored);
+	// FSMs whose owner has no collider data offer no colliders mode
+	const modes = $derived(hierarchy === null ? MODES.filter((m) => m.id !== 'colliders') : MODES);
+	const mode = $derived.by<Mode>(() => {
+		const m = isMode(urlMode) ? urlMode : stored;
+		return m === 'colliders' && hierarchy === null ? 'graph' : m;
+	});
 	$effect(() => {
-		if (browser && isMode(urlMode) && urlMode !== stored) {
+		// following a collider link is a one-off visit, not a new preferred mode
+		if (browser && isMode(urlMode) && urlMode !== stored && !colliderTargets.length) {
 			stored = urlMode;
 			localStorage.setItem(STORAGE_KEY, urlMode);
 		}
@@ -36,6 +86,7 @@
 		if (browser) localStorage.setItem(STORAGE_KEY, m);
 		const p = new URLSearchParams(page.url.searchParams);
 		p.set('mode', m);
+		if (m !== 'colliders') p.delete('collider');
 		// keep a deep-link hash (`#State/N`) across the switch so the anchor re-applies in the
 		// new view — `goto` with a hash-less URL would drop it
 		goto(`${page.url.pathname}?${p}${browser ? location.hash : ''}`, {
@@ -73,7 +124,15 @@
 		<GraphView model={m} {tooltips} {modeTabs} />
 	{:else}
 		<div class="bar">{@render modeTabs()}</div>
-		{#if mode === 'pseudo'}
+		{#if mode === 'colliders'}
+			{#if hierarchyQuery.isError}
+				<p class="msg err">{String(hierarchyQuery.error)}</p>
+			{:else if !hierarchyQuery.data}
+				<p class="msg dim">loading…</p>
+			{:else}
+				<CollidersView root={hierarchyQuery.data} {owner} targets={colliderTargets} />
+			{/if}
+		{:else if mode === 'pseudo'}
 			<PseudoView model={m} {tooltips} />
 		{:else}
 			<RawView model={m} {tooltips} />
@@ -83,7 +142,7 @@
 
 {#snippet modeTabs()}
 	<div class="modes">
-		{#each MODES as mo (mo.id)}
+		{#each modes as mo (mo.id)}
 			<button class:active={mode === mo.id} onclick={() => setMode(mo.id)}>{mo.label}</button>
 		{/each}
 	</div>

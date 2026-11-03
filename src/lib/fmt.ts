@@ -28,6 +28,8 @@ export interface Token {
 	title?: string;
 	/** event name — when this token is an event value (->"CANCEL"), for click-to-navigate */
 	event?: string;
+	/** name of the action param this token is the whole value of */
+	param?: string;
 }
 
 const tokenText = (toks: Token[]) => toks.map((t) => t.text).join('');

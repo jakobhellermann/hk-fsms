@@ -125,7 +125,12 @@
 
 {#if rest.length}
 	{#if detailEntry}
-		<FsmDetail {gameRef} hash={detailEntry.hash} />
+		<FsmDetail
+			{gameRef}
+			hash={detailEntry.hash}
+			hierarchy={detailEntry.hierarchy}
+			owner={detailEntry.game_object}
+		/>
 	{:else if pending}
 		<p class="msg dim">loading…</p>
 	{:else}

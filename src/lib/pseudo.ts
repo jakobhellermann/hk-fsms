@@ -129,7 +129,8 @@ export function actionTokens(a: Action, tip?: ActionTip): Token[] {
 	rest.forEach((p, j) => {
 		if (j > 0) toks.push({ text: ', ' });
 		if (p.name) toks.push({ text: `${p.name}=`, title: tip?.params?.[p.name] });
-		toks.push(...valueTokens(p));
+		const vt = valueTokens(p);
+		toks.push(...(vt.length === 1 ? [{ ...vt[0], param: p.name }] : vt));
 	});
 	toks.push({ text: ')' });
 	return toks;

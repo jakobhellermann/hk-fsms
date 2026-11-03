@@ -4,6 +4,8 @@
 	import { fmtCallValue, varRefName } from '$lib/fmt';
 	import { isDeadAction } from '$lib/actions';
 	import type { Tooltips } from '$lib/tooltips';
+	import { getContext } from 'svelte';
+	import { COLLIDER_LINKS, type ColliderLinks, linkTargets } from '$lib/colliders';
 
 	// renders one state's actions + transitions as pseudocode lines, shared by the full PseudoView and
 	// the graph's state-preview sidebar. `onnavigate` is how each host follows a state reference
@@ -45,6 +47,8 @@
 		);
 	}
 
+	const colliderLinks = getContext<ColliderLinks | undefined>(COLLIDER_LINKS);
+
 	// variable name → formatted authored default, for the hover on `var "X"` references
 	const varDefaults = $derived(
 		new Map(model.variables.map((v) => [v.name, fmtCallValue(v.value)]))
@@ -62,6 +66,13 @@
 
 {#each state.actions as a, i (i)}
 	{@const dead = a.enabled && isDeadAction(a)}
+	{@const links = colliderLinks
+		? new Map(
+				[...linkTargets(a, model, colliderLinks.owner)]
+					.map(([p, ts]) => [p, ts.filter(colliderLinks.known)] as const)
+					.filter(([, ts]) => ts.length)
+			)
+		: new Map<string, string[]>()}
 	<div
 		class="line"
 		class:off={!a.enabled || dead}
@@ -69,9 +80,12 @@
 		data-anchor={`${state.name}/${i + 1}`}
 		style="padding-left: {indent}ch; --bar-x: {indent - 2}ch"
 	>
-		{#each actionTokens(a, tooltips[a.class]) as t, k (k)}{#if t.event}{@const target = eventTarget(
-					t.event
-				)}{#if target}<span
+		{#each actionTokens(a, tooltips[a.class]) as t, k (k)}{#if t.param && links.has(t.param)}{@const targets =
+					links.get(t.param)!}<a
+					class="{t.cls} range"
+					href={colliderLinks!.href(targets)}
+					title="show {targets.join(', ')} in the colliders view">{t.text}</a
+				>{:else if t.event}{@const target = eventTarget(t.event)}{#if target}<span
 						class="event link"
 						role="button"
 						tabindex="0"
@@ -122,6 +136,13 @@
 {/if}
 
 <style>
+	.range {
+		text-decoration: underline dotted;
+		text-underline-offset: 3px;
+	}
+	.range:hover {
+		text-decoration-style: solid;
+	}
 	.line {
 		position: relative;
 		white-space: pre-wrap;
