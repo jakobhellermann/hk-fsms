@@ -43,8 +43,7 @@
 		if (browser) localStorage.setItem(CFG_KEY, JSON.stringify(layoutCfg));
 	});
 
-	// narrow screens: the layout controls collapse behind the toggle (the toolbar styles switch
-	// this group into a dropdown)
+	// the layout controls live in a dropdown behind the toggle
 	let cfgOpen = $state(false);
 	let toolbarEl = $state<HTMLElement>();
 	function closeCfgOnOutside(e: PointerEvent) {
@@ -311,12 +310,23 @@
 		z-index: 3; /* dropdown paints above canvas and panel */
 	}
 	.tb-secondary {
+		display: none;
+		position: absolute;
+		top: 100%;
+		left: var(--pad-x);
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.6rem;
+		padding: 0.6rem;
+		background: var(--panel);
+		border: 1px solid #333;
+		border-radius: 4px;
+	}
+	.tb-secondary.open {
 		display: flex;
-		align-items: center;
-		gap: 0.4rem;
 	}
 	.tb-toggle {
-		display: none;
+		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
@@ -337,7 +347,6 @@
 		cursor: pointer;
 	}
 	.tb-label {
-		margin-left: 0.5rem;
 		font-size: 0.8rem;
 		color: var(--dim);
 	}
@@ -463,30 +472,5 @@
 		display: block;
 		width: 100%;
 		height: 100%;
-	}
-	@media (max-width: 680px) {
-		.tb-toggle {
-			display: flex;
-		}
-		.tb-secondary {
-			display: none;
-			position: absolute;
-			top: 100%;
-			left: var(--pad-x);
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.6rem;
-			padding: 0.6rem;
-			background: var(--panel);
-			border: 1px solid #333;
-			border-radius: 4px;
-		}
-		.tb-secondary.open {
-			display: flex;
-		}
-		.tb-label,
-		.tb-check {
-			margin-left: 0;
-		}
 	}
 </style>
