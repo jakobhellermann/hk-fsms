@@ -129,7 +129,7 @@ fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
     #[derive(Deserialize)]
     struct Compact {
         f: Vec<String>,
-        e: Vec<(usize, String, String, String)>,
+        e: Vec<(usize, String, String, String, Option<String>)>,
     }
     let compact: Compact = serde_json::from_str(
         &std::fs::read_to_string(version_dir.join("index.json"))
@@ -138,7 +138,7 @@ fn dump_game(slug: &str, data_dir: &Path, out_dir: &Path) -> Result<usize> {
     let index: Vec<Entry> = compact
         .e
         .into_iter()
-        .map(|(fi, name, game_object, hash)| Entry {
+        .map(|(fi, name, game_object, hash, _)| Entry {
             file: compact.f[fi].clone(),
             name,
             game_object,

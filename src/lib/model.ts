@@ -211,22 +211,25 @@ export interface IndexEntry {
 	name: string;
 	game_object: string;
 	hash: string;
+	/** content hash of the owner's collider hierarchy; null if it has no colliders */
+	hierarchy: string | null;
 }
 
 // out/<game>/index.json is a compact columnar format: a shared file table plus one tuple per FSM,
-// `[fileIndex, name, game_object, hash]` — far smaller than one object-with-keys per entry.
+// `[fileIndex, name, game_object, hash, hierarchy]` — far smaller than one object-with-keys per entry.
 export interface CompactIndex {
 	f: string[];
-	e: [number, string, string, string][];
+	e: [number, string, string, string, (string | null)?][];
 }
 
 /** expand the compact index.json into `IndexEntry[]` (assigning each a stable `id`). */
 export function expandIndex(raw: CompactIndex): IndexEntry[] {
-	return raw.e.map(([fi, name, game_object, hash], id) => ({
+	return raw.e.map(([fi, name, game_object, hash, hierarchy], id) => ({
 		id,
 		file: raw.f[fi],
 		name,
 		game_object,
-		hash
+		hash,
+		hierarchy: hierarchy ?? null
 	}));
 }

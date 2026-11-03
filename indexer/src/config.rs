@@ -34,27 +34,29 @@ pub struct Entry {
     pub name: String,
     pub game_object: String,
     pub hash: String,
+    /// Content hash of the owner's collider hierarchy; `None` if it has no colliders.
+    pub hierarchy: Option<String>,
 }
 
 /// Serialize entries to the compact on-disk `index.json`: a shared file table plus one tuple per FSM,
-/// `[fileIndex, name, game_object, hash]`. `path_id` is internal-only (sort/dedup) and dropped. This
+/// `[fileIndex, name, game_object, hash, hierarchy]`. `path_id` is internal-only (sort/dedup) and dropped. This
 /// roughly halves the raw size vs one object-with-keys per entry — matters for mobile load/parse.
 pub fn to_compact_json(entries: &[Entry]) -> Vec<u8> {
     use std::collections::HashMap;
     let mut idx: HashMap<&str, usize> = HashMap::new();
     let mut files: Vec<&str> = Vec::new();
-    let mut rows: Vec<(usize, &str, &str, &str)> = Vec::with_capacity(entries.len());
+    let mut rows: Vec<(usize, &str, &str, &str, Option<&str>)> = Vec::with_capacity(entries.len());
     for e in entries {
         let fi = *idx.entry(e.file.as_str()).or_insert_with(|| {
             files.push(e.file.as_str());
             files.len() - 1
         });
-        rows.push((fi, &e.name, &e.game_object, &e.hash));
+        rows.push((fi, &e.name, &e.game_object, &e.hash, e.hierarchy.as_deref()));
     }
     #[derive(Serialize)]
     struct Compact<'a> {
         f: Vec<&'a str>,
-        e: Vec<(usize, &'a str, &'a str, &'a str)>,
+        e: Vec<(usize, &'a str, &'a str, &'a str, Option<&'a str>)>,
     }
     serde_json::to_vec(&Compact { f: files, e: rows }).expect("compact index serializes")
 }

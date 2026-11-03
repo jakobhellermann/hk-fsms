@@ -1,4 +1,5 @@
 mod config;
+mod hierarchy;
 mod scan;
 mod scene_lookup;
 mod tooltip_map;
