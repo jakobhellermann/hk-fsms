@@ -19,9 +19,11 @@
 	import StateBody from './StateBody.svelte';
 	import { PanZoom } from '$lib/panzoom.svelte';
 	import SettingsMenu from '$lib/SettingsMenu.svelte';
+	import { useHeaderBar } from '$lib/header-bar.svelte';
 	import { viewSettings } from '$lib/settings.svelte';
 
-	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as fit)
+	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as fit), which
+	// sits in the page header
 	let {
 		model,
 		modeTabs,
@@ -119,6 +121,8 @@
 		if (!cw || !ch || !n) return { tx: (cw - layout.width) / 2, ty: 20, k: 1 };
 		return { tx: cw / 2 - (n.x + n.w / 2), ty: 56 - n.y, k: 1 };
 	});
+	useHeaderBar(() => toolbar);
+
 	const pz = new PanZoom(
 		() => home,
 		() => canvas,
@@ -160,19 +164,6 @@
 		});
 	});
 
-	// size the body to exactly fill the viewport below it — robust to the header height (vs a fixed
-	// magic offset, which left a sliver of page scroll)
-	let bodyEl = $state<HTMLElement>();
-	let bodyTop = $state(0);
-	$effect(() => {
-		const measure = () => {
-			if (bodyEl) bodyTop = bodyEl.getBoundingClientRect().top + window.scrollY;
-		};
-		measure();
-		window.addEventListener('resize', measure);
-		return () => window.removeEventListener('resize', measure);
-	});
-
 	// drag the panel's top edge to resize its height
 	let resizing = $state<{ y: number; h: number } | null>(null);
 	function resizeDown(e: PointerEvent) {
@@ -205,35 +196,7 @@
 	onpointercancel={end}
 />
 
-<div class="toolbar">
-	<SettingsMenu label="view options">
-		<span class="tb-label">transitions</span>
-		<div class="seg">
-			{#each ['routed', 'side', 'bottom'] as s}
-				<button
-					class:active={layoutCfg.edgeStyle === s}
-					onclick={() => (layoutCfg.edgeStyle = s as EdgeStyle)}
-					>{s === 'routed' ? 'edge' : s === 'bottom' ? 'vertical' : s}</button
-				>
-			{/each}
-		</div>
-		<label>
-			<input type="checkbox" bind:checked={layoutCfg.collapseChains} />
-			collapse chains
-		</label>
-		<label>
-			<input type="checkbox" bind:checked={viewSettings.hideCosmetic} />
-			hide cosmetic actions
-		</label>
-	</SettingsMenu>
-	<button onclick={() => (pz.view = { ...fit })}>fit</button>
-	{#if modeTabs}
-		<span class="grow"></span>
-		{@render modeTabs()}
-	{/if}
-</div>
-
-<div class="body" bind:this={bodyEl} style="height: calc(100dvh - {bodyTop}px)">
+<div class="body">
 	<!-- drag/wheel are mouse-only enhancements -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
@@ -291,14 +254,41 @@
 	</aside>
 </div>
 
+{#snippet toolbar()}
+	<div class="toolbar">
+		<SettingsMenu label="view options">
+			<span class="tb-label">transitions</span>
+			<div class="seg">
+				{#each ['routed', 'side', 'bottom'] as s}
+					<button
+						class:active={layoutCfg.edgeStyle === s}
+						onclick={() => (layoutCfg.edgeStyle = s as EdgeStyle)}
+						>{s === 'routed' ? 'edge' : s === 'bottom' ? 'vertical' : s}</button
+					>
+				{/each}
+			</div>
+			<label>
+				<input type="checkbox" bind:checked={layoutCfg.collapseChains} />
+				collapse chains
+			</label>
+			<label>
+				<input type="checkbox" bind:checked={viewSettings.hideCosmetic} />
+				hide cosmetic actions
+			</label>
+		</SettingsMenu>
+		<button onclick={() => (pz.view = { ...fit })}>fit</button>
+		{#if modeTabs}
+			<span class="grow"></span>
+			{@render modeTabs()}
+		{/if}
+	</div>
+{/snippet}
+
 <style>
 	.toolbar {
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		padding: 0.5rem var(--pad-x);
-		position: relative;
-		z-index: 3; /* dropdown paints above canvas and panel */
 	}
 	.grow {
 		flex: 1;
@@ -308,8 +298,7 @@
 		color: var(--fg);
 		border: 1px solid #333;
 		border-radius: 4px;
-		width: 28px;
-		height: 26px;
+		padding: 0.25rem 0.5rem;
 		cursor: pointer;
 	}
 	.tb-label {
@@ -336,10 +325,13 @@
 		color: var(--bg);
 		border-color: var(--accent);
 	}
+	/* fills the rest of the viewport below the header (see the game layout); size containment keeps
+	   its content (e.g. a long object list) from growing the page past the viewport */
 	.body {
+		flex: 1;
+		contain: size;
 		display: flex;
 		flex-direction: column;
-		/* height is set inline from the measured top offset (see component) */
 	}
 	.canvas {
 		flex: 1;

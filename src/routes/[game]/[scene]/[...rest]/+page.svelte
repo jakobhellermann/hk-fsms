@@ -125,11 +125,13 @@
 
 {#if rest.length}
 	{#if detailEntry}
+		<!-- `?.`: leaving the page turns detailEntry undefined one update before this block unmounts,
+		     and FsmDetail's toolbar (rendered in the layout's header) still reads these props then -->
 		<FsmDetail
 			{gameRef}
-			hash={detailEntry.hash}
-			hierarchy={detailEntry.hierarchy}
-			owner={detailEntry.game_object}
+			hash={detailEntry?.hash ?? ''}
+			hierarchy={detailEntry?.hierarchy ?? null}
+			owner={detailEntry?.game_object ?? ''}
 		/>
 	{:else if pending}
 		<p class="msg dim">loading…</p>

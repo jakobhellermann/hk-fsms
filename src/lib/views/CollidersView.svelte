@@ -168,17 +168,6 @@
 		// a tap without panning selects the shape under the pointer, or clears on empty canvas
 		if (pz.end(e)) select(hovered);
 	}
-
-	let bodyEl = $state<HTMLElement>();
-	let bodyTop = $state(0);
-	$effect(() => {
-		const measure = () => {
-			if (bodyEl) bodyTop = bodyEl.getBoundingClientRect().top + window.scrollY;
-		};
-		measure();
-		window.addEventListener('resize', measure);
-		return () => window.removeEventListener('resize', measure);
-	});
 </script>
 
 <svelte:window onpointermove={(e) => pz.move(e)} onpointerup={end} onpointercancel={end} />
@@ -201,7 +190,7 @@
 		>
 	{/if}
 </div>
-<div class="body" bind:this={bodyEl} style="height: calc(100dvh - {bodyTop}px)">
+<div class="body">
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="canvas"
@@ -284,7 +273,11 @@
 	.cat {
 		color: var(--c);
 	}
+	/* fills the rest of the viewport below the header (see the game layout); size containment keeps
+	   its content (e.g. a long object list) from growing the page past the viewport */
 	.body {
+		flex: 1;
+		contain: size;
 		display: flex;
 		border-top: 1px solid #333;
 	}

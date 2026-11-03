@@ -16,6 +16,7 @@
 	import CollidersView from '$lib/views/CollidersView.svelte';
 	import SettingsMenu from '$lib/SettingsMenu.svelte';
 	import { viewSettings } from '$lib/settings.svelte';
+	import { useHeaderBar } from '$lib/header-bar.svelte';
 	import { setContext } from 'svelte';
 	import { COLLIDER_LINKS, type ColliderLinks, nodePaths } from '$lib/colliders';
 
@@ -113,6 +114,9 @@
 		staleTime: Infinity
 	}));
 	const tooltips = $derived(tooltipsQuery.data ?? {});
+
+	// the graph puts its own toolbar (with the mode tabs) into the header
+	useHeaderBar(() => (modelQuery.data && mode !== 'graph' ? bar : undefined));
 </script>
 
 {#if modelQuery.isError}
@@ -122,21 +126,8 @@
 {:else}
 	{@const m = modelQuery.data}
 	{#if mode === 'graph'}
-		<!-- the graph hosts the mode tabs in its own toolbar (same row as fit) -->
 		<GraphView model={m} {tooltips} {modeTabs} />
 	{:else}
-		<div class="bar">
-			{#if mode === 'pseudo'}
-				<SettingsMenu label="view options">
-					<label>
-						<input type="checkbox" bind:checked={viewSettings.hideCosmetic} />
-						hide cosmetic actions
-					</label>
-				</SettingsMenu>
-			{/if}
-			<span class="grow"></span>
-			{@render modeTabs()}
-		</div>
 		{#if mode === 'colliders'}
 			{#if hierarchyQuery.isError}
 				<p class="msg err">{String(hierarchyQuery.error)}</p>
@@ -153,6 +144,21 @@
 	{/if}
 {/if}
 
+{#snippet bar()}
+	<div class="bar">
+		{#if mode === 'pseudo'}
+			<SettingsMenu label="view options">
+				<label>
+					<input type="checkbox" bind:checked={viewSettings.hideCosmetic} />
+					hide cosmetic actions
+				</label>
+			</SettingsMenu>
+		{/if}
+		<span class="grow"></span>
+		{@render modeTabs()}
+	</div>
+{/snippet}
+
 {#snippet modeTabs()}
 	<div class="modes">
 		{#each modes as mo (mo.id)}
@@ -165,7 +171,7 @@
 	.bar {
 		display: flex;
 		align-items: center;
-		padding: 0.5rem var(--pad-x);
+		gap: 0.4rem;
 	}
 	.grow {
 		flex: 1;

@@ -8,6 +8,7 @@
 
 <script lang="ts">
 	import { base } from '$app/paths';
+	import { provideHeaderBar } from '$lib/header-bar.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
@@ -119,6 +120,8 @@
 			replaceState: true
 		});
 	}
+
+	const headerBar = provideHeaderBar();
 </script>
 
 <svelte:head>
@@ -149,71 +152,95 @@
 	{/if}
 {/snippet}
 
-<header>
-	<div class="topline">
-		<a class="home" href="{base}/{segment}"><h1>PlayMaker FSM browser</h1></a>
-		<div class="switch">
-			<div class="games">
-				{#each GAMES as g (g.id)}
-					<a
-						class="gamebtn"
-						class:active={game === g.id}
-						title={g.label}
-						href="{base}/{gameSegment({
-							game: g.id,
-							version: lastVersion.get(g.id) ?? null
-						})}{query ? `?q=${encodeURIComponent(query)}` : ''}"
-					>
-						<span class="lbl-long">{g.label}</span>
-						<span class="lbl-short">{g.short}</span>
-					</a>
-				{/each}
+<div class="page">
+	<header>
+		<div class="header-main">
+			<div class="topline">
+				<a class="home" href="{base}/{segment}"><h1>PlayMaker FSM browser</h1></a>
+				<div class="switch">
+					<div class="games">
+						{#each GAMES as g (g.id)}
+							<a
+								class="gamebtn"
+								class:active={game === g.id}
+								title={g.label}
+								href="{base}/{gameSegment({
+									game: g.id,
+									version: lastVersion.get(g.id) ?? null
+								})}{query ? `?q=${encodeURIComponent(query)}` : ''}"
+							>
+								<span class="lbl-long">{g.label}</span>
+								<span class="lbl-short">{g.short}</span>
+							</a>
+						{/each}
+					</div>
+					{@render versionSelect('wide')}
+				</div>
 			</div>
-			{@render versionSelect('wide')}
-		</div>
-	</div>
 
-	<nav class="crumbs">
-		<a class="crumb" class:active={scene === null} href="{base}/{segment}">{gameLabel}</a>
-		{#if scene !== null}
-			<span class="sep">›</span>
-			{#if isDetail}
-				<a class="crumb" href={sceneHref} title={scene}>{sceneTitle(scene)}</a>
-				<span class="sep">›</span>
-				<span class="crumb active">{fsmCrumb}</span>
-			{:else}
-				<span class="crumb active" title={scene}>{sceneTitle(scene)}</span>
+			<nav class="crumbs">
+				<a class="crumb" class:active={scene === null} href="{base}/{segment}">{gameLabel}</a>
+				{#if scene !== null}
+					<span class="sep">›</span>
+					{#if isDetail}
+						<a class="crumb" href={sceneHref} title={scene}>{sceneTitle(scene)}</a>
+						<span class="sep">›</span>
+						<span class="crumb active">{fsmCrumb}</span>
+					{:else}
+						<span class="crumb active" title={scene}>{sceneTitle(scene)}</span>
+					{/if}
+				{/if}
+				{@render versionSelect('narrow')}
+			</nav>
+
+			{#if !isDetail}
+				<div class="filter-wrap">
+					<input
+						class="filter"
+						bind:this={filterEl}
+						{placeholder}
+						value={query}
+						oninput={(e) => setQuery(e.currentTarget.value)}
+					/>
+					{#if query}
+						<button class="clear" onclick={() => setQuery('')} aria-label="clear filter">✕</button>
+					{/if}
+				</div>
 			{/if}
+		</div>
+		{#if headerBar.bar}
+			<div class="header-bar">{@render headerBar.bar()}</div>
 		{/if}
-		{@render versionSelect('narrow')}
-	</nav>
+	</header>
 
-	{#if !isDetail}
-		<div class="filter-wrap">
-			<input
-				class="filter"
-				bind:this={filterEl}
-				{placeholder}
-				value={query}
-				oninput={(e) => setQuery(e.currentTarget.value)}
-			/>
-			{#if query}
-				<button class="clear" onclick={() => setQuery('')} aria-label="clear filter">✕</button>
-			{/if}
-		</div>
-	{/if}
-</header>
-
-{@render children()}
+	<main>{@render children()}</main>
+</div>
 
 <style>
+	/* the header takes what it needs, the page content the rest of the viewport (and more, if long) */
+	.page {
+		display: grid;
+		grid-template-rows: auto 1fr;
+		min-height: 100dvh;
+	}
+	main {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
 	header {
-		padding: 0.85rem var(--pad-x);
 		position: sticky;
 		top: 0;
 		background: var(--bg);
-		border-bottom: 1px solid #333;
 		z-index: 1;
+	}
+	.header-main {
+		padding: 0.85rem var(--pad-x);
+		border-bottom: 1px solid #333;
+	}
+	/* the page's own toolbar (see `useHeaderBar`), below the divider */
+	.header-bar {
+		padding: 0.5rem var(--pad-x);
 	}
 	.topline {
 		display: flex;

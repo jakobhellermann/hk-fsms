@@ -30,16 +30,13 @@
 	.menu {
 		position: relative;
 	}
+	/* sized like the mode tabs next to it: by padding, not fixed pixels */
 	.toggle {
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		background: var(--panel);
 		color: var(--fg);
 		border: 1px solid #333;
 		border-radius: 4px;
-		width: 28px;
-		height: 26px;
+		padding: 0.25rem 0.5rem;
 		cursor: pointer;
 	}
 	.toggle.active {
