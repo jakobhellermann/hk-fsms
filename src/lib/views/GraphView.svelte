@@ -18,6 +18,8 @@
 	import GraphSvg from '$lib/graph/GraphSvg.svelte';
 	import StateBody from './StateBody.svelte';
 	import { PanZoom } from '$lib/panzoom.svelte';
+	import SettingsMenu from '$lib/SettingsMenu.svelte';
+	import { viewSettings } from '$lib/settings.svelte';
 
 	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as fit)
 	let {
@@ -42,13 +44,6 @@
 	$effect(() => {
 		if (browser) localStorage.setItem(CFG_KEY, JSON.stringify(layoutCfg));
 	});
-
-	// the layout controls live in a dropdown behind the toggle
-	let cfgOpen = $state(false);
-	let toolbarEl = $state<HTMLElement>();
-	function closeCfgOnOutside(e: PointerEvent) {
-		if (cfgOpen && e.target instanceof Node && !toolbarEl?.contains(e.target)) cfgOpen = false;
-	}
 
 	// the selected state lives in the URL (?state=) so it survives reload and is shareable; its
 	// pseudocode shows in the sidebar
@@ -205,21 +200,13 @@
 
 <svelte:window
 	onhashchange={applyAnchor}
-	onpointerdown={closeCfgOnOutside}
 	onpointermove={move}
 	onpointerup={end}
 	onpointercancel={end}
 />
 
-<div class="toolbar" bind:this={toolbarEl}>
-	<button
-		class="tb-toggle"
-		class:active={cfgOpen}
-		aria-label="layout options"
-		aria-expanded={cfgOpen}
-		onclick={() => (cfgOpen = !cfgOpen)}>⚙</button
-	>
-	<div class="tb-secondary" class:open={cfgOpen}>
+<div class="toolbar">
+	<SettingsMenu label="view options">
 		<span class="tb-label">transitions</span>
 		<div class="seg">
 			{#each ['routed', 'side', 'bottom'] as s}
@@ -230,11 +217,15 @@
 				>
 			{/each}
 		</div>
-		<label class="tb-check">
+		<label>
 			<input type="checkbox" bind:checked={layoutCfg.collapseChains} />
 			collapse chains
 		</label>
-	</div>
+		<label>
+			<input type="checkbox" bind:checked={viewSettings.hideCosmetic} />
+			hide cosmetic actions
+		</label>
+	</SettingsMenu>
 	<button onclick={() => (pz.view = { ...fit })}>fit</button>
 	{#if modeTabs}
 		<span class="grow"></span>
@@ -309,31 +300,6 @@
 		position: relative;
 		z-index: 3; /* dropdown paints above canvas and panel */
 	}
-	.tb-secondary {
-		display: none;
-		position: absolute;
-		top: 100%;
-		left: var(--pad-x);
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 0.6rem;
-		padding: 0.6rem;
-		background: var(--panel);
-		border: 1px solid #333;
-		border-radius: 4px;
-	}
-	.tb-secondary.open {
-		display: flex;
-	}
-	.tb-toggle {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-	.tb-toggle.active {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
 	.grow {
 		flex: 1;
 	}
@@ -349,15 +315,6 @@
 	.tb-label {
 		font-size: 0.8rem;
 		color: var(--dim);
-	}
-	.tb-check {
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
-		margin-left: 0.5rem;
-		font-size: 0.8rem;
-		color: var(--dim);
-		cursor: pointer;
 	}
 	.seg {
 		display: flex;

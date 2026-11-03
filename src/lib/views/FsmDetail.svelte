@@ -14,6 +14,8 @@
 	import PseudoView from '$lib/views/PseudoView.svelte';
 	import GraphView from '$lib/views/GraphView.svelte';
 	import CollidersView from '$lib/views/CollidersView.svelte';
+	import SettingsMenu from '$lib/SettingsMenu.svelte';
+	import { viewSettings } from '$lib/settings.svelte';
 	import { setContext } from 'svelte';
 	import { COLLIDER_LINKS, type ColliderLinks, nodePaths } from '$lib/colliders';
 
@@ -123,7 +125,18 @@
 		<!-- the graph hosts the mode tabs in its own toolbar (same row as fit) -->
 		<GraphView model={m} {tooltips} {modeTabs} />
 	{:else}
-		<div class="bar">{@render modeTabs()}</div>
+		<div class="bar">
+			{#if mode === 'pseudo'}
+				<SettingsMenu label="view options">
+					<label>
+						<input type="checkbox" bind:checked={viewSettings.hideCosmetic} />
+						hide cosmetic actions
+					</label>
+				</SettingsMenu>
+			{/if}
+			<span class="grow"></span>
+			{@render modeTabs()}
+		</div>
 		{#if mode === 'colliders'}
 			{#if hierarchyQuery.isError}
 				<p class="msg err">{String(hierarchyQuery.error)}</p>
@@ -151,8 +164,11 @@
 <style>
 	.bar {
 		display: flex;
-		justify-content: flex-end;
+		align-items: center;
 		padding: 0.5rem var(--pad-x);
+	}
+	.grow {
+		flex: 1;
 	}
 	.modes button {
 		background: var(--panel);

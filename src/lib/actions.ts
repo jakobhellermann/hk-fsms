@@ -197,17 +197,96 @@ export function setter(a: Action): { target: Param; value: Param } | undefined {
 	return undefined;
 }
 
+/** params the action writes a variable through */
+function storeParams(a: Action): Param[] {
+	// `store<Noun>` (and bare `store`) is the write convention; `stored<Noun>` (past participle, lower
+	// `d`) is a value the action *reads* — e.g. TimeLimitCheck's StoredValue, GetNextPreSpawnedGameObject's
+	// storedArray. Exclude those so we don't render a read input as the `var "x" = …` output.
+	return a.params.filter(
+		(p) => /^store/i.test(p.name) && !/^[Ss]tored[A-Z]/.test(p.name) && varName(p.value) !== null
+	);
+}
+
 /**
  * The single output parameter an action writes into a variable, if any — PlayMaker's `store*` naming
  * convention. Returns `undefined` for actions with zero or multiple such outputs (e.g. raycasts that
  * store hit point/normal/distance at once), so those keep their plain `Action(args)` form.
  */
 export function storeParam(a: Action): Param | undefined {
-	// `store<Noun>` (and bare `store`) is the write convention; `stored<Noun>` (past participle, lower
-	// `d`) is a value the action *reads* — e.g. TimeLimitCheck's StoredValue, GetNextPreSpawnedGameObject's
-	// storedArray. Exclude those so we don't render a read input as the `var "x" = …` output.
-	const stores = a.params.filter(
-		(p) => /^store/i.test(p.name) && !/^[Ss]tored[A-Z]/.test(p.name) && varName(p.value) !== null
-	);
+	const stores = storeParams(a);
 	return stores.length === 1 ? stores[0] : undefined;
+}
+
+// Audio, particles/effects, camera shake and controller vibration: presentation that doesn't change
+// how the FSM runs. Short class names, `*` for versioned variants (`V2`, …).
+// Deliberately absent: EnemySingControl (drives the needolin reaction), StartRoarEmitter (can stun
+// the hero), Activate/TriggerWorldRumble (send events), ShakePosition/iTweenShakePosition (move
+// objects). Camera shakes (and their bare world force) count although that force can tip objects
+// over or reach scene-wired event responders.
+const COSMETIC = new RegExp(
+	'^(' +
+		[
+			'Audio.*',
+			'PlayAudioEvent.*',
+			'PlaySound',
+			'PlayRandomSound',
+			'FadeAudio.*',
+			'SetAudio.*',
+			'TransitionToAudioSnapshot',
+			'ApplyMusicCue',
+			'ApplyAtmosCue',
+			'PanAudio',
+			'RandomiseAudioPosition',
+			'PlayEnemySingAudio',
+			'PlayRandomAudioClipTable.*',
+			'SetRandomAudioClipFromTable',
+			'LimitedPlayAudio.*',
+			'LimitedRemoveAudioLooped',
+			'StartFadeOutAudioSource',
+			'FadeOutTransitionAudioFaders',
+			'SetNPCSpeakingAudioTable',
+			'ApplyMusicSnapshot',
+			'SetSceneManagerActorSnapshot',
+			'PlayOneShotOnAudioSource',
+			'PauseAudioListener',
+			'MatchAudioSourceTime',
+			'ForceHeroFootstepSound',
+			'PlayParticleEmitter.*',
+			'StopParticleEmitter.*',
+			'StopParticleEmittersInChildren.*',
+			'SetParticleEmission.*',
+			'SpawnBlood.*',
+			'ScreenFlash.*',
+			'Blink',
+			'Flicker',
+			'ParticleSystemPlay',
+			'PlayParticleSystemPool',
+			'PlayParticleEffectsInState',
+			'StopPlayParticleEffectsInChildren',
+			'SetParticleColour',
+			'SetParticleEmitterUVFlip',
+			'DoSpriteFlash.*',
+			'SpriteFlashSetBlocked',
+			'CancelFlashByID',
+			'DoCameraShake.*',
+			'CancelCameraShake',
+			'SendCameraShakeWorldForce.*',
+			'PlayVibration.*',
+			'StopVibration.*',
+			'SetVibrationManagerStrength',
+			'VibrationPlayer.*',
+			'StartHeroVibrationRegion',
+			'VibrationRegionPlayOneShot'
+		].join('|') +
+		')$'
+);
+
+/**
+ * Pure presentation (see `COSMETIC`). One that fires an event or writes a variable still steers the
+ * FSM, so it never counts.
+ */
+export function isCosmetic(a: Action): boolean {
+	if (!COSMETIC.test(short(a.class))) return false;
+	const firesEvent = a.params.some((p) => p.value.type === 'Event' && p.value.value !== null);
+	return !firesEvent && storeParams(a).length === 0;
 }

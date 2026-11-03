@@ -2,7 +2,8 @@
 	import type { FsmModel, State } from '$lib/model';
 	import { actionTokens, type Token } from '$lib/pseudo';
 	import { fmtCallValue, varRefName } from '$lib/fmt';
-	import { isDeadAction } from '$lib/actions';
+	import { isCosmetic, isDeadAction } from '$lib/actions';
+	import { viewSettings } from '$lib/settings.svelte';
 	import type { Tooltips } from '$lib/tooltips';
 	import { getContext } from 'svelte';
 	import { COLLIDER_LINKS, type ColliderLinks, linkTargets } from '$lib/colliders';
@@ -49,6 +50,13 @@
 
 	const colliderLinks = getContext<ColliderLinks | undefined>(COLLIDER_LINKS);
 
+	// keeps each action's index, which anchors (`#State/N`) and the flash refer to
+	const shownActions = $derived(
+		state.actions
+			.map((a, i) => ({ a, i }))
+			.filter(({ a }) => !(viewSettings.hideCosmetic && isCosmetic(a)))
+	);
+
 	// variable name → formatted authored default, for the hover on `var "X"` references
 	const varDefaults = $derived(
 		new Map(model.variables.map((v) => [v.name, fmtCallValue(v.value)]))
@@ -64,7 +72,7 @@
 	}
 </script>
 
-{#each state.actions as a, i (i)}
+{#each shownActions as { a, i } (i)}
 	{@const dead = a.enabled && isDeadAction(a)}
 	{@const links = colliderLinks
 		? new Map(
@@ -110,7 +118,7 @@
 		></button>
 	</div>
 {/each}
-{#if state.actions.length && state.transitions.length}
+{#if shownActions.length && state.transitions.length}
 	<div class="blank"></div>
 {/if}
 {#each state.transitions as t (t.event + t.to_state)}
@@ -131,7 +139,7 @@
 		{/if}
 	</div>
 {/each}
-{#if emptyNote && !state.actions.length && !state.transitions.length}
+{#if emptyNote && !shownActions.length && !state.transitions.length}
 	<div class="cmt" style="padding-left: {indent}ch">(no actions or transitions)</div>
 {/if}
 
