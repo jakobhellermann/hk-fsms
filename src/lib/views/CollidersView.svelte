@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { PanZoom } from '$lib/panzoom.svelte';
 	import {
 		CATEGORIES,
 		type Category,
@@ -102,16 +103,20 @@
 			k
 		};
 	});
-	let view = $state<{ tx: number; ty: number; k: number } | null>(null);
-	const cur = $derived(view ?? fit);
+	const pz = new PanZoom(
+		() => fit,
+		() => canvas,
+		{ min: 0.5, max: 2000 }
+	);
+	const cur = $derived(pz.cur);
 	$effect(() => {
 		void root;
-		view = null;
+		pz.view = null;
 		selected = { paths: [], subtree: false };
 	});
 	$effect(() => {
 		selected = { paths: targets, subtree: true };
-		view = null;
+		pz.view = null;
 	});
 
 	// grid step: the power of 10 (or 5×) that keeps lines ≥ 24px apart
@@ -159,35 +164,9 @@
 			panelEl?.querySelector('li.selected')?.scrollIntoView({ block: 'nearest' });
 	});
 
-	let drag: { x: number; y: number; tx: number; ty: number } | null = null;
-	let moved = false;
-	let grabbing = $state(false);
-	function down(e: PointerEvent) {
-		if (e.button > 0) return;
-		drag = { x: e.clientX, y: e.clientY, tx: cur.tx, ty: cur.ty };
-		moved = false;
-		grabbing = true;
-	}
-	function move(e: PointerEvent) {
-		if (!drag) return;
-		if (Math.abs(e.clientX - drag.x) > 3 || Math.abs(e.clientY - drag.y) > 3) moved = true;
-		view = { tx: drag.tx + (e.clientX - drag.x), ty: drag.ty + (e.clientY - drag.y), k: cur.k };
-	}
-	function up() {
-		// a click without panning selects the shape under the pointer, or clears on empty canvas
-		if (drag && !moved) select(hovered);
-		drag = null;
-		grabbing = false;
-	}
-	function wheel(e: WheelEvent) {
-		e.preventDefault();
-		const rect = canvas?.getBoundingClientRect();
-		if (!rect) return;
-		const mx = e.clientX - rect.left;
-		const my = e.clientY - rect.top;
-		const k = Math.min(Math.max(cur.k * Math.exp(-e.deltaY * 0.0015), 0.5), 2000);
-		const r = k / cur.k;
-		view = { tx: mx - (mx - cur.tx) * r, ty: my - (my - cur.ty) * r, k };
+	function end(e: PointerEvent) {
+		// a tap without panning selects the shape under the pointer, or clears on empty canvas
+		if (pz.end(e)) select(hovered);
 	}
 
 	let bodyEl = $state<HTMLElement>();
@@ -202,10 +181,10 @@
 	});
 </script>
 
-<svelte:window onpointermove={move} onpointerup={up} onpointercancel={up} />
+<svelte:window onpointermove={(e) => pz.move(e)} onpointerup={end} onpointercancel={end} />
 
 <div class="toolbar">
-	<button onclick={() => (view = null)}>fit</button>
+	<button onclick={() => (pz.view = null)}>fit</button>
 	{#if targets.length && !targetHits.length}
 		<span class="err">{targets.join(', ')}: no colliders in the indexed data</span>
 	{/if}
@@ -226,12 +205,12 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="canvas"
-		class:grabbing
+		class:grabbing={pz.dragging}
 		bind:this={canvas}
 		bind:clientWidth={cw}
 		bind:clientHeight={ch}
-		onpointerdown={down}
-		onwheel={wheel}
+		onpointerdown={(e) => pz.down(e)}
+		onwheel={(e) => pz.wheel(e)}
 	>
 		<svg>
 			<g class="grid">

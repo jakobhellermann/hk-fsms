@@ -17,6 +17,7 @@
 	import { anchorFragment, anchorUrl, copyText, resolveAnchor } from '$lib/anchor';
 	import GraphSvg from '$lib/graph/GraphSvg.svelte';
 	import StateBody from './StateBody.svelte';
+	import { PanZoom } from '$lib/panzoom.svelte';
 
 	// `modeTabs` lets the detail view drop its mode switcher into the toolbar (same row as fit)
 	let {
@@ -103,8 +104,7 @@
 
 	const layout = $derived(computeLayout(model, layoutCfg));
 
-	// pan/zoom: an SVG <g> transform driven by mouse drag (pan) and wheel (zoom-to-cursor).
-	// `view` null = follow the fit-to-canvas transform; any interaction pins it to concrete values.
+	// pan/zoom: an SVG <g> transform (see `PanZoom`), following `home` until the first interaction
 	let canvas = $state<HTMLDivElement>();
 	let cw = $state(0);
 	let ch = $state(0);
@@ -125,15 +125,19 @@
 		if (!cw || !ch || !n) return { tx: (cw - layout.width) / 2, ty: 20, k: 1 };
 		return { tx: cw / 2 - (n.x + n.w / 2), ty: 56 - n.y, k: 1 };
 	});
-	let view = $state<{ tx: number; ty: number; k: number } | null>(null);
-	const cur = $derived(view ?? home);
+	const pz = new PanZoom(
+		() => home,
+		() => canvas,
+		{ min: 0.1, max: 4 }
+	);
+	const cur = $derived(pz.cur);
 
 	// re-fit whenever the model (i.e. the FSM) changes — not on config tweaks,
 	// so adjusting ranker/seps doesn't lose pan/zoom state
 	let lastCentered: string | null = null;
 	$effect(() => {
 		void model;
-		view = null;
+		pz.view = null;
 		lastCentered = null;
 	});
 
@@ -158,7 +162,7 @@
 			const x0 = cur.tx + n.x * k;
 			const y0 = cur.ty + n.y * k;
 			if (x0 >= m && y0 >= m && x0 + n.w * k <= w - m && y0 + n.h * k <= h - m) return;
-			view = { tx: w / 2 - (n.x + n.w / 2) * k, ty: h / 2 - (n.y + n.h / 2) * k, k };
+			pz.view = { tx: w / 2 - (n.x + n.w / 2) * k, ty: h / 2 - (n.y + n.h / 2) * k, k };
 		});
 	});
 
@@ -175,61 +179,6 @@
 		return () => window.removeEventListener('resize', measure);
 	});
 
-	function zoomAround(mx: number, my: number, factor: number) {
-		const k = clamp(cur.k * factor, 0.1, 4);
-		const r = k / cur.k;
-		view = { tx: mx - (mx - cur.tx) * r, ty: my - (my - cur.ty) * r, k };
-	}
-	// coalesce wheel events to one zoom per animation frame: trackpads fire far faster than 60 Hz and
-	// each `view` write forces a synchronous repaint of the whole SVG. summed deltas compose exactly
-	// (exp is multiplicative), so batching is lossless.
-	let wheelAccum = 0;
-	let wheelPos = { x: 0, y: 0 };
-	let wheelRaf = 0;
-	function wheel(e: WheelEvent) {
-		e.preventDefault();
-		const rect = canvas?.getBoundingClientRect();
-		if (!rect) return;
-		wheelPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-		wheelAccum += e.deltaY;
-		if (!wheelRaf)
-			wheelRaf = requestAnimationFrame(() => {
-				wheelRaf = 0;
-				zoomAround(wheelPos.x, wheelPos.y, Math.exp(-wheelAccum * 0.0015));
-				wheelAccum = 0;
-			});
-	}
-
-	// pan/zoom via pointer events (mouse, touch, pen). one pointer pans; two pinch-zoom.
-	const pointers = new Map<number, { x: number; y: number }>();
-	let drag = $state<{ x: number; y: number; tx: number; ty: number } | null>(null);
-	let pinch: { dist: number; cx: number; cy: number; k: number; tx: number; ty: number } | null =
-		null;
-	let moved = false; // whether the current gesture actually moved (vs a plain tap/click)
-	function startPinch() {
-		const rect = canvas?.getBoundingClientRect();
-		const [a, b] = [...pointers.values()];
-		pinch = {
-			dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
-			cx: (a.x + b.x) / 2 - (rect?.left ?? 0),
-			cy: (a.y + b.y) / 2 - (rect?.top ?? 0),
-			k: cur.k,
-			tx: cur.tx,
-			ty: cur.ty
-		};
-	}
-	function down(e: PointerEvent) {
-		if (e.button > 0) return; // ignore right/middle mouse buttons
-		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		moved = false;
-		if (pointers.size >= 2) {
-			startPinch();
-			drag = null;
-			return;
-		}
-		drag = { x: e.clientX, y: e.clientY, tx: cur.tx, ty: cur.ty };
-	}
-
 	// drag the panel's top edge to resize its height
 	let resizing = $state<{ y: number; h: number } | null>(null);
 	function resizeDown(e: PointerEvent) {
@@ -242,24 +191,7 @@
 			panelHeight = clamp(resizing.h + (resizing.y - e.clientY), 120, 640);
 			return;
 		}
-		if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		if (pinch && pointers.size >= 2) {
-			const rect = canvas?.getBoundingClientRect();
-			const [a, b] = [...pointers.values()];
-			const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
-			const midx = (a.x + b.x) / 2 - (rect?.left ?? 0);
-			const midy = (a.y + b.y) / 2 - (rect?.top ?? 0);
-			const k = clamp((pinch.k * dist) / pinch.dist, 0.1, 4);
-			const r = k / pinch.k;
-			// pin the graph point under the start midpoint, while following the fingers' midpoint (so a
-			// two-finger move also pans)
-			view = { tx: midx - (pinch.cx - pinch.tx) * r, ty: midy - (pinch.cy - pinch.ty) * r, k };
-			moved = true;
-			return;
-		}
-		if (!drag) return;
-		if (Math.abs(e.clientX - drag.x) > 3 || Math.abs(e.clientY - drag.y) > 3) moved = true;
-		view = { tx: drag.tx + (e.clientX - drag.x), ty: drag.ty + (e.clientY - drag.y), k: cur.k };
+		pz.move(e);
 	}
 	function end(e: PointerEvent) {
 		if (resizing) {
@@ -267,17 +199,8 @@
 			if (browser) localStorage.setItem(SIDEBAR_KEY, String(panelHeight));
 			return;
 		}
-		pointers.delete(e.pointerId);
-		if (pointers.size < 2) pinch = null;
-		if (pointers.size === 0) {
-			// a tap/click on empty canvas (no pan) clears the selection
-			if (drag && !moved) select(null);
-			drag = null;
-		} else if (pointers.size === 1) {
-			// one finger lifted after a pinch — resume panning from the remaining finger without a jump
-			const [p] = [...pointers.values()];
-			drag = { x: p.x, y: p.y, tx: cur.tx, ty: cur.ty };
-		}
+		// a tap/click on empty canvas (no pan) clears the selection
+		if (pz.end(e)) select(null);
 	}
 </script>
 
@@ -313,7 +236,7 @@
 			collapse chains
 		</label>
 	</div>
-	<button onclick={() => (view = { ...fit })}>fit</button>
+	<button onclick={() => (pz.view = { ...fit })}>fit</button>
 	{#if modeTabs}
 		<span class="grow"></span>
 		{@render modeTabs()}
@@ -328,10 +251,10 @@
 		bind:this={canvas}
 		bind:clientWidth={cw}
 		bind:clientHeight={ch}
-		onpointerdown={down}
-		onwheel={wheel}
+		onpointerdown={(e) => pz.down(e)}
+		onwheel={(e) => pz.wheel(e)}
 		oncontextmenu={(e) => e.preventDefault()}
-		class:grabbing={!!drag}
+		class:grabbing={pz.dragging}
 	>
 		<svg class="stage">
 			<g transform="translate({cur.tx} {cur.ty}) scale({cur.k})">
@@ -340,7 +263,7 @@
 					edgeStyle={layoutCfg.edgeStyle}
 					{selected}
 					onselect={(name) => {
-						if (!moved) select(name);
+						if (!pz.moved) select(name);
 					}}
 				/>
 			</g>
