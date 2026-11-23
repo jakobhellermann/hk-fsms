@@ -8,6 +8,10 @@ declare global {
 		// interface PageState {}
 		// interface Platform {}
 	}
+	/** build-time feature flag */
+	interface ImportMetaEnv {
+		readonly ENABLE_COLLIDERS: boolean;
+	}
 }
 
 export {};

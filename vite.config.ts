@@ -3,6 +3,9 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	define: {
+		'import.meta.env.ENABLE_COLLIDERS': JSON.stringify(process.env.ENABLE_COLLIDERS === '1')
+	},
 	plugins: [
 		sveltekit({
 			compilerOptions: {

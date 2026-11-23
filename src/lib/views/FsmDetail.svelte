@@ -27,13 +27,14 @@
 		owner
 	}: { gameRef: GameRef; hash: string; hierarchy: string | null; owner: string } = $props();
 
+	const colliders = import.meta.env.ENABLE_COLLIDERS;
 	// links from actions to the colliders view, with the referenced objects selected. The hierarchy
 	// (shared with the colliders view's query) tells which references have colliders to show.
 	const colliderTargets = $derived(page.url.searchParams.getAll('collider'));
 	const hierarchyQuery = createQuery(() => ({
 		queryKey: ['hierarchy', gameRef.game, hierarchy],
 		queryFn: () => fetchHierarchy(gameRef.game, hierarchy!),
-		enabled: hierarchy !== null,
+		enabled: colliders && hierarchy !== null,
 		staleTime: Infinity
 	}));
 	const linkable = $derived(
@@ -41,19 +42,20 @@
 			? nodePaths(hierarchyQuery.data, owner)
 			: new Set<string>()
 	);
-	setContext<ColliderLinks>(COLLIDER_LINKS, {
-		get owner() {
-			return owner;
-		},
-		known: (target) => linkable.has(target.endsWith('/*') ? target.slice(0, -2) : target),
-		href: (targets) => {
-			const p = new URLSearchParams(page.url.searchParams);
-			p.set('mode', 'colliders');
-			p.delete('collider');
-			for (const t of targets) p.append('collider', t);
-			return `${page.url.pathname}?${p}`;
-		}
-	});
+	if (colliders)
+		setContext<ColliderLinks>(COLLIDER_LINKS, {
+			get owner() {
+				return owner;
+			},
+			known: (target) => linkable.has(target.endsWith('/*') ? target.slice(0, -2) : target),
+			href: (targets) => {
+				const p = new URLSearchParams(page.url.searchParams);
+				p.set('mode', 'colliders');
+				p.delete('collider');
+				for (const t of targets) p.append('collider', t);
+				return `${page.url.pathname}?${p}`;
+			}
+		});
 
 	type Mode = 'raw' | 'pseudo' | 'graph' | 'colliders';
 	const MODES: { id: Mode; label: string }[] = [
@@ -63,7 +65,7 @@
 		{ id: 'colliders', label: 'colliders' }
 	];
 	const isMode = (s: string | null): s is Mode =>
-		s === 'raw' || s === 'pseudo' || s === 'graph' || s === 'colliders';
+		s === 'raw' || s === 'pseudo' || s === 'graph' || (colliders && s === 'colliders');
 
 	// view mode is a global preference (localStorage), overridable per-FSM via ?mode=
 	const STORAGE_KEY = 'fsm:view-mode';
@@ -71,8 +73,10 @@
 	if (browser && isMode(localStorage.getItem(STORAGE_KEY)))
 		stored = localStorage.getItem(STORAGE_KEY) as Mode;
 	const urlMode = $derived(page.url.searchParams.get('mode'));
-	// FSMs whose owner has no collider data offer no colliders mode
-	const modes = $derived(hierarchy === null ? MODES.filter((m) => m.id !== 'colliders') : MODES);
+	// the colliders mode needs the flag on and an owner with collider data
+	const modes = $derived(
+		colliders && hierarchy !== null ? MODES : MODES.filter((m) => m.id !== 'colliders')
+	);
 	const mode = $derived.by<Mode>(() => {
 		const m = isMode(urlMode) ? urlMode : stored;
 		return m === 'colliders' && hierarchy === null ? 'graph' : m;
