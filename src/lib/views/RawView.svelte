@@ -3,7 +3,15 @@
 	import type { Tooltips } from '$lib/tooltips';
 	import { fmtCallValue, short } from '$lib/fmt';
 	import { glossary } from '$lib/glossary';
-	import { anchorFragment, anchorUrl, copyText, resolveAnchor, type FsmAnchor } from '$lib/anchor';
+	import {
+		anchorFragment,
+		anchorUrl,
+		copyText,
+		globalFragment,
+		resolveAnchor,
+		type FsmAnchor,
+		type GlobalAnchor
+	} from '$lib/anchor';
 	import ParamRow from '$lib/ParamRow.svelte';
 
 	let { model, tooltips = {} }: { model: FsmModel; tooltips?: Tooltips } = $props();
@@ -15,19 +23,39 @@
 
 	// `#State/N` permalinks (see anchor.ts): deep-link scroll+flash, and per-action copy buttons
 	let statesEl = $state<HTMLElement>();
+	let globalsEl = $state<HTMLElement>();
 	let flash = $state<FsmAnchor | null>(null);
-	function flashAnchor(a: FsmAnchor) {
-		flash = a;
+	let flashGlobal = $state<GlobalAnchor | null>(null);
+	function flashAnchor(a: FsmAnchor | GlobalAnchor) {
+		if ('event' in a) {
+			flash = null;
+			flashGlobal = a;
+		} else {
+			flashGlobal = null;
+			flash = a;
+		}
 		setTimeout(() => {
 			if (flash === a) flash = null;
+			if (flashGlobal === a) flashGlobal = null;
 		}, 1600);
 	}
 	function applyAnchor() {
 		const a = resolveAnchor(
 			model.states.map((s) => s.name),
+			model.global_transitions,
 			location.hash
 		);
 		if (!a) return;
+		if ('event' in a) {
+			const el = globalsEl?.querySelector(
+				`[data-gt-event="${CSS.escape(a.event)}"][data-gt-target="${CSS.escape(a.target)}"]`
+			);
+			if (el instanceof HTMLElement) {
+				el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				flashAnchor(a);
+			}
+			return;
+		}
 		// action line first, degrading to the state block when the action index no longer exists
 		// (stale link, out of range) — flashing what was actually found
 		const line =
@@ -45,6 +73,12 @@
 		history.replaceState(history.state, '', url);
 		void copyText(url);
 		flashAnchor({ state, action });
+	}
+	function linkGlobal(t: { event: string; to_state: string }) {
+		const url = anchorUrl('raw', globalFragment(model.global_transitions, t));
+		history.replaceState(history.state, '', url);
+		void copyText(url);
+		flashAnchor({ event: t.event, target: t.to_state });
 	}
 	$effect(() => {
 		void model;
@@ -68,11 +102,21 @@
 {/if}
 
 {#if model.global_transitions.length}
-	<section>
+	<section bind:this={globalsEl}>
 		<h2 title={glossary.globalTransitions}>Global transitions</h2>
 		{#each model.global_transitions as t (t.event + t.to_state)}
-			<div class="mono">
-				on <span class="event">{t.event}</span> -> <span class="state">{t.to_state}</span>
+			<div
+				class="mono gt"
+				data-gt-event={t.event}
+				data-gt-target={t.to_state}
+				class:flash={flashGlobal?.event === t.event && flashGlobal.target === t.to_state}
+			>
+				on <span class="event">{t.event}</span> -> <span class="state">{t.to_state}</span><button
+					class="anch"
+					title="copy link to this global transition"
+					aria-label="copy link to global transition on {t.event}"
+					onclick={() => linkGlobal(t)}
+				></button>
 			</div>
 		{/each}
 	</section>
@@ -157,6 +201,9 @@
 		position: relative;
 		font-weight: 600;
 	}
+	.gt {
+		position: relative;
+	}
 	@keyframes flash {
 		0% {
 			background: color-mix(in srgb, var(--action) 30%, transparent);
@@ -214,9 +261,10 @@
 		user-select: none;
 		opacity: 0;
 	}
-	/* state heads sit at the section's content edge, so their `#` lives in the section's 8px
-	   padding — the same column the action `#`s occupy */
-	.state-head .anch {
+	/* state heads and global transition rows sit at the section's content edge, so their `#` lives
+	   in the section's 8px padding — the same column the action `#`s occupy */
+	.state-head .anch,
+	.gt .anch {
 		left: -8px;
 		width: 8px;
 	}

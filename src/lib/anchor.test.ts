@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anchorFragment, anchorUrl, resolveAnchor } from './anchor';
+import { anchorFragment, anchorUrl, globalFragment, resolveAnchor } from './anchor';
 
 describe('anchorFragment', () => {
 	it('encodes the state name and appends the 1-based action index', () => {
@@ -22,34 +22,64 @@ describe('anchorFragment', () => {
 	});
 });
 
+describe('globalFragment', () => {
+	it('emits the event alone when it is unambiguous', () => {
+		expect(
+			globalFragment([{ event: 'HERO DAMAGED', to_state: 'Cancel All' }], {
+				event: 'HERO DAMAGED',
+				to_state: 'Cancel All'
+			})
+		).toBe('on/HERO%20DAMAGED');
+	});
+
+	it('appends the target when several global transitions share the event', () => {
+		const globals = [
+			{ event: 'STUN', to_state: 'Check Facing' },
+			{ event: 'STUN', to_state: 'Check Direction' }
+		];
+		expect(globalFragment(globals, globals[0])).toBe('on/STUN/Check%20Facing');
+		expect(globalFragment(globals, globals[1])).toBe('on/STUN/Check%20Direction');
+	});
+});
+
 describe('resolveAnchor', () => {
 	const names = ['Init', 'Idle', 'Mage Lord 2', 'Cancel Lag/Tag', '', 'Init 2'];
+	const globals = [
+		{ event: 'HERO DAMAGED', to_state: 'Cancel All' },
+		{ event: 'SPRINT CANCEL', to_state: 'Cancel All' },
+		{ event: 'STUN', to_state: 'Check Facing' },
+		{ event: 'STUN', to_state: 'Check Direction' },
+		{ event: 'EVT', to_state: 'Cancel Lag/Tag' }
+	];
 
 	it('resolves a state + action anchor', () => {
-		expect(resolveAnchor(names, '#Init/7')).toEqual({ state: 'Init', action: 7 });
-		expect(resolveAnchor(names, '#Init/0')).toEqual({ state: 'Init', action: 0 });
+		expect(resolveAnchor(names, [], '#Init/7')).toEqual({ state: 'Init', action: 7 });
+		expect(resolveAnchor(names, [], '#Init/0')).toEqual({ state: 'Init', action: 0 });
 	});
 
 	it('resolves a state-only anchor', () => {
-		expect(resolveAnchor(names, '#Mage%20Lord%202')).toEqual({
+		expect(resolveAnchor(names, [], '#Mage%20Lord%202')).toEqual({
 			state: 'Mage Lord 2',
 			action: null
 		});
 	});
 
 	it('decodes the state name', () => {
-		expect(resolveAnchor(names, '#Mage%20Lord%202/1')).toEqual({ state: 'Mage Lord 2', action: 1 });
+		expect(resolveAnchor(names, [], '#Mage%20Lord%202/1')).toEqual({
+			state: 'Mage Lord 2',
+			action: 1
+		});
 	});
 
 	it('separates on the last slash, so manual links with literal `/` in the name work', () => {
-		expect(resolveAnchor(names, '#Cancel%20Lag/Tag/2')).toEqual({
+		expect(resolveAnchor(names, [], '#Cancel%20Lag/Tag/2')).toEqual({
 			state: 'Cancel Lag/Tag',
 			action: 2
 		});
 	});
 
 	it('also accepts the canonical %2F encoding', () => {
-		expect(resolveAnchor(names, '#Cancel%20Lag%2FTag/2')).toEqual({
+		expect(resolveAnchor(names, [], '#Cancel%20Lag%2FTag/2')).toEqual({
 			state: 'Cancel Lag/Tag',
 			action: 2
 		});
@@ -57,29 +87,69 @@ describe('resolveAnchor', () => {
 
 	it('prefers a real state name ending in /<digits> over splitting it', () => {
 		// no state `Init` beyond the ones listed, but `Init 2` exists as a state
-		expect(resolveAnchor(['Init 2'], '#Init%202/3')).toEqual({ state: 'Init 2', action: 3 });
+		expect(resolveAnchor(['Init 2'], [], '#Init%202/3')).toEqual({ state: 'Init 2', action: 3 });
 		// a fragment that is exactly a state name ending in `/digits` resolves state-only
-		expect(resolveAnchor(['X/3'], '#X/3')).toEqual({ state: 'X/3', action: null });
+		expect(resolveAnchor(['X/3'], [], '#X/3')).toEqual({ state: 'X/3', action: null });
 		// real state with that name wins over the split reading
-		expect(resolveAnchor(['X', 'X/3'], '#X/3')).toEqual({ state: 'X/3', action: null });
-		expect(resolveAnchor(['X/3', 'X'], '#X/4')).toEqual({ state: 'X', action: 4 });
+		expect(resolveAnchor(['X', 'X/3'], [], '#X/3')).toEqual({ state: 'X/3', action: null });
+		expect(resolveAnchor(['X/3', 'X'], [], '#X/4')).toEqual({ state: 'X', action: 4 });
 	});
 
 	it('resolves the empty state name with an action', () => {
-		expect(resolveAnchor(names, '#/3')).toEqual({ state: '', action: 3 });
+		expect(resolveAnchor(names, [], '#/3')).toEqual({ state: '', action: 3 });
 	});
 
 	it('returns null for non-anchors', () => {
-		expect(resolveAnchor(names, '')).toBeNull();
-		expect(resolveAnchor(names, '#')).toBeNull();
-		expect(resolveAnchor(names, '#Nope/1')).toBeNull();
-		expect(resolveAnchor(names, '#Nope')).toBeNull();
-		expect(resolveAnchor(['Init'], '#Init')).toEqual({ state: 'Init', action: null });
+		expect(resolveAnchor(names, [], '')).toBeNull();
+		expect(resolveAnchor(names, [], '#')).toBeNull();
+		expect(resolveAnchor(names, [], '#Nope/1')).toBeNull();
+		expect(resolveAnchor(names, [], '#Nope')).toBeNull();
+		expect(resolveAnchor(['Init'], [], '#Init')).toEqual({ state: 'Init', action: null });
 	});
 
 	it('takes malformed percent sequences literally', () => {
-		expect(resolveAnchor(['100%'], '#100%25')).toEqual({ state: '100%', action: null });
-		expect(resolveAnchor(['a%zb'], '#a%zb')).toEqual({ state: 'a%zb', action: null });
+		expect(resolveAnchor(['100%'], [], '#100%25')).toEqual({ state: '100%', action: null });
+		expect(resolveAnchor(['a%zb'], [], '#a%zb')).toEqual({ state: 'a%zb', action: null });
+	});
+
+	it('resolves an event-only global anchor to the first transition on that event', () => {
+		expect(resolveAnchor([], globals, '#on/HERO%20DAMAGED')).toEqual({
+			event: 'HERO DAMAGED',
+			target: 'Cancel All'
+		});
+		expect(resolveAnchor([], globals, '#on/STUN')).toEqual({
+			event: 'STUN',
+			target: 'Check Facing'
+		});
+	});
+
+	it('resolves an event + target pair, with both parts decoded', () => {
+		expect(resolveAnchor([], globals, '#on/STUN/Check%20Direction')).toEqual({
+			event: 'STUN',
+			target: 'Check Direction'
+		});
+		// first `/` separates: the target keeps its own slash, hand-typed or canonical
+		expect(resolveAnchor([], globals, '#on/EVT/Cancel%20Lag/Tag')).toEqual({
+			event: 'EVT',
+			target: 'Cancel Lag/Tag'
+		});
+		expect(resolveAnchor([], globals, '#on/EVT/Cancel%20Lag%2FTag')).toEqual({
+			event: 'EVT',
+			target: 'Cancel Lag/Tag'
+		});
+	});
+
+	it('returns null for unknown events, unknown pairs and a bare `on/`', () => {
+		expect(resolveAnchor([], globals, '#on/NOPE')).toBeNull();
+		expect(resolveAnchor([], globals, '#on/STUN/Nope')).toBeNull();
+		expect(resolveAnchor([], globals, '#on/')).toBeNull();
+	});
+
+	it('lets a state named like the global grammar win over it', () => {
+		expect(resolveAnchor(['on/STUN'], globals, '#on/STUN')).toEqual({
+			state: 'on/STUN',
+			action: null
+		});
 	});
 });
 

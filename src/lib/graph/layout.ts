@@ -324,8 +324,7 @@ export function computeLayout(model: FsmModel, layoutCfg: LayoutCfg): LayoutResu
 				const top = stack[stack.length - 1];
 				if (top.i < groupAdj[top.u].length) {
 					const v = groupAdj[top.u][top.i++];
-					if (color[v] === 1)
-						backPair.add(top.u + ' ' + v); // v is an ancestor on the stack
+					if (color[v] === 1) backPair.add(top.u + ' ' + v); // v is an ancestor on the stack
 					else if (color[v] === 0) {
 						color[v] = 1;
 						stack.push({ u: v, i: 0 });

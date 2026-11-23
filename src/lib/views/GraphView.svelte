@@ -67,7 +67,8 @@
 	}
 
 	// `#State/N` permalinks (see anchor.ts): a deep link selects the state (reusing the `?state=`
-	// mechanism + its pan-into-view effect) and flashes the anchored action in the sidebar
+	// mechanism + its pan-into-view effect) and flashes the anchored action in the sidebar; a global
+	// transition anchor (`#on/<event>`) selects its target state the same way
 	let flashAction = $state<number | null>(null);
 	$effect(() => {
 		if (flashAction == null) return;
@@ -77,9 +78,19 @@
 	function applyAnchor() {
 		const a = resolveAnchor(
 			model.states.map((s) => s.name),
+			model.global_transitions,
 			location.hash
 		);
 		if (!a) return;
+		if ('event' in a) {
+			// global transitions are unselectable ★ arrows in the graph, so the anchor lands on its
+			// target state; a dead one (target state missing) selects nothing
+			untrack(() => {
+				if (selected !== a.target && model.states.some((s) => s.name === a.target))
+					select(a.target, true);
+			});
+			return;
+		}
 		flashAction = a.action;
 		// `selected` (page.url-derived) must not become a dependency of the caller's effect — the
 		// goto in select() would re-trigger it and re-flash the line on every selection

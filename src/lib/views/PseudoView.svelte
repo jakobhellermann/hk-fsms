@@ -2,19 +2,36 @@
 	import { fmtCallValue } from '$lib/fmt';
 	import type { FsmModel } from '$lib/model';
 	import type { Tooltips } from '$lib/tooltips';
-	import { anchorFragment, anchorUrl, copyText, resolveAnchor, type FsmAnchor } from '$lib/anchor';
+	import {
+		anchorFragment,
+		anchorUrl,
+		copyText,
+		globalFragment,
+		resolveAnchor,
+		type FsmAnchor,
+		type GlobalAnchor
+	} from '$lib/anchor';
 	import StateBody from './StateBody.svelte';
 
 	let { model, tooltips = {} }: { model: FsmModel; tooltips?: Tooltips } = $props();
 
 	let root = $state<HTMLElement>();
 	let flash = $state<FsmAnchor | null>(null);
+	let flashGlobal = $state<GlobalAnchor | null>(null);
 
-	/** flash a state header (action null) or an action line, clearing itself after the animation */
-	function flashAnchor(a: FsmAnchor) {
-		flash = a;
+	/** flash a state header (action null), an action line or a global transition, clearing itself
+	 * after the animation */
+	function flashAnchor(a: FsmAnchor | GlobalAnchor) {
+		if ('event' in a) {
+			flash = null;
+			flashGlobal = a;
+		} else {
+			flashGlobal = null;
+			flash = a;
+		}
 		setTimeout(() => {
 			if (flash === a) flash = null;
+			if (flashGlobal === a) flashGlobal = null;
 		}, 1600);
 	}
 
@@ -27,15 +44,26 @@
 		}
 	}
 
-	/** deep-link (`#Init/7`): scroll to the anchored action line and flash it; if the action
-	 * index no longer exists (stale link, out of range), degrade to the state header — and flash
+	/** deep-link (`#Init/7`, `#on/EVENT`): scroll to the anchored line and flash it; if the action
+	 * index no longer exists (stale link, out of range), degrade to the state header and flash
 	 * that, so the fallback still gives feedback */
 	function applyAnchor() {
 		const a = resolveAnchor(
 			model.states.map((s) => s.name),
+			model.global_transitions,
 			location.hash
 		);
 		if (!a) return;
+		if ('event' in a) {
+			const el = root?.querySelector(
+				`[data-gt-event="${CSS.escape(a.event)}"][data-gt-target="${CSS.escape(a.target)}"]`
+			);
+			if (el instanceof HTMLElement) {
+				el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				flashAnchor(a);
+			}
+			return;
+		}
 		const line =
 			a.action == null
 				? null
@@ -53,6 +81,14 @@
 		history.replaceState(history.state, '', url);
 		void copyText(url);
 		flashAnchor(a);
+	}
+
+	/** copy a permalink to a global transition (`#on/<event>`, see anchor.ts) */
+	function linkGlobal(t: { event: string; to_state: string }) {
+		const url = anchorUrl('pseudo', globalFragment(model.global_transitions, t));
+		history.replaceState(history.state, '', url);
+		void copyText(url);
+		flashAnchor({ event: t.event, target: t.to_state });
 	}
 
 	// apply a deep-link anchor once the model has rendered — effects run after the DOM update, so
@@ -109,10 +145,20 @@
 	<div class="i1"><span class="kw">start</span> {@render stateRef(model.start_state)}</div>
 
 	{#each model.global_transitions as t (t.event + t.to_state)}
-		<div class="i1">
+		<div
+			class="i1 shead"
+			data-gt-event={t.event}
+			data-gt-target={t.to_state}
+			class:flash={flashGlobal?.event === t.event && flashGlobal.target === t.to_state}
+		>
 			<span class="kw">on</span> <span class="event">{t.event}</span>
 			<span class="arrow">-></span>
-			{@render stateRef(t.to_state)} <span class="cmt">// from any state</span>
+			{@render stateRef(t.to_state)} <span class="cmt">// from any state</span><button
+				class="anch"
+				title="copy link to this global transition"
+				aria-label="copy link to global transition on {t.event}"
+				onclick={() => linkGlobal(t)}
+			></button>
 		</div>
 	{/each}
 
@@ -184,9 +230,9 @@
 	.i1 {
 		padding-left: 2ch;
 	}
-	/* state-header permalink: same gutter column as the action `#`s — the button spans the 2ch
-	   indent (up to the `state` keyword), so hovering/clicking anywhere there copies the link; the
-	   `#` itself sits at the strip's left edge, clear of the text */
+	/* permalink gutters (state headers, global transitions): same gutter column as the action `#`s,
+	   the button spans the 2ch indent (up to the keyword), so hovering/clicking anywhere there
+	   copies the link; the `#` itself sits at the strip's left edge, clear of the text */
 	.shead {
 		position: relative;
 	}

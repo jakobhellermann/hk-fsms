@@ -10,6 +10,11 @@
  * the name is percent-encoded and only the *last* `/<digits>` run of the fragment is the action
  * index — `#Cancel%20Lag/Tag/2` anchors action 2 of state `Cancel Lag/Tag`. Canonical links (built
  * by {@link anchorFragment}) encode the name's own slashes as `%2F`, keeping the separator literal.
+ *
+ * A global transition anchors as `#on/<event>`, e.g. `#on/HERO%20DAMAGED`; when the FSM has several
+ * global transitions on the same event (real in the data: one live + one dead entry), the emitted
+ * fragment appends the target (`#on/STUN/Check%20Facing`). The resolver accepts both forms: an
+ * event-only fragment resolves to the first transition on that event.
  */
 
 export type FsmAnchor = {
@@ -18,10 +23,24 @@ export type FsmAnchor = {
 	action: number | null;
 };
 
+/** a global transition, resolved to its concrete entry (first one on the event for `#on/<event>`) */
+export type GlobalAnchor = { event: string; target: string };
+
+/** minimal shape of the model's global transitions, so anchor.ts stays model-agnostic */
+type GlobalTransition = { event: string; to_state: string };
+
 /** fragment (without leading `#`) for a state's nth action (1-based) — or the state when n is null */
 export function anchorFragment(state: string, action: number | null): string {
 	const name = encodeURIComponent(state);
 	return action == null ? name : `${name}/${action}`;
+}
+
+/** fragment for a global transition: `on/<event>`. The target is appended only when the FSM has
+ * several global transitions on that event, so the usual (unambiguous) link stays short. */
+export function globalFragment(globals: GlobalTransition[], t: GlobalTransition): string {
+	const event = encodeURIComponent(t.event);
+	const dup = globals.filter((g) => g.event === t.event).length > 1;
+	return dup ? `on/${event}/${encodeURIComponent(t.to_state)}` : `on/${event}`;
 }
 
 function decode(s: string): string {
@@ -33,20 +52,36 @@ function decode(s: string): string {
 }
 
 /**
- * Resolve a URL hash (`#Init/7`) against a model's state names. Returns `null` for anything that
- * isn't an anchor. The whole fragment is tried as a state name first — a state may itself be named
- * `X/3`, and a manually typed link to it should not read as "action 3 of X" (canonical links
- * avoid the ambiguity entirely by encoding the name's own `/` as `%2F`).
+ * Resolve a URL hash (`#Init/7`, `#on/HERO%20DAMAGED`) against a model's state names and global
+ * transitions. Returns `null` for anything that isn't an anchor. The whole fragment is tried as a
+ * state name first — a state may itself be named `X/3`, and a manually typed link to it should not
+ * read as "action 3 of X" (canonical links avoid the ambiguity entirely by encoding the name's own
+ * `/` as `%2F`). State anchors win over global ones by the same rule: a state named `on` captures
+ * `#on/…` fragments before the global grammar applies.
  */
-export function resolveAnchor(stateNames: string[], hash: string): FsmAnchor | null {
+export function resolveAnchor(
+	stateNames: string[],
+	globals: GlobalTransition[],
+	hash: string
+): FsmAnchor | GlobalAnchor | null {
 	const raw = hash.replace(/^#/, '');
 	if (!raw) return null;
 	const whole = decode(raw);
 	if (stateNames.includes(whole)) return { state: whole, action: null };
 	const m = raw.match(/\/(\d+)$/);
-	if (!m) return null;
-	const state = decode(raw.slice(0, -m[0].length));
-	return stateNames.includes(state) ? { state, action: Number(m[1]) } : null;
+	if (m) {
+		const state = decode(raw.slice(0, -m[0].length));
+		if (stateNames.includes(state)) return { state, action: Number(m[1]) };
+	}
+	if (raw.startsWith('on/')) {
+		const rest = raw.slice(3);
+		const sep = rest.indexOf('/'); // events never contain `/` in the data, so the first one separates
+		const event = decode(sep < 0 ? rest : rest.slice(0, sep));
+		const target = sep < 0 ? null : decode(rest.slice(sep + 1));
+		const t = globals.find((g) => g.event === event && (target == null || g.to_state === target));
+		return t ? { event: t.event, target: t.to_state } : null;
+	}
+	return null;
 }
 
 /**
