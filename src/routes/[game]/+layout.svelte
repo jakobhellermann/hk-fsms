@@ -73,6 +73,9 @@
 	// segments below the scene: [] = object tree, [...gameObject, fsm] = an FSM detail
 	const rest = $derived(resolved.rest);
 	const isDetail = $derived(scene !== null && rest.length > 0);
+	const sourceClass = $derived(
+		page.route.id === '/[game]/source/[cls]' ? (page.params.cls ?? '') : null
+	);
 	const query = $derived(page.url.searchParams.get('q') ?? '');
 
 	const sceneHref = $derived(
@@ -89,7 +92,7 @@
 	// on-screen keyboard on tablets). intercept only the initial Tab, when nothing is focused yet.
 	let filterEl = $state<HTMLInputElement>();
 	function onKeydown(e: KeyboardEvent) {
-		if (isDetail || !filterEl) return;
+		if (isDetail || sourceClass !== null || !filterEl) return;
 		const active = document.activeElement;
 		const typing =
 			active instanceof HTMLElement &&
@@ -126,11 +129,13 @@
 
 <svelte:head>
 	<title>
-		{isDetail
-			? `${fsmCrumb} — ${sceneTitle(scene ?? '')}`
-			: scene
-				? `${sceneTitle(scene)}`
-				: `FSMs — ${gameLabel}`}
+		{sourceClass !== null
+			? `${sourceClass.split('.').pop()} — source`
+			: isDetail
+				? `${fsmCrumb} — ${sceneTitle(scene ?? '')}`
+				: scene
+					? `${sceneTitle(scene)}`
+					: `FSMs — ${gameLabel}`}
 	</title>
 </svelte:head>
 
@@ -179,8 +184,15 @@
 			</div>
 
 			<nav class="crumbs">
-				<a class="crumb" class:active={scene === null} href="{base}/{segment}">{gameLabel}</a>
-				{#if scene !== null}
+				<a
+					class="crumb"
+					class:active={scene === null && sourceClass === null}
+					href="{base}/{segment}">{gameLabel}</a
+				>
+				{#if sourceClass !== null}
+					<span class="sep">›</span>
+					<span class="crumb active" title={sourceClass}>{sourceClass.split('.').pop()}</span>
+				{:else if scene !== null}
 					<span class="sep">›</span>
 					{#if isDetail}
 						<a class="crumb" href={sceneHref} title={scene}>{sceneTitle(scene)}</a>
@@ -193,7 +205,7 @@
 				{@render versionSelect('narrow')}
 			</nav>
 
-			{#if !isDetail}
+			{#if !isDetail && sourceClass === null}
 				<div class="filter-wrap">
 					<input
 						class="filter"

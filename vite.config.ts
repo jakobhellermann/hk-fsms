@@ -1,12 +1,14 @@
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { decompilerAssets } from './src/lib/source/vite';
 
 export default defineConfig({
 	define: {
 		'import.meta.env.ENABLE_COLLIDERS': JSON.stringify(process.env.ENABLE_COLLIDERS === '1')
 	},
 	plugins: [
+		decompilerAssets(),
 		sveltekit({
 			compilerOptions: {
 				runes: ({ filename }) =>

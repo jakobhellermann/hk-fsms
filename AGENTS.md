@@ -60,6 +60,10 @@ Run `pnpm fmt` and keep `check`/`lint` clean before committing. Commit often wit
   semantics.
 - `src/lib/views/{RawView,PseudoView,GraphView}.svelte` — the FSM detail modes. Graph uses
   `@dagrejs/dagre` for layout + plain SVG (fit-to-screen, +/-, drag-to-pan).
+- `src/routes/[game]/source/[cls]` + `src/lib/source/` — decompiled source of an action class,
+  linked from action names. `ilspy-wasm-cache` decompiles it in the browser from the game's
+  `Managed` folder the user drops (cached per origin in IndexedDB); the page reads from the game's
+  last dropped build (one per game, "pick source" replaces it).
 - `indexer/src/hierarchy.rs` + `src/lib/colliders.ts` + `CollidersView.svelte` — the `colliders`
   mode. Categories and colors mirror Silksong.DebugMod's `HitboxRender.CategorizeHitbox` (detailed
   mode), plus `HealthManager` split out of "other".

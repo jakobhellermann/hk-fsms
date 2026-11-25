@@ -5,6 +5,8 @@
 	import { isCosmetic, isDeadAction } from '$lib/actions';
 	import { viewSettings } from '$lib/settings.svelte';
 	import type { Tooltips } from '$lib/tooltips';
+	import { base } from '$app/paths';
+	import { page } from '$app/state';
 	import { getContext } from 'svelte';
 	import { COLLIDER_LINKS, type ColliderLinks, linkTargets } from '$lib/colliders';
 
@@ -101,9 +103,12 @@
 						onclick={() => onnavigate(target)}
 						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && onnavigate(target)}
 						>{t.text}</span
-					>{:else}<span class={t.cls} title={tokenTitle(t)}>{t.text}</span>{/if}{:else}<span
-					class={t.cls}
-					title={tokenTitle(t)}>{t.text}</span
+					>{:else}<span class={t.cls} title={tokenTitle(t)}>{t.text}</span
+					>{/if}{:else if t.cls === 'act'}<a
+					class="act"
+					href="{base}/{page.params.game}/source/{encodeURIComponent(a.class)}"
+					title={tokenTitle(t)}>{t.text}</a
+				>{:else}<span class={t.cls} title={tokenTitle(t)}>{t.text}</span
 				>{/if}{/each}{#if !a.enabled}<span class="cmt">{' // disabled'}</span>{/if}
 		<!-- gutter comes last, adjacent: `.line` renders with white-space: pre-wrap, where
 		     inter-element whitespace is significant — a button before the tokens would shift the code
@@ -229,6 +234,12 @@
 	}
 	.act {
 		color: var(--action);
+	}
+	a.act {
+		text-decoration: none;
+	}
+	a.act:hover {
+		text-decoration: underline;
 	}
 	.var {
 		color: #9d8fb5;
