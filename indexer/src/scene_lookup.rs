@@ -31,40 +31,41 @@ pub fn build_scene_lookup<R: EnvResolver, P: rabex_env::rabex::typetree::TypeTre
     // gives us the bundle path (relative to the build folder).
     if let Some(addressables) = env.addressables()? {
         let build_folder = addressables.build_folder();
-        for loc in addressables.resource_locations(&env.game_files)? {
-            if loc.provider_id.as_str() != resource_providers::BUNDLED_ASSET
-                || loc.type_.m_ClassName.as_str() != SCENE_INSTANCE_CLASS
-            {
-                continue;
-            }
-            let Some(name) = Path::new(loc.primary_key.as_str())
-                .file_stem()
-                .and_then(|s| s.to_str())
-            else {
-                continue;
-            };
-            if lookup.contains_key(name) {
-                continue;
-            }
-            // The scene's bundle is its ASSET_BUNDLE dependency.
-            if let Some(dep) = loc
-                .dependencies
-                .iter()
-                .find(|dep| dep.provider_id.as_str() == resource_providers::ASSET_BUNDLE)
-            {
-                // Windows builds' catalogs use `\` separators.
-                let path = addressables
-                    .evaluate_string(&dep.internal_id)
-                    .replace('\\', "/");
-                let relative = Path::new(&path)
-                    .strip_prefix(&build_folder)
-                    .with_context(|| {
-                        format!(
-                            "scene bundle {path} is outside the addressables build folder {}",
-                            build_folder.display()
-                        )
-                    })?;
-                lookup.insert(relative.to_string_lossy().to_string(), name.to_owned());
+        for catalog in addressables.catalogs(&env.game_files)? {
+            for loc in catalog.locations() {
+                if loc.provider_id.as_str() != resource_providers::BUNDLED_ASSET
+                    || loc.type_.m_ClassName.as_str() != SCENE_INSTANCE_CLASS
+                {
+                    continue;
+                }
+                let Some(name) = Path::new(loc.primary_key.as_str())
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                else {
+                    continue;
+                };
+                if lookup.contains_key(name) {
+                    continue;
+                }
+                // The scene's bundle is its ASSET_BUNDLE dependency.
+                if let Some(dep) = catalog
+                    .locations_at(&loc.dependencies)
+                    .find(|dep| dep.provider_id.as_str() == resource_providers::ASSET_BUNDLE)
+                {
+                    // Windows builds' catalogs use `\` separators.
+                    let path = addressables
+                        .evaluate_string(&dep.internal_id)
+                        .replace('\\', "/");
+                    let relative = Path::new(&path).strip_prefix(&build_folder).with_context(
+                        || {
+                            format!(
+                                "scene bundle {path} is outside the addressables build folder {}",
+                                build_folder.display()
+                            )
+                        },
+                    )?;
+                    lookup.insert(relative.to_string_lossy().to_string(), name.to_owned());
+                }
             }
         }
     }
