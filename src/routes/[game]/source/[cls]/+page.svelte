@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
-	import { segmentLines, type DecompiledType } from 'ilspy-wasm-cache';
+	import { base } from '$app/paths';
+	import { page } from '$app/state';
+	import { segmentLines, symbolOf, type DecompiledType } from 'ilspy-wasm-cache';
 	import { source } from '$lib/source/source.svelte';
 	import type { PageProps } from './$types';
 
@@ -11,11 +13,37 @@
 	let picker = $state<HTMLInputElement>();
 
 	const status = $derived(source.status);
+	// not `:target`: that stays unset when the anchor renders after the navigation, as on a cold load
+	const target = $derived(decodeURIComponent(page.url.hash.slice(1)));
 
 	function lines(type: DecompiledType) {
-		// anchor id per member line, so `#OnEnter` jumps to it
-		const anchors = new Map(type.members.toReversed().map((m) => [m.line, m.name]));
-		return segmentLines(type).map((segments, i) => ({ segments, id: anchors.get(i + 1) }));
+		const declared = new Map<number, number>();
+		// per member line: `#OnEnter` by name, `#t<metadata token>` for links from other types
+		const anchors = new Map<number, string[]>();
+		const names = new Set<string>();
+		for (const m of type.members) {
+			const ids = anchors.get(m.line) ?? [];
+			if (!names.has(m.name)) ids.push(m.name);
+			names.add(m.name);
+			const symbol = symbolOf(type, m.symbol);
+			if (symbol) {
+				declared.set(m.symbol, m.line);
+				ids.push(`t${symbol.token}`);
+			}
+			anchors.set(m.line, ids);
+		}
+		const href = (id: number, line: number) => {
+			const symbol = symbolOf(type, id);
+			if (!symbol) return null;
+			const at = declared.get(id);
+			if (at !== undefined) return at === line ? null : `#L${at}`;
+			if (symbol.type === type.type) return null;
+			return `${base}/${params.game}/source/${encodeURIComponent(symbol.type)}#t${symbol.token}`;
+		};
+		return segmentLines(type).map((segments, i) => ({
+			anchors: anchors.get(i + 1) ?? [],
+			segments: segments.map((s) => ({ ...s, href: href(s.symbol, i + 1) }))
+		}));
 	}
 
 	function scrollToHash(_: HTMLElement) {
@@ -85,9 +113,13 @@
 		{#await data.source.type then type}
 			<pre use:scrollToHash>{#each lines(type) as line, i (i)}<div
 						class="ln"
-						id={line.id}>{#each line.segments as s, j (j)}{#if s.kind}<span class="t-{s.kind}"
-									>{s.text}</span
-								>{:else}{s.text}{/if}{/each}</div>{/each}</pre>
+						class:target={target === `L${i + 1}` || line.anchors.includes(target)}
+						id="L{i + 1}">{#each line.anchors as id (id)}<span
+								class="anchor"
+								{id}></span
+							>{/each}{#each line.segments as s, j (j)}{#if s.href}<a class="t-{s.kind}" href={s.href}
+									>{s.text}</a
+								>{:else if s.kind}<span class="t-{s.kind}">{s.text}</span>{:else}{s.text}{/if}{/each}</div>{/each}</pre>
 		{:catch e}
 			<p class="err">{e}</p>
 		{/await}
@@ -148,8 +180,17 @@
 		color: var(--dim);
 		user-select: none;
 	}
-	.ln:target {
+	.ln.target {
 		background: var(--panel);
+	}
+	.anchor {
+		scroll-margin-top: 30vh;
+	}
+	pre a {
+		text-decoration: none;
+	}
+	pre a:hover {
+		text-decoration: underline;
 	}
 	.t-keyword {
 		color: #c678dd;
